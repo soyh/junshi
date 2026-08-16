@@ -2,16 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
-from app.repositories.person import PersonRepository
 from app.schemas.person import (
     PersonCreate,
     PersonResponse,
     PersonUpdate,
 )
+from app.services.person import PersonService
 
 router = APIRouter(prefix="/persons", tags=["persons"])
 
-repository = PersonRepository()
+service = PersonService()
 
 
 def row_to_dict(row):
@@ -28,7 +28,7 @@ def create_person(
     user_id: str = Depends(get_current_user_id),
 ):
     with get_connection() as conn:
-        person = repository.create(
+        person = service.create(
             conn,
             user_id,
             payload.name,
@@ -44,7 +44,7 @@ def list_persons(
     user_id: str = Depends(get_current_user_id),
 ):
     with get_connection() as conn:
-        persons = repository.list(conn, user_id)
+        persons = service.list(conn, user_id)
 
     return [row_to_dict(person) for person in persons]
 
@@ -55,7 +55,7 @@ def get_person(
     user_id: str = Depends(get_current_user_id),
 ):
     with get_connection() as conn:
-        person = repository.get(conn, user_id, person_id)
+        person = service.get(conn, user_id, person_id)
 
     if person is None:
         raise HTTPException(
@@ -73,7 +73,7 @@ def update_person(
     user_id: str = Depends(get_current_user_id),
 ):
     with get_connection() as conn:
-        person = repository.update(
+        person = service.update(
             conn,
             user_id,
             person_id,
@@ -97,7 +97,7 @@ def delete_person(
     user_id: str = Depends(get_current_user_id),
 ):
     with get_connection() as conn:
-        deleted = repository.delete(conn, user_id, person_id)
+        deleted = service.delete(conn, user_id, person_id)
 
     if not deleted:
         raise HTTPException(

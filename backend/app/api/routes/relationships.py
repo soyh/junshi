@@ -4,19 +4,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
-from app.repositories.relationship import RelationshipRepository
 from app.schemas.relationship import (
     RelationshipCreate,
     RelationshipResponse,
     RelationshipUpdate,
 )
+from app.services.relationship import RelationshipService
 
 router = APIRouter(
     prefix="/relationships",
     tags=["relationships"],
 )
 
-repository = RelationshipRepository()
+service = RelationshipService()
 
 
 def row_to_dict(row):
@@ -33,24 +33,8 @@ def create_relationship(
     user_id: str = Depends(get_current_user_id),
 ):
     with get_connection() as conn:
-        person = conn.execute(
-            """
-            SELECT id
-            FROM persons
-            WHERE id = ?
-              AND user_id = ?
-            """,
-            (payload.person_id, user_id),
-        ).fetchone()
-
-        if person is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Person not found",
-            )
-
         try:
-            relationship = repository.create(
+            relationship = service.create(
                 conn,
                 user_id,
                 payload.person_id,
@@ -60,11 +44,19 @@ def create_relationship(
                 payload.current_goal,
                 payload.notes,
             )
+        except ValueError as exc:
+            if str(exc) == "Person not found":
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Person not found",
+                ) from exc
+            raise
         except sqlite3.IntegrityError as exc:
             error_message = str(exc)
 
             if (
-                "UNIQUE constraint failed: relationships.user_id, relationships.person_id"
+                "UNIQUE constraint failed: "
+                "relationships.user_id, relationships.person_id"
                 in error_message
             ):
                 raise HTTPException(
@@ -82,7 +74,7 @@ def list_relationships(
     user_id: str = Depends(get_current_user_id),
 ):
     with get_connection() as conn:
-        relationships = repository.list(conn, user_id)
+        relationships = service.list(conn, user_id)
 
     return [row_to_dict(item) for item in relationships]
 
@@ -96,7 +88,7 @@ def get_relationship(
     user_id: str = Depends(get_current_user_id),
 ):
     with get_connection() as conn:
-        relationship = repository.get(
+        relationship = service.get(
             conn,
             user_id,
             relationship_id,
@@ -121,7 +113,7 @@ def update_relationship(
     user_id: str = Depends(get_current_user_id),
 ):
     with get_connection() as conn:
-        relationship = repository.update(
+        relationship = service.update(
             conn,
             user_id,
             relationship_id,
@@ -150,7 +142,7 @@ def delete_relationship(
     user_id: str = Depends(get_current_user_id),
 ):
     with get_connection() as conn:
-        deleted = repository.delete(
+        deleted = service.delete(
             conn,
             user_id,
             relationship_id,
