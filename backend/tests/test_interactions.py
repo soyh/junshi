@@ -191,3 +191,124 @@ def test_interaction_rejects_invalid_type(client):
     )
 
     assert response.status_code == 422
+
+
+def test_interaction_patch_distinguishes_omitted_and_explicit_null(client):
+    person_response = client.post(
+        "/api/v1/persons",
+        json={
+            "name": "TEST-006 PATCH语义对象",
+        },
+    )
+    assert person_response.status_code == 201
+
+    person_id = person_response.json()["id"]
+
+    relationship_response = client.post(
+        "/api/v1/relationships",
+        json={
+            "person_id": person_id,
+            "status": "active",
+            "stage": "initial_contact",
+            "long_term_goal": "TEST-006",
+            "current_goal": "PATCH语义",
+        },
+    )
+    assert relationship_response.status_code == 201
+
+    relationship_id = relationship_response.json()["id"]
+
+    create_response = client.post(
+        "/api/v1/interactions",
+        json={
+            "person_id": person_id,
+            "relationship_id": relationship_id,
+            "type": "message",
+            "occurred_at": "2026-08-16T12:00:00+00:00",
+            "content": "TEST-006 原始内容",
+        },
+    )
+    assert create_response.status_code == 201
+
+    interaction_id = create_response.json()["id"]
+
+    # 1. 未提供 relationship_id：必须保持原值
+    response = client.patch(
+        f"/api/v1/interactions/{interaction_id}",
+        json={
+            "content": "TEST-006 更新内容",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["relationship_id"] == relationship_id
+    assert response.json()["content"] == "TEST-006 更新内容"
+
+    # 2. 显式 relationship_id=null：必须清空
+    response = client.patch(
+        f"/api/v1/interactions/{interaction_id}",
+        json={
+            "relationship_id": None,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["relationship_id"] is None
+    assert response.json()["content"] == "TEST-006 更新内容"
+
+    # 3. 未提供 content：必须保持原值
+    response = client.patch(
+        f"/api/v1/interactions/{interaction_id}",
+        json={
+            "type": "call",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["type"] == "call"
+    assert response.json()["content"] == "TEST-006 更新内容"
+
+    # 4. 显式 content=null：必须清空
+    response = client.patch(
+        f"/api/v1/interactions/{interaction_id}",
+        json={
+            "content": None,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["content"] is None
+
+
+def test_interaction_patch_rejects_null_type(client):
+    person_response = client.post(
+        "/api/v1/persons",
+        json={
+            "name": "TEST-006 类型约束对象",
+        },
+    )
+    assert person_response.status_code == 201
+
+    person_id = person_response.json()["id"]
+
+    create_response = client.post(
+        "/api/v1/interactions",
+        json={
+            "person_id": person_id,
+            "type": "message",
+            "occurred_at": "2026-08-16T12:00:00+00:00",
+            "content": "TEST-006",
+        },
+    )
+    assert create_response.status_code == 201
+
+    interaction_id = create_response.json()["id"]
+
+    response = client.patch(
+        f"/api/v1/interactions/{interaction_id}",
+        json={
+            "type": None,
+        },
+    )
+
+    assert response.status_code == 422

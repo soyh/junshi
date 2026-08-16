@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.context import get_current_user_id
+from app.core.sentinels import UNSET
 from app.core.database import get_connection
 from app.domain.errors import (
     InteractionNotFoundError,
@@ -133,10 +134,18 @@ def update_interaction(
                 conn,
                 user_id,
                 interaction_id,
-                payload.relationship_id,
-                payload.type,
-                payload.occurred_at,
-                payload.content,
+                payload.relationship_id
+                if "relationship_id" in payload.model_fields_set
+                else UNSET,
+                payload.type
+                if "type" in payload.model_fields_set
+                else UNSET,
+                payload.occurred_at
+                if "occurred_at" in payload.model_fields_set
+                else UNSET,
+                payload.content
+                if "content" in payload.model_fields_set
+                else UNSET,
             )
     except InteractionNotFoundError:
         raise HTTPException(

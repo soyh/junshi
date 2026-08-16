@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class InteractionCreate(BaseModel):
@@ -23,6 +23,12 @@ class InteractionUpdate(BaseModel):
     )
     occurred_at: datetime | None = None
     content: str | None = None
+
+    @model_validator(mode="after")
+    def validate_explicit_nulls(self):
+        if "occurred_at" in self.model_fields_set and self.occurred_at is None:
+            raise ValueError("occurred_at cannot be null")
+        return self
 
 
 class InteractionResponse(BaseModel):

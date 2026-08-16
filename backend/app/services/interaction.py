@@ -1,6 +1,7 @@
 import sqlite3
 from datetime import datetime
 
+from app.core.sentinels import UNSET
 from app.domain.errors import (
     InteractionNotFoundError,
     InvalidInteractionTypeError,
@@ -160,10 +161,10 @@ class InteractionService:
         conn: sqlite3.Connection,
         user_id: str,
         interaction_id: str,
-        relationship_id: str | None,
-        interaction_type: str | None,
-        occurred_at: datetime | None,
-        content: str | None,
+        relationship_id=UNSET,
+        interaction_type=UNSET,
+        occurred_at=UNSET,
+        content=UNSET,
     ) -> sqlite3.Row:
         existing = self.get(
             conn,
@@ -171,16 +172,21 @@ class InteractionService:
             interaction_id,
         )
 
-        if interaction_type is not None:
+        if interaction_type is not UNSET:
+            if interaction_type is None:
+                raise InvalidInteractionTypeError(
+                    "Interaction type cannot be null"
+                )
             self._validate_type(interaction_type)
 
-        if relationship_id is not None:
-            self._validate_relationship(
-                conn,
-                user_id,
-                existing["person_id"],
-                relationship_id,
-            )
+        if relationship_id is not UNSET:
+            if relationship_id is not None:
+                self._validate_relationship(
+                    conn,
+                    user_id,
+                    existing["person_id"],
+                    relationship_id,
+                )
 
         updated = self.repository.update(
             conn,
@@ -189,8 +195,8 @@ class InteractionService:
             relationship_id,
             interaction_type,
             occurred_at.isoformat()
-            if occurred_at is not None
-            else None,
+            if occurred_at is not UNSET and occurred_at is not None
+            else occurred_at,
             content,
         )
 

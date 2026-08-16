@@ -2,6 +2,8 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 
+from app.core.sentinels import UNSET
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -108,10 +110,10 @@ class InteractionRepository:
         conn: sqlite3.Connection,
         user_id: str,
         interaction_id: str,
-        relationship_id: str | None,
-        interaction_type: str | None,
-        occurred_at: str | None,
-        content: str | None,
+        relationship_id=UNSET,
+        interaction_type=UNSET,
+        occurred_at=UNSET,
+        content=UNSET,
     ) -> sqlite3.Row | None:
         existing = self.get(
             conn,
@@ -123,27 +125,27 @@ class InteractionRepository:
             return None
 
         new_relationship_id = (
-            relationship_id
-            if relationship_id is not None
-            else existing["relationship_id"]
+            existing["relationship_id"]
+            if relationship_id is UNSET
+            else relationship_id
         )
 
         new_type = (
-            interaction_type
-            if interaction_type is not None
-            else existing["type"]
+            existing["type"]
+            if interaction_type is UNSET
+            else interaction_type
         )
 
         new_occurred_at = (
-            occurred_at
-            if occurred_at is not None
-            else existing["occurred_at"]
+            existing["occurred_at"]
+            if occurred_at is UNSET
+            else occurred_at
         )
 
         new_content = (
-            content
-            if content is not None
-            else existing["content"]
+            existing["content"]
+            if content is UNSET
+            else content
         )
 
         conn.execute(
