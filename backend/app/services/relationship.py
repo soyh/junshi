@@ -1,5 +1,9 @@
 import sqlite3
 
+from app.domain.errors import (
+    PersonNotFoundError,
+    RelationshipAlreadyExistsError,
+)
 from app.repositories.relationship import RelationshipRepository
 
 
@@ -32,18 +36,32 @@ class RelationshipService:
         ).fetchone()
 
         if person is None:
-            raise ValueError("Person not found")
+            raise PersonNotFoundError("Person not found")
 
-        return self.repository.create(
-            conn,
-            user_id,
-            person_id,
-            status,
-            stage,
-            long_term_goal,
-            current_goal,
-            notes,
-        )
+        try:
+            return self.repository.create(
+                conn,
+                user_id,
+                person_id,
+                status,
+                stage,
+                long_term_goal,
+                current_goal,
+                notes,
+            )
+        except sqlite3.IntegrityError as exc:
+            error_message = str(exc)
+
+            if (
+                "UNIQUE constraint failed: "
+                "relationships.user_id, relationships.person_id"
+                in error_message
+            ):
+                raise RelationshipAlreadyExistsError(
+                    "Relationship already exists for this person"
+                ) from exc
+
+            raise
 
     def list(
         self,
