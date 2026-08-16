@@ -1,6 +1,11 @@
 import pytest
 
 from app.core.database import get_connection
+from app.domain.errors import RelationshipAlreadyExistsError
+from app.domain.errors import (
+    PersonNotFoundError,
+    RelationshipAlreadyExistsError,
+)
 from app.services.person import PersonService
 from app.services.relationship import RelationshipService
 
@@ -87,10 +92,52 @@ def test_relationship_service_requires_owned_person(client):
 
         assert relationship["person_id"] == person_id
 
-        with pytest.raises(ValueError, match="Person not found"):
+        with pytest.raises(PersonNotFoundError, match="Person not found"):
             relationship_service.create(
                 conn,
                 OTHER_USER_ID,
+                person_id,
+                "active",
+                "initial_contact",
+                None,
+                None,
+                None,
+            )
+
+
+def test_relationship_service_rejects_duplicate_relationship(client):
+    person_service = PersonService()
+    relationship_service = RelationshipService()
+
+    with get_connection() as conn:
+        person = person_service.create(
+            conn,
+            LOCAL_USER_ID,
+            "Duplicate关系对象",
+            None,
+            None,
+        )
+
+        person_id = person["id"]
+
+        relationship_service.create(
+            conn,
+            LOCAL_USER_ID,
+            person_id,
+            "active",
+            "initial_contact",
+            None,
+            None,
+            None,
+        )
+
+        with pytest.raises(
+            RelationshipAlreadyExistsError,
+            match="Relationship already exists for this person",
+        ):
+            relationship_service.create(
+                conn,
+                LOCAL_USER_ID,
                 person_id,
                 "active",
                 "initial_contact",

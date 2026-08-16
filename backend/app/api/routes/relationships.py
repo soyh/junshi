@@ -1,6 +1,9 @@
-import sqlite3
-
 from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.domain.errors import (
+    PersonNotFoundError,
+    RelationshipAlreadyExistsError,
+)
 
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
@@ -44,27 +47,16 @@ def create_relationship(
                 payload.current_goal,
                 payload.notes,
             )
-        except ValueError as exc:
-            if str(exc) == "Person not found":
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Person not found",
-                ) from exc
-            raise
-        except sqlite3.IntegrityError as exc:
-            error_message = str(exc)
-
-            if (
-                "UNIQUE constraint failed: "
-                "relationships.user_id, relationships.person_id"
-                in error_message
-            ):
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Relationship already exists for this person",
-                ) from exc
-
-            raise
+        except PersonNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Person not found",
+            ) from exc
+        except RelationshipAlreadyExistsError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Relationship already exists for this person",
+            ) from exc
 
     return row_to_dict(relationship)
 
