@@ -1,12 +1,22 @@
 from fastapi import APIRouter
 
-from app.api.routes.persons import router as persons_router
+from app.api.routes.conversations import router as conversations_router
 from app.api.routes.interactions import router as interactions_router
+from app.api.routes.messages import (
+    conversation_messages_router,
+    router as messages_router,
+)
+from app.api.routes.persons import router as persons_router
 from app.api.routes.relationships import router as relationships_router
 
-api_router = APIRouter(prefix="/api/v1")
+
+api_router = APIRouter(
+    prefix="/api/v1",
+)
 
 api_router.include_router(persons_router)
 api_router.include_router(relationships_router)
-
 api_router.include_router(interactions_router)
+api_router.include_router(messages_router)
+api_router.include_router(conversation_messages_router)
+api_router.include_router(conversations_router)

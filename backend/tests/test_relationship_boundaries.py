@@ -124,3 +124,213 @@ def test_relationship_delete_is_complete_and_isolated(client):
 
     assert list_after_delete.status_code == 200
     assert list_after_delete.json() == []
+
+
+def test_relationship_delete_cascades_to_person(client):
+    person_response = client.post(
+        "/api/v1/persons",
+        json={
+            "name": "FK级联删除测试对象",
+        },
+    )
+
+    assert person_response.status_code == 201
+    person_id = person_response.json()["id"]
+
+    relationship_response = client.post(
+        "/api/v1/relationships",
+        json={
+            "person_id": person_id,
+            "status": "active",
+            "stage": "initial_contact",
+        },
+    )
+
+    assert relationship_response.status_code == 201
+    relationship_id = relationship_response.json()["id"]
+
+    person_delete_response = client.delete(
+        f"/api/v1/persons/{person_id}",
+    )
+
+    assert person_delete_response.status_code == 204
+    assert person_delete_response.content == b""
+
+    relationship_response = client.get(
+        f"/api/v1/relationships/{relationship_id}",
+    )
+
+    assert relationship_response.status_code == 404
+    assert relationship_response.json() == {
+        "detail": "Relationship not found"
+    }
+
+
+def test_conversation_relationship_delete_sets_relationship_null(
+    client,
+):
+    person_response = client.post(
+        "/api/v1/persons",
+        json={
+            "name": "Conversation关系SET NULL测试对象",
+        },
+    )
+
+    assert person_response.status_code == 201
+    person_id = person_response.json()["id"]
+
+    relationship_response = client.post(
+        "/api/v1/relationships",
+        json={
+            "person_id": person_id,
+            "status": "active",
+            "stage": "initial_contact",
+        },
+    )
+
+    assert relationship_response.status_code == 201
+    relationship_id = relationship_response.json()["id"]
+
+    conversation_response = client.post(
+        "/api/v1/conversations",
+        json={
+            "person_id": person_id,
+            "relationship_id": relationship_id,
+            "title": "关系删除后仍保留的会话",
+        },
+    )
+
+    assert conversation_response.status_code == 201
+    conversation_id = conversation_response.json()["id"]
+
+    relationship_delete_response = client.delete(
+        f"/api/v1/relationships/{relationship_id}",
+    )
+
+    assert relationship_delete_response.status_code == 204
+    assert relationship_delete_response.content == b""
+
+    conversation_get_response = client.get(
+        f"/api/v1/conversations/{conversation_id}",
+    )
+
+    assert conversation_get_response.status_code == 200
+
+    conversation = conversation_get_response.json()
+
+    assert conversation["id"] == conversation_id
+    assert conversation["person_id"] == person_id
+    assert conversation["relationship_id"] is None
+
+
+def test_person_delete_cascades_to_conversations_and_messages(
+    client,
+):
+    person_response = client.post(
+        "/api/v1/persons",
+        json={
+            "name": "Person级联删除全链路测试对象",
+        },
+    )
+
+    assert person_response.status_code == 201
+    person_id = person_response.json()["id"]
+
+    conversation_response = client.post(
+        "/api/v1/conversations",
+        json={
+            "person_id": person_id,
+            "title": "级联删除测试会话",
+        },
+    )
+
+    assert conversation_response.status_code == 201
+    conversation_id = conversation_response.json()["id"]
+
+    message_response = client.post(
+        "/api/v1/messages",
+        json={
+            "conversation_id": conversation_id,
+            "sender_type": "user",
+            "content": "级联删除测试消息",
+        },
+    )
+
+    assert message_response.status_code == 201
+    message_id = message_response.json()["id"]
+
+    person_delete_response = client.delete(
+        f"/api/v1/persons/{person_id}",
+    )
+
+    assert person_delete_response.status_code == 204
+    assert person_delete_response.content == b""
+
+    conversation_get_response = client.get(
+        f"/api/v1/conversations/{conversation_id}",
+    )
+
+    assert conversation_get_response.status_code == 404
+    assert conversation_get_response.json() == {
+        "detail": "Conversation not found"
+    }
+
+    message_get_response = client.get(
+        f"/api/v1/messages/{message_id}",
+    )
+
+    assert message_get_response.status_code == 404
+    assert message_get_response.json() == {
+        "detail": "Message not found"
+    }
+
+
+def test_conversation_delete_cascades_to_messages(client):
+    person_response = client.post(
+        "/api/v1/persons",
+        json={
+            "name": "Conversation级联消息测试对象",
+        },
+    )
+
+    assert person_response.status_code == 201
+    person_id = person_response.json()["id"]
+
+    conversation_response = client.post(
+        "/api/v1/conversations",
+        json={
+            "person_id": person_id,
+            "title": "会话删除级联消息测试",
+        },
+    )
+
+    assert conversation_response.status_code == 201
+    conversation_id = conversation_response.json()["id"]
+
+    message_response = client.post(
+        "/api/v1/messages",
+        json={
+            "conversation_id": conversation_id,
+            "sender_type": "user",
+            "content": "应该被级联删除的消息",
+        },
+    )
+
+    assert message_response.status_code == 201
+    message_id = message_response.json()["id"]
+
+    conversation_delete_response = client.delete(
+        f"/api/v1/conversations/{conversation_id}",
+    )
+
+    assert conversation_delete_response.status_code == 204
+    assert conversation_delete_response.content == b""
+
+    message_get_response = client.get(
+        f"/api/v1/messages/{message_id}",
+    )
+
+    assert message_get_response.status_code == 404
+    assert message_get_response.json() == {
+        "detail": "Message not found"
+    }

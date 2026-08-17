@@ -1427,3 +1427,580 @@ TEST-006-VERIFIED
 
 不要直接修改代码。
 
+
+
+================================================================================
+CURRENT STAGE ADDENDUM — TEST-023 ~ TEST-025
+Date: 2026-08-17
+================================================================================
+
+【阶段说明】
+
+本阶段继续接手 conversations / messages 功能开发后的数据库、
+migration、测试初始化及 Git 状态验证。
+
+本阶段暂不修改业务逻辑。
+当前重点转向 Migration 生命周期、测试 fixture、FastAPI lifespan
+以及 SQLite 数据库路径/状态的一致性验证。
+
+
+--------------------------------------------------------------------------------
+TEST-023 — GIT / MIGRATION FILE STATUS
+--------------------------------------------------------------------------------
+
+执行目录：
+
+/opt/ai-love-strategist
+
+Git root 已确认：
+
+/opt/ai-love-strategist
+
+
+当前 Git 状态：
+
+ M backend/app/api/router.py
+ M backend/app/domain/errors.py
+ M backend/tests/test_relationship_boundaries.py
+?? backend/app/api/routes/conversations.py
+?? backend/app/api/routes/messages.py
+?? backend/app/repositories/conversation.py
+?? backend/app/repositories/message.py
+?? backend/app/schemas/conversation.py
+?? backend/app/schemas/message.py
+?? backend/app/services/conversation.py
+?? backend/app/services/message.py
+?? backend/migrations/003_conversations_messages.sql
+?? backend/tests/test_conversation_service.py
+?? backend/tests/test_conversations.py
+?? backend/tests/test_database_integrity.py
+?? backend/tests/test_message_service.py
+?? backend/tests/test_messages.py
+
+
+当前 Git 已跟踪的 migration 文件：
+
+backend/app/core/migrations.py
+backend/migrations/001_initial.sql
+backend/migrations/002_interactions.sql
+
+
+重要结论：
+
+backend/migrations/003_conversations_messages.sql 已经存在于服务器，
+并且已经实际被 migration runner 执行过。
+
+但是目前尚未加入 Git tracking。
+
+当前状态：
+
+?? backend/migrations/003_conversations_messages.sql
+
+后续确认问题并完成测试之前，不要急于 commit。
+
+
+--------------------------------------------------------------------------------
+TEST-023 — MIGRATION LOG OBSERVATION
+--------------------------------------------------------------------------------
+
+app.log 中发现异常高频的 migration 日志。
+
+短时间内反复出现：
+
+Applying migration: 001_initial.sql
+Migration applied: 001_initial.sql
+Applying migration: 002_interactions.sql
+Migration applied: 002_interactions.sql
+Applying migration: 003_conversations_messages.sql
+Migration applied: 003_conversations_messages.sql
+
+随后又重复执行 001 / 002 / 003。
+
+日志时间集中在：
+
+2026-08-17 22:48:56
+2026-08-17 22:48:57
+2026-08-17 22:48:58
+2026-08-17 22:48:59
+2026-08-17 22:49:00
+2026-08-17 22:49:01
+
+该现象需要进一步诊断。
+
+
+--------------------------------------------------------------------------------
+TEST-024 — MIGRATION IMPLEMENTATION
+--------------------------------------------------------------------------------
+
+当前 migration runner：
+
+backend/app/core/migrations.py
+
+
+当前实现核心逻辑：
+
+1. 根据 backend/migrations 目录读取所有 .sql 文件。
+2. 按文件名排序。
+3. 使用文件名前缀作为 migration version。
+4. 创建 schema_migrations 表。
+5. 检查 version 是否已经存在。
+6. 不存在时执行 SQL。
+7. 执行成功后写入 schema_migrations。
+
+
+migration version 规则：
+
+001_initial.sql
+    -> 001
+
+002_interactions.sql
+    -> 002
+
+003_conversations_messages.sql
+    -> 003
+
+
+当前 schema_migrations：
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version TEXT PRIMARY KEY,
+    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+
+
+当前 migration runner 的设计理论上具备幂等性。
+
+因此：
+
+同一个数据库在第二次执行 run_migrations() 时，
+如果 schema_migrations 正常持久化，
+不应该再次执行已经存在的 migration。
+
+
+--------------------------------------------------------------------------------
+TEST-024 — MIGRATION REFERENCES
+--------------------------------------------------------------------------------
+
+当前 run_migrations() 的调用位置已确认：
+
+backend/app/main.py
+backend/tests/conftest.py
+
+
+main.py：
+
+FastAPI lifespan 启动时执行：
+
+initialize_database()
+run_migrations()
+ensure_local_user()
+
+
+tests/conftest.py：
+
+测试 fixture 中执行：
+
+initialize_database()
+run_migrations()
+ensure_local_user()
+
+随后：
+
+with TestClient(app)
+
+
+因此当前存在明确的重复初始化路径：
+
+测试 fixture
+    ->
+initialize_database()
+    ->
+run_migrations()
+    ->
+ensure_local_user()
+    ->
+TestClient(app)
+    ->
+FastAPI lifespan
+    ->
+initialize_database()
+    ->
+run_migrations()
+    ->
+ensure_local_user()
+
+
+这说明测试过程中 run_migrations() 至少可能被调用两次。
+
+
+--------------------------------------------------------------------------------
+TEST-024 — APPLICATION INITIALIZATION
+--------------------------------------------------------------------------------
+
+当前 backend/app/main.py：
+
+FastAPI 使用 lifespan。
+
+启动流程：
+
+initialize_database()
+run_migrations()
+ensure_local_user()
+
+然后：
+
+Application startup complete
+
+
+关闭时：
+
+Application shutdown complete
+
+
+当前 main.py 存在模块级：
+
+settings = get_settings()
+
+
+该 settings 缓存行为在测试环境动态切换 DATABASE_PATH 时需要特别关注。
+
+
+--------------------------------------------------------------------------------
+TEST-025 — TEST FIXTURE
+--------------------------------------------------------------------------------
+
+当前 backend/tests/conftest.py：
+
+测试使用 pytest tmp_path 创建独立 SQLite：
+
+tmp_path / "test.sqlite3"
+
+
+然后：
+
+monkeypatch.setenv("DATABASE_PATH", str(database_path))
+
+get_settings.cache_clear()
+
+initialize_database()
+run_migrations()
+ensure_local_user()
+
+with TestClient(app)
+
+
+测试结束：
+
+get_settings.cache_clear()
+
+
+当前测试 fixture 的目的：
+
+每个测试使用独立 SQLite 数据库，避免污染生产数据库。
+
+
+需要注意：
+
+app 在 conftest.py 中提前：
+
+from app.main import app
+
+而 app.main.py 中存在模块级：
+
+settings = get_settings()
+
+
+因此：
+
+DATABASE_PATH
++
+get_settings.cache
++
+app.main 模块级 settings
+
+之间的初始化时序需要进一步验证。
+
+
+--------------------------------------------------------------------------------
+TEST-025 — DATABASE LAYER
+--------------------------------------------------------------------------------
+
+当前 backend/app/core/database.py 已确认。
+
+initialize_database()：
+
+1. 获取 settings
+2. 创建 database directory
+3. 开启 SQLite foreign_keys
+4. 开启 WAL
+5. 设置 busy_timeout = 5000
+
+
+get_connection()：
+
+sqlite3.connect(
+    settings.database_path,
+    timeout=5.0,
+)
+
+row_factory = sqlite3.Row
+
+并设置：
+
+PRAGMA foreign_keys = ON
+PRAGMA busy_timeout = 5000
+
+
+异常时 rollback。
+正常时 commit。
+最终关闭 connection。
+
+
+当前 database.py 暂未发现需要立即修改的问题。
+
+
+--------------------------------------------------------------------------------
+TEST-025 — BOOTSTRAP
+--------------------------------------------------------------------------------
+
+当前 backend/app/core/bootstrap.py：
+
+ensure_local_user()
+
+
+使用：
+
+INSERT OR IGNORE INTO users (id)
+VALUES (?)
+
+
+该操作具有幂等性。
+
+
+当前启动顺序：
+
+initialize_database()
+    ->
+run_migrations()
+    ->
+ensure_local_user()
+
+
+该顺序目前合理。
+
+
+--------------------------------------------------------------------------------
+TEST-025 — TEST FILE INVENTORY
+--------------------------------------------------------------------------------
+
+当前 backend/tests：
+
+conftest.py
+__init__.py
+test_conversation_service.py
+test_conversations.py
+test_database_integrity.py
+test_health.py
+test_interactions.py
+test_message_service.py
+test_messages.py
+test_persons.py
+test_relationship_boundaries.py
+test_relationships.py
+test_services.py
+
+
+本阶段新增/涉及：
+
+test_conversation_service.py
+test_conversations.py
+test_database_integrity.py
+test_message_service.py
+test_messages.py
+
+
+--------------------------------------------------------------------------------
+CURRENT BLOCKER
+--------------------------------------------------------------------------------
+
+当前最重要的问题：
+
+app.log 中存在大量短时间重复 migration application。
+
+
+目前已经确认：
+
+A. migration runner 本身具备 version 检查逻辑。
+
+B. 测试 fixture 会主动调用 run_migrations()。
+
+C. TestClient(app) 会触发 FastAPI lifespan。
+
+D. FastAPI lifespan 又会调用 run_migrations()。
+
+因此存在重复调用。
+
+但是：
+
+仅仅“调用两次”无法完全解释为什么日志显示：
+
+Applying migration: 001
+Applying migration: 002
+Applying migration: 003
+
+不断重复。
+
+因为如果两次使用的是同一个 SQLite 数据库，
+第一次执行成功后 schema_migrations 应该包含：
+
+001
+002
+003
+
+第二次调用应该全部跳过。
+
+
+因此当前尚不能直接认定 migrations.py 存在 bug。
+
+
+--------------------------------------------------------------------------------
+CURRENT DIAGNOSTIC HYPOTHESES
+--------------------------------------------------------------------------------
+
+需要重点区分：
+
+A.
+同一个数据库被重复调用，
+但是 schema_migrations 没有正常持久化。
+
+B.
+不同 DATABASE_PATH 之间发生切换。
+
+C.
+TestClient / lifespan 导致重复调用，
+但 migration 本身实际上是正常幂等的。
+
+D.
+get_settings() cache / 初始化时序导致：
+fixture 使用测试数据库，
+而 app/lifespan 使用了另外的 database_path。
+
+E.
+SQLite transaction / connection 行为导致 schema_migrations 状态异常。
+
+F.
+其他尚未发现的数据库初始化路径。
+
+
+--------------------------------------------------------------------------------
+IMPORTANT CURRENT CONSTRAINTS
+--------------------------------------------------------------------------------
+
+当前阶段：
+
+不要删除数据库。
+
+不要删除 schema_migrations。
+
+不要删除或修改 001_initial.sql。
+
+不要删除或修改 002_interactions.sql。
+
+不要修改 003_conversations_messages.sql，
+除非后续诊断证明 SQL 本身存在问题。
+
+不要重写 migrations.py。
+
+不要修改 conversations / messages 业务逻辑。
+
+不要为了让 pytest 通过而修改测试预期。
+
+不要进行大规模架构重构。
+
+不要提交 Git。
+
+
+--------------------------------------------------------------------------------
+NEXT ACTION — TEST-026
+--------------------------------------------------------------------------------
+
+下一步执行 TEST-026。
+
+目标：
+
+确认每一次 run_migrations()：
+
+1. 使用哪个 database_path。
+2. migration files 是什么。
+3. schema_migrations 中当前有哪些 version。
+4. 每个 migration version 的 exists 状态。
+5. fixture 和 FastAPI lifespan 是否使用相同数据库。
+6. get_settings() cache 是否导致 database_path 不一致。
+
+
+建议临时增加诊断日志：
+
+Migration database path
+
+Migration files
+
+Migration check:
+version
+exists
+database_path
+
+
+目标是最终区分：
+
+A. 同一数据库状态未持久化
+B. database_path 切换
+C. 正常重复调用
+D. settings cache / 初始化时序问题
+E. SQLite transaction 问题
+F. 其他问题
+
+
+--------------------------------------------------------------------------------
+TEST-026 AFTER DIAGNOSIS
+--------------------------------------------------------------------------------
+
+确定根因后：
+
+1. 采用最小修改方案。
+2. 不改变已有业务功能。
+3. 修复测试初始化 / migration 生命周期。
+4. 重新执行完整 pytest。
+5. 检查 SQLite schema_migrations。
+6. 检查 app.log。
+7. 再检查 Git status。
+8. 确认 003 migration 纳入 Git。
+9. 更新本交接文档。
+10. 最后再考虑 commit。
+
+
+--------------------------------------------------------------------------------
+HANDOVER RULE FOR NEXT CONVERSATION
+--------------------------------------------------------------------------------
+
+下一次对话必须首先读取：
+
+/opt/ai-love-strategist/docs/DEVELOPMENT_HANDOVER.md
+
+
+然后：
+
+1. 不从零重新设计项目。
+2. 不重复修改已经完成的 conversations / messages 功能。
+3. 先确认当前服务器实际代码。
+4. 先执行 TEST-026。
+5. 不在根因确认前进行大规模修改。
+6. 所有修改都以实际服务器代码为准。
+7. 每次修改后运行对应测试。
+8. 涉及数据库必须检查实际 SQLite 状态。
+9. 涉及 migration 必须检查 schema_migrations。
+10. 涉及 Git 必须检查 git diff / git status。
+
+
+================================================================================
+END OF CURRENT STAGE ADDENDUM
+================================================================================
