@@ -58,6 +58,32 @@ def test_analysis_context_returns_persisted_context_and_empty_analysis_lists(cli
     assert body["recommendations"] == []
 
 
+def test_analysis_context_response_has_stable_top_level_contract(client):
+    person_id = _create_person(client)
+    conversation_id = _create_conversation(client, person_id)
+
+    response = client.get(f"/api/v1/conversations/{conversation_id}/analysis/context")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {
+        "conversation",
+        "person",
+        "messages",
+        "facts",
+        "inferences",
+        "unknowns",
+        "recommendations",
+    }
+    assert isinstance(body["conversation"], dict)
+    assert isinstance(body["person"], dict)
+    assert isinstance(body["messages"], list)
+    assert isinstance(body["facts"], list)
+    assert isinstance(body["inferences"], list)
+    assert isinstance(body["unknowns"], list)
+    assert isinstance(body["recommendations"], list)
+
+
 def test_analysis_context_returns_empty_messages_for_empty_conversation(client):
     person_id = _create_person(client)
     conversation_id = _create_conversation(client, person_id)
