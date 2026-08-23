@@ -98,11 +98,15 @@ Evidence 仅引用已有 Message / Interaction，不自行创造事实。
 
 暂不接真实 LLM、Model Router、AI Provider；不生成推断、不生成推荐、不进入 Memory System。
 
+服务器验证结果：TEST-011 专项 9 passed；全量 121 passed。
+
+已追加边界测试：
+- 排除同一 user 下其他 person 的 Interaction
+- 同时覆盖 user / person 两种 Message sender_type
+
 数据库变化：无新增 migration。
 
-当前专项测试：尚待服务器执行。
-
-下一步：服务器同步 test-011-evidence 后执行 TEST-011 专项测试和全量 pytest；若通过，再继续收紧 Evidence 边界并进行最终验收。
+下一步：服务器同步最新 test-011-evidence 后执行新增专项测试；通过后 TEST-011 可进入最终验收收尾。
 
 ---
 
