@@ -570,3 +570,27 @@ def test_text_import_preserves_pipe_unicode_and_content_whitespace(client):
         "你好 | 世界",
         "好久不见 | 最近怎么样？",
     ]
+
+
+def test_text_import_normalizes_timestamp_field_whitespace(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "  2026-08-23T10:00:00+00:00  | user | 第一条\n"
+                "2026-08-23T10:01:00+00:00\t | person | 第二条"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+    assert body["imported_count"] == 2
+    assert [candidate["sent_at"] for candidate in body["candidates"]] == [
+        "2026-08-23T10:00:00+00:00",
+        "2026-08-23T10:01:00+00:00",
+    ]
