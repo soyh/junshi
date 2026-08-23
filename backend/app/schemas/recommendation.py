@@ -8,4 +8,7 @@ class RecommendationContextResponse(BaseModel):
     relationship: dict[str, Any]
     current_state: dict[str, Any]
     evidence: list[dict[str, Any]]
+    facts: list[Any]
+    inferences: list[Any]
+    unknowns: list[Any]
     recommendations: list[Any]
