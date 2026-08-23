@@ -386,3 +386,39 @@ def test_text_import_normalizes_field_whitespace(client):
         "sender_type": "user",
         "content": "第一条",
     }
+
+
+def test_text_import_accepts_equivalent_timezone_offsets(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "2026-08-23T18:00:00+08:00 | user | 第一条\n"
+                "2026-08-23T10:00:00Z | person | 第二条"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["imported_count"] == 2
+
+
+def test_text_import_rejects_out_of_order_timezone_offsets(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "2026-08-23T18:01:00+08:00 | user | 第二条\n"
+                "2026-08-23T10:00:00Z | person | 第一条"
+            ),
+        },
+    )
+
+    assert response.status_code == 422
+    assert "Import messages must be ordered by sent_at" in response.json()["detail"]
