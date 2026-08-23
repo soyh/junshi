@@ -546,3 +546,27 @@ def test_text_import_mixed_blank_lines_preserves_original_line_numbers(client):
         "第一条",
         "第二条",
     ]
+
+
+def test_text_import_preserves_pipe_unicode_and_content_whitespace(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "2026-08-23T10:00:00+00:00 | user |   你好 | 世界  \n"
+                "2026-08-23T10:01:00+00:00 | person |  好久不见 | 最近怎么样？  "
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+    assert body["imported_count"] == 2
+    assert [candidate["content"] for candidate in body["candidates"]] == [
+        "你好 | 世界",
+        "好久不见 | 最近怎么样？",
+    ]
