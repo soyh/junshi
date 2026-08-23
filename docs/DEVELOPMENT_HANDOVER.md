@@ -81,19 +81,28 @@ Branch：test-011-evidence
 
 目标：建立分析事实的证据层，使后续 Fact / Inference 能够引用明确、可追溯的原始数据来源。
 
-设计原则：
+当前第一阶段实现：
+- Evidence response schema
+- Message evidence
+- Person-scoped Interaction evidence
+- source_id / source_type / occurred_at / content / metadata
+- user_id isolation
+- conversation → person 归属边界
+- deterministic ordering
+- deleted source reflection
+- read-only behavior，无分析结果持久化
 
-- Evidence 必须指向已有持久化事实，不自行创造事实。
-- 第一阶段只支持已有 Message / Interaction 作为证据来源。
-- Evidence 必须进行 user_id isolation，并保持 person / conversation 归属边界。
-- 暂不接真实 LLM。
-- 暂不生成推断。
-- 暂不生成推荐。
-- 暂不进入 Memory System。
+API：GET /api/v1/conversations/{conversation_id}/analysis/evidence
 
-数据库变化：优先无新增 migration；若实现证据持久化确有必要，再单独评估 migration，不提前扩大架构。
+Evidence 仅引用已有 Message / Interaction，不自行创造事实。
 
-下一步：服务器同步 test-011-evidence 后执行专项测试和全量 pytest；通过后继续 TEST-011 契约与边界验收。
+暂不接真实 LLM、Model Router、AI Provider；不生成推断、不生成推荐、不进入 Memory System。
+
+数据库变化：无新增 migration。
+
+当前专项测试：尚待服务器执行。
+
+下一步：服务器同步 test-011-evidence 后执行 TEST-011 专项测试和全量 pytest；若通过，再继续收紧 Evidence 边界并进行最终验收。
 
 ---
 
