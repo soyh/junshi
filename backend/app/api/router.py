@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.routes.analysis import router as analysis_router
 from app.api.routes.conversations import router as conversations_router
 from app.api.routes.interactions import router as interactions_router
 from app.api.routes.messages import (
@@ -24,3 +25,4 @@ api_router.include_router(conversation_messages_router)
 api_router.include_router(conversations_router)
 api_router.include_router(timeline_router)
 api_router.include_router(text_imports_router)
+api_router.include_router(analysis_router)
