@@ -25,7 +25,16 @@ def test_recommendation_context_returns_evidence_backed_input_and_empty_recommen
     response = client.get(f"/api/v1/persons/{person['id']}/recommendation-analysis/context")
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"person", "relationship", "current_state", "evidence", "recommendations"}
+    assert set(body) == {
+        "person",
+        "relationship",
+        "current_state",
+        "evidence",
+        "facts",
+        "inferences",
+        "unknowns",
+        "recommendations",
+    }
     assert body["person"]["id"] == person["id"]
     assert body["relationship"]["id"] == relationship["id"]
     assert body["current_state"] == {
@@ -35,6 +44,9 @@ def test_recommendation_context_returns_evidence_backed_input_and_empty_recommen
         "current_goal": "增加互动",
     }
     assert body["evidence"] == []
+    assert body["facts"] == []
+    assert body["inferences"] == []
+    assert body["unknowns"] == []
     assert body["recommendations"] == []
 
 
@@ -58,6 +70,9 @@ def test_recommendation_context_reuses_relationship_state_evidence(client):
     assert len(evidence) == 1
     assert evidence[0]["source_type"] == "interaction"
     assert evidence[0]["source_id"] == interaction.json()["id"]
+    assert response.json()["facts"] == []
+    assert response.json()["inferences"] == []
+    assert response.json()["unknowns"] == []
     assert response.json()["recommendations"] == []
 
 
