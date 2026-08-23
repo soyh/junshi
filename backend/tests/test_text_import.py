@@ -467,3 +467,23 @@ def test_text_import_rolls_back_conversation_when_message_creation_fails(
     )
     assert conversations.status_code == 200
     assert conversations.json() == []
+
+
+def test_text_import_whitespace_only_text_does_not_create_conversation(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": "   \n\t  \n ",
+        },
+    )
+
+    assert response.status_code == 422
+
+    conversations = client.get(
+        f"/api/v1/conversations?person_id={person_id}"
+    )
+    assert conversations.status_code == 200
+    assert conversations.json() == []
