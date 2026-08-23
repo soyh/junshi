@@ -2,11 +2,11 @@
 
 更新时间：2026-08-24
 
-当前阶段：TEST-017 Action plan synthesis
+当前阶段：TEST-018 Strategic reply synthesis
 
 当前状态：IN PROGRESS
 
-当前 Branch：test-017-action-plan-synthesis
+当前 Branch：test-018-strategic-reply-synthesis
 
 ---
 
@@ -175,24 +175,6 @@ Branch：test-016-action-plan-foundation
 
 API：GET /api/v1/persons/{person_id}/action-plan/context
 
-第一阶段实现：
-- 复用 person / relationship / current_state
-- 复用 evidence、facts、inferences、unknowns、recommendations
-- 固化 action_plan=[]，当前阶段不自行创造行动
-- 固化 action_constraints
-- requires_user_confirmation=true
-- must_not_auto_execute=true
-- must_not_change_relationship=true
-- must_be_evidence_backed=true
-- must_preserve_unknowns=true
-- user_id isolation
-- person_id isolation
-- read-only behavior
-- missing person / missing relationship 404 boundary
-- locked response shape
-
-第一阶段边界：不接真实 LLM，不执行行动，不自动发送消息，不修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
-
 最终服务器验证：TEST-016 专项 7 passed；全量 166 passed。
 
 验收结论：TEST-016 Action plan foundation VERIFIED。
@@ -203,14 +185,14 @@ API：GET /api/v1/persons/{person_id}/action-plan/context
 
 Action plan synthesis
 
-状态：IN PROGRESS
+状态：VERIFIED
 
 Branch：test-017-action-plan-synthesis
 
 目标：把已经存在的 Recommendation 转换为结构化 Action Plan Proposal，但只允许“明确行动 + 明确证据引用”的 Recommendation 被提升为行动计划；不自行创造建议、不调用 LLM、不执行行动。
 
 第一阶段实现：
-- 新增 deterministic `ActionPlanService.build_action_plan()`
+- deterministic `ActionPlanService.build_action_plan()`
 - 仅接受包含非空 `action` 的 Recommendation
 - 必须包含 `evidence_source_ids`
 - 每个 evidence source id 必须真实存在于当前上下文 evidence
@@ -225,7 +207,37 @@ Branch：test-017-action-plan-synthesis
 
 第一阶段边界：不接真实 LLM，不自动生成无证据行动，不自动执行，不自动发送消息，不修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
-服务器验证待完成：TEST-017 专项 11 项测试；全量测试。
+最终服务器验证：TEST-017 专项 11 passed；全量 170 passed。
+
+验收结论：TEST-017 Action plan synthesis VERIFIED。
+
+---
+
+## TEST-018
+
+Strategic reply synthesis
+
+状态：IN PROGRESS
+
+Branch：test-018-strategic-reply-synthesis
+
+目标：在已有 Strategic Reply Foundation 之上，把“已经明确存在的、证据支持的回复候选”提升为确定性的 draft；只允许 Recommendation 明确提供 `reply` 且引用真实 Evidence 时生成 draft，不自行编造回复。
+
+第一阶段实现：
+- 新增 deterministic `StrategicReplyService.build_draft()`
+- 仅接受非空 `reply`
+- 必须包含非空 `evidence_source_ids`
+- 每个 evidence source id 必须真实存在于当前上下文 evidence
+- 按 Recommendation 原始顺序选择第一个合法 draft
+- 只做外层空白清理，不重写回复内容
+- 没有合法、证据支持的 reply 时保持 `draft=null`
+- 保留既有 `reply_constraints`
+- 继续保持 user_id / person_id isolation
+- 继续保持 read-only
+
+第一阶段边界：不接真实 LLM，不生成无证据回复，不自动发送消息，不修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+
+服务器验证待完成：TEST-018 专项 10 项测试；全量测试。
 
 ---
 
