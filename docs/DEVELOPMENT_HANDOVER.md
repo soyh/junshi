@@ -4,7 +4,7 @@
 
 当前阶段：TEST-015 Strategic reply foundation
 
-当前状态：IMPLEMENTED — awaiting server verification
+当前状态：VERIFIED
 
 当前 Branch：test-015-strategic-reply-foundation
 
@@ -128,7 +128,7 @@ API：GET /api/v1/persons/{person_id}/recommendation-analysis/context
 
 Strategic reply foundation
 
-状态：IMPLEMENTED — awaiting server verification
+状态：VERIFIED
 
 Branch：test-015-strategic-reply-foundation
 
@@ -157,7 +157,17 @@ reply_constraints 当前固定为：
 
 第一阶段边界：不接真实 LLM，不生成真实回复，不自动发送消息，不修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
-验收前需要服务器执行：TEST-015 专项测试与全量 pytest。
+最终服务器验证：TEST-015 专项 9 passed；全量 159 passed。
+
+验收结论：TEST-015 Strategic reply foundation VERIFIED。
+
+---
+
+## 下一阶段
+
+当前仓库尚未出现 TEST-016 分支或正式 TEST-016 实现。
+
+进入 TEST-016 前必须先定义明确的阶段目标、输入输出契约和边界测试；不得跳过阶段定义直接扩展功能。
 
 ---
 
