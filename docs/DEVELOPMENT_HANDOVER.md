@@ -2,13 +2,11 @@
 
 更新时间：2026-08-23
 
-当前阶段：TEST-010 Conversation Analysis Foundation
+当前阶段：TEST-011 Evidence
 
 当前状态：IN PROGRESS
 
-当前 Branch：
-
-test-010-conversation-analysis
+当前 Branch：test-011-evidence
 
 ---
 
@@ -16,13 +14,9 @@ test-010-conversation-analysis
 
 Person Timeline
 
-状态：
+状态：VERIFIED
 
-VERIFIED
-
-Branch：
-
-test-008-person-timeline
+Branch：test-008-person-timeline
 
 ---
 
@@ -30,23 +24,13 @@ test-008-person-timeline
 
 Text Import
 
-状态：
+状态：VERIFIED
 
-VERIFIED
+Branch：test-009-text-import
 
-Branch：
+最终验证 Commit：a2059a6 test: verify text import rollback atomicity
 
-test-009-text-import
-
-最终验证 Commit：
-
-a2059a6 test: verify text import rollback atomicity
-
-最终测试：
-
-Text Import 专项：44 passed
-
-全量：103 passed
+最终测试：Text Import 专项 44 passed；全量 103 passed
 
 ---
 
@@ -54,71 +38,71 @@ Text Import 专项：44 passed
 
 Conversation Analysis Foundation
 
-状态：
+状态：VERIFIED
 
-IN PROGRESS
+Branch：test-010-conversation-analysis
 
-Branch：
+目标：建立分析输入上下文，暂不接真实 LLM。
 
-test-010-conversation-analysis
-
-目标：
-
-建立分析输入上下文。
-
-暂不接真实 LLM。
-
-第一阶段已实现：
-
+验收结果：
 - Conversation Analysis 输入模型
 - 分析上下文组装
 - Message / Conversation / Person 关系映射
 - user_id / person_id 隔离
 - Fact / Inference / Unknown / Recommendation 四类信息边界
 - Route → Service → Repository 层边界
-- 基础 API 测试契约
+- 稳定顶层响应契约
+- 空会话处理
+- 消息确定性排序
+- 删除消息反映
+- 分析上下文不写入分析结果
 
-当前输入上下文 API：
+API：GET /api/v1/conversations/{conversation_id}/analysis/context
 
-GET /api/v1/conversations/{conversation_id}/analysis/context
+当前上下文结构：conversation、person、messages、facts、inferences、unknowns、recommendations。
 
-当前上下文结构：
+边界规则：当前阶段只组装已有持久化事实，不进行推断，不生成未知事实，不生成推荐，不调用模型；facts / inferences / unknowns / recommendations 均为空列表。
 
-- conversation
-- person
-- messages
-- facts
-- inferences
-- unknowns
-- recommendations
+最终服务器验证：TEST-010 专项 9 passed；全量 112 passed。
 
-边界规则：
+数据库变化：无新增 migration。
 
-当前阶段只组装已有持久化事实，不进行推断，不生成未知事实，不生成推荐，不调用模型。
+验收结论：TEST-010 Conversation Analysis Foundation VERIFIED。
 
-当前 facts / inferences / unknowns / recommendations 均为空列表，作为后续分析层的明确契约边界。
+---
 
-明确禁止：
+## TEST-011
 
-- 不接真实 LLM
-- 不接 Model Router
-- 不接 AI Provider
-- 不生成真实策略回复
-- 不自动发送消息
-- 不提前进入 Memory System
+Evidence
 
-当前新增：
+状态：IN PROGRESS
 
-- backend/app/repositories/analysis.py
-- backend/app/services/analysis.py
-- backend/app/schemas/analysis.py
-- backend/app/api/routes/analysis.py
-- backend/tests/test_analysis.py
+Branch：test-011-evidence
 
-数据库变化：
+目标：建立分析事实的证据层，使后续 Fact / Inference 能够引用明确、可追溯的原始数据来源。
 
-无新增 migration。
+设计原则：
 
-下一步：
+- Evidence 必须指向已有持久化事实，不自行创造事实。
+- 第一阶段只支持已有 Message / Interaction 作为证据来源。
+- Evidence 必须进行 user_id isolation，并保持 person / conversation 归属边界。
+- 暂不接真实 LLM。
+- 暂不生成推断。
+- 暂不生成推荐。
+- 暂不进入 Memory System。
 
-服务器同步 test-010-conversation-analysis 后执行 TEST-010 专项测试和全量 pytest；确认通过后再继续收紧分析上下文契约并验收 TEST-010。
+数据库变化：优先无新增 migration；若实现证据持久化确有必要，再单独评估 migration，不提前扩大架构。
+
+下一步：服务器同步 test-011-evidence 后执行专项测试和全量 pytest；通过后继续 TEST-011 契约与边界验收。
+
+---
+
+## 开发原则
+
+不要随意改变现有架构。
+
+优先采用：Route → Service → Repository → SQLite
+
+所有用户数据必须进行 user_id 隔离。API Key 不得明文保存。系统不得自动向第三方发送消息。不得使用 8899。MVP 阶段不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+
+每完成一个明确阶段：代码 → 测试 → Git status → Git commit → 更新交接文档。
