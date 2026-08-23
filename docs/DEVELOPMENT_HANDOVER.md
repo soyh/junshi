@@ -2,11 +2,11 @@
 
 更新时间：2026-08-24
 
-当前阶段：TEST-013 Relationship state analysis
+当前阶段：TEST-014 Recommendation foundation
 
 当前状态：IN PROGRESS
 
-当前 Branch：test-013-relationship-state-analysis
+当前 Branch：test-014-recommendation-foundation
 
 ---
 
@@ -109,13 +109,13 @@ API：GET /api/v1/persons/{person_id}/profile
 
 Relationship state analysis
 
-状态：IN PROGRESS
+状态：VERIFIED
 
 Branch：test-013-relationship-state-analysis
 
 目标：在已有 Person profile、Timeline、Conversation Analysis Context、Evidence 基础上，建立关系状态分析的稳定输入与输出边界。
 
-当前第一阶段实现：
+第一阶段实现：
 - Relationship state response schema
 - 当前持久化 relationship state 映射
 - Person / Relationship 归属校验
@@ -126,14 +126,30 @@ Branch：test-013-relationship-state-analysis
 - read-only behavior
 - Fact / Inference / Unknown / Recommendation 空结果契约
 - missing person / missing relationship 404 boundary
+- deleted source reflection
+- locked response shape
 
 API：GET /api/v1/persons/{person_id}/relationship-analysis/state
 
 第一阶段边界：只读取已有持久化事实和 Evidence，不接真实 LLM，不自动生成未经证据支持的事实，不自动发送消息，不直接修改 Relationship 状态，不新增 migration。
 
-当前专项测试：已补齐 8 个关系状态分析边界测试；服务器待执行。
+最终服务器验证：TEST-013 专项 10 passed；全量 141 passed。
 
-下一步：服务器同步 test-013-relationship-state-analysis 后执行专项测试和全量 pytest；通过后继续强化契约边界并最终验收 TEST-013。
+验收结论：TEST-013 Relationship state analysis VERIFIED。
+
+---
+
+## TEST-014
+
+Recommendation foundation
+
+状态：IN PROGRESS
+
+Branch：test-014-recommendation-foundation
+
+目标：在现有 Person profile、Timeline、Conversation Analysis Context、Evidence、Relationship state analysis 之上，建立建议输出的稳定契约与证据边界。
+
+第一阶段边界：只允许基于已有事实、Evidence 和已确认关系状态形成结构化建议输入；不接真实 LLM，不自动发送消息，不直接修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
 ---
 
