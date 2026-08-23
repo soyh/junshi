@@ -1,3 +1,6 @@
+from app.services.action_plan import ActionPlanService
+
+
 def create_person(client, name="行动计划测试对象"):
     response = client.post("/api/v1/persons", json={"name": name})
     assert response.status_code == 201
@@ -54,6 +57,7 @@ def test_action_plan_context_preserves_analysis_buckets(client):
     assert body["inferences"] == []
     assert body["unknowns"] == []
     assert body["recommendations"] == []
+    assert body["action_plan"] == []
 
 
 def test_action_plan_context_isolated_by_user(client):
@@ -99,3 +103,97 @@ def test_action_plan_context_without_relationship_returns_404(client):
     person = create_person(client)
     response = get_context(client, person["id"])
     assert response.status_code == 404
+
+
+def test_build_action_plan_promotes_only_explicit_evidence_backed_actions():
+    evidence = [
+        {"source_id": "e1", "source_type": "interaction"},
+        {"source_id": "e2", "source_type": "message"},
+    ]
+    recommendations = [
+        {
+            "id": "r1",
+            "action": "在合适时机发起轻量互动",
+            "evidence_source_ids": ["e2"],
+            "priority": "medium",
+            "time_horizon": "near_term",
+        },
+        {"id": "r2", "action": "没有证据引用", "evidence_source_ids": []},
+        {"id": "r3", "action": "引用不存在证据", "evidence_source_ids": ["missing"]},
+        {"id": "r4", "reason": "只有理由，没有明确行动", "evidence_source_ids": ["e1"]},
+    ]
+
+    result = ActionPlanService.build_action_plan(recommendations, evidence)
+
+    assert result == [
+        {
+            "recommendation_id": "r1",
+            "action": "在合适时机发起轻量互动",
+            "evidence_source_ids": ["e2"],
+            "status": "proposed",
+            "requires_user_confirmation": True,
+            "priority": "medium",
+            "time_horizon": "near_term",
+        }
+    ]
+
+
+def test_build_action_plan_preserves_recommendation_order_and_does_not_mutate_inputs():
+    evidence = [{"source_id": "e1"}, {"source_id": "e2"}]
+    recommendations = [
+        {"id": "r2", "action": "第二项", "evidence_source_ids": ["e2"]},
+        {"id": "r1", "action": "第一项", "evidence_source_ids": ["e1"]},
+    ]
+    original = [item.copy() for item in recommendations]
+
+    result = ActionPlanService.build_action_plan(recommendations, evidence)
+
+    assert [item["recommendation_id"] for item in result] == ["r2", "r1"]
+    assert recommendations == original
+    assert result[0]["evidence_source_ids"] is not recommendations[0]["evidence_source_ids"]
+
+
+def test_build_action_plan_skips_non_dict_and_malformed_recommendations():
+    evidence = [{"source_id": "e1"}]
+    recommendations = [
+        None,
+        "not a recommendation",
+        {"id": "r1", "action": "   ", "evidence_source_ids": ["e1"]},
+        {"id": "r2", "action": "缺少引用"},
+        {"id": "r3", "action": "引用类型错误", "evidence_source_ids": "e1"},
+    ]
+
+    assert ActionPlanService.build_action_plan(recommendations, evidence) == []
+
+
+def test_get_context_synthesizes_only_valid_recommendations():
+    class FakeStrategicReplyService:
+        def get_context(self, conn, user_id, person_id):
+            return {
+                "person": {"id": person_id},
+                "relationship": {"id": "rel-1"},
+                "current_state": {},
+                "evidence": [{"source_id": "e1"}],
+                "facts": [],
+                "inferences": [],
+                "unknowns": [{"text": "尚不确定"}],
+                "recommendations": [
+                    {"id": "r1", "action": "提出轻量邀请", "evidence_source_ids": ["e1"]},
+                    {"id": "r2", "action": "无证据行动", "evidence_source_ids": ["missing"]},
+                ],
+            }
+
+    context = ActionPlanService(FakeStrategicReplyService()).get_context(None, "user-1", "person-1")
+
+    assert context["action_plan"] == [
+        {
+            "recommendation_id": "r1",
+            "action": "提出轻量邀请",
+            "evidence_source_ids": ["e1"],
+            "status": "proposed",
+            "requires_user_confirmation": True,
+        }
+    ]
+    assert context["unknowns"] == [{"text": "尚不确定"}]
+    assert context["action_constraints"]["must_not_auto_execute"] is True
+    assert context["action_constraints"]["requires_user_confirmation"] is True
