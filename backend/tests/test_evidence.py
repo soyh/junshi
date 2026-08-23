@@ -16,12 +16,12 @@ def _create_conversation(client, person_id):
     return response.json()["id"]
 
 
-def _create_message(client, conversation_id, content, sent_at):
+def _create_message(client, conversation_id, content, sent_at, sender_type="person"):
     response = client.post(
         "/api/v1/messages",
         json={
             "conversation_id": conversation_id,
-            "sender_type": "person",
+            "sender_type": sender_type,
             "content": content,
             "sent_at": sent_at,
         },
@@ -226,3 +226,48 @@ def test_evidence_does_not_persist_results(client):
         }
 
     assert after == before
+
+
+def test_evidence_excludes_other_person_interactions(client):
+    person_id = _create_person(client, name="目标对象")
+    other_person_id = _create_person(client, name="其他对象")
+    conversation_id = _create_conversation(client, person_id)
+
+    _create_interaction(client, person_id, "2026-08-23T10:00:00+00:00", "目标互动")
+    _create_interaction(client, other_person_id, "2026-08-23T10:01:00+00:00", "其他互动")
+
+    evidence = client.get(
+        f"/api/v1/conversations/{conversation_id}/analysis/evidence"
+    ).json()["evidence"]
+
+    interactions = [item for item in evidence if item["source_type"] == "interaction"]
+    assert [item["content"] for item in interactions] == ["目标互动"]
+    assert all(item["person_id"] == person_id for item in interactions)
+
+
+def test_evidence_includes_both_message_sender_types(client):
+    person_id = _create_person(client)
+    conversation_id = _create_conversation(client, person_id)
+
+    _create_message(
+        client,
+        conversation_id,
+        "用户发送",
+        "2026-08-23T10:00:00+00:00",
+        sender_type="user",
+    )
+    _create_message(
+        client,
+        conversation_id,
+        "对象发送",
+        "2026-08-23T10:01:00+00:00",
+        sender_type="person",
+    )
+
+    evidence = client.get(
+        f"/api/v1/conversations/{conversation_id}/analysis/evidence"
+    ).json()["evidence"]
+
+    messages = [item for item in evidence if item["source_type"] == "message"]
+    assert [item["content"] for item in messages] == ["用户发送", "对象发送"]
+    assert [item["metadata"]["sender_type"] for item in messages] == ["user", "person"]
