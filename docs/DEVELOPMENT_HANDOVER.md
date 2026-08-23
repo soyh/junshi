@@ -92,14 +92,16 @@ Branch：test-012-person-profile
 - person_id isolation
 - read-only behavior
 - deterministic relationship ordering
+- deterministic latest interaction selection by occurred_at
+- missing person 404 boundary
 
 API：GET /api/v1/persons/{person_id}/profile
 
 边界：当前只读取已有持久化数据，不进行人物推断、不生成画像结论、不调用 LLM、不写入 profile analysis 结果、不新增 migration。
 
-当前专项测试：服务器待执行。
+当前专项测试：已补齐 8 个 API/聚合边界测试；服务器待执行。
 
-下一步：服务器同步 test-012-person-profile 后执行 TEST-012 专项测试和全量 pytest；通过后继续收紧 Person profile 契约并最终验收。
+下一步：服务器同步 test-012-person-profile 后执行 TEST-012 专项测试和全量 pytest；通过后最终验收。
 
 ---
 
