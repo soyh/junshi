@@ -307,11 +307,20 @@ def test_text_import_unknown_person_does_not_create_conversation(client):
 
     assert response.status_code == 404
 
-    conversations = client.get(
-        f"/api/v1/conversations?person_id={unknown_person_id}"
-    )
-    assert conversations.status_code == 200
-    assert conversations.json() == []
+    # The conversations API also rejects an unknown person with 404. The
+    # import endpoint has already verified that the person does not exist;
+    # the important TEST-009 boundary is that the failed import creates no
+    # conversation. Query the database through the existing test connection
+    # instead of changing the conversations API contract.
+    from app.core.database import get_connection
+
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS count FROM conversations WHERE person_id = ?",
+            (unknown_person_id,),
+        ).fetchone()
+
+    assert row["count"] == 0
 
 
 def test_text_import_accepts_pipe_inside_content(client):
