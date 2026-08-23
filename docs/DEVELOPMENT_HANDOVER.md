@@ -1,18 +1,14 @@
-Message
+# Development Handover
 
-以及必要的基础测试。
+更新时间：2026-08-23
 
----
+当前阶段：TEST-009 Text Import
 
-# 9. 后续开发路线
+当前状态：VERIFIED
 
-## TEST-007
+当前 Branch：
 
-Conversations + Messages
-
-Branch：
-
-test-007-conversations-messages
+test-009-text-import
 
 ---
 
@@ -28,83 +24,6 @@ Branch：
 
 test-008-person-timeline
 
-Commit：
-
-a671cfb fix: keep conversation creation events after activity
-
-目标：
-
-建立 Person Timeline，将：
-
-- Interaction
-- Conversation
-- Message
-
-统一聚合为 Person 级时间线。
-
-完成内容：
-
-- Interaction timeline events
-- Conversation creation events
-- Message timeline events
-- Message → Conversation → Person 归属
-- user_id isolation
-- person_id isolation
-- pagination
-- deterministic ordering
-- deleted message reflection
-- SQLite UNION ALL ordering 修复
-- Conversation creation event ordering 修复
-
-修改文件：
-
-- backend/app/repositories/timeline.py
-- backend/app/services/timeline.py
-- backend/app/api/routes/timeline.py
-- backend/app/schemas/timeline.py
-- backend/app/api/router.py
-- backend/tests/test_timeline.py
-
-数据库变化：
-
-无新增 migration。
-
-API变化：
-
-新增：
-
-GET /api/v1/persons/{person_id}/timeline
-
-测试：
-
-Timeline：
-
-8 passed
-
-全量：
-
-59 passed
-
-验证：
-
-PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
-
-结果：
-
-59 passed
-
-已知问题：
-
-无。
-
-下一阶段：
-
-TEST-009
-
-Branch：
-
-test-009-text-import
-
 ---
 
 ## TEST-009
@@ -113,7 +32,7 @@ Text Import
 
 状态：
 
-IN PROGRESS
+VERIFIED
 
 Branch：
 
@@ -123,9 +42,9 @@ test-009-text-import
 
 f7b2455 feat: add TEST-009 text import foundation
 
-最近验证增强 Commit：
+最终验证 Commit：
 
-20d0a6e test: strengthen TEST-009 text import validation
+a2059a6 test: verify text import rollback atomicity
 
 目标：
 
@@ -140,7 +59,7 @@ Text
 → Conversation
 → Message
 
-当前完成内容：
+已完成：
 
 - 固定文本导入格式：timestamp | sender_type | content
 - 空行跳过
@@ -152,6 +71,8 @@ Text
 - Zulu timestamp 支持
 - 时间顺序 validation
 - 相同 timestamp 允许
+- 等价 timezone instant validation
+- 相同 instant 保持原始输入顺序
 - Person existence validation
 - user_id isolation
 - Conversation 自动创建
@@ -159,7 +80,11 @@ Text
 - imported_count 返回
 - message_ids 返回
 - candidates 返回
+- message_ids 与 persisted messages 顺序一致
+- message_ids 与 candidates 顺序一致
 - 导入失败时不创建 Conversation
+- Message 创建过程中发生异常时整个导入事务 rollback
+- rollback 后不残留已创建 Message
 
 API：
 
@@ -173,13 +98,33 @@ POST /api/v1/text-imports
   "text": "2026-08-23T10:00:00+00:00 | user | 你好\n2026-08-23T10:01:00+00:00 | person | 你好呀"
 }
 
-当前测试：
+最终测试：
 
-8 个 API/集成测试 + 4 个 parser/validation 测试
+Text Import 专项：
 
-服务器验证：
+44 passed
 
-待执行。
+全量：
+
+103 passed
+
+验证：
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q backend/tests/test_text_import.py backend/tests/test_text_import_contract.py
+
+结果：
+
+44 passed
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
+
+结果：
+
+103 passed
+
+git diff --check
+
+通过。
 
 数据库变化：
 
@@ -198,15 +143,19 @@ POST /api/v1/text-imports
 - 不做自动发送
 - 不进入 Conversation Analysis
 
-下一步：
+验收结论：
 
-继续完善 TEST-009 Text Import 的导入契约与边界测试；验证通过后再标记 TEST-009 VERIFIED。
+TEST-009 Text Import VERIFIED。
 
 ---
 
 ## TEST-010
 
 Conversation Analysis Foundation
+
+状态：
+
+NOT STARTED
 
 Branch：
 
@@ -218,22 +167,25 @@ test-010-conversation-analysis
 
 暂不接真实 LLM。
 
----
+第一阶段只建立：
 
-## TEST-011
+- Conversation Analysis 输入模型
+- 分析上下文组装
+- Message / Conversation / Person 关系映射
+- user_id / person_id 隔离
+- 明确 Fact / Inference / Unknown / Recommendation 边界
+- API / Service / Repository 层边界
+- 测试契约
 
-Evidence
+明确禁止：
 
-Branch：
+- 不接真实 LLM
+- 不接 Model Router
+- 不接 AI Provider
+- 不生成真实策略回复
+- 不自动发送消息
+- 不提前进入 Memory System
 
-test-011-evidence
+下一步：
 
-目标：
-
-建立：
-
-Evidence
-Analysis
-Message
-
-之间的可追溯关系。
+先设计 TEST-010 的分析输入上下文契约，再实现代码和测试。
