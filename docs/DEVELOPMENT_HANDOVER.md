@@ -2,11 +2,11 @@
 
 更新时间：2026-08-24
 
-当前阶段：TEST-015 Strategic reply foundation
+当前阶段：TEST-016 Action plan foundation
 
-当前状态：VERIFIED
+当前状态：IN PROGRESS
 
-当前 Branch：test-015-strategic-reply-foundation
+当前 Branch：test-016-action-plan-foundation
 
 ---
 
@@ -163,11 +163,35 @@ reply_constraints 当前固定为：
 
 ---
 
-## 下一阶段
+## TEST-016
 
-当前仓库尚未出现 TEST-016 分支或正式 TEST-016 实现。
+Action plan foundation
 
-进入 TEST-016 前必须先定义明确的阶段目标、输入输出契约和边界测试；不得跳过阶段定义直接扩展功能。
+状态：IN PROGRESS
+
+Branch：test-016-action-plan-foundation
+
+目标：在 Strategic Reply Foundation 之上建立“行动计划”输入契约，将 Recommendation / Strategic Reply 的分析上下文向可执行策略推进，但仍严格保持“建议”和“执行”分离。
+
+API：GET /api/v1/persons/{person_id}/action-plan/context
+
+第一阶段实现：
+- 复用 person / relationship / current_state
+- 复用 evidence、facts、inferences、unknowns、recommendations
+- 固化 action_plan=[]，当前阶段不自行创造行动
+- 固化 action_constraints
+- requires_user_confirmation=true
+- must_not_auto_execute=true
+- must_not_change_relationship=true
+- must_be_evidence_backed=true
+- must_preserve_unknowns=true
+- user_id isolation
+- person_id isolation
+- read-only behavior
+- missing person / missing relationship 404 boundary
+- locked response shape
+
+第一阶段边界：不接真实 LLM，不执行行动，不自动发送消息，不修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
 ---
 
