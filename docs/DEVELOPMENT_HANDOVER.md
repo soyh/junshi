@@ -2,11 +2,11 @@
 
 更新时间：2026-08-24
 
-当前阶段：TEST-014 Recommendation foundation
+当前阶段：TEST-015 Strategic reply foundation
 
-当前状态：VERIFIED
+当前状态：IMPLEMENTED — awaiting server verification
 
-当前 Branch：test-014-recommendation-foundation
+当前 Branch：test-015-strategic-reply-foundation
 
 ---
 
@@ -84,22 +84,6 @@ Branch：test-012-person-profile
 
 目标：建立人物档案的只读聚合入口，为后续人物画像和关系分析提供稳定输入边界。
 
-第一阶段实现：
-- Person 基础档案
-- Person 关联 Relationship 列表
-- Relationship / Conversation / Interaction / Message 统计
-- 最新 Interaction
-- user_id isolation
-- person_id isolation
-- read-only behavior
-- deterministic relationship ordering
-- deterministic latest interaction selection by occurred_at
-- missing person 404 boundary
-
-API：GET /api/v1/persons/{person_id}/profile
-
-边界：当前只读取已有持久化数据，不进行人物推断、不生成画像结论、不调用 LLM、不写入 profile analysis 结果、不新增 migration。
-
 最终服务器验证：TEST-012 专项 8 passed；全量 131 passed。
 
 验收结论：TEST-012 Person profile VERIFIED。
@@ -114,25 +98,7 @@ Relationship state analysis
 
 Branch：test-013-relationship-state-analysis
 
-目标：在已有 Person profile、Timeline、Conversation Analysis Context、Evidence 基础上，建立关系状态分析的稳定输入与输出边界。
-
-第一阶段实现：
-- Relationship state response schema
-- 当前持久化 relationship state 映射
-- Person / Relationship 归属校验
-- Message / Interaction evidence 聚合
-- deterministic evidence ordering
-- user_id isolation
-- person_id isolation
-- read-only behavior
-- Fact / Inference / Unknown / Recommendation 空结果契约
-- missing person / missing relationship 404 boundary
-- deleted source reflection
-- locked response shape
-
-API：GET /api/v1/persons/{person_id}/relationship-analysis/state
-
-第一阶段边界：只读取已有持久化事实和 Evidence，不接真实 LLM，不自动生成未经证据支持的事实，不自动发送消息，不直接修改 Relationship 状态，不新增 migration。
+目标：建立关系状态分析的稳定输入与输出边界。
 
 最终服务器验证：TEST-013 专项 10 passed；全量 141 passed。
 
@@ -148,27 +114,50 @@ Recommendation foundation
 
 Branch：test-014-recommendation-foundation
 
-目标：在现有 Person profile、Timeline、Conversation Analysis Context、Evidence、Relationship state analysis 之上，建立建议输出的稳定契约与证据边界。
+目标：建立建议输出的稳定契约与证据边界。
 
-第一阶段实现：
-- Recommendation foundation response schema
-- Person / Relationship / Relationship state context aggregation
-- Evidence-backed analysis context boundary
-- facts / inferences / unknowns / recommendations analysis buckets
-- user_id isolation
-- person_id isolation
-- relationship ownership boundary
-- deterministic ordering
-- read-only behavior
-- locked response shape
-
-API：GET /api/v1/persons/{person_id}/recommendation
-
-第一阶段边界：只允许基于已有事实、Evidence 和已确认关系状态形成结构化建议输入；当前不生成未经证据支持的分析内容，不接真实 LLM，不自动发送消息，不直接修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+API：GET /api/v1/persons/{person_id}/recommendation-analysis/context
 
 最终服务器验证：TEST-014 专项 9 passed；全量 150 passed。
 
 验收结论：TEST-014 Recommendation foundation VERIFIED。
+
+---
+
+## TEST-015
+
+Strategic reply foundation
+
+状态：IMPLEMENTED — awaiting server verification
+
+Branch：test-015-strategic-reply-foundation
+
+目标：在 Recommendation Foundation 之上建立“策略回复”的稳定输入契约，同时严格保持分析、生成和执行分离。
+
+API：GET /api/v1/persons/{person_id}/strategic-reply/context
+
+第一阶段实现：
+- 复用 Recommendation Foundation 的 person / relationship / current_state
+- 复用 evidence、facts、inferences、unknowns、recommendations
+- 固化 reply_constraints
+- 固化 draft=null，明确当前阶段不生成真实回复
+- user_id isolation
+- person_id isolation
+- deterministic evidence ordering
+- read-only behavior
+- deleted evidence reflection
+- missing person / missing relationship 404 boundary
+- locked response shape
+
+reply_constraints 当前固定为：
+- must_be_evidence_backed=true
+- must_preserve_unknowns=true
+- must_not_auto_send=true
+- must_not_change_relationship=true
+
+第一阶段边界：不接真实 LLM，不生成真实回复，不自动发送消息，不修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+
+验收前需要服务器执行：TEST-015 专项测试与全量 pytest。
 
 ---
 
