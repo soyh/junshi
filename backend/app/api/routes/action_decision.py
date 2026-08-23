@@ -56,5 +56,9 @@ def create_action_decision(
             )
     except ValueError as exc:
         detail = str(exc)
-        code = status.HTTP_404_NOT_FOUND if "person" in detail else status.HTTP_409_CONFLICT
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if "person" in detail or "relationship" in detail
+            else status.HTTP_409_CONFLICT
+        )
         raise HTTPException(status_code=code, detail=detail) from exc
