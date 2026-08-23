@@ -243,3 +243,92 @@ def test_text_import_parser_rejects_empty_message_content():
         assert str(exc) == "Message content cannot be empty at line 1"
     else:
         raise AssertionError("Expected empty message content to be rejected")
+
+
+def test_text_import_invalid_format_does_not_create_conversation(client):
+    person_id = _text_import_test_helpers(client)
+
+    before = client.get(f"/api/v1/conversations?person_id={person_id}")
+    assert before.status_code == 200
+    assert before.json() == []
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": "not a valid import line",
+        },
+    )
+
+    assert response.status_code == 422
+
+    after = client.get(f"/api/v1/conversations?person_id={person_id}")
+    assert after.status_code == 200
+    assert after.json() == []
+
+
+def test_text_import_validation_failure_does_not_create_conversation(client):
+    person_id = _text_import_test_helpers(client)
+
+    invalid_inputs = [
+        "not-a-timestamp | user | 你好",
+        "2026-08-23T10:00:00+00:00 | stranger | 你好",
+        "2026-08-23T10:00:00+00:00 | user |   ",
+        (
+            "2026-08-23T10:01:00+00:00 | user | 第二条\n"
+            "2026-08-23T10:00:00+00:00 | person | 第一条"
+        ),
+    ]
+
+    for text in invalid_inputs:
+        response = client.post(
+            "/api/v1/text-imports",
+            json={"person_id": person_id, "text": text},
+        )
+        assert response.status_code == 422
+
+    conversations = client.get(
+        f"/api/v1/conversations?person_id={person_id}"
+    )
+    assert conversations.status_code == 200
+    assert conversations.json() == []
+
+
+def test_text_import_unknown_person_does_not_create_conversation(client):
+    unknown_person_id = "00000000-0000-0000-0000-000000000099"
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": unknown_person_id,
+            "text": "2026-08-23T10:00:00+00:00 | user | 你好",
+        },
+    )
+
+    assert response.status_code == 404
+
+    conversations = client.get(
+        f"/api/v1/conversations?person_id={unknown_person_id}"
+    )
+    assert conversations.status_code == 200
+    assert conversations.json() == []
+
+
+def test_text_import_accepts_pipe_inside_content(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": "2026-08-23T10:00:00+00:00 | user | A | B | C",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    messages = client.get(
+        f"/api/v1/conversations/{body['conversation_id']}/messages"
+    )
+    assert messages.status_code == 200
+    assert messages.json()[0]["content"] == "A | B | C"
