@@ -1,8 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-23
-当前阶段：TEST-027 完成
-下一阶段：TEST-028 Person Timeline
+当前阶段：TEST-009 Text Import
+当前状态：VERIFIED
+下一阶段：TEST-010 Conversation Analysis Foundation
 项目目录：/opt/ai-love-strategist
 
 ---
@@ -16,8 +17,6 @@ AI Love Strategist
 定位：
 
 AI 恋爱军师 / AI Relationship Management & Dating Companion System。
-
-项目不是简单聊天机器人，也不是单纯的回复话术生成器。
 
 最终目标：
 
@@ -38,89 +37,33 @@ AI 恋爱军师 / AI Relationship Management & Dating Companion System。
 → 长期关系跟踪
 
 系统不得自动联系第三方。
-
 每个人物必须保持独立档案和数据隔离。
 
 ---
 
 ## 2. 服务器环境
 
-服务器：
+服务器：Alibaba Cloud Linux 3.2104 LTS 64-bit
+Python：3.11.13
+Node.js：20.20.2
+NPM：10.8.2
+项目目录：/opt/ai-love-strategist
+虚拟环境：/opt/ai-love-strategist/.venv
+数据库：SQLite
+数据库文件：/opt/ai-love-strategist/data/app.sqlite3
+FastAPI：127.0.0.1:18080
 
-Alibaba Cloud Linux 3.2104 LTS 64-bit
-
-Python：
-
-3.11.13
-
-Node.js：
-
-20.20.2
-
-NPM：
-
-10.8.2
-
-项目目录：
-
-/opt/ai-love-strategist
-
-虚拟环境：
-
-/opt/ai-love-strategist/.venv
-
-激活方式：
-
-source /opt/ai-love-strategist/.venv/bin/activate
-
-数据库：
-
-SQLite
-
-数据库文件：
-
-/opt/ai-love-strategist/data/app.sqlite3
-
-FastAPI：
-
-127.0.0.1:18080
-
-禁止使用、修改、停止：
-
-8899
-
-原因：
-
-服务器上已有其他服务占用 8899。
+禁止使用、修改、停止：8899
 
 当前没有 Docker。
-
 当前没有 Nginx。
-
-当前没有域名。
-
-第一阶段通过公网 IP 访问。
 
 ---
 
 ## 3. 当前技术架构
 
-Backend：
-
-Python 3.11
-FastAPI
-SQLite
-Pydantic / pydantic-settings
-
-Frontend：
-
-React
-TypeScript
-Vite
-
-当前重点开发区域：
-
-backend/app
+Backend：Python 3.11 / FastAPI / SQLite / Pydantic / pydantic-settings
+Frontend：React / TypeScript / Vite
 
 主要结构：
 
@@ -131,273 +74,228 @@ backend/app/domain
 backend/app/repositories
 backend/app/schemas
 backend/app/services
-
-数据库迁移：
-
 backend/migrations
-
-测试：
-
 backend/tests
 
----
-
-## 4. 当前数据库迁移
-
-目前存在：
-
-001_initial.sql
-002_interactions.sql
-003_conversations_messages.sql
-
-当前生产数据库：
-
-/opt/ai-love-strategist/data/app.sqlite3
-
-当前 schema_migrations：
-
-001
-002
-003
-
-当前数据库表：
-
-users
-persons
-relationships
-interactions
-conversations
-messages
-schema_migrations
+当前生产数据库 schema migrations：001 / 002 / 003
 
 ---
 
-## 5. 已完成的核心功能
+## 4. 已完成核心功能
 
-### Persons
+Persons
+Relationships
+Interactions
+Conversations
+Messages
+Person Timeline
+Text Import
 
-已经实现人物对象 CRUD 和用户隔离。
+已完成的基础能力包括：
 
-### Relationships
-
-已经实现关系记录 CRUD、人物归属检查以及相关边界处理。
-
-### Interactions
-
-已经实现：
-
-创建互动
-查询互动列表
-按 person_id 筛选
-查询单条互动
-更新互动
-删除互动
-用户隔离
-人物归属检查
-关系归属检查
-interaction type 校验
-PATCH omitted / explicit null 语义
-
-### Conversations
-
-已经实现 conversations 基础 CRUD/API。
-
-### Messages
-
-已经实现 messages 基础 CRUD/API。
-
-同时支持：
-
-/messages
-
-以及：
-
-/conversations/{conversation_id}/messages
+- user_id isolation
+- person_id isolation
+- relationship / person 归属检查
+- conversations / messages CRUD
+- Person Timeline
+- Text Import
 
 ---
 
-## 6. Migration 问题诊断结果
+## 5. TEST-008
 
-TEST-026 专门调查了此前 app.log 中大量出现：
+Person Timeline
 
-Applying migration: 001
-Applying migration: 002
-Applying migration: 003
+状态：VERIFIED
 
-的问题。
-
-最终结论：
-
-不是 migration runner 的幂等性 Bug。
-
-验证结果：
-
-同一个数据库连续执行两次 run_migrations()：
-
-第一次：
-正常。
-
-第二次：
-不会重复应用。
-
-schema_migrations 保持：
-
-001
-002
-003
-
-生产数据库也已经正确保存：
-
-001
-002
-003
-
-进一步测试 TestClient 使用不同临时数据库时：
-
-test1.sqlite3
-test2.sqlite3
-
-两个数据库都会分别初始化：
-
-001
-002
-003
-
-因此之前日志中大量 migration 日志主要来自测试期间反复创建独立 SQLite 测试数据库。
-
-TEST-026：
-
-PASS
-
-不需要修改 migration runner。
-
----
-
-## 7. TEST-027
-
-执行：
-
-PYTHONPATH=backend pytest -q
-
-结果：
-
-51 passed in 6.44s
-
-当前测试：
-
-51 tests
-
-通过：
-
-51
-
-失败：
-
-0
-
-当前 Git 工作区：
-
-clean
-
----
-
-## 8. 当前 Git 状态
-
-当前分支：
+Branch：
 
 test-008-person-timeline
 
-当前 HEAD：
+已完成：
 
-411ae05 feat: add conversations and messages
+- Interaction timeline events
+- Conversation creation events
+- Message timeline events
+- Message → Conversation → Person 归属
+- user_id isolation
+- person_id isolation
+- pagination
+- deterministic ordering
+- deleted message reflection
+- SQLite UNION ALL ordering 修复
+- Conversation creation event ordering 修复
 
-当前：
-
-git status --short
-
-无输出。
-
-工作区干净。
-
-注意：
-
-虽然分支名称已经包含 person-timeline，但 Person Timeline 功能尚未正式开始开发。
-
----
-
-## 9. 当前稳定基线
-
-当前代码可以视为一个稳定开发基线。
-
-基线：
-
-Branch:
-test-008-person-timeline
-
-HEAD:
-411ae05 feat: add conversations and messages
-
-Tests:
-51 passed
-
-Working tree:
-clean
-
-Database:
-SQLite
-
-Migrations:
-001 / 002 / 003
-
-Backend:
-FastAPI
-
-Python:
-3.11.13
-
-Port:
-18080
-
-Forbidden:
-8899
+无新增 migration。
 
 ---
 
-## 10. 下一阶段：TEST-028
+## 6. TEST-009
 
-下一阶段目标：
+Text Import
 
-Person Timeline / Relationship Timeline
+状态：VERIFIED
 
-当前尚未开始正式实现。
+Branch：
 
-TEST-028 需要首先设计，而不是直接写代码。
+test-009-text-import
 
-目标步骤：
+基础实现 Commit：
 
-1. 明确 Timeline 的领域模型
-2. 明确 Interaction 如何进入 Timeline
-3. 明确 Conversation 如何进入 Timeline
-4. 明确 Message 如何进入 Timeline
-5. 明确事件类型
-6. 明确统一时间字段
-7. 明确排序规则
-8. 明确分页规则
-9. 明确 user_id 隔离
-10. 明确 person_id 隔离
-11. 设计 repository
-12. 设计 service
-13. 设计 API
-14. 编写测试
-15. 执行全量 pytest
-16. 检查 Git
-17. commit
+f7b2455 feat: add TEST-009 text import foundation
 
-不要在 TEST-028 阶段提前进入 AI 分析、模型 Router、人物画像、记忆系统等高级模块。
+最终验证 Commit：
+
+a2059a6 test: verify text import rollback atomicity
+
+目标：
+
+文本聊天记录导入。
+
+流程：
+
+Text
+→ Parse
+→ Message Candidates
+→ Validation
+→ Conversation
+→ Message
+
+已完成：
+
+- 固定文本导入格式：timestamp | sender_type | content
+- 空行跳过
+- Message Candidate 生成
+- line_number 保留
+- sender_type validation
+- content validation
+- ISO-8601 timestamp validation
+- Zulu timestamp 支持
+- 时间顺序 validation
+- 相同 timestamp 允许
+- 等价 timezone instant validation
+- 相同 instant 保持原始输入顺序
+- Person existence validation
+- user_id isolation
+- Conversation 自动创建
+- Message 自动创建
+- imported_count 返回
+- message_ids 返回
+- candidates 返回
+- message_ids 与 persisted messages 顺序一致
+- message_ids 与 candidates 顺序一致
+- 导入失败时不创建 Conversation
+- Message 创建过程中发生异常时整个导入事务 rollback
+- rollback 后不残留已创建 Message
+
+API：
+
+POST /api/v1/text-imports
+
+最终测试：
+
+Text Import 专项：44 passed
+全量：103 passed
+
+git diff --check：通过
+
+数据库变化：无新增 migration。
+架构变化：无。
+
+明确边界：
+
+- 不接 OCR
+- 不接 screenshot import
+- 不接外部聊天平台 integration
+- 不接 LLM
+- 不做自动发送
+- 不进入 Conversation Analysis
+
+验收结论：
+
+TEST-009 Text Import VERIFIED。
 
 ---
 
-## 11. 开发原则
+## 7. 当前 Git 状态
+
+代码分支：
+
+test-009-text-import
+
+最新代码 Commit：
+
+a2059a6 test: verify text import rollback atomicity
+
+随后 handover 文档已通过 GitHub 更新，作为文档同步提交。
+
+本地开发环境在 TEST-009 验收时：
+
+Working tree：clean
+
+---
+
+## 8. 当前稳定测试基线
+
+TEST-009 专项：
+
+44 passed
+
+全量：
+
+103 passed
+
+验证命令：
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q backend/tests/test_text_import.py backend/tests/test_text_import_contract.py
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
+
+---
+
+## 9. 下一阶段：TEST-010
+
+Conversation Analysis Foundation
+
+Branch：
+
+test-010-conversation-analysis
+
+状态：NOT STARTED
+
+目标：
+
+建立分析输入上下文。
+
+暂不接真实 LLM。
+
+第一阶段目标：
+
+1. 定义 Conversation Analysis 输入模型
+2. 设计分析上下文组装
+3. 建立 Message / Conversation / Person 关系映射
+4. 保证 user_id / person_id 隔离
+5. 明确 Fact / Inference / Unknown / Recommendation 四类信息边界
+6. 设计 Route → Service → Repository 层边界
+7. 编写测试契约
+8. 执行全量 pytest
+9. Git status / commit
+10. 更新 handover
+
+明确禁止：
+
+- 不接真实 LLM
+- 不接 Model Router
+- 不接 AI Provider
+- 不生成真实策略回复
+- 不自动发送消息
+- 不提前进入 Memory System
+
+TEST-010 的第一步必须是设计契约，而不是直接接入模型。
+
+---
+
+## 10. 开发原则
 
 不要随意改变现有架构。
 
@@ -408,21 +306,14 @@ Route
 → Repository
 → SQLite
 
-领域错误由 Service/Domain 层定义。
-
+领域错误由 Service / Domain 层定义。
 API 层负责将领域错误转换成 HTTP 状态码。
-
 所有用户数据必须进行 user_id 隔离。
-
 person、relationship、interaction、conversation、message 都不能发生跨用户访问。
-
 API Key 不得明文保存。
-
 系统不得自动向第三方发送消息。
-
 不得使用 8899。
-
-不要因为测试日志问题修改正常的 migration 幂等机制。
+MVP 阶段不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
 每完成一个明确阶段：
 
@@ -434,38 +325,25 @@ API Key 不得明文保存。
 
 ---
 
-
-## 12. 新对话启动时的第一任务
+## 11. 新对话启动时的第一任务
 
 新对话不要重新从项目零开始。
 
 首先确认：
 
 当前项目目录：
-
 /opt/ai-love-strategist
-
-当前分支：
-
-test-008-person-timeline
-
-当前 HEAD：
-
-a671cfb
-
-当前测试基线：
-
-59 passed
 
 然后读取：
 
+DEVELOPMENT_HANDOVER.md
 docs/DEVELOPMENT_HANDOVER.md
 
-再根据当前 TEST 阶段继续开发。
+确认当前 Branch、HEAD、测试基线和当前 TEST 阶段后，再继续开发。
 
 ---
 
-## 13. 当前项目状态总结
+## 12. 当前项目状态总结
 
 已完成：
 
@@ -479,54 +357,35 @@ Migration 002
 Migration 003
 TEST-026
 TEST-027
-TEST-028 / Person Timeline
 TEST-008 / Person Timeline
+TEST-009 / Text Import
 
 当前：
 
+TEST-009 VERIFIED
+
 Branch：
 
-test-008-person-timeline
+test-009-text-import
 
-HEAD：
+Latest code commit：
 
-a671cfb
+a2059a6
 
 Tests：
 
-59 passed
+103 passed
 
-Timeline tests：
+Text Import tests：
 
-8 passed
+44 passed
 
-Git：
+Working tree（本次 TEST-009 验收时）：
 
 clean
 
-TEST-008：
-
-VERIFIED
-
-已完成：
-
-Person Timeline
-
-包含：
-
-Interaction
-Conversation
-Message
-Pagination
-Ordering
-Person isolation
-User isolation
-Message → Conversation → Person mapping
-Deleted message reflection
-
 未完成：
 
-Text Import
 Conversation Analysis
 Evidence
 Person profile
@@ -539,10 +398,10 @@ Model Router
 AI provider integration
 Long-term relationship tracking
 
-当前下一阶段：
+下一阶段：
 
-TEST-009 Text Import
+TEST-010 Conversation Analysis Foundation
 
 下一 Branch：
 
-test-009-text-import
+test-010-conversation-analysis
