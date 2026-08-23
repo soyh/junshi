@@ -22,19 +22,13 @@ def create_relationship(client, person_id, **overrides):
 def test_relationship_state_returns_persisted_state_and_empty_analysis_buckets(client):
     person = create_person(client)
     relationship = create_relationship(client, person["id"], status="active", stage="exclusive")
-
     response = client.get(f"/api/v1/persons/{person['id']}/relationship-analysis/state")
-
     assert response.status_code == 200
     body = response.json()
+    assert set(body) == {"person", "relationship", "current_state", "evidence", "facts", "inferences", "unknowns", "recommendations"}
     assert body["person"]["id"] == person["id"]
     assert body["relationship"]["id"] == relationship["id"]
-    assert body["current_state"] == {
-        "status": "active",
-        "stage": "exclusive",
-        "long_term_goal": "建立长期关系",
-        "current_goal": "增加互动",
-    }
+    assert body["current_state"] == {"status": "active", "stage": "exclusive", "long_term_goal": "建立长期关系", "current_goal": "增加互动"}
     assert body["evidence"] == []
     assert body["facts"] == []
     assert body["inferences"] == []
@@ -45,37 +39,14 @@ def test_relationship_state_returns_persisted_state_and_empty_analysis_buckets(c
 def test_relationship_state_aggregates_message_and_interaction_evidence(client):
     person = create_person(client)
     relationship = create_relationship(client, person["id"])
-    conversation = client.post(
-        "/api/v1/conversations",
-        json={"person_id": person["id"], "title": "状态分析会话", "status": "active"},
-    )
+    conversation = client.post("/api/v1/conversations", json={"person_id": person["id"], "title": "状态分析会话", "status": "active"})
     assert conversation.status_code == 201
     conversation_id = conversation.json()["id"]
-
-    message = client.post(
-        "/api/v1/messages",
-        json={
-            "conversation_id": conversation_id,
-            "sender_type": "person",
-            "content": "最近工作比较忙",
-            "sent_at": "2026-08-23T10:00:00+00:00",
-        },
-    )
-    interaction = client.post(
-        "/api/v1/interactions",
-        json={
-            "person_id": person["id"],
-            "relationship_id": relationship["id"],
-            "type": "meeting",
-            "occurred_at": "2026-08-23T11:00:00+00:00",
-            "content": "线下见面",
-        },
-    )
+    message = client.post("/api/v1/messages", json={"conversation_id": conversation_id, "sender_type": "person", "content": "最近工作比较忙", "sent_at": "2026-08-23T10:00:00+00:00"})
+    interaction = client.post("/api/v1/interactions", json={"person_id": person["id"], "relationship_id": relationship["id"], "type": "meeting", "occurred_at": "2026-08-23T11:00:00+00:00", "content": "线下见面"})
     assert message.status_code == 201
     assert interaction.status_code == 201
-
     response = client.get(f"/api/v1/persons/{person['id']}/relationship-analysis/state")
-
     assert response.status_code == 200
     evidence = response.json()["evidence"]
     assert [item["source_type"] for item in evidence] == ["message", "interaction"]
@@ -83,36 +54,18 @@ def test_relationship_state_aggregates_message_and_interaction_evidence(client):
     assert evidence[1]["source_id"] == interaction.json()["id"]
     assert evidence[0]["conversation_id"] == conversation_id
     assert evidence[1]["conversation_id"] is None
+    assert evidence[0]["metadata"] == {"sender_type": "person"}
+    assert evidence[1]["metadata"] == {"type": "meeting", "relationship_id": relationship["id"]}
 
 
 def test_relationship_state_evidence_is_deterministically_ordered(client):
     person = create_person(client)
     relationship = create_relationship(client, person["id"])
-    first = client.post(
-        "/api/v1/interactions",
-        json={
-            "person_id": person["id"],
-            "relationship_id": relationship["id"],
-            "type": "call",
-            "occurred_at": "2026-08-23T12:00:00+00:00",
-            "content": "较晚事件",
-        },
-    )
-    second = client.post(
-        "/api/v1/interactions",
-        json={
-            "person_id": person["id"],
-            "relationship_id": relationship["id"],
-            "type": "message",
-            "occurred_at": "2026-08-23T10:00:00+00:00",
-            "content": "较早事件",
-        },
-    )
+    first = client.post("/api/v1/interactions", json={"person_id": person["id"], "relationship_id": relationship["id"], "type": "call", "occurred_at": "2026-08-23T12:00:00+00:00", "content": "较晚事件"})
+    second = client.post("/api/v1/interactions", json={"person_id": person["id"], "relationship_id": relationship["id"], "type": "message", "occurred_at": "2026-08-23T10:00:00+00:00", "content": "较早事件"})
     assert first.status_code == 201
     assert second.status_code == 201
-
     response = client.get(f"/api/v1/persons/{person['id']}/relationship-analysis/state")
-
     assert response.status_code == 200
     evidence = response.json()["evidence"]
     assert [item["source_id"] for item in evidence] == [second.json()["id"], first.json()["id"]]
@@ -121,12 +74,7 @@ def test_relationship_state_evidence_is_deterministically_ordered(client):
 def test_relationship_state_isolated_by_user(client):
     person = create_person(client)
     create_relationship(client, person["id"])
-
-    response = client.get(
-        f"/api/v1/persons/{person['id']}/relationship-analysis/state",
-        headers={"X-User-ID": "11111111-1111-1111-1111-111111111111"},
-    )
-
+    response = client.get(f"/api/v1/persons/{person['id']}/relationship-analysis/state", headers={"X-User-ID": "11111111-1111-1111-1111-111111111111"})
     assert response.status_code == 404
 
 
@@ -135,20 +83,9 @@ def test_relationship_state_does_not_mix_other_person_evidence(client):
     second = create_person(client, "对象B")
     create_relationship(client, first["id"])
     second_relationship = create_relationship(client, second["id"])
-    interaction = client.post(
-        "/api/v1/interactions",
-        json={
-            "person_id": second["id"],
-            "relationship_id": second_relationship["id"],
-            "type": "meeting",
-            "occurred_at": "2026-08-23T12:00:00+00:00",
-            "content": "只属于对象B",
-        },
-    )
+    interaction = client.post("/api/v1/interactions", json={"person_id": second["id"], "relationship_id": second_relationship["id"], "type": "meeting", "occurred_at": "2026-08-23T12:00:00+00:00", "content": "只属于对象B"})
     assert interaction.status_code == 201
-
     response = client.get(f"/api/v1/persons/{first['id']}/relationship-analysis/state")
-
     assert response.status_code == 200
     assert response.json()["evidence"] == []
 
@@ -156,20 +93,48 @@ def test_relationship_state_does_not_mix_other_person_evidence(client):
 def test_relationship_state_is_read_only(client):
     person = create_person(client)
     relationship = create_relationship(client, person["id"])
-
     before = client.get(f"/api/v1/persons/{person['id']}/relationship-analysis/state")
     after = client.get(f"/api/v1/persons/{person['id']}/relationship-analysis/state")
-
     assert before.status_code == 200
     assert after.status_code == 200
     assert after.json() == before.json()
     assert after.json()["relationship"]["id"] == relationship["id"]
 
 
+def test_relationship_state_deleted_message_is_reflected_in_evidence(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    conversation = client.post("/api/v1/conversations", json={"person_id": person["id"], "title": "删除源测试", "status": "active"})
+    assert conversation.status_code == 201
+    message = client.post("/api/v1/messages", json={"conversation_id": conversation.json()["id"], "sender_type": "person", "content": "将被删除", "sent_at": "2026-08-23T10:00:00+00:00"})
+    assert message.status_code == 201
+    before = client.get(f"/api/v1/persons/{person['id']}/relationship-analysis/state")
+    assert before.status_code == 200
+    assert [item["source_id"] for item in before.json()["evidence"]] == [message.json()["id"]]
+    deleted = client.delete(f"/api/v1/messages/{message.json()['id']}")
+    assert deleted.status_code == 204
+    after = client.get(f"/api/v1/persons/{person['id']}/relationship-analysis/state")
+    assert after.status_code == 200
+    assert after.json()["evidence"] == []
+
+
+def test_relationship_state_deleted_interaction_is_reflected_in_evidence(client):
+    person = create_person(client)
+    relationship = create_relationship(client, person["id"])
+    interaction = client.post("/api/v1/interactions", json={"person_id": person["id"], "relationship_id": relationship["id"], "type": "meeting", "occurred_at": "2026-08-23T12:00:00+00:00", "content": "将被删除"})
+    assert interaction.status_code == 201
+    before = client.get(f"/api/v1/persons/{person['id']}/relationship-analysis/state")
+    assert before.status_code == 200
+    assert [item["source_id"] for item in before.json()["evidence"]] == [interaction.json()["id"]]
+    deleted = client.delete(f"/api/v1/interactions/{interaction.json()['id']}")
+    assert deleted.status_code == 204
+    after = client.get(f"/api/v1/persons/{person['id']}/relationship-analysis/state")
+    assert after.status_code == 200
+    assert after.json()["evidence"] == []
+
+
 def test_relationship_state_missing_person_returns_404(client):
-    response = client.get(
-        "/api/v1/persons/99999999-9999-9999-9999-999999999999/relationship-analysis/state"
-    )
+    response = client.get("/api/v1/persons/99999999-9999-9999-9999-999999999999/relationship-analysis/state")
     assert response.status_code == 404
 
 
