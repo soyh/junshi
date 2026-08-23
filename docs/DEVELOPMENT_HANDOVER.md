@@ -2,11 +2,11 @@
 
 更新时间：2026-08-24
 
-当前阶段：TEST-016 Action plan foundation
+当前阶段：TEST-017 Action plan synthesis
 
 当前状态：IN PROGRESS
 
-当前 Branch：test-016-action-plan-foundation
+当前 Branch：test-017-action-plan-synthesis
 
 ---
 
@@ -167,7 +167,7 @@ reply_constraints 当前固定为：
 
 Action plan foundation
 
-状态：IN PROGRESS
+状态：VERIFIED
 
 Branch：test-016-action-plan-foundation
 
@@ -192,6 +192,40 @@ API：GET /api/v1/persons/{person_id}/action-plan/context
 - locked response shape
 
 第一阶段边界：不接真实 LLM，不执行行动，不自动发送消息，不修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+
+最终服务器验证：TEST-016 专项 7 passed；全量 166 passed。
+
+验收结论：TEST-016 Action plan foundation VERIFIED。
+
+---
+
+## TEST-017
+
+Action plan synthesis
+
+状态：IN PROGRESS
+
+Branch：test-017-action-plan-synthesis
+
+目标：把已经存在的 Recommendation 转换为结构化 Action Plan Proposal，但只允许“明确行动 + 明确证据引用”的 Recommendation 被提升为行动计划；不自行创造建议、不调用 LLM、不执行行动。
+
+第一阶段实现：
+- 新增 deterministic `ActionPlanService.build_action_plan()`
+- 仅接受包含非空 `action` 的 Recommendation
+- 必须包含 `evidence_source_ids`
+- 每个 evidence source id 必须真实存在于当前上下文 evidence
+- 保持 Recommendation 原始顺序
+- 不修改输入 Recommendation / Evidence
+- 输出 `status=proposed`
+- 输出 `requires_user_confirmation=true`
+- 保留可选 `priority` / `time_horizon`
+- 保留现有 facts / inferences / unknowns / recommendations
+- 继续保持 user_id / person_id isolation
+- 继续保持 read-only
+
+第一阶段边界：不接真实 LLM，不自动生成无证据行动，不自动执行，不自动发送消息，不修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+
+服务器验证待完成：TEST-017 专项 11 项测试；全量测试。
 
 ---
 
