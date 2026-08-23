@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-24
-当前阶段：TEST-018 Strategic reply synthesis
+当前阶段：TEST-019 + TEST-020 action feedback loop foundations
 当前状态：IN PROGRESS
-当前 Branch：test-018-strategic-reply-synthesis
+当前 Branch：test-020-action-outcome-foundation
 
 ---
 
@@ -16,9 +16,9 @@
 最终目标：用户添加一个关系对象后，可以持续导入聊天记录和互动数据，由系统建立人物画像、关系状态、历史记忆和行动计划，并根据后续反馈持续更新。
 
 核心闭环：
-添加对象 → 建立人物档案 → 导入聊天/互动 → 分析 → 建立画像 → 判断关系状态 → 生成策略回复 → 用户执行 → 反馈 → 更新记忆 → 长期关系跟踪
+添加对象 → 建立人物档案 → 导入聊天/互动 → 分析 → 建立画像 → 判断关系状态 → 生成策略回复 → 用户确认 → 用户执行 → 记录结果 → 反馈 → 更新记忆 → 长期关系跟踪
 
-当前工程阶段仍以“稳定的数据、证据、分析和策略契约”为主，尚未进入真实 LLM、自动执行或自动发送阶段。
+当前工程阶段仍以“稳定的数据、证据、分析、策略、用户决策和结果反馈契约”为主，尚未进入真实 LLM、自动执行或自动发送阶段。
 
 系统不得自动联系第三方。每个人物必须保持独立档案和数据隔离。
 
@@ -47,7 +47,7 @@ Frontend：React / TypeScript / Vite
 
 主要结构：backend/app/api、backend/app/config、backend/app/core、backend/app/domain、backend/app/repositories、backend/app/schemas、backend/app/services、backend/migrations、backend/tests
 
-当前生产数据库 schema migrations：001 / 002 / 003
+当前生产数据库 schema migrations：001 / 002 / 003 / 004 / 005
 
 ---
 
@@ -63,6 +63,7 @@ TEST-014 Recommendation Foundation — VERIFIED
 TEST-015 Strategic Reply Foundation — VERIFIED
 TEST-016 Action Plan Foundation — VERIFIED
 TEST-017 Action Plan Synthesis — VERIFIED
+TEST-018 Strategic Reply Synthesis — VERIFIED
 
 ---
 
@@ -85,19 +86,16 @@ API：GET /api/v1/conversations/{conversation_id}/analysis/context
 TEST-011 Evidence
 Branch：test-011-evidence
 API：GET /api/v1/conversations/{conversation_id}/analysis/evidence
-目标：为 Fact / Inference 提供可追溯 Evidence；只引用已有 Message / Interaction，不自行创造事实。
 最终服务器验证：专项 11 passed；全量 123 passed。
 
 TEST-012 Person Profile
 Branch：test-012-person-profile
 API：GET /api/v1/persons/{person_id}/profile
-目标：建立人物档案的只读聚合入口。
 最终服务器验证：专项 8 passed；全量 131 passed。
 
 TEST-013 Relationship State Analysis
 Branch：test-013-relationship-state-analysis
 API：GET /api/v1/persons/{person_id}/relationship-analysis/state
-目标：建立关系状态分析的稳定输入与输出边界。
 最终服务器验证：专项 10 passed；全量 141 passed。
 
 ---
@@ -109,19 +107,6 @@ Branch：test-014-recommendation-foundation
 API：GET /api/v1/persons/{person_id}/recommendation-analysis/context
 
 目标：建立建议输出的稳定契约与证据边界。
-
-核心边界：
-- Person / Relationship / current_state 聚合
-- Evidence / facts / inferences / unknowns / recommendations
-- user_id isolation
-- person_id isolation
-- relationship ownership boundary
-- deterministic ordering
-- read-only behavior
-- locked response shape
-- 不接真实 LLM
-- 不自动发送消息
-- 不直接修改 Relationship
 
 最终服务器验证：专项 9 passed；全量 150 passed。
 
@@ -164,18 +149,7 @@ Branch：test-017-action-plan-synthesis
 
 目标：把已经存在的 Recommendation 转换为结构化 Action Plan Proposal，但只允许“明确行动 + 明确证据引用”的 Recommendation 被提升为行动计划。
 
-核心实现：
-- deterministic ActionPlanService.build_action_plan()
-- 非空 action
-- 非空 evidence_source_ids
-- Evidence source 必须真实存在
-- 保持 Recommendation 原始顺序
-- status=proposed
-- requires_user_confirmation=true
-- 保留 priority / time_horizon
-- 不自动执行
-
-最终服务器验证：TEST-017 专项 11 passed；全量 170 passed。
+最终服务器验证：专项 11 passed；全量 170 passed。
 
 验收结论：TEST-017 Action Plan Synthesis VERIFIED。
 
@@ -184,29 +158,69 @@ Branch：test-017-action-plan-synthesis
 ## 10. TEST-018 Strategic Reply Synthesis
 
 Branch：test-018-strategic-reply-synthesis
-状态：IN PROGRESS
+状态：VERIFIED
 
-目标：在 Strategic Reply Foundation 之上，把“已经明确存在的、证据支持的回复候选”提升为确定性的 draft；只允许 Recommendation 明确提供 reply 且引用真实 Evidence 时生成 draft，不自行编造回复。
+目标：只允许 Recommendation 明确提供 `reply` 且引用真实 Evidence 时生成确定性的 draft，不自行编造回复。
 
-第一阶段实现：
-- deterministic StrategicReplyService.build_draft()
-- 仅接受非空 reply
-- 必须包含非空 evidence_source_ids
-- 每个 evidence source id 必须真实存在于当前上下文 evidence
-- 按 Recommendation 原始顺序选择第一个合法 draft
-- 只做外层空白清理，不重写回复内容
-- 没有合法、证据支持的 reply 时保持 draft=null
-- 保留既有 reply_constraints
-- 保持 user_id / person_id isolation
-- 保持 read-only
+最终服务器验证：专项 10 passed；全量 180 passed。
 
-第一阶段边界：不接真实 LLM，不生成无证据回复，不自动发送消息，不修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
-
-服务器验证待完成：TEST-018 专项 10 项测试；全量测试。
+验收结论：TEST-018 Strategic Reply Synthesis VERIFIED。
 
 ---
 
-## 11. 开发原则
+## 11. TEST-019 Action Confirmation Foundation
+
+Branch：test-019-action-confirmation-foundation
+状态：IN PROGRESS
+
+目标：把 requires_user_confirmation 从静态约束推进为可记录的用户决策层。用户可以确认或拒绝已有、证据支持的 Action Plan；系统只记录用户决策，不执行行动。
+
+API：
+- GET /api/v1/persons/{person_id}/action-plan/decisions/context
+- POST /api/v1/persons/{person_id}/action-plan/decisions
+
+新增 migration：004_action_feedback.sql
+
+核心边界：
+- confirmed 必须引用当前可用的 evidence-backed recommendation
+- rejected 可以记录用户暂不执行的决定
+- deterministic decision history
+- user_id / person_id isolation
+- 不自动执行
+- 不自动发送消息
+- 不修改 Relationship
+
+---
+
+## 12. TEST-020 Action Outcome Foundation
+
+Branch：test-020-action-outcome-foundation
+状态：IN PROGRESS
+
+目标：在用户确认行动之后记录执行结果，为后续反馈分析和长期记忆更新建立确定性输入层。
+
+API：
+- GET /api/v1/persons/{person_id}/action-plan/outcomes
+- POST /api/v1/persons/{person_id}/action-plan/outcomes/{decision_id}
+
+新增 migration：005_action_outcomes.sql
+
+核心边界：
+- 仅允许 confirmed action decision 产生 outcome
+- outcome 固定为 completed / skipped / failed
+- 保留用户 note
+- deterministic history ordering
+- user_id / person_id isolation
+- 不把 outcome 自动写成 Interaction
+- 不自动发送消息
+- 不自动修改 Relationship
+- 不接真实 LLM
+
+服务器验证方式：TEST-019 与 TEST-020 专项测试一次性执行，然后执行一次全量测试。
+
+---
+
+## 开发原则
 
 不要随意改变现有架构。
 
@@ -215,3 +229,5 @@ Branch：test-018-strategic-reply-synthesis
 所有用户数据必须进行 user_id 隔离。API Key 不得明文保存。系统不得自动向第三方发送消息。不得使用 8899。MVP 阶段不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
 每完成一个明确阶段：代码 → 测试 → Git status → Git commit → 更新交接文档。
+
+当前流程约定：相邻的两个 TEST-No 合并为一次服务器测试批次，以减少用户重复操作；每个 TEST 仍保持独立代码边界和验收记录。
