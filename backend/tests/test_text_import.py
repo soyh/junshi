@@ -594,3 +594,27 @@ def test_text_import_normalizes_timestamp_field_whitespace(client):
         "2026-08-23T10:00:00+00:00",
         "2026-08-23T10:01:00+00:00",
     ]
+
+
+def test_text_import_normalizes_sender_type_whitespace(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "2026-08-23T10:00:00+00:00 |   user   | 第一条\n"
+                "2026-08-23T10:01:00+00:00 | \tperson\t | 第二条"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+    assert body["imported_count"] == 2
+    assert [candidate["sender_type"] for candidate in body["candidates"]] == [
+        "user",
+        "person",
+    ]
