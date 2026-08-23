@@ -422,3 +422,48 @@ def test_text_import_rejects_out_of_order_timezone_offsets(client):
 
     assert response.status_code == 422
     assert "Import messages must be ordered by sent_at" in response.json()["detail"]
+
+
+def test_text_import_rolls_back_conversation_when_message_creation_fails(
+    client, monkeypatch
+):
+    person_id = _text_import_test_helpers(client)
+
+    from app.api.routes import text_imports as text_import_routes
+
+    original_create = text_import_routes.service.message_repository.create
+    calls = 0
+
+    def failing_create(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise ValueError("simulated message creation failure")
+        return original_create(*args, **kwargs)
+
+    monkeypatch.setattr(
+        text_import_routes.service.message_repository,
+        "create",
+        failing_create,
+    )
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "2026-08-23T10:00:00+00:00 | user | 第一条\n"
+                "2026-08-23T10:01:00+00:00 | person | 第二条"
+            ),
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "simulated message creation failure"}
+    assert calls == 2
+
+    conversations = client.get(
+        f"/api/v1/conversations?person_id={person_id}"
+    )
+    assert conversations.status_code == 200
+    assert conversations.json() == []
