@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
+from app.domain.errors import PersonNotFoundError
 from app.schemas.timeline import TimelineResponse
 from app.services.timeline import TimelineService
 
@@ -17,13 +18,19 @@ def get_person_timeline(
     offset: int = Query(default=0, ge=0),
     user_id: str = Depends(get_current_user_id),
 ):
-    with get_connection() as conn:
-        items, total = service.list(
-            conn,
-            user_id,
-            person_id,
-            limit,
-            offset,
+    try:
+        with get_connection() as conn:
+            items, total = service.list(
+                conn,
+                user_id,
+                person_id,
+                limit,
+                offset,
+            )
+    except PersonNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Person not found",
         )
 
     return {
