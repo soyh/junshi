@@ -8,6 +8,7 @@ from app.api.routes.messages import (
 )
 from app.api.routes.persons import router as persons_router
 from app.api.routes.relationships import router as relationships_router
+from app.api.routes.text_imports import router as text_imports_router
 from app.api.routes.timeline import router as timeline_router
 
 
@@ -22,3 +23,4 @@ api_router.include_router(messages_router)
 api_router.include_router(conversation_messages_router)
 api_router.include_router(conversations_router)
 api_router.include_router(timeline_router)
+api_router.include_router(text_imports_router)
