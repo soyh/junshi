@@ -638,3 +638,23 @@ def test_text_import_rejects_sender_type_with_wrong_case(client):
     )
     assert conversations.status_code == 200
     assert conversations.json() == []
+
+
+def test_text_import_rejects_empty_sender_type(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": "2026-08-23T10:00:00+00:00 |    | 没有发送者",
+        },
+    )
+
+    assert response.status_code == 422
+
+    conversations = client.get(
+        f"/api/v1/conversations?person_id={person_id}"
+    )
+    assert conversations.status_code == 200
+    assert conversations.json() == []
