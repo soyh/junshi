@@ -74,6 +74,22 @@ def test_evidence_returns_messages_and_person_interactions(client):
     assert body["evidence"][1]["conversation_id"] == conversation_id
 
 
+def test_evidence_response_has_stable_contract(client):
+    person_id = _create_person(client)
+    conversation_id = _create_conversation(client, person_id)
+
+    response = client.get(
+        f"/api/v1/conversations/{conversation_id}/analysis/evidence"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {"conversation_id", "person_id", "evidence"}
+    assert isinstance(body["conversation_id"], str)
+    assert isinstance(body["person_id"], str)
+    assert isinstance(body["evidence"], list)
+
+
 def test_evidence_preserves_source_metadata(client):
     person_id = _create_person(client)
     conversation_id = _create_conversation(client, person_id)
@@ -100,7 +116,9 @@ def test_evidence_is_deterministically_ordered(client):
     person_id = _create_person(client)
     conversation_id = _create_conversation(client, person_id)
 
-    _create_message(client, conversation_id, "第二", "2026-08-23T10:01:00+00:00")
+    message_id = _create_message(
+        client, conversation_id, "消息", "2026-08-23T10:01:00+00:00"
+    )
     first_interaction = _create_interaction(
         client, person_id, "2026-08-23T10:00:00+00:00", "第一"
     )
@@ -114,8 +132,19 @@ def test_evidence_is_deterministically_ordered(client):
 
     assert response.status_code == 200
     evidence = response.json()["evidence"]
-    assert evidence[0]["source_id"] == first_interaction
-    assert evidence[-1]["source_id"] == second_interaction or evidence[-1]["source_type"] == "message"
+    assert [item["source_id"] for item in evidence] == [
+        first_interaction,
+        second_interaction,
+        message_id,
+    ]
+
+
+def test_evidence_rejects_unknown_conversation(client):
+    response = client.get(
+        "/api/v1/conversations/00000000-0000-0000-0000-000000000099/analysis/evidence"
+    )
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Conversation not found"}
 
 
 def test_evidence_enforces_user_isolation(client):
