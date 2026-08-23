@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
-更新时间：2026-08-23
-当前阶段：TEST-011 Evidence
-当前状态：IN PROGRESS
-下一阶段：Person profile
+更新时间：2026-08-24
+当前阶段：TEST-014 Recommendation foundation
+当前状态：VERIFIED
+下一阶段：Strategic reply foundation
 项目目录：/opt/ai-love-strategist
 
 ---
@@ -61,133 +61,136 @@ Messages
 Person Timeline
 Text Import
 Conversation Analysis Foundation
-
-已完成的基础能力包括：user_id isolation、person_id isolation、relationship / person 归属检查、conversations / messages CRUD、Person Timeline、Text Import、Conversation Analysis input context。
+Evidence
+Person Profile
+Relationship State Analysis
+Recommendation Foundation
 
 ---
 
 ## 5. TEST-008
 
-Person Timeline
-
-状态：VERIFIED
+Person Timeline — VERIFIED
 
 Branch：test-008-person-timeline
-
-已完成：Interaction timeline events、Conversation creation events、Message timeline events、Message → Conversation → Person 归属、user_id isolation、person_id isolation、pagination、deterministic ordering、deleted message reflection、SQLite UNION ALL ordering 修复、Conversation creation event ordering 修复。
-
-无新增 migration。
 
 ---
 
 ## 6. TEST-009
 
-Text Import
-
-状态：VERIFIED
+Text Import — VERIFIED
 
 Branch：test-009-text-import
 
 最终验证 Commit：a2059a6 test: verify text import rollback atomicity
-
 最终测试：Text Import 专项 44 passed；全量 103 passed；git diff --check 通过。
-
 数据库变化：无新增 migration。架构变化：无。
-
-验收结论：TEST-009 Text Import VERIFIED。
 
 ---
 
 ## 7. TEST-010
 
-Conversation Analysis Foundation
-
-状态：VERIFIED
+Conversation Analysis Foundation — VERIFIED
 
 Branch：test-010-conversation-analysis
 
-目标：建立分析输入上下文。
-
-验收结果：
-- Conversation Analysis 输入模型
-- 分析上下文组装
-- Message / Conversation / Person 关系映射
-- user_id / person_id 隔离
-- Fact / Inference / Unknown / Recommendation 四类信息边界
-- Route → Service → Repository 层边界
-- 稳定顶层响应契约
-- 空会话处理
-- 消息确定性排序
-- 删除消息反映
-- 分析上下文不写入分析结果
-
 API：GET /api/v1/conversations/{conversation_id}/analysis/context
-
-当前返回结构：conversation、person、messages、facts、inferences、unknowns、recommendations。
-
-当前阶段边界：只读取和组装已有持久化数据；不进行推断、不生成未知事实、不生成推荐、不调用模型。四类分析字段均为空列表，作为后续分析层的明确契约边界。
-
 最终服务器验证：TEST-010 专项 9 passed；全量 112 passed。
-
 数据库变化：无新增 migration。
-
-验收结论：TEST-010 Conversation Analysis Foundation VERIFIED。
 
 ---
 
 ## 8. TEST-011
 
-Evidence
-
-状态：IN PROGRESS
+Evidence — VERIFIED
 
 Branch：test-011-evidence
 
-目标：建立分析事实的证据层，使后续 Fact / Inference 能够引用明确、可追溯的原始数据来源。
-
-设计原则：Evidence 必须指向已有持久化事实，不自行创造事实。第一阶段只支持已有 Message / Interaction 作为证据来源。Evidence 必须进行 user_id isolation，并保持 person / conversation 归属边界。
-
-暂不接真实 LLM。暂不生成推断。暂不生成推荐。暂不进入 Memory System。
-
-数据库变化：优先无新增 migration；若实现证据持久化确有必要，再单独评估 migration，不提前扩大架构。
-
-下一步：服务器同步 test-011-evidence 后执行专项测试和全量 pytest；通过后继续 TEST-011 契约与边界验收。
+API：GET /api/v1/conversations/{conversation_id}/analysis/evidence
+第一阶段仅引用已有 Message / Interaction，不自行创造事实；完成 user_id isolation、person / conversation 归属边界、deterministic ordering、deleted source reflection、read-only behavior。
+最终服务器验证：TEST-011 专项 11 passed；全量 123 passed。
+数据库变化：无新增 migration。
 
 ---
 
-## 9. 开发原则
+## 9. TEST-012
+
+Person Profile — VERIFIED
+
+Branch：test-012-person-profile
+
+API：GET /api/v1/persons/{person_id}/profile
+目标：建立人物档案的只读聚合入口，为后续人物画像和关系分析提供稳定输入边界。
+最终服务器验证：TEST-012 专项 8 passed；全量 131 passed。
+数据库变化：无新增 migration。
+
+---
+
+## 10. TEST-013
+
+Relationship State Analysis — VERIFIED
+
+Branch：test-013-relationship-state-analysis
+
+API：GET /api/v1/persons/{person_id}/relationship-analysis/state
+目标：在 Person profile、Timeline、Conversation Analysis Context、Evidence 基础上建立关系状态分析的稳定输入与输出边界。
+最终服务器验证：TEST-013 专项 10 passed；全量 141 passed。
+数据库变化：无新增 migration。
+
+---
+
+## 11. TEST-014
+
+Recommendation Foundation — VERIFIED
+
+Branch：test-014-recommendation-foundation
+
+API：GET /api/v1/persons/{person_id}/recommendation
+
+目标：在现有 Person profile、Timeline、Conversation Analysis Context、Evidence、Relationship state analysis 之上，建立建议输出的稳定契约与证据边界。
+
+第一阶段实现：
+- Recommendation foundation response schema
+- Person / Relationship / Relationship state context aggregation
+- Evidence-backed analysis context boundary
+- facts / inferences / unknowns / recommendations analysis buckets
+- user_id isolation
+- person_id isolation
+- relationship ownership boundary
+- deterministic ordering
+- read-only behavior
+- locked response shape
+
+第一阶段边界：只允许基于已有事实、Evidence 和已确认关系状态形成结构化建议输入；当前不生成未经证据支持的分析内容，不接真实 LLM，不自动发送消息，不直接修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+
+最终服务器验证：TEST-014 专项 9 passed；全量 150 passed。
+
+验收结论：TEST-014 Recommendation Foundation VERIFIED。
+
+---
+
+## 12. 下一阶段
+
+Strategic reply foundation。
+
+目标：在 Recommendation Foundation 之上建立“策略回复”输入与输出边界，但仍保持分析与执行分离。
+
+原则：
+- 先建立稳定的策略回复契约
+- 必须能够追溯到已有事实 / Evidence / Recommendation context
+- 不直接发送消息
+- 不接真实 LLM，除非后续阶段明确进入 Model Router / AI provider integration
+- 不修改既有 Relationship 状态
+- 不新增 migration，除非数据持久化确有必要并单独评估
+
+---
+
+## 13. 开发原则
 
 不要随意改变现有架构。
 
 优先采用：Route → Service → Repository → SQLite
 
-领域错误由 Service / Domain 层定义。API 层负责将领域错误转换成 HTTP 状态码。所有用户数据必须进行 user_id 隔离。person、relationship、interaction、conversation、message 都不能发生跨用户访问。API Key 不得明文保存。系统不得自动向第三方发送消息。不得使用 8899。MVP 阶段不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+所有用户数据必须进行 user_id 隔离。API Key 不得明文保存。系统不得自动向第三方发送消息。不得使用 8899。MVP 阶段不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
 每完成一个明确阶段：代码 → 测试 → Git status → Git commit → 更新交接文档。
-
----
-
-## 10. 新对话启动时的第一任务
-
-首先确认当前项目目录：/opt/ai-love-strategist
-
-然后读取：DEVELOPMENT_HANDOVER.md、docs/DEVELOPMENT_HANDOVER.md
-
-确认当前 Branch、HEAD、测试基线和当前 TEST 阶段后，再继续开发。
-
----
-
-## 11. 当前项目状态总结
-
-已完成：Persons、Relationships、Interactions、Conversations、Messages、Migration 001、Migration 002、Migration 003、TEST-026、TEST-027、TEST-008 / Person Timeline、TEST-009 / Text Import、TEST-010 / Conversation Analysis Foundation
-
-当前：TEST-011 Evidence
-
-Branch：test-011-evidence
-
-数据库：SQLite
-Migrations：001 / 002 / 003
-
-下一验收目标：TEST-011 Evidence
-
-后续：Person profile、Relationship state analysis、Strategic reply、Action plan、Feedback、Memory system、Model Router、AI provider integration、Long-term relationship tracking
