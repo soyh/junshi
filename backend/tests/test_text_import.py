@@ -341,3 +341,48 @@ def test_text_import_accepts_pipe_inside_content(client):
     )
     assert messages.status_code == 200
     assert messages.json()[0]["content"] == "A | B | C"
+
+
+def test_text_import_accepts_windows_line_endings(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "2026-08-23T10:00:00+00:00 | user | 第一条\r\n"
+                "2026-08-23T10:01:00+00:00 | person | 第二条"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["imported_count"] == 2
+    assert [
+        candidate["line_number"] for candidate in response.json()["candidates"]
+    ] == [1, 2]
+
+
+def test_text_import_normalizes_field_whitespace(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "  2026-08-23T10:00:00+00:00  |  user  |  第一条  \n"
+                "2026-08-23T10:01:00+00:00 | person | 第二条"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["candidates"][0] == {
+        "line_number": 1,
+        "sent_at": "2026-08-23T10:00:00+00:00",
+        "sender_type": "user",
+        "content": "第一条",
+    }
