@@ -2,19 +2,11 @@
 
 更新时间：2026-08-24
 
-当前阶段：TEST-012 Person profile
+当前阶段：TEST-013 Relationship state analysis
 
-当前状态：VERIFIED
+当前状态：IN PROGRESS
 
-当前 Branch：test-012-person-profile
-
-最终验证 Commit：fe0c58d test: align person profile ordering with relationship invariant
-
-最终服务器验证：TEST-012 专项 8 passed；全量 131 passed。
-
-验收结论：TEST-012 Person profile VERIFIED。
-
-下一阶段：TEST-013 Relationship state analysis
+当前 Branch：test-013-relationship-state-analysis
 
 ---
 
@@ -117,13 +109,31 @@ API：GET /api/v1/persons/{person_id}/profile
 
 Relationship state analysis
 
-状态：PLANNED
+状态：IN PROGRESS
+
+Branch：test-013-relationship-state-analysis
 
 目标：在已有 Person profile、Timeline、Conversation Analysis Context、Evidence 基础上，建立关系状态分析的稳定输入与输出边界。
 
-第一阶段原则：只基于已有持久化事实和 Evidence 进行状态分析契约建设；不接真实 LLM，不自动生成未经证据支持的事实，不自动发送消息，不直接修改 Relationship 状态。
+当前第一阶段实现：
+- Relationship state response schema
+- 当前持久化 relationship state 映射
+- Person / Relationship 归属校验
+- Message / Interaction evidence 聚合
+- deterministic evidence ordering
+- user_id isolation
+- person_id isolation
+- read-only behavior
+- Fact / Inference / Unknown / Recommendation 空结果契约
+- missing person / missing relationship 404 boundary
 
-下一步：建立 Relationship state analysis schema / service / repository 或最小必要读取层，并补齐 user_id、person_id、relationship 归属、deterministic ordering、read-only 与 Fact / Inference / Unknown / Recommendation 边界测试。
+API：GET /api/v1/persons/{person_id}/relationship-analysis/state
+
+第一阶段边界：只读取已有持久化事实和 Evidence，不接真实 LLM，不自动生成未经证据支持的事实，不自动发送消息，不直接修改 Relationship 状态，不新增 migration。
+
+当前专项测试：已补齐 8 个关系状态分析边界测试；服务器待执行。
+
+下一步：服务器同步 test-013-relationship-state-analysis 后执行专项测试和全量 pytest；通过后继续强化契约边界并最终验收 TEST-013。
 
 ---
 
