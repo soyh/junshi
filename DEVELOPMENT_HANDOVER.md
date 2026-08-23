@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-23
-当前阶段：TEST-009 Text Import
-当前状态：VERIFIED
-下一阶段：TEST-010 Conversation Analysis Foundation
+当前阶段：TEST-010 Conversation Analysis Foundation
+当前状态：IN PROGRESS
+下一阶段：TEST-010 验收后进入 TEST-011 Evidence
 项目目录：/opt/ai-love-strategist
 
 ---
@@ -140,57 +140,9 @@ Branch：
 
 test-009-text-import
 
-基础实现 Commit：
-
-f7b2455 feat: add TEST-009 text import foundation
-
 最终验证 Commit：
 
 a2059a6 test: verify text import rollback atomicity
-
-目标：
-
-文本聊天记录导入。
-
-流程：
-
-Text
-→ Parse
-→ Message Candidates
-→ Validation
-→ Conversation
-→ Message
-
-已完成：
-
-- 固定文本导入格式：timestamp | sender_type | content
-- 空行跳过
-- Message Candidate 生成
-- line_number 保留
-- sender_type validation
-- content validation
-- ISO-8601 timestamp validation
-- Zulu timestamp 支持
-- 时间顺序 validation
-- 相同 timestamp 允许
-- 等价 timezone instant validation
-- 相同 instant 保持原始输入顺序
-- Person existence validation
-- user_id isolation
-- Conversation 自动创建
-- Message 自动创建
-- imported_count 返回
-- message_ids 返回
-- candidates 返回
-- message_ids 与 persisted messages 顺序一致
-- message_ids 与 candidates 顺序一致
-- 导入失败时不创建 Conversation
-- Message 创建过程中发生异常时整个导入事务 rollback
-- rollback 后不残留已创建 Message
-
-API：
-
-POST /api/v1/text-imports
 
 最终测试：
 
@@ -202,66 +154,21 @@ git diff --check：通过
 数据库变化：无新增 migration。
 架构变化：无。
 
-明确边界：
-
-- 不接 OCR
-- 不接 screenshot import
-- 不接外部聊天平台 integration
-- 不接 LLM
-- 不做自动发送
-- 不进入 Conversation Analysis
-
 验收结论：
 
 TEST-009 Text Import VERIFIED。
 
 ---
 
-## 7. 当前 Git 状态
-
-代码分支：
-
-test-009-text-import
-
-最新代码 Commit：
-
-a2059a6 test: verify text import rollback atomicity
-
-随后 handover 文档已通过 GitHub 更新，作为文档同步提交。
-
-本地开发环境在 TEST-009 验收时：
-
-Working tree：clean
-
----
-
-## 8. 当前稳定测试基线
-
-TEST-009 专项：
-
-44 passed
-
-全量：
-
-103 passed
-
-验证命令：
-
-PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q backend/tests/test_text_import.py backend/tests/test_text_import_contract.py
-
-PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
-
----
-
-## 9. 下一阶段：TEST-010
+## 7. TEST-010
 
 Conversation Analysis Foundation
+
+状态：IN PROGRESS
 
 Branch：
 
 test-010-conversation-analysis
-
-状态：NOT STARTED
 
 目标：
 
@@ -269,18 +176,54 @@ test-010-conversation-analysis
 
 暂不接真实 LLM。
 
-第一阶段目标：
+第一阶段已实现：
 
-1. 定义 Conversation Analysis 输入模型
-2. 设计分析上下文组装
-3. 建立 Message / Conversation / Person 关系映射
-4. 保证 user_id / person_id 隔离
-5. 明确 Fact / Inference / Unknown / Recommendation 四类信息边界
-6. 设计 Route → Service → Repository 层边界
-7. 编写测试契约
-8. 执行全量 pytest
-9. Git status / commit
-10. 更新 handover
+1. Conversation Analysis 输入模型
+2. 分析上下文组装
+3. Message / Conversation / Person 关系映射
+4. user_id / person_id 隔离
+5. Fact / Inference / Unknown / Recommendation 四类信息边界
+6. Route → Service → Repository 层边界
+7. 基础 API 测试契约
+
+当前 API：
+
+GET /api/v1/conversations/{conversation_id}/analysis/context
+
+当前返回结构：
+
+conversation
+person
+messages
+facts
+inferences
+unknowns
+recommendations
+
+当前阶段边界：
+
+只读取和组装已有持久化数据。
+
+不进行推断。
+不生成未知事实。
+不生成推荐。
+不调用模型。
+
+当前四类分析字段均为空列表，作为后续分析层的明确契约边界。
+
+新增文件：
+
+backend/app/repositories/analysis.py
+backend/app/services/analysis.py
+backend/app/schemas/analysis.py
+backend/app/api/routes/analysis.py
+backend/tests/test_analysis.py
+
+API Router 已注册 analysis router。
+
+数据库变化：
+
+无新增 migration。
 
 明确禁止：
 
@@ -290,12 +233,29 @@ test-010-conversation-analysis
 - 不生成真实策略回复
 - 不自动发送消息
 - 不提前进入 Memory System
+- 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB
 
-TEST-010 的第一步必须是设计契约，而不是直接接入模型。
+当前验证状态：
+
+代码已直接写入 GitHub 分支，服务器测试尚未执行。
+
+下一步：
+
+服务器同步 test-010-conversation-analysis。
+
+执行：
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q backend/tests/test_analysis.py
+
+然后执行全量：
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
+
+确认通过后，再继续 TEST-010 契约收紧与最终验收。
 
 ---
 
-## 10. 开发原则
+## 8. 开发原则
 
 不要随意改变现有架构。
 
@@ -325,7 +285,7 @@ MVP 阶段不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
 ---
 
-## 11. 新对话启动时的第一任务
+## 9. 新对话启动时的第一任务
 
 新对话不要重新从项目零开始。
 
@@ -343,7 +303,7 @@ docs/DEVELOPMENT_HANDOVER.md
 
 ---
 
-## 12. 当前项目状态总结
+## 10. 当前项目状态总结
 
 已完成：
 
@@ -362,32 +322,27 @@ TEST-009 / Text Import
 
 当前：
 
-TEST-009 VERIFIED
+TEST-010 Conversation Analysis Foundation
 
 Branch：
 
-test-009-text-import
+test-010-conversation-analysis
 
-Latest code commit：
+数据库：
 
-a2059a6
+SQLite
 
-Tests：
+Migrations：
 
-103 passed
+001 / 002 / 003
 
-Text Import tests：
+下一验收目标：
 
-44 passed
+TEST-010 Conversation Analysis Foundation
 
-Working tree（本次 TEST-009 验收时）：
+后续：
 
-clean
-
-未完成：
-
-Conversation Analysis
-Evidence
+TEST-011 Evidence
 Person profile
 Relationship state analysis
 Strategic reply
@@ -397,11 +352,3 @@ Memory system
 Model Router
 AI provider integration
 Long-term relationship tracking
-
-下一阶段：
-
-TEST-010 Conversation Analysis Foundation
-
-下一 Branch：
-
-test-010-conversation-analysis
