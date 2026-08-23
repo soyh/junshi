@@ -20,5 +20,8 @@ class RecommendationService:
             "relationship": state["relationship"],
             "current_state": state["current_state"],
             "evidence": state["evidence"],
+            "facts": state["facts"],
+            "inferences": state["inferences"],
+            "unknowns": state["unknowns"],
             "recommendations": [],
         }
