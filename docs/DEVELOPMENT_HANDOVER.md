@@ -657,27 +657,92 @@ test-007-conversations-messages
 
 ## TEST-008
 
-Message Sources
+Person Timeline
+
+状态：
+
+VERIFIED
 
 Branch：
 
-test-008-message-sources
+test-008-person-timeline
+
+Commit：
+
+a671cfb fix: keep conversation creation events after activity
 
 目标：
 
-建立消息来源追踪基础。
+建立 Person Timeline，将：
 
-为：
+- Interaction
+- Conversation
+- Message
 
-- manual
-- text import
-- screenshot
-- OCR
-- future integrations
+统一聚合为 Person 级时间线。
 
-建立来源模型。
+完成内容：
 
----
+- Interaction timeline events
+- Conversation creation events
+- Message timeline events
+- Message → Conversation → Person 归属
+- user_id isolation
+- person_id isolation
+- pagination
+- deterministic ordering
+- deleted message reflection
+- SQLite UNION ALL ordering 修复
+- Conversation creation event ordering 修复
+
+修改文件：
+
+- backend/app/repositories/timeline.py
+- backend/app/services/timeline.py
+- backend/app/api/routes/timeline.py
+- backend/app/schemas/timeline.py
+- backend/app/api/router.py
+- backend/tests/test_timeline.py
+
+数据库变化：
+
+无新增 migration。
+
+API变化：
+
+新增：
+
+GET /api/v1/persons/{person_id}/timeline
+
+测试：
+
+Timeline：
+
+8 passed
+
+全量：
+
+59 passed
+
+验证：
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
+
+结果：
+
+59 passed
+
+已知问题：
+
+无。
+
+下一阶段：
+
+TEST-009
+
+Branch：
+
+test-009-text-import
 
 ## TEST-009
 

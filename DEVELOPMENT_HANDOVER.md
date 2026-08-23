@@ -434,6 +434,7 @@ API Key 不得明文保存。
 
 ---
 
+
 ## 12. 新对话启动时的第一任务
 
 新对话不要重新从项目零开始。
@@ -450,17 +451,17 @@ test-008-person-timeline
 
 当前 HEAD：
 
-411ae05
+a671cfb
 
-当前基线：
+当前测试基线：
 
-51 passed
+59 passed
 
-然后进入：
+然后读取：
 
-TEST-028 Person Timeline
+docs/DEVELOPMENT_HANDOVER.md
 
-第一步应该是读取当前代码和测试，确认现有 persons、relationships、interactions、conversations、messages 的数据结构和 API，然后设计 Timeline，不要直接修改代码。
+再根据当前 TEST 阶段继续开发。
 
 ---
 
@@ -478,17 +479,56 @@ Migration 002
 Migration 003
 TEST-026
 TEST-027
+TEST-028 / Person Timeline
+TEST-008 / Person Timeline
 
 当前：
 
-51/51 tests passed
-Git clean
+Branch：
+
+test-008-person-timeline
+
+HEAD：
+
+a671cfb
+
+Tests：
+
+59 passed
+
+Timeline tests：
+
+8 passed
+
+Git：
+
+clean
+
+TEST-008：
+
+VERIFIED
+
+已完成：
+
+Person Timeline
+
+包含：
+
+Interaction
+Conversation
+Message
+Pagination
+Ordering
+Person isolation
+User isolation
+Message → Conversation → Person mapping
+Deleted message reflection
 
 未完成：
 
-Person Timeline
-Relationship Timeline
-Chat analysis
+Text Import
+Conversation Analysis
+Evidence
 Person profile
 Relationship state analysis
 Strategic reply
@@ -499,6 +539,10 @@ Model Router
 AI provider integration
 Long-term relationship tracking
 
-当前应继续：
+当前下一阶段：
 
-TEST-028 Person Timeline
+TEST-009 Text Import
+
+下一 Branch：
+
+test-009-text-import
