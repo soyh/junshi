@@ -66,7 +66,7 @@ class TimelineRepository:
             WHERE m.user_id = ?
               AND c.person_id = ?
 
-            ORDER BY occurred_at DESC, source_type ASC, source_id ASC
+            ORDER BY datetime(occurred_at) DESC, source_type ASC, source_id ASC
             LIMIT ? OFFSET ?
         """
 
