@@ -11,6 +11,7 @@ from app.api.routes.messages import (
 from app.api.routes.person_profiles import router as person_profiles_router
 from app.api.routes.persons import router as persons_router
 from app.api.routes.relationships import router as relationships_router
+from app.api.routes.relationship_state import router as relationship_state_router
 from app.api.routes.text_imports import router as text_imports_router
 from app.api.routes.timeline import router as timeline_router
 
@@ -22,6 +23,7 @@ api_router = APIRouter(
 api_router.include_router(persons_router)
 api_router.include_router(person_profiles_router)
 api_router.include_router(relationships_router)
+api_router.include_router(relationship_state_router)
 api_router.include_router(interactions_router)
 api_router.include_router(messages_router)
 api_router.include_router(conversation_messages_router)
