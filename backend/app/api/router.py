@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes.action_decision import router as action_decision_router
+from app.api.routes.action_outcome import router as action_outcome_router
 from app.api.routes.action_plan import router as action_plan_router
 from app.api.routes.analysis import router as analysis_router
 from app.api.routes.conversations import router as conversations_router
@@ -32,6 +33,7 @@ api_router.include_router(recommendation_router)
 api_router.include_router(strategic_reply_router)
 api_router.include_router(action_plan_router)
 api_router.include_router(action_decision_router)
+api_router.include_router(action_outcome_router)
 api_router.include_router(interactions_router)
 api_router.include_router(messages_router)
 api_router.include_router(conversation_messages_router)
