@@ -4,7 +4,7 @@
 
 当前阶段：TEST-014 Recommendation foundation
 
-当前状态：IN PROGRESS
+当前状态：VERIFIED
 
 当前 Branch：test-014-recommendation-foundation
 
@@ -31,6 +31,8 @@ Branch：test-009-text-import
 最终验证 Commit：a2059a6 test: verify text import rollback atomicity
 
 最终测试：Text Import 专项 44 passed；全量 103 passed
+
+验收结论：TEST-009 Text Import VERIFIED。
 
 ---
 
@@ -83,7 +85,6 @@ Branch：test-012-person-profile
 目标：建立人物档案的只读聚合入口，为后续人物画像和关系分析提供稳定输入边界。
 
 第一阶段实现：
-- Person profile response schema
 - Person 基础档案
 - Person 关联 Relationship 列表
 - Relationship / Conversation / Interaction / Message 统计
@@ -143,13 +144,31 @@ API：GET /api/v1/persons/{person_id}/relationship-analysis/state
 
 Recommendation foundation
 
-状态：IN PROGRESS
+状态：VERIFIED
 
 Branch：test-014-recommendation-foundation
 
 目标：在现有 Person profile、Timeline、Conversation Analysis Context、Evidence、Relationship state analysis 之上，建立建议输出的稳定契约与证据边界。
 
-第一阶段边界：只允许基于已有事实、Evidence 和已确认关系状态形成结构化建议输入；不接真实 LLM，不自动发送消息，不直接修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+第一阶段实现：
+- Recommendation foundation response schema
+- Person / Relationship / Relationship state context aggregation
+- Evidence-backed analysis context boundary
+- facts / inferences / unknowns / recommendations analysis buckets
+- user_id isolation
+- person_id isolation
+- relationship ownership boundary
+- deterministic ordering
+- read-only behavior
+- locked response shape
+
+API：GET /api/v1/persons/{person_id}/recommendation
+
+第一阶段边界：只允许基于已有事实、Evidence 和已确认关系状态形成结构化建议输入；当前不生成未经证据支持的分析内容，不接真实 LLM，不自动发送消息，不直接修改 Relationship，不新增 migration，不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+
+最终服务器验证：TEST-014 专项 9 passed；全量 150 passed。
+
+验收结论：TEST-014 Recommendation foundation VERIFIED。
 
 ---
 
