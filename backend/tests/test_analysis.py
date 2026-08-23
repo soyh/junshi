@@ -34,52 +34,69 @@ def _create_message(client, conversation_id, sender_type, content, sent_at):
         },
     )
     assert response.status_code == 201
+    return response.json()["id"]
 
 
 def test_analysis_context_returns_persisted_context_and_empty_analysis_lists(client):
     person_id = _create_person(client)
     conversation_id = _create_conversation(client, person_id)
 
-    _create_message(
-        client,
-        conversation_id,
-        "user",
-        "你好",
-        "2026-08-23T10:00:00+00:00",
-    )
-    _create_message(
-        client,
-        conversation_id,
-        "person",
-        "你好呀",
-        "2026-08-23T10:01:00+00:00",
-    )
+    _create_message(client, conversation_id, "user", "你好", "2026-08-23T10:00:00+00:00")
+    _create_message(client, conversation_id, "person", "你好呀", "2026-08-23T10:01:00+00:00")
 
-    response = client.get(
-        f"/api/v1/conversations/{conversation_id}/analysis/context"
-    )
+    response = client.get(f"/api/v1/conversations/{conversation_id}/analysis/context")
 
     assert response.status_code == 200
     body = response.json()
-
     assert body["conversation"]["id"] == conversation_id
     assert body["conversation"]["person_id"] == person_id
     assert body["person"]["id"] == person_id
-    assert [message["content"] for message in body["messages"]] == [
-        "你好",
-        "你好呀",
-    ]
+    assert [message["content"] for message in body["messages"]] == ["你好", "你好呀"]
     assert body["facts"] == []
     assert body["inferences"] == []
     assert body["unknowns"] == []
     assert body["recommendations"] == []
 
 
+def test_analysis_context_returns_empty_messages_for_empty_conversation(client):
+    person_id = _create_person(client)
+    conversation_id = _create_conversation(client, person_id)
+
+    response = client.get(f"/api/v1/conversations/{conversation_id}/analysis/context")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["conversation"]["id"] == conversation_id
+    assert body["person"]["id"] == person_id
+    assert body["messages"] == []
+    assert body["facts"] == []
+    assert body["inferences"] == []
+    assert body["unknowns"] == []
+    assert body["recommendations"] == []
+
+
+def test_analysis_context_preserves_message_order_contract(client):
+    person_id = _create_person(client)
+    conversation_id = _create_conversation(client, person_id)
+
+    _create_message(client, conversation_id, "user", "第二条", "2026-08-23T10:01:00+00:00")
+    _create_message(client, conversation_id, "person", "第一条", "2026-08-23T10:00:00+00:00")
+    _create_message(client, conversation_id, "user", "同一时刻后写入", "2026-08-23T10:01:00+00:00")
+
+    response = client.get(f"/api/v1/conversations/{conversation_id}/analysis/context")
+
+    assert response.status_code == 200
+    assert [message["content"] for message in response.json()["messages"]] == [
+        "第一条",
+        "第二条",
+        "同一时刻后写入",
+    ]
+
+
 def test_analysis_context_rejects_unknown_conversation(client):
     response = client.get(
         "/api/v1/conversations/00000000-0000-0000-0000-000000000099/analysis/context"
     )
-
     assert response.status_code == 404
     assert response.json() == {"detail": "Conversation not found"}
 
@@ -92,7 +109,6 @@ def test_analysis_context_enforces_user_isolation(client):
         f"/api/v1/conversations/{conversation_id}/analysis/context",
         headers={"X-User-ID": "11111111-1111-1111-1111-111111111111"},
     )
-
     assert response.status_code == 404
     assert response.json() == {"detail": "Conversation not found"}
 
@@ -102,26 +118,59 @@ def test_analysis_context_maps_messages_only_from_target_conversation(client):
     conversation_a = _create_conversation(client, person_id, "A")
     conversation_b = _create_conversation(client, person_id, "B")
 
-    _create_message(
+    _create_message(client, conversation_a, "user", "A消息", "2026-08-23T10:00:00+00:00")
+    _create_message(client, conversation_b, "user", "B消息", "2026-08-23T10:01:00+00:00")
+
+    response = client.get(f"/api/v1/conversations/{conversation_a}/analysis/context")
+    assert response.status_code == 200
+    assert [message["content"] for message in response.json()["messages"]] == ["A消息"]
+
+
+def test_analysis_context_reflects_deleted_message(client):
+    person_id = _create_person(client)
+    conversation_id = _create_conversation(client, person_id)
+    message_id = _create_message(
         client,
-        conversation_a,
+        conversation_id,
         "user",
-        "A消息",
+        "待删除消息",
         "2026-08-23T10:00:00+00:00",
     )
-    _create_message(
-        client,
-        conversation_b,
-        "user",
-        "B消息",
-        "2026-08-23T10:01:00+00:00",
-    )
 
-    response = client.get(
-        f"/api/v1/conversations/{conversation_a}/analysis/context"
-    )
+    delete_response = client.delete(f"/api/v1/messages/{message_id}")
+    assert delete_response.status_code == 204
 
+    response = client.get(f"/api/v1/conversations/{conversation_id}/analysis/context")
     assert response.status_code == 200
-    assert [message["content"] for message in response.json()["messages"]] == [
-        "A消息"
-    ]
+    assert response.json()["messages"] == []
+
+
+def test_analysis_context_does_not_persist_analysis_results(client):
+    person_id = _create_person(client)
+    conversation_id = _create_conversation(client, person_id)
+    _create_message(client, conversation_id, "user", "分析输入", "2026-08-23T10:00:00+00:00")
+
+    from app.core.database import get_connection
+
+    with get_connection() as conn:
+        before = {
+            "persons": conn.execute("SELECT COUNT(*) AS count FROM persons").fetchone()["count"],
+            "conversations": conn.execute("SELECT COUNT(*) AS count FROM conversations").fetchone()["count"],
+            "messages": conn.execute("SELECT COUNT(*) AS count FROM messages").fetchone()["count"],
+        }
+
+    response = client.get(f"/api/v1/conversations/{conversation_id}/analysis/context")
+    assert response.status_code == 200
+
+    with get_connection() as conn:
+        after = {
+            "persons": conn.execute("SELECT COUNT(*) AS count FROM persons").fetchone()["count"],
+            "conversations": conn.execute("SELECT COUNT(*) AS count FROM conversations").fetchone()["count"],
+            "messages": conn.execute("SELECT COUNT(*) AS count FROM messages").fetchone()["count"],
+        }
+
+    assert after == before
+    assert response.json()["facts"] == []
+    assert response.json()["inferences"] == []
+    assert response.json()["unknowns"] == []
+    assert response.json()["recommendations"] == []
