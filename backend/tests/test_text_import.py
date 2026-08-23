@@ -709,3 +709,29 @@ def test_text_import_preserves_original_order_for_equal_timestamps(client):
         "第二条",
         "第三条",
     ]
+
+
+def test_text_import_preserves_original_order_for_equal_instants_across_timezones(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "2026-08-23T18:00:00+08:00 | user | 第一条\n"
+                "2026-08-23T10:00:00Z | person | 第二条\n"
+                "2026-08-23T18:00:00+08:00 | user | 第三条"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+    assert body["imported_count"] == 3
+    assert [candidate["content"] for candidate in body["candidates"]] == [
+        "第一条",
+        "第二条",
+        "第三条",
+    ]
