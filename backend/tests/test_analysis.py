@@ -1,0 +1,127 @@
+def _create_person(client, name="分析测试对象"):
+    response = client.post(
+        "/api/v1/persons",
+        json={
+            "name": name,
+            "nickname": None,
+            "notes": "TEST-010",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def _create_conversation(client, person_id, title="分析测试会话"):
+    response = client.post(
+        "/api/v1/conversations",
+        json={
+            "person_id": person_id,
+            "title": title,
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def _create_message(client, conversation_id, sender_type, content, sent_at):
+    response = client.post(
+        "/api/v1/messages",
+        json={
+            "conversation_id": conversation_id,
+            "sender_type": sender_type,
+            "content": content,
+            "sent_at": sent_at,
+        },
+    )
+    assert response.status_code == 201
+
+
+def test_analysis_context_returns_persisted_context_and_empty_analysis_lists(client):
+    person_id = _create_person(client)
+    conversation_id = _create_conversation(client, person_id)
+
+    _create_message(
+        client,
+        conversation_id,
+        "user",
+        "你好",
+        "2026-08-23T10:00:00+00:00",
+    )
+    _create_message(
+        client,
+        conversation_id,
+        "person",
+        "你好呀",
+        "2026-08-23T10:01:00+00:00",
+    )
+
+    response = client.get(
+        f"/api/v1/conversations/{conversation_id}/analysis/context"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["conversation"]["id"] == conversation_id
+    assert body["conversation"]["person_id"] == person_id
+    assert body["person"]["id"] == person_id
+    assert [message["content"] for message in body["messages"]] == [
+        "你好",
+        "你好呀",
+    ]
+    assert body["facts"] == []
+    assert body["inferences"] == []
+    assert body["unknowns"] == []
+    assert body["recommendations"] == []
+
+
+def test_analysis_context_rejects_unknown_conversation(client):
+    response = client.get(
+        "/api/v1/conversations/00000000-0000-0000-0000-000000000099/analysis/context"
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Conversation not found"}
+
+
+def test_analysis_context_enforces_user_isolation(client):
+    person_id = _create_person(client)
+    conversation_id = _create_conversation(client, person_id)
+
+    response = client.get(
+        f"/api/v1/conversations/{conversation_id}/analysis/context",
+        headers={"X-User-ID": "11111111-1111-1111-1111-111111111111"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Conversation not found"}
+
+
+def test_analysis_context_maps_messages_only_from_target_conversation(client):
+    person_id = _create_person(client)
+    conversation_a = _create_conversation(client, person_id, "A")
+    conversation_b = _create_conversation(client, person_id, "B")
+
+    _create_message(
+        client,
+        conversation_a,
+        "user",
+        "A消息",
+        "2026-08-23T10:00:00+00:00",
+    )
+    _create_message(
+        client,
+        conversation_b,
+        "user",
+        "B消息",
+        "2026-08-23T10:01:00+00:00",
+    )
+
+    response = client.get(
+        f"/api/v1/conversations/{conversation_a}/analysis/context"
+    )
+
+    assert response.status_code == 200
+    assert [message["content"] for message in response.json()["messages"]] == [
+        "A消息"
+    ]
