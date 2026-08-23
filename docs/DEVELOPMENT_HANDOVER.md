@@ -4,9 +4,17 @@
 
 当前阶段：TEST-012 Person profile
 
-当前状态：IN PROGRESS
+当前状态：VERIFIED
 
 当前 Branch：test-012-person-profile
+
+最终验证 Commit：fe0c58d test: align person profile ordering with relationship invariant
+
+最终服务器验证：TEST-012 专项 8 passed；全量 131 passed。
+
+验收结论：TEST-012 Person profile VERIFIED。
+
+下一阶段：TEST-013 Relationship state analysis
 
 ---
 
@@ -76,13 +84,13 @@ API：GET /api/v1/conversations/{conversation_id}/analysis/evidence
 
 Person profile
 
-状态：IN PROGRESS
+状态：VERIFIED
 
 Branch：test-012-person-profile
 
 目标：建立人物档案的只读聚合入口，为后续人物画像和关系分析提供稳定输入边界。
 
-当前第一阶段实现：
+第一阶段实现：
 - Person profile response schema
 - Person 基础档案
 - Person 关联 Relationship 列表
@@ -99,9 +107,23 @@ API：GET /api/v1/persons/{person_id}/profile
 
 边界：当前只读取已有持久化数据，不进行人物推断、不生成画像结论、不调用 LLM、不写入 profile analysis 结果、不新增 migration。
 
-当前专项测试：已补齐 8 个 API/聚合边界测试；服务器待执行。
+最终服务器验证：TEST-012 专项 8 passed；全量 131 passed。
 
-下一步：服务器同步 test-012-person-profile 后执行 TEST-012 专项测试和全量 pytest；通过后最终验收。
+验收结论：TEST-012 Person profile VERIFIED。
+
+---
+
+## TEST-013
+
+Relationship state analysis
+
+状态：PLANNED
+
+目标：在已有 Person profile、Timeline、Conversation Analysis Context、Evidence 基础上，建立关系状态分析的稳定输入与输出边界。
+
+第一阶段原则：只基于已有持久化事实和 Evidence 进行状态分析契约建设；不接真实 LLM，不自动生成未经证据支持的事实，不自动发送消息，不直接修改 Relationship 状态。
+
+下一步：建立 Relationship state analysis schema / service / repository 或最小必要读取层，并补齐 user_id、person_id、relationship 归属、deterministic ordering、read-only 与 Fact / Inference / Unknown / Recommendation 边界测试。
 
 ---
 
