@@ -7,7 +7,7 @@ from app.services.action_outcome import ActionOutcomeService
 
 
 router = APIRouter(
-    prefix="/persons/{person_id}/action-plan/decisions/{decision_id}/outcome",
+    prefix="/persons/{person_id}/action-plan/outcomes",
     tags=["action-outcomes"],
 )
 
@@ -15,7 +15,7 @@ service = ActionOutcomeService()
 
 
 @router.get(
-    "/history",
+    "",
     response_model=list[ActionOutcomeResponse],
     status_code=status.HTTP_200_OK,
 )
@@ -28,7 +28,7 @@ def list_action_outcomes(
 
 
 @router.post(
-    "",
+    "/{decision_id}",
     response_model=ActionOutcomeResponse,
     status_code=status.HTTP_201_CREATED,
 )
