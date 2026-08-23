@@ -774,3 +774,44 @@ def test_text_import_message_ids_match_persisted_messages_in_order(client):
         "第二条",
         "第三条",
     ]
+
+
+def test_text_import_message_ids_align_with_candidates_in_order(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "2026-08-23T10:00:00+00:00 | user | 第一条\n"
+                "2026-08-23T10:01:00+00:00 | person | 第二条\n"
+                "2026-08-23T10:02:00+00:00 | user | 第三条"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+
+    assert body["imported_count"] == 3
+    assert len(body["message_ids"]) == len(body["candidates"])
+
+    messages = client.get(
+        f"/api/v1/conversations/{body['conversation_id']}/messages"
+    )
+    assert messages.status_code == 200
+
+    persisted_messages = messages.json()
+
+    assert len(persisted_messages) == len(body["candidates"])
+
+    for message_id, candidate, message in zip(
+        body["message_ids"],
+        body["candidates"],
+        persisted_messages,
+    ):
+        assert message_id == message["id"]
+        assert candidate["content"] == message["content"]
+        assert candidate["sent_at"] == message["sent_at"]
