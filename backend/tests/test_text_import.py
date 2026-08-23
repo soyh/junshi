@@ -487,3 +487,62 @@ def test_text_import_whitespace_only_text_does_not_create_conversation(client):
     )
     assert conversations.status_code == 200
     assert conversations.json() == []
+
+
+def test_text_import_skips_leading_and_trailing_blank_lines_preserving_line_numbers(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "\n"
+                "\n"
+                "2026-08-23T10:00:00+00:00 | user | 第一条\n"
+                "\n"
+                "2026-08-23T10:01:00+00:00 | person | 第二条\n"
+                "\n"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+    assert body["imported_count"] == 2
+    assert [candidate["line_number"] for candidate in body["candidates"]] == [3, 5]
+    assert [candidate["content"] for candidate in body["candidates"]] == [
+        "第一条",
+        "第二条",
+    ]
+
+
+def test_text_import_mixed_blank_lines_preserves_original_line_numbers(client):
+    person_id = _text_import_test_helpers(client)
+
+    response = client.post(
+        "/api/v1/text-imports",
+        json={
+            "person_id": person_id,
+            "text": (
+                "\r\n"
+                "2026-08-23T10:00:00+00:00 | user | 第一条\r\n"
+                "\r\n"
+                "   \r\n"
+                "\t\r\n"
+                "2026-08-23T10:01:00+00:00 | person | 第二条\r\n"
+                "\r\n"
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+    assert body["imported_count"] == 2
+    assert [candidate["line_number"] for candidate in body["candidates"]] == [2, 6]
+    assert [candidate["content"] for candidate in body["candidates"]] == [
+        "第一条",
+        "第二条",
+    ]
