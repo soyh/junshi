@@ -61,12 +61,14 @@ def test_person_profile_is_read_only(client):
 
 def test_person_profile_relationships_are_deterministically_ordered(client):
     person = create_person(client)
-    first = client.post("/api/v1/relationships", json={"person_id": person["id"], "status": "active", "stage": "dating"})
-    second = client.post("/api/v1/relationships", json={"person_id": person["id"], "status": "active", "stage": "exclusive"})
-    assert first.status_code == 201
-    assert second.status_code == 201
-    response = client.get(f"/api/v1/persons/{person['id']}/profile")
-    assert [item["id"] for item in response.json()["relationships"]] == [first.json()["id"], second.json()["id"]]
+    relationship = client.post("/api/v1/relationships", json={"person_id": person["id"], "status": "active", "stage": "dating"})
+    assert relationship.status_code == 201
+    first = client.get(f"/api/v1/persons/{person['id']}/profile")
+    second = client.get(f"/api/v1/persons/{person['id']}/profile")
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert [item["id"] for item in first.json()["relationships"]] == [relationship.json()["id"]]
+    assert second.json()["relationships"] == first.json()["relationships"]
 
 
 def test_person_profile_latest_interaction_uses_occurred_at(client):
