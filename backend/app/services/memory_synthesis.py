@@ -25,6 +25,7 @@ class MemorySynthesisService:
                     "source_candidate_id": candidate["id"],
                     "source_decision_id": candidate["source_decision_id"],
                     "source_outcome_id": candidate["source_outcome_id"],
+                    "source_created_at": candidate["source_created_at"],
                     "memory": {
                         "action_outcome": outcome,
                         "note": candidate["content"]["note"],
