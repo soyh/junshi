@@ -36,9 +36,10 @@ TEST-015 Strategic Reply Foundation — VERIFIED
 TEST-016 Action Plan Foundation — VERIFIED
 TEST-017 Action Plan Synthesis — VERIFIED
 TEST-018 Strategic Reply Synthesis — VERIFIED
+TEST-019 Action Confirmation Foundation — VERIFIED
+TEST-020 Action Outcome Foundation — VERIFIED
 
-TEST-019 Action Confirmation Foundation — 待服务器批次验收
-TEST-020 Action Outcome Foundation — 待服务器批次验收
+TEST-019 + TEST-020 最终服务器验证：专项 15 passed；全量 195 passed。
 
 ---
 
@@ -82,8 +83,8 @@ memory_constraints：
 
 相邻两个 TEST-No 合并为一次服务器测试批次：
 
-TEST-019 + TEST-020：一次专项 + 一次全量
-TEST-021 + TEST-022：一次专项 + 一次全量
+TEST-019 + TEST-020：专项 15 passed + 全量 195 passed
+TEST-021 + TEST-022：一次专项 + 一次全量，当前待服务器验收
 
 每个 TEST 仍保持独立代码边界、测试文件和验收记录。
 
