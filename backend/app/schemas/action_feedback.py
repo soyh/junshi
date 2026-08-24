@@ -25,9 +25,25 @@ class ActionFeedbackSynthesisResponse(BaseModel):
     source: dict[str, str | None]
 
 
+class ActionFeedbackSummary(BaseModel):
+    total_decisions: int
+    decision_counts: dict[str, int]
+    outcome_observed_count: int
+    outcome_unknown_count: int
+    outcome_counts: dict[str, int]
+    latest_observed_outcome: dict[str, str | None] | None
+
+
 class ActionFeedbackContextResponse(BaseModel):
     person: dict[str, Any]
     relationship: dict[str, Any]
     feedback_constraints: dict[str, Any]
     feedback: list[ActionFeedbackResponse]
     feedback_synthesis: list[ActionFeedbackSynthesisResponse]
+
+
+class ActionFeedbackSummaryResponse(BaseModel):
+    person: dict[str, Any]
+    relationship: dict[str, Any]
+    feedback_summary_constraints: dict[str, Any]
+    summary: ActionFeedbackSummary
