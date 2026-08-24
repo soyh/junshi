@@ -203,3 +203,26 @@ class ActionFeedbackService:
             },
             "signals": signals,
         }
+
+    def get_learning_context(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
+        summary = self.get_summary(conn, user_id, person_id)
+        trend = self.get_trend(conn, user_id, person_id)
+        signals = self.get_signals(conn, user_id, person_id)
+        return {
+            "person": summary["person"],
+            "relationship": summary["relationship"],
+            "feedback_learning_constraints": {
+                "must_be_source_backed": True,
+                "must_preserve_unknowns": True,
+                "must_keep_summary_trend_signal_views_consistent": True,
+                "must_not_infer_recommendation_quality": True,
+                "must_not_infer_success": True,
+                "must_not_infer_relationship_impact": True,
+                "must_not_change_relationship": True,
+                "must_not_auto_execute": True,
+                "must_not_call_llm": True,
+            },
+            "summary": summary["summary"],
+            "trend": trend["observations"],
+            "signals": signals["signals"],
+        }
