@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-24
-当前阶段：TEST-023 memory update synthesis
+当前阶段：TEST-023 + TEST-024 memory update loop
 当前状态：IN PROGRESS
-当前 Branch：test-023-memory-update-synthesis
+当前 Branch：test-024-memory-update-synthesis
 
 ---
 
@@ -51,40 +51,44 @@ TEST-021 + TEST-022 最终服务器验证：专项 18 passed；全量 213 passed
 ## TEST-023 Memory Update Synthesis
 
 Branch：test-023-memory-update-synthesis
-状态：IN PROGRESS
+状态：IMPLEMENTED，待服务器批次验收
 
-目标：把已经通过 TEST-022 source-backed memory candidate 的行动结果，转换为更稳定的“记忆更新提案”结构；仍然只提供 proposal，不写入长期 memory。
+目标：把 TEST-022 已经确认 source-backed 的 memory candidate 转换为更稳定的记忆更新提案；仍然只提供 proposal，不写入长期 memory。
 
 API：GET /api/v1/persons/{person_id}/memory-updates/synthesis
 
-核心实现：
-- 仅允许 TEST-022 已存在的 source-backed candidate 进入 synthesis
-- proposal deterministic id
-- status=proposed
-- 保留 source_candidate_id / source_decision_id / source_outcome_id
-- 保留真实 action outcome 与 note
-- 明确记录 relationship impact 与未来行为为 unknown
-- user_id / person_id isolation
-- read-only
+核心边界：source-backed、deterministic、保留 decision/outcome/note、明确 relationship impact 与未来行为为 unknown、user_id / person_id isolation、read-only、不接真实 LLM。
 
-核心边界：
-- 不从 outcome 推断长期关系变化
-- 不从 completed / skipped / failed 推断对方心理
-- 不自动写长期 memory
-- 不改变 Relationship
+---
+
+## TEST-024 Memory Update Persistence Foundation
+
+Branch：test-024-memory-update-synthesis
+状态：IMPLEMENTED，待服务器批次验收
+
+目标：建立“显式持久化”边界。只有通过 TEST-023 synthesis 得到的 source-backed candidate，并由用户显式调用 persist endpoint，才允许写入长期 memory。
+
+API：POST /api/v1/persons/{person_id}/memory-updates/{candidate_id}/persist
+
+新增 migration：006_memory_updates.sql
+
+核心实现：
+- 只允许当前 person / user 下真实存在的 synthesis candidate 持久化
+- 持久化时完整保留 source_candidate_id / source_decision_id / source_outcome_id
+- 保留 action outcome 与 note
+- persisted memory deterministic id
+- 同一 candidate 重复 persist 不产生重复记录
+- user_id / person_id isolation
+- 不修改 Relationship
 - 不执行行动
 - 不发送消息
 - 不接真实 LLM
-- 不新增 migration
 
-memory_constraints：
-- must_be_source_backed=true
-- must_be_proposed=true
-- must_preserve_unknowns=true
-- must_not_infer_from_missing_outcome=true
-- must_not_infer_relationship_impact=true
-- must_not_auto_persist=true
-- must_not_change_relationship=true
+核心安全边界：
+- persist 必须由明确的 POST 调用触发
+- 不在 GET synthesis/context 中自动持久化
+- 缺失或跨 person/user 的 candidate 返回 404
+- 不从 outcome 推断关系变化或对方心理
 
 ---
 
@@ -106,6 +110,6 @@ TEST-023 + TEST-024：一次专项 + 一次全量
 优先采用：Route → Service → Repository → SQLite
 所有用户数据必须进行 user_id 隔离。API Key 不得明文保存。系统不得自动向第三方发送消息。不得使用 8899。MVP 阶段不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
-当前生产数据库 schema migrations：001 / 002 / 003 / 004 / 005。
+当前生产数据库 schema migrations：001 / 002 / 003 / 004 / 005 / 006。
 
 每完成一个明确阶段：代码 → 测试 → Git status → Git commit → 更新交接文档。
