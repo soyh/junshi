@@ -78,7 +78,7 @@ def test_learning_context_is_deterministic(client):
     person = create_person(client)
     create_relationship(client, person["id"])
     first = seed_decision(person["id"], "recommendation-b", "confirmed")
-    second = seed_decision(person["id"], "recommendation-a", "rejected")
+    second = seed_decision(person["id"], "recommendation-a", "confirmed")
     create_outcome(client, person["id"], first["id"], "completed")
     create_outcome(client, person["id"], second["id"], "skipped")
     first_body = get_learning_context(client, person["id"]).json()
