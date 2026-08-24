@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-24
-当前阶段：TEST-023 + TEST-024 memory update loop
-当前状态：IN PROGRESS
-当前 Branch：test-024-memory-update-synthesis
+当前阶段：TEST-025 + TEST-026 memory/action feedback synthesis
+当前状态：READY FOR SERVER VERIFICATION
+当前 Branch：test-026-action-feedback-synthesis
 
 ---
 
@@ -38,57 +38,66 @@ TEST-017 Action Plan Synthesis — VERIFIED
 TEST-018 Strategic Reply Synthesis — VERIFIED
 TEST-019 Action Confirmation Foundation — VERIFIED
 TEST-020 Action Outcome Foundation — VERIFIED
-
-TEST-019 + TEST-020 最终服务器验证：专项 15 passed；全量 195 passed。
-
 TEST-021 Action Feedback Synthesis — VERIFIED
 TEST-022 Memory Update Foundation — VERIFIED
+TEST-023 Memory Update Synthesis — VERIFIED
+TEST-024 Memory Update Persistence Foundation — VERIFIED
 
+TEST-019 + TEST-020 最终服务器验证：专项 15 passed；全量 195 passed。
 TEST-021 + TEST-022 最终服务器验证：专项 18 passed；全量 213 passed。
+TEST-023 + TEST-024 最终服务器验证：专项 15 passed；全量 228 passed。
 
 ---
 
-## TEST-023 Memory Update Synthesis
+## TEST-025 Memory Update Synthesis Contract
 
-Branch：test-023-memory-update-synthesis
+Branch：test-025-memory-update-synthesis
 状态：IMPLEMENTED，待服务器批次验收
 
-目标：把 TEST-022 已经确认 source-backed 的 memory candidate 转换为更稳定的记忆更新提案；仍然只提供 proposal，不写入长期 memory。
+目标：在既有 memory candidate / synthesis 基础上锁定 source identity 契约，使每一个候选记忆更新都能稳定追溯到 action decision、action outcome 和 outcome 时间戳。
 
-API：GET /api/v1/persons/{person_id}/memory-updates/synthesis
-
-核心边界：source-backed、deterministic、保留 decision/outcome/note、明确 relationship impact 与未来行为为 unknown、user_id / person_id isolation、read-only、不接真实 LLM。
-
----
-
-## TEST-024 Memory Update Persistence Foundation
-
-Branch：test-024-memory-update-synthesis
-状态：IMPLEMENTED，待服务器批次验收
-
-目标：建立“显式持久化”边界。只有通过 TEST-023 synthesis 得到的 source-backed candidate，并由用户显式调用 persist endpoint，才允许写入长期 memory。
-
-API：POST /api/v1/persons/{person_id}/memory-updates/{candidate_id}/persist
-
-新增 migration：006_memory_updates.sql
-
-核心实现：
-- 只允许当前 person / user 下真实存在的 synthesis candidate 持久化
-- 持久化时完整保留 source_candidate_id / source_decision_id / source_outcome_id
-- 保留 action outcome 与 note
-- persisted memory deterministic id
-- 同一 candidate 重复 persist 不产生重复记录
-- user_id / person_id isolation
+核心边界：
+- source_decision_id 必须保留
+- source_outcome_id 必须保留
+- source_created_at 必须保留
+- stable source identity
+- 只有存在真实 outcome 的记录才能成为 memory candidate
+- must_not_infer_from_missing_outcome=true
+- must_not_auto_persist=true
 - 不修改 Relationship
-- 不执行行动
-- 不发送消息
 - 不接真实 LLM
 
-核心安全边界：
-- persist 必须由明确的 POST 调用触发
-- 不在 GET synthesis/context 中自动持久化
-- 缺失或跨 person/user 的 candidate 返回 404
-- 不从 outcome 推断关系变化或对方心理
+新增专项测试：backend/tests/test_memory_update_contract.py
+
+---
+
+## TEST-026 Action Feedback Synthesis
+
+Branch：test-026-action-feedback-synthesis
+状态：IMPLEMENTED，待服务器批次验收
+
+目标：把 action decision + action outcome 组合成确定性的 feedback synthesis，同时严格区分“已有决策”“已观察到的执行结果”和“仍未知的信息”。
+
+API：GET /api/v1/persons/{person_id}/action-plan/feedback/context
+
+新增输出：feedback_synthesis
+
+feedback_status：
+- outcome_observed：存在真实 action outcome
+- outcome_unknown：只有 decision，没有 outcome
+
+核心边界：
+- decision_signal 必须来自真实 action decision
+- outcome_signal 在缺少 outcome 时必须为 unknown
+- 不得把缺失 outcome 推断为成功
+- action_effect 与 relationship_impact 保持 unknown
+- 保留 source decision/outcome identity
+- must_not_auto_execute=true
+- must_not_change_relationship=true
+- user_id / person_id isolation
+- 不接真实 LLM
+
+新增专项测试：backend/tests/test_action_feedback_synthesis.py
 
 ---
 
@@ -96,9 +105,17 @@ API：POST /api/v1/persons/{person_id}/memory-updates/{candidate_id}/persist
 
 相邻两个 TEST-No 合并为一次服务器测试批次：
 
-TEST-019 + TEST-020：专项 15 passed + 全量 195 passed
-TEST-021 + TEST-022：专项 18 passed + 全量 213 passed
-TEST-023 + TEST-024：一次专项 + 一次全量
+TEST-025 + TEST-026：
+1. 先执行两个专项测试文件
+2. 再执行一次全量 pytest
+
+推荐命令：
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
+  backend/tests/test_memory_update_contract.py \
+  backend/tests/test_action_feedback_synthesis.py
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
 
 每个 TEST 仍保持独立代码边界、测试文件和验收记录。
 
