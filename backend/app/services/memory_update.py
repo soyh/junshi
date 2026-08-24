@@ -24,6 +24,13 @@ class MemoryUpdateService:
                         "outcome": item["outcome"],
                         "note": item["outcome_note"],
                     },
+                    "recommendation_id": item.get("recommendation_id"),
+                    "learning_source": {
+                        "status": "observed_outcome",
+                        "decision_id": item["decision_id"],
+                        "outcome_id": item["outcome_id"],
+                        "recommendation_id": item.get("recommendation_id"),
+                    },
                     "source_decision_id": item["decision_id"],
                     "source_outcome_id": item["outcome_id"],
                     "source_created_at": item["outcome_created_at"],
@@ -41,6 +48,7 @@ class MemoryUpdateService:
                 "must_not_auto_persist": True,
                 "must_not_change_relationship": True,
                 "must_have_stable_source_identity": True,
+                "must_preserve_learning_provenance": True,
             },
             "candidates": candidates,
         }
