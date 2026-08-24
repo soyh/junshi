@@ -10,6 +10,7 @@ from app.api.routes.analysis import router as analysis_router
 from app.api.routes.conversations import router as conversations_router
 from app.api.routes.evidence import router as evidence_router
 from app.api.routes.interactions import router as interactions_router
+from app.api.routes.memory_learning_synthesis import router as memory_learning_synthesis_router
 from app.api.routes.memory_persistence import router as memory_persistence_router
 from app.api.routes.memory_synthesis import router as memory_synthesis_router
 from app.api.routes.memory_update import router as memory_update_router
@@ -45,6 +46,7 @@ api_router.include_router(action_feedback_learning_router)
 api_router.include_router(action_feedback_learning_synthesis_router)
 api_router.include_router(memory_update_router)
 api_router.include_router(memory_synthesis_router)
+api_router.include_router(memory_learning_synthesis_router)
 api_router.include_router(memory_persistence_router)
 api_router.include_router(interactions_router)
 api_router.include_router(messages_router)
