@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-25
-当前阶段：TEST-039 + TEST-040 strategy decision confirmation bridge
+当前阶段：TEST-041 + TEST-042 strategy decision execution bridge
 当前状态：IMPLEMENTED，待服务器批次验收
-当前 Branch：test-039-040-strategy-decision-confirmation
+当前 Branch：test-041-042-strategy-decision-execution
 
 ---
 
@@ -58,41 +58,52 @@ TEST-037 Strategy Decision Context — VERIFIED
 TEST-038 Strategy Decision Synthesis — VERIFIED
 TEST-039 Strategy Decision Confirmation — IMPLEMENTED，待服务器验收
 TEST-040 Strategy Decision Confirmation Synthesis — IMPLEMENTED，待服务器验收
+TEST-041 Strategy Decision Execution — IMPLEMENTED，待服务器验收
+TEST-042 Strategy Decision Execution Synthesis — IMPLEMENTED，待服务器验收
 
 TEST-037 + TEST-038 服务器专项验收：15 passed；全量测试：318 passed。
 TEST-033 + TEST-034 服务器专项验收：用户已确认通过；全量测试通过。
+TEST-039 + TEST-040 服务器专项验收：15 passed；全量测试：333 passed。
 
 ---
 
-## TEST-039 Strategy Decision Confirmation
+## TEST-041 Strategy Decision Execution
 
-Branch：test-039-040-strategy-decision-confirmation
+Branch：test-041-042-strategy-decision-execution
 状态：IMPLEMENTED，待服务器批次验收
 
 API：
-GET /api/v1/persons/{person_id}/strategy-decision/confirmation-context
-POST /api/v1/persons/{person_id}/strategy-decision/confirmations
+GET /api/v1/persons/{person_id}/strategy-decision/execution-context
+POST /api/v1/persons/{person_id}/strategy-decision/executions/{decision_id}
 
-目标：把 TEST-038 的 deterministic decision candidates 接入显式用户决策记录，使用户可以明确 confirmed / rejected，而系统不自动确认、不自动执行、不自动发送。
+目标：在 TEST-039/040 的显式 confirmed decision 之后，建立独立的显式 execution 记录。execution 不等于 outcome，也不自动产生 outcome。
 
-核心边界：必须记录用户决策；confirmed 必须带 recommendation_id；recommendation 必须来自当前决策输入；不自动确认；不自动执行；不自动发送；不改变 Relationship；不调用真实 LLM；user/person isolation。
+核心边界：必须是 confirmed decision；必须显式执行；同一 decision 只能记录一次 execution；已有 outcome 后不得补写 execution；不自动执行；不自动发送；user/person isolation。
 
-专项测试：backend/tests/test_strategy_decision_confirmation.py
+专项测试：backend/tests/test_strategy_decision_execution.py
 
 ---
 
-## TEST-040 Strategy Decision Confirmation Synthesis
+## TEST-042 Strategy Decision Execution Synthesis
 
-Branch：test-039-040-strategy-decision-confirmation
+Branch：test-041-042-strategy-decision-execution
 状态：IMPLEMENTED，待服务器批次验收
 
-API：GET /api/v1/persons/{person_id}/strategy-decision/confirmation-synthesis
+API：GET /api/v1/persons/{person_id}/strategy-decision/execution-synthesis
 
-目标：对已经记录的显式用户决策进行 deterministic 汇总，区分 confirmed / rejected，并明确 execution 仍需独立的显式执行步骤。
+目标：deterministic 汇总 confirmed / executed / outcome-recorded / pending execution 状态，保持 execution 与 outcome 的独立边界。
 
-核心边界：只汇总没有 outcome 的显式 confirmation；不把 confirmation 当成 execution；不自动执行；不自动发送；保持 decision history；deterministic；user/person isolation。
+核心边界：只把 confirmed 且尚无 execution/outcome 的 decision 视为 pending；不把 execution 当成 outcome；不自动产生 outcome；保持历史记录；deterministic；user/person isolation。
 
-专项测试：backend/tests/test_strategy_decision_confirmation_synthesis.py
+专项测试：backend/tests/test_strategy_decision_execution_synthesis.py
+
+---
+
+## 数据库
+
+新增 migration：007_action_executions.sql
+
+action_executions 保存显式 execution 事件，decision_id 唯一；与 action_decisions、action_outcomes 保持独立生命周期。
 
 ---
 
@@ -100,13 +111,13 @@ API：GET /api/v1/persons/{person_id}/strategy-decision/confirmation-synthesis
 
 相邻两个 TEST-No 合并为一次服务器测试批次。
 
-下一批：TEST-039 + TEST-040。
+下一批：TEST-041 + TEST-042。
 
 推荐命令：
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_strategy_decision_confirmation.py \
-  backend/tests/test_strategy_decision_confirmation_synthesis.py
+  backend/tests/test_strategy_decision_execution.py \
+  backend/tests/test_strategy_decision_execution_synthesis.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
 
@@ -120,6 +131,6 @@ PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
 优先采用：Route → Service → Repository → SQLite
 所有用户数据必须进行 user_id 隔离。API Key 不得明文保存。系统不得自动向第三方发送消息。不得使用 8899。MVP 阶段不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
-当前生产数据库 schema migrations：001 / 002 / 003 / 004 / 005 / 006。
+当前生产数据库 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
 
 每完成一个明确阶段：代码 → 测试 → Git status → Git commit → 更新交接文档。
