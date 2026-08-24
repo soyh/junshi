@@ -23,16 +23,16 @@ TEST-015 Strategic Reply Foundation — VERIFIED
 TEST-016 Action Plan Foundation — VERIFIED
 TEST-017 Action Plan Synthesis — VERIFIED
 TEST-018 Strategic Reply Synthesis — VERIFIED
+TEST-019 Action Confirmation Foundation — VERIFIED
+TEST-020 Action Outcome Foundation — VERIFIED
 
-TEST-019 Action Confirmation Foundation — 待服务器批次验收
-TEST-020 Action Outcome Foundation — 待服务器批次验收
+TEST-019 + TEST-020 最终服务器验证：专项 15 passed；全量 195 passed。
 
 ---
 
 ## TEST-021 Action Feedback Synthesis
 
 Branch：test-021-action-feedback-synthesis
-
 状态：IMPLEMENTED，待服务器验收
 
 目标：把用户决策与行动结果汇总为确定性的反馈上下文，为后续长期记忆更新提供稳定输入，但不把反馈自动解释为新的事实或关系变化。
@@ -58,7 +58,6 @@ API：GET /api/v1/persons/{person_id}/action-plan/feedback/context
 ## TEST-022 Memory Update Foundation
 
 Branch：test-022-memory-update-foundation
-
 状态：IN PROGRESS
 
 目标：把已经存在的、明确来源于用户决策与行动结果的反馈转换为“记忆更新候选”输入；第一阶段只提供候选，不直接写入长期记忆。
