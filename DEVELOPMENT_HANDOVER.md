@@ -52,18 +52,19 @@ TEST-031 Action Feedback Learning Input — VERIFIED
 TEST-032 Action Feedback Learning Synthesis — VERIFIED
 TEST-033 Memory Learning Provenance — VERIFIED
 TEST-034 Memory Learning Synthesis — VERIFIED
-TEST-035 Learning Strategy Context — IMPLEMENTED，待服务器验收
-TEST-036 Learning Strategy Synthesis — IMPLEMENTED，待服务器验收
+TEST-035 Learning Strategy Context — VERIFIED
+TEST-036 Learning Strategy Synthesis — VERIFIED
 TEST-037 Strategy Decision Context — VERIFIED
 TEST-038 Strategy Decision Synthesis — VERIFIED
-TEST-039 Strategy Decision Confirmation — IMPLEMENTED，待服务器验收
-TEST-040 Strategy Decision Confirmation Synthesis — IMPLEMENTED，待服务器验收
+TEST-039 Strategy Decision Confirmation — VERIFIED
+TEST-040 Strategy Decision Confirmation Synthesis — VERIFIED
 TEST-041 Strategy Decision Execution — IMPLEMENTED，待服务器验收
 TEST-042 Strategy Decision Execution Synthesis — IMPLEMENTED，待服务器验收
 
 TEST-037 + TEST-038 服务器专项验收：15 passed；全量测试：318 passed。
 TEST-033 + TEST-034 服务器专项验收：用户已确认通过；全量测试通过。
 TEST-039 + TEST-040 服务器专项验收：15 passed；全量测试：333 passed。
+TEST-035 + TEST-036 服务器全量测试基线：303 passed；用户已确认专项与全量测试通过。
 
 ---
 
