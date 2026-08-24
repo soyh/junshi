@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes.action_decision import router as action_decision_router
 from app.api.routes.action_feedback import router as action_feedback_router
 from app.api.routes.action_feedback_learning import router as action_feedback_learning_router
+from app.api.routes.action_feedback_learning_synthesis import router as action_feedback_learning_synthesis_router
 from app.api.routes.action_outcome import router as action_outcome_router
 from app.api.routes.action_plan import router as action_plan_router
 from app.api.routes.analysis import router as analysis_router
@@ -41,6 +42,7 @@ api_router.include_router(action_decision_router)
 api_router.include_router(action_outcome_router)
 api_router.include_router(action_feedback_router)
 api_router.include_router(action_feedback_learning_router)
+api_router.include_router(action_feedback_learning_synthesis_router)
 api_router.include_router(memory_update_router)
 api_router.include_router(memory_synthesis_router)
 api_router.include_router(memory_persistence_router)
