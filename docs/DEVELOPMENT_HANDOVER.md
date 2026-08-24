@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-08-25
-当前阶段：TEST-035 + TEST-036 learning strategy bridge
+当前阶段：TEST-037 + TEST-038 strategy decision bridge
 当前状态：IMPLEMENTED，待服务器批次验收
-当前 Branch：test-036-learning-strategy-synthesis-final4
+当前 Branch：test-038-strategy-decision-synthesis
 
 ---
 
@@ -36,38 +36,42 @@ TEST-031 Action Feedback Learning Input — VERIFIED
 TEST-032 Action Feedback Learning Synthesis — VERIFIED
 TEST-033 Memory Learning Provenance — VERIFIED
 TEST-034 Memory Learning Synthesis — VERIFIED
+TEST-035 Learning Strategy Context — IMPLEMENTED，待服务器验收
+TEST-036 Learning Strategy Synthesis — IMPLEMENTED，待服务器验收
+TEST-037 Strategy Decision Context — IMPLEMENTED，待服务器验收
+TEST-038 Strategy Decision Synthesis — IMPLEMENTED，待服务器验收
 
 TEST-033 + TEST-034 服务器专项验收：用户已确认通过；全量测试通过。
 
 ---
 
-## TEST-035 Learning Strategy Context
+## TEST-037 Strategy Decision Context
 
-Branch：test-035-learning-strategy-context-final7
+Branch：test-037-strategy-decision-context
 状态：IMPLEMENTED，待服务器批次验收
 
-API：GET /api/v1/persons/{person_id}/learning-strategy/context
+API：GET /api/v1/persons/{person_id}/strategy-decision/context
 
-目标：把现有 Recommendation Context、Action Feedback Learning Synthesis、Memory Learning Synthesis 汇总为统一的 strategy input context。该阶段只提供 source-backed inputs，不直接生成新的 recommendation。
+目标：把 TEST-036 的 source-backed strategy candidates 转换为显式决策输入上下文，为后续策略决策提供结构化、可审计的输入，但不自动选择任何 recommendation。
 
-核心边界：保留 facts / inferences / unknowns；保留 learning unknowns；不推断 recommendation quality、success、relationship impact；不改变 Relationship；不自动执行；不自动发送；不调用真实 LLM；read-only；deterministic；user/person isolation。
+核心边界：保留 recommendation identity；保留 observed / unknown；不排名；不自动选择；不把 decision input 转成事实；不改变 Relationship；不自动执行；不自动发送；不调用真实 LLM；read-only；deterministic；user/person isolation。
 
-专项测试：backend/tests/test_learning_strategy_context.py
+专项测试：backend/tests/test_strategy_decision.py
 
 ---
 
-## TEST-036 Learning Strategy Synthesis
+## TEST-038 Strategy Decision Synthesis
 
-Branch：test-036-learning-strategy-synthesis-final4
+Branch：test-038-strategy-decision-synthesis
 状态：IMPLEMENTED，待服务器批次验收
 
-API：GET /api/v1/persons/{person_id}/learning-strategy/synthesis
+API：GET /api/v1/persons/{person_id}/strategy-decision/synthesis
 
-目标：将 TEST-035 的 learning inputs 按 recommendation identity 做 source-backed deterministic synthesis，输出 strategy candidates；memory update provenance 只作为辅助计数，不把 learning signal 转化为事实或 recommendation ranking。
+目标：将 TEST-037 决策输入转换为 deterministic decision candidates，明确哪些候选具备 observed outcome evidence，同时保持最终 selection 显式留空。
 
-核心边界：recommendation identity 必须来自原始 action feedback；observed / unknown 保持分离；不推断 recommendation quality、success、relationship impact；不把 learning 转成 fact；不对 recommendation 排名；不自动执行；不自动发送；不调用真实 LLM；read-only；deterministic；user/person isolation。
+核心边界：decision status 不是事实；不进行 recommendation ranking；不自动选择；不自动执行；不自动发送；不调用真实 LLM；read-only；deterministic；user/person isolation。
 
-专项测试：backend/tests/test_learning_strategy_synthesis.py
+专项测试：backend/tests/test_strategy_decision_synthesis.py
 
 ---
 
@@ -75,12 +79,14 @@ API：GET /api/v1/persons/{person_id}/learning-strategy/synthesis
 
 相邻两个 TEST-No 合并为一次服务器测试批次。
 
-下一批：TEST-035 + TEST-036。
+下一批：TEST-037 + TEST-038。
 
 推荐命令：
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_learning_strategy_context.py \
-  backend/tests/test_learning_strategy_synthesis.py
+  backend/tests/test_strategy_decision.py \
+  backend/tests/test_strategy_decision_synthesis.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
+
+每个 TEST 保持独立代码边界、测试文件和验收记录。
