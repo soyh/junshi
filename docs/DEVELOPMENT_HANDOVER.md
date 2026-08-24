@@ -2,8 +2,8 @@
 
 更新时间：2026-08-24
 当前阶段：TEST-027 + TEST-028 action feedback aggregation/trend
-当前状态：TEST-027 IMPLEMENTED，等待与 TEST-028 合并服务器验收
-当前 Branch：test-027-action-feedback-synthesis
+当前状态：READY FOR SERVER VERIFICATION
+当前 Branch：test-028-action-feedback-synthesis
 
 ---
 
@@ -45,7 +45,7 @@ Branch：test-025-memory-update-synthesis
 ## TEST-026 Action Feedback Synthesis
 
 Branch：test-026-action-feedback-synthesis
-状态：IMPLEMENTED，服务器批次验收待 TEST-025 + TEST-026 一起执行
+状态：IMPLEMENTED，待服务器批次验收
 
 目标：把 action decision + action outcome 组合成确定性的 feedback synthesis，严格区分已观察结果和未知信息。
 
@@ -64,47 +64,36 @@ Branch：test-027-action-feedback-synthesis
 
 API：GET /api/v1/persons/{person_id}/action-plan/feedback/summary
 
-输出：
-- total_decisions
-- decision_counts
-- outcome_observed_count
-- outcome_unknown_count
-- outcome_counts
-- latest_observed_outcome
+输出：total_decisions、decision_counts、outcome_observed_count、outcome_unknown_count、outcome_counts、latest_observed_outcome。
 
-核心边界：
-- 只统计真实 action decision / action outcome
-- 缺失 outcome 单独计入 outcome_unknown_count
-- 不把缺失 outcome 推断为成功
-- 不推断 relationship impact
-- 不修改 Relationship
-- 不自动执行
-- user_id / person_id isolation
-- read-only
+核心边界：只统计真实 action decision / action outcome；缺失 outcome 单独计数；不推断成功、不推断 relationship impact、不修改 Relationship、不自动执行；user_id / person_id isolation；read-only。
 
-新增/扩展专项测试：backend/tests/test_action_feedback_synthesis.py
+专项测试：backend/tests/test_action_feedback_synthesis.py
 
 ---
 
 ## TEST-028 Action Feedback Trend Synthesis
 
 Branch：test-028-action-feedback-synthesis
-状态：DESIGN NEXT
+状态：IMPLEMENTED，待服务器批次验收
 
-目标：将 TEST-027 的聚合摘要进一步形成确定性的时间序列反馈观察，供后续关系长期跟踪使用；只表达观察，不生成关系结论。
+目标：将 TEST-027 的聚合输入进一步形成确定性的时间序列反馈观察，供后续长期关系跟踪使用；只表达观察，不生成关系结论。
 
-计划 API：GET /api/v1/persons/{person_id}/action-plan/feedback/trend
+API：GET /api/v1/persons/{person_id}/action-plan/feedback/trend
 
-计划输出：按 action outcome 时间排序的 observed / unknown feedback observations，并保留 decision_id、outcome_id、source timestamps。
+输出：observations，每条保留 event_at、decision_id、outcome_id、decision/outcome 状态及 source timestamps。
 
 核心边界：
 - 只使用已有 decision/outcome source
 - missing outcome 保持 unknown
 - deterministic ordering
-- 不进行成功率以外的心理或关系推断
+- 不进行心理或关系推断
 - 不修改 Relationship
 - 不自动执行
 - 不接真实 LLM
+- user_id / person_id isolation
+
+新增专项测试：backend/tests/test_action_feedback_trend.py
 
 ---
 
@@ -112,8 +101,15 @@ Branch：test-028-action-feedback-synthesis
 
 相邻两个 TEST-No 合并为一次服务器测试批次。
 
-TEST-025 + TEST-026：待用户执行的历史服务器批次已在前一阶段准备完成。
-TEST-027 + TEST-028：TEST-028 完成后一次专项 + 一次全量。
+TEST-027 + TEST-028：一次专项 + 一次全量。
+
+推荐命令：
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
+  backend/tests/test_action_feedback_synthesis.py \
+  backend/tests/test_action_feedback_trend.py
+
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
 
 每个 TEST 保持独立代码边界、测试文件和验收记录。
 
