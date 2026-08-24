@@ -26,6 +26,7 @@ class MemoryUpdateService:
                     },
                     "source_decision_id": item["decision_id"],
                     "source_outcome_id": item["outcome_id"],
+                    "source_created_at": item["outcome_created_at"],
                 }
             )
 
@@ -39,6 +40,7 @@ class MemoryUpdateService:
                 "must_not_infer_from_missing_outcome": True,
                 "must_not_auto_persist": True,
                 "must_not_change_relationship": True,
+                "must_have_stable_source_identity": True,
             },
             "candidates": candidates,
         }
