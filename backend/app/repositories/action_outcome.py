@@ -18,6 +18,20 @@ class ActionOutcomeRepository:
         return [dict(row) for row in rows]
 
     @staticmethod
+    def get_by_decision(
+        conn: sqlite3.Connection, user_id: str, person_id: str, decision_id: str
+    ) -> dict | None:
+        row = conn.execute(
+            """
+            SELECT id, user_id, person_id, decision_id, outcome, note, created_at
+            FROM action_outcomes
+            WHERE decision_id = ? AND user_id = ? AND person_id = ?
+            """,
+            (decision_id, user_id, person_id),
+        ).fetchone()
+        return dict(row) if row else None
+
+    @staticmethod
     def create(
         conn: sqlite3.Connection,
         user_id: str,
