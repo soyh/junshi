@@ -28,6 +28,7 @@ from app.api.routes.relationship_state import router as relationship_state_route
 from app.api.routes.strategic_reply import router as strategic_reply_router
 from app.api.routes.strategy_decision import router as strategy_decision_router
 from app.api.routes.strategy_decision_confirmation import router as strategy_decision_confirmation_router
+from app.api.routes.strategy_decision_confirmation_synthesis import router as strategy_decision_confirmation_synthesis_router
 from app.api.routes.strategy_decision_synthesis import router as strategy_decision_synthesis_router
 from app.api.routes.text_imports import router as text_imports_router
 from app.api.routes.timeline import router as timeline_router
@@ -57,6 +58,7 @@ api_router.include_router(learning_strategy_synthesis_router)
 api_router.include_router(strategy_decision_router)
 api_router.include_router(strategy_decision_synthesis_router)
 api_router.include_router(strategy_decision_confirmation_router)
+api_router.include_router(strategy_decision_confirmation_synthesis_router)
 api_router.include_router(memory_persistence_router)
 api_router.include_router(interactions_router)
 api_router.include_router(messages_router)
