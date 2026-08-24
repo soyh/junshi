@@ -2,260 +2,89 @@
 
 更新时间：2026-08-24
 
-当前阶段：TEST-019 + TEST-020 action feedback loop foundations
+当前阶段：TEST-021 Action Feedback Synthesis
 
 当前状态：IN PROGRESS
 
-当前 Branch：test-020-action-outcome-foundation
+当前 Branch：test-021-action-feedback-synthesis
 
 ---
 
-## TEST-008
+## 已完成阶段
 
-Person Timeline
+TEST-008 Person Timeline — VERIFIED
+TEST-009 Text Import — VERIFIED
+TEST-010 Conversation Analysis Foundation — VERIFIED
+TEST-011 Evidence — VERIFIED
+TEST-012 Person Profile — VERIFIED
+TEST-013 Relationship State Analysis — VERIFIED
+TEST-014 Recommendation Foundation — VERIFIED
+TEST-015 Strategic Reply Foundation — VERIFIED
+TEST-016 Action Plan Foundation — VERIFIED
+TEST-017 Action Plan Synthesis — VERIFIED
+TEST-018 Strategic Reply Synthesis — VERIFIED
 
-状态：VERIFIED
+TEST-019 Action Confirmation Foundation — 服务器待验收
+TEST-020 Action Outcome Foundation — 服务器待验收
 
-Branch：test-008-person-timeline
-
----
-
-## TEST-009
-
-Text Import
-
-状态：VERIFIED
-
-Branch：test-009-text-import
-
-最终验证 Commit：a2059a6 test: verify text import rollback atomicity
-
-最终测试：Text Import 专项 44 passed；全量 103 passed
-
-验收结论：TEST-009 Text Import VERIFIED。
+TEST-019 + TEST-020 服务器验证规则：两个 TEST-No 合并一次专项测试，再执行一次全量测试。
 
 ---
 
-## TEST-010
+## TEST-021 Action Feedback Synthesis
 
-Conversation Analysis Foundation
+Branch：test-021-action-feedback-synthesis
 
-状态：VERIFIED
+目标：把用户决策与行动结果汇总为确定性的反馈上下文，为后续长期记忆更新提供稳定输入，但不把反馈自动解释为新的事实或关系变化。
 
-Branch：test-010-conversation-analysis
-
-目标：建立分析输入上下文，暂不接真实 LLM。
-
-最终服务器验证：TEST-010 专项 9 passed；全量 112 passed。
-
-验收结论：TEST-010 Conversation Analysis Foundation VERIFIED。
-
----
-
-## TEST-011
-
-Evidence
-
-状态：VERIFIED
-
-Branch：test-011-evidence
-
-目标：建立分析事实的证据层，使后续 Fact / Inference 能够引用明确、可追溯的原始数据来源。
-
-API：GET /api/v1/conversations/{conversation_id}/analysis/evidence
-
-最终服务器验证：TEST-011 专项 11 passed；全量 123 passed。
-
-验收结论：TEST-011 Evidence VERIFIED。
-
----
-
-## TEST-012
-
-Person profile
-
-状态：VERIFIED
-
-Branch：test-012-person-profile
-
-目标：建立人物档案的只读聚合入口，为后续人物画像和关系分析提供稳定输入边界。
-
-最终服务器验证：TEST-012 专项 8 passed；全量 131 passed。
-
-验收结论：TEST-012 Person profile VERIFIED。
-
----
-
-## TEST-013
-
-Relationship state analysis
-
-状态：VERIFIED
-
-Branch：test-013-relationship-state-analysis
-
-目标：建立关系状态分析的稳定输入与输出边界。
-
-最终服务器验证：TEST-013 专项 10 passed；全量 141 passed。
-
-验收结论：TEST-013 Relationship state analysis VERIFIED。
-
----
-
-## TEST-014
-
-Recommendation foundation
-
-状态：VERIFIED
-
-Branch：test-014-recommendation-foundation
-
-目标：建立建议输出的稳定契约与证据边界。
-
-API：GET /api/v1/persons/{person_id}/recommendation-analysis/context
-
-最终服务器验证：TEST-014 专项 9 passed；全量 150 passed。
-
-验收结论：TEST-014 Recommendation foundation VERIFIED。
-
----
-
-## TEST-015
-
-Strategic reply foundation
-
-状态：VERIFIED
-
-Branch：test-015-strategic-reply-foundation
-
-目标：在 Recommendation Foundation 之上建立“策略回复”的稳定输入契约，同时严格保持分析、生成和执行分离。
-
-API：GET /api/v1/persons/{person_id}/strategic-reply/context
-
-reply_constraints：
-- must_be_evidence_backed=true
-- must_preserve_unknowns=true
-- must_not_auto_send=true
-- must_not_change_relationship=true
-
-最终服务器验证：TEST-015 专项 9 passed；全量 159 passed。
-
-验收结论：TEST-015 Strategic reply foundation VERIFIED。
-
----
-
-## TEST-016
-
-Action plan foundation
-
-状态：VERIFIED
-
-Branch：test-016-action-plan-foundation
-
-目标：建立行动计划输入契约，但不自行创造行动、不执行行动。
-
-API：GET /api/v1/persons/{person_id}/action-plan/context
-
-最终服务器验证：TEST-016 专项 7 passed；全量 166 passed。
-
-验收结论：TEST-016 Action plan foundation VERIFIED。
-
----
-
-## TEST-017
-
-Action plan synthesis
-
-状态：VERIFIED
-
-Branch：test-017-action-plan-synthesis
-
-目标：把已经存在的 Recommendation 转换为结构化 Action Plan Proposal，但只允许“明确行动 + 明确证据引用”的 Recommendation 被提升为行动计划。
-
-核心边界：不自行创造建议、不调用 LLM、不执行行动。
-
-最终服务器验证：TEST-017 专项 11 passed；全量 170 passed。
-
-验收结论：TEST-017 Action Plan Synthesis VERIFIED。
-
----
-
-## TEST-018
-
-Strategic reply synthesis
-
-状态：VERIFIED（服务器已验收）
-
-Branch：test-018-strategic-reply-synthesis
-
-目标：只允许 Recommendation 明确提供 `reply` 且引用真实 Evidence 时生成确定性的 draft，不自行编造回复。
-
-最终服务器验证：TEST-018 专项 10 passed；全量 180 passed。
-
-验收结论：TEST-018 Strategic Reply Synthesis VERIFIED。
-
----
-
-## TEST-019
-
-Action confirmation foundation
-
-状态：IN PROGRESS
-
-Branch：test-019-action-confirmation-foundation
-
-目标：把“requires_user_confirmation”从静态约束推进为可记录的用户决策层。用户可以确认或拒绝一个已有、证据支持的 Action Plan；系统只记录用户决策，不执行行动。
-
-API：
-- GET /api/v1/persons/{person_id}/action-plan/decisions/context
-- POST /api/v1/persons/{person_id}/action-plan/decisions
+API：GET /api/v1/persons/{person_id}/action-plan/feedback/context
 
 第一阶段实现：
-- 新增 action_decisions 持久化表
-- 记录 confirmed / rejected
-- confirmed 必须引用当前可用的 evidence-backed recommendation
-- rejected 可以记录用户暂不执行的决定
-- 决策历史 deterministic ordering
+- 聚合 action_decisions 与 action_outcomes
+- deterministic ordering
+- decision 可没有 outcome；缺失 outcome 不代表成功或失败
+- 保留 completed / skipped / failed 原始结果
+- 保留 decision / outcome note
 - user_id / person_id isolation
-- 不自动执行
-- 不自动发送消息
-- 不修改 Relationship
-
-新增 migration：004_action_feedback.sql
-
-服务器验证待完成：TEST-019 专项测试 + TEST-020 专项测试一次性验证；随后执行全量测试。
-
----
-
-## TEST-020
-
-Action outcome foundation
-
-状态：IN PROGRESS
-
-Branch：test-020-action-outcome-foundation
-
-目标：在用户确认行动之后记录执行结果，为后续反馈分析和长期记忆更新建立确定性输入层。
-
-API：
-- GET /api/v1/persons/{person_id}/action-plan/outcomes
-- POST /api/v1/persons/{person_id}/action-plan/outcomes/{decision_id}
-
-第一阶段实现：
-- 新增 action_outcomes 持久化表
-- 仅允许 confirmed action decision 产生 outcome
-- outcome 固定为 completed / skipped / failed
-- 保留用户 note
-- deterministic history ordering
-- user_id / person_id isolation
-- 不把 outcome 自动写成 Interaction
-- 不自动发送消息
+- read-only
+- 必须保持 unknowns
 - 不自动修改 Relationship
+- 不自动执行行动
+- 不自动发送消息
 - 不接真实 LLM
 
-新增 migration：005_action_outcomes.sql
+反馈约束：
+- must_be_decision_backed=true
+- must_be_outcome_backed=false
+- must_preserve_unknowns=true
+- must_not_infer_success_from_missing_outcome=true
+- must_not_change_relationship=true
+- must_not_auto_execute=true
 
-服务器验证待完成：与 TEST-019 一起专项验证；随后执行全量测试。
+服务器验证待完成：与 TEST-022 一起专项验证；随后执行全量测试。
+
+---
+
+## TEST-022 Memory Update Foundation
+
+Branch：test-022-memory-update-foundation
+
+目标：把已经存在的、明确来源于用户决策与行动结果的反馈转换为“记忆更新候选”输入；第一阶段只提供候选，不直接写入长期记忆。
+
+第一阶段边界：
+- 只允许真实 decision / outcome 作为 source
+- 不从缺失 outcome 推导成功
+- 不把 skipped / failed 自动改写成事实
+- memory candidate 必须标记为 proposed
+- 保留 source decision_id / outcome_id
+- user_id / person_id isolation
+- read-only
+- 不自动修改 Relationship
+- 不自动发送消息
+- 不接真实 LLM
+- 暂不新增长期 memory migration
+
+服务器验证规则：TEST-021 + TEST-022 合并一次专项测试，再执行一次全量测试。
 
 ---
 
@@ -270,5 +99,3 @@ API：
 当前生产数据库 schema migrations：001 / 002 / 003 / 004 / 005。
 
 每完成一个明确阶段：代码 → 测试 → Git status → Git commit → 更新交接文档。
-
-本次流程约定：TEST-019 与 TEST-020 作为相邻的反馈闭环阶段，合并为一次服务器专项测试，再执行一次全量测试。
