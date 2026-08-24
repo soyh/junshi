@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
-更新时间：2026-08-24
-当前阶段：TEST-033 + TEST-034 memory learning bridge
+更新时间：2026-08-25
+当前阶段：TEST-035 + TEST-036 learning strategy bridge
 当前状态：IMPLEMENTED，待服务器批次验收
-当前 Branch：test-034-memory-learning-synthesis
+当前 Branch：test-036-learning-strategy-synthesis-final4
 
 ---
 
@@ -50,49 +50,40 @@ TEST-029 Action Feedback Learning Signals — VERIFIED
 TEST-030 Action Feedback Learning Context — VERIFIED
 TEST-031 Action Feedback Learning Input — VERIFIED
 TEST-032 Action Feedback Learning Synthesis — VERIFIED
+TEST-033 Memory Learning Provenance — VERIFIED
+TEST-034 Memory Learning Synthesis — VERIFIED
 
-TEST-031 + TEST-032 服务器专项验收：14 passed；全量 275 passed。
-
----
-
-## TEST-033 Memory Learning Provenance
-
-Branch：test-033-memory-learning-provenance
-状态：IMPLEMENTED，待服务器批次验收
-
-API：GET /api/v1/persons/{person_id}/memory-updates/context
-
-目标：在现有 memory update candidate 上保留 recommendation identity 与 action feedback learning source provenance，使 memory candidate 可以追溯回具体 decision/outcome/recommendation，而不把 learning signal 解释为新的事实。
-
-核心边界：只增加 source-backed provenance；outcome 缺失时不生成 memory candidate；不推断 recommendation quality、success、relationship impact；不修改 Relationship；不自动持久化；不调用真实 LLM；read-only；deterministic；user/person isolation。
-
-专项测试：backend/tests/test_memory_learning_provenance.py
+TEST-033 + TEST-034 服务器专项验收：用户已确认通过；全量测试通过。
 
 ---
 
-## TEST-034 Memory Learning Synthesis
+## TEST-035 Learning Strategy Context
 
-Branch：test-034-memory-learning-synthesis
+Branch：test-035-learning-strategy-context-final7
 状态：IMPLEMENTED，待服务器批次验收
 
-API：GET /api/v1/persons/{person_id}/memory-updates/learning-synthesis
+API：GET /api/v1/persons/{person_id}/learning-strategy/context
 
-目标：把已有 memory synthesis proposal 与 action feedback learning signals 进行 source-backed 对齐，提供统一 learning provenance；不产生新的事实，不改变现有 memory persistence contract。
+目标：把现有 Recommendation Context、Action Feedback Learning Synthesis、Memory Learning Synthesis 汇总为统一的 strategy input context。该阶段只提供 source-backed inputs，不直接生成新的 recommendation。
 
-核心边界：
-- source decision/outcome 必须保持一致
-- recommendation identity 只能来自原始 action feedback
-- observed / unknown 保持分离
-- 不推断 recommendation quality
-- 不推断 success
-- 不推断 relationship impact
-- 不自动持久化
-- 不自动执行
-- read-only
-- deterministic
-- user/person isolation
+核心边界：保留 facts / inferences / unknowns；保留 learning unknowns；不推断 recommendation quality、success、relationship impact；不改变 Relationship；不自动执行；不自动发送；不调用真实 LLM；read-only；deterministic；user/person isolation。
 
-专项测试：backend/tests/test_memory_learning_synthesis.py
+专项测试：backend/tests/test_learning_strategy_context.py
+
+---
+
+## TEST-036 Learning Strategy Synthesis
+
+Branch：test-036-learning-strategy-synthesis-final4
+状态：IMPLEMENTED，待服务器批次验收
+
+API：GET /api/v1/persons/{person_id}/learning-strategy/synthesis
+
+目标：将 TEST-035 的 learning inputs 按 recommendation identity 做 source-backed deterministic synthesis，输出 strategy candidates；memory update provenance 只作为辅助计数，不把 learning signal 转化为事实或 recommendation ranking。
+
+核心边界：recommendation identity 必须来自原始 action feedback；observed / unknown 保持分离；不推断 recommendation quality、success、relationship impact；不把 learning 转成 fact；不对 recommendation 排名；不自动执行；不自动发送；不调用真实 LLM；read-only；deterministic；user/person isolation。
+
+专项测试：backend/tests/test_learning_strategy_synthesis.py
 
 ---
 
@@ -100,13 +91,13 @@ API：GET /api/v1/persons/{person_id}/memory-updates/learning-synthesis
 
 相邻两个 TEST-No 合并为一次服务器测试批次。
 
-TEST-033 + TEST-034：下一次服务器验收批次。
+下一批：TEST-035 + TEST-036。
 
 推荐命令：
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_memory_learning_provenance.py \
-  backend/tests/test_memory_learning_synthesis.py
+  backend/tests/test_learning_strategy_context.py \
+  backend/tests/test_learning_strategy_synthesis.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
 
