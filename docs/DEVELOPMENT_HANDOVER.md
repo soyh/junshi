@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-08-24
-当前阶段：TEST-031 + TEST-032 action feedback learning layer
+当前阶段：TEST-033 + TEST-034 memory learning bridge
 当前状态：IMPLEMENTED，待服务器批次验收
-当前 Branch：test-032-action-feedback-learning-synthesis-final5
+当前 Branch：test-033-memory-learning-provenance
 
 ---
 
@@ -32,42 +32,62 @@ TEST-027 Action Feedback Aggregation — VERIFIED
 TEST-028 Action Feedback Trend Synthesis — VERIFIED
 TEST-029 Action Feedback Learning Signals — VERIFIED
 TEST-030 Action Feedback Learning Context — VERIFIED
+TEST-031 Action Feedback Learning Input — IMPLEMENTED
+TEST-032 Action Feedback Learning Synthesis — IMPLEMENTED
 
-TEST-029 + TEST-030 最终服务器验证：专项 15 passed；全量 261 passed。
-
----
-
-## TEST-031
-
-Action Feedback Learning Input
-
-Branch：test-031-action-feedback-learning-input-final9
-状态：IMPLEMENTED，待服务器批次验收
-
-API：GET /api/v1/persons/{person_id}/action-plan/feedback/learning-input
-
-目标：把 TEST-030 recommendation-level feedback signals 转换为 source-backed learning input，仅整理已观察 outcome，不解释 recommendation quality、success 或 relationship impact。
-
-核心边界：observed / unknown 严格分离；保留 decision/outcome counts 和 source；unknowns 显式保留；不修改 Relationship；不自动执行；不调用真实 LLM；read-only；deterministic；user/person isolation。
-
-专项测试：backend/tests/test_action_feedback_learning.py
+TEST-031 + TEST-032 服务器专项验收：14 passed；全量 275 passed。
 
 ---
 
-## TEST-032
+## TEST-033 Memory Learning Provenance
 
-Action Feedback Learning Synthesis
-
-Branch：test-032-action-feedback-learning-synthesis-final5
+Branch：test-033-memory-learning-provenance
 状态：IMPLEMENTED，待服务器批次验收
 
-API：GET /api/v1/persons/{person_id}/action-plan/feedback/learning-synthesis
+API：GET /api/v1/persons/{person_id}/memory-updates/context
 
-目标：在 TEST-031 learning input 之上形成 source-backed learning candidate；仅标记是否存在已观察 outcome，不生成 recommendation quality、success 或 relationship impact 推断。
+目标：在现有 memory update candidate 上保留 recommendation identity 与 action feedback learning source provenance，使 memory candidate 可以追溯回具体 decision/outcome/recommendation，而不把 learning signal 解释为新的事实。
 
-核心边界：candidate source-backed；unknown outcome 保持 unknown；outcome counts 原样保留；不修改 Relationship；不自动执行；不调用真实 LLM；read-only；deterministic；user/person isolation。
+核心边界：
+- 只增加 source-backed provenance
+- outcome 缺失时不生成 memory candidate
+- 不推断 recommendation quality
+- 不推断 success
+- 不推断 relationship impact
+- 不修改 Relationship
+- 不自动持久化
+- 不调用真实 LLM
+- read-only
+- deterministic
+- user/person isolation
 
-专项测试：backend/tests/test_action_feedback_learning_synthesis.py
+专项测试：backend/tests/test_memory_learning_provenance.py
+
+---
+
+## TEST-034 Memory Learning Synthesis
+
+Branch：test-034-memory-learning-synthesis
+状态：DESIGNED，后续实现
+
+API：GET /api/v1/persons/{person_id}/memory-updates/learning-synthesis
+
+目标：把已有 memory synthesis proposal 与 action feedback learning signals 进行 source-backed 对齐，提供统一 learning provenance；不产生新的事实，不改变现有 memory persistence contract。
+
+核心边界：
+- source decision/outcome 必须保持一致
+- recommendation identity 只能来自原始 action feedback
+- observed / unknown 保持分离
+- 不推断 recommendation quality
+- 不推断 success
+- 不推断 relationship impact
+- 不自动持久化
+- 不自动执行
+- read-only
+- deterministic
+- user/person isolation
+
+专项测试：backend/tests/test_memory_learning_synthesis.py
 
 ---
 
@@ -75,12 +95,12 @@ API：GET /api/v1/persons/{person_id}/action-plan/feedback/learning-synthesis
 
 相邻两个 TEST-No 合并为一次服务器测试批次。
 
-下一批：TEST-031 + TEST-032。
+下一批：TEST-033 + TEST-034。
 
 推荐命令：
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_action_feedback_learning.py \
-  backend/tests/test_action_feedback_learning_synthesis.py
+  backend/tests/test_memory_learning_provenance.py \
+  backend/tests/test_memory_learning_synthesis.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
