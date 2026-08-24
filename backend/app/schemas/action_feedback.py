@@ -46,6 +46,16 @@ class ActionFeedbackTrendObservation(BaseModel):
     source: dict[str, str | None]
 
 
+class ActionFeedbackSignal(BaseModel):
+    recommendation_id: str | None
+    decision_count: int
+    decision_counts: dict[str, int]
+    outcome_observed_count: int
+    outcome_unknown_count: int
+    outcome_counts: dict[str, int]
+    latest_observed_outcome: dict[str, str | None] | None
+
+
 class ActionFeedbackContextResponse(BaseModel):
     person: dict[str, Any]
     relationship: dict[str, Any]
@@ -66,3 +76,10 @@ class ActionFeedbackTrendResponse(BaseModel):
     relationship: dict[str, Any]
     feedback_trend_constraints: dict[str, Any]
     observations: list[ActionFeedbackTrendObservation]
+
+
+class ActionFeedbackSignalResponse(BaseModel):
+    person: dict[str, Any]
+    relationship: dict[str, Any]
+    feedback_signal_constraints: dict[str, Any]
+    signals: list[ActionFeedbackSignal]
