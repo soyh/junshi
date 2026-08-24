@@ -74,9 +74,9 @@ API：GET /api/v1/persons/{person_id}/strategy-decision/confirmation-synthesis
 
 目标：对已经记录的显式用户决策进行 deterministic 汇总，区分 confirmed / rejected，并明确 execution 仍需独立的显式执行步骤。
 
-核心边界：只汇总已记录决策；不把 confirmation 当成 execution；不自动执行；不自动发送；保持 decision history；deterministic；user/person isolation。
+核心边界：只汇总没有 outcome 的显式 confirmation；不把 confirmation 当成 execution；不自动执行；不自动发送；保持 decision history；deterministic；user/person isolation。
 
-专项测试：backend/tests/test_strategy_decision_confirmation.py
+专项测试：backend/tests/test_strategy_decision_confirmation_synthesis.py
 
 ---
 
@@ -89,7 +89,8 @@ API：GET /api/v1/persons/{person_id}/strategy-decision/confirmation-synthesis
 推荐命令：
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_strategy_decision_confirmation.py
+  backend/tests/test_strategy_decision_confirmation.py \
+  backend/tests/test_strategy_decision_confirmation_synthesis.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
 
