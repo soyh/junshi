@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-08-25
-当前阶段：TEST-037 + TEST-038 strategy decision bridge
+当前阶段：TEST-039 + TEST-040 strategy decision confirmation bridge
 当前状态：IMPLEMENTED，待服务器批次验收
-当前 Branch：test-038-strategy-decision-synthesis
+当前 Branch：test-039-040-strategy-decision-confirmation
 
 ---
 
@@ -38,40 +38,45 @@ TEST-033 Memory Learning Provenance — VERIFIED
 TEST-034 Memory Learning Synthesis — VERIFIED
 TEST-035 Learning Strategy Context — IMPLEMENTED，待服务器验收
 TEST-036 Learning Strategy Synthesis — IMPLEMENTED，待服务器验收
-TEST-037 Strategy Decision Context — IMPLEMENTED，待服务器验收
-TEST-038 Strategy Decision Synthesis — IMPLEMENTED，待服务器验收
+TEST-037 Strategy Decision Context — VERIFIED
+TEST-038 Strategy Decision Synthesis — VERIFIED
+TEST-039 Strategy Decision Confirmation — IMPLEMENTED，待服务器验收
+TEST-040 Strategy Decision Confirmation Synthesis — IMPLEMENTED，待服务器验收
 
+TEST-037 + TEST-038 服务器专项验收：15 passed；全量测试：318 passed。
 TEST-033 + TEST-034 服务器专项验收：用户已确认通过；全量测试通过。
 
 ---
 
-## TEST-037 Strategy Decision Context
+## TEST-039 Strategy Decision Confirmation
 
-Branch：test-037-strategy-decision-context
+Branch：test-039-040-strategy-decision-confirmation
 状态：IMPLEMENTED，待服务器批次验收
 
-API：GET /api/v1/persons/{person_id}/strategy-decision/context
+API：
+GET /api/v1/persons/{person_id}/strategy-decision/confirmation-context
+POST /api/v1/persons/{person_id}/strategy-decision/confirmations
 
-目标：把 TEST-036 的 source-backed strategy candidates 转换为显式决策输入上下文，为后续策略决策提供结构化、可审计的输入，但不自动选择任何 recommendation。
+目标：把 TEST-038 的 deterministic decision candidates 接入显式用户决策记录，使用户可以明确 confirmed / rejected，而系统不自动确认、不自动执行、不自动发送。
 
-核心边界：保留 recommendation identity；保留 observed / unknown；不排名；不自动选择；不把 decision input 转成事实；不改变 Relationship；不自动执行；不自动发送；不调用真实 LLM；read-only；deterministic；user/person isolation。
+核心边界：必须记录用户决策；confirmed 必须带 recommendation_id；recommendation 必须来自当前决策输入；不自动确认；不自动执行；不自动发送；不改变 Relationship；不调用真实 LLM；user/person isolation。
 
-专项测试：backend/tests/test_strategy_decision.py
+专项测试：backend/tests/test_strategy_decision_confirmation.py
 
 ---
 
-## TEST-038 Strategy Decision Synthesis
+## TEST-040 Strategy Decision Confirmation Synthesis
 
-Branch：test-038-strategy-decision-synthesis
+Branch：test-039-040-strategy-decision-confirmation
 状态：IMPLEMENTED，待服务器批次验收
 
-API：GET /api/v1/persons/{person_id}/strategy-decision/synthesis
+API：GET /api/v1/persons/{person_id}/strategy-decision/confirmation-synthesis
 
-目标：将 TEST-037 决策输入转换为 deterministic decision candidates，明确哪些候选具备 observed outcome evidence，同时保持最终 selection 显式留空。
+目标：对已经记录的显式用户决策进行 deterministic 汇总，区分 confirmed / rejected，并明确 execution 仍需独立的显式执行步骤。
 
-核心边界：decision status 不是事实；不进行 recommendation ranking；不自动选择；不自动执行；不自动发送；不调用真实 LLM；read-only；deterministic；user/person isolation。
+核心边界：只汇总已记录决策；不把 confirmation 当成 execution；不自动执行；不自动发送；保持 decision history；deterministic；user/person isolation。
 
-专项测试：backend/tests/test_strategy_decision_synthesis.py
+专项测试：backend/tests/test_strategy_decision_confirmation.py
 
 ---
 
@@ -79,13 +84,12 @@ API：GET /api/v1/persons/{person_id}/strategy-decision/synthesis
 
 相邻两个 TEST-No 合并为一次服务器测试批次。
 
-下一批：TEST-037 + TEST-038。
+下一批：TEST-039 + TEST-040。
 
 推荐命令：
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_strategy_decision.py \
-  backend/tests/test_strategy_decision_synthesis.py
+  backend/tests/test_strategy_decision_confirmation.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
 
