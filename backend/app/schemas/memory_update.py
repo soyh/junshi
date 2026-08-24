@@ -10,6 +10,7 @@ class MemoryUpdateCandidate(BaseModel):
     content: dict[str, Any]
     source_decision_id: str
     source_outcome_id: str
+    source_created_at: str | None
 
 
 class MemoryUpdateContextResponse(BaseModel):
