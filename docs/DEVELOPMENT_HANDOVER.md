@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-08-24
-当前阶段：TEST-025 + TEST-026 memory/action feedback synthesis
-当前状态：READY FOR SERVER VERIFICATION
-当前 Branch：test-026-action-feedback-synthesis
+当前阶段：TEST-027 + TEST-028 action feedback aggregation/trend
+当前状态：TEST-027 IMPLEMENTED，等待与 TEST-028 合并服务器验收
+当前 Branch：test-027-action-feedback-synthesis
 
 ---
 
@@ -38,68 +38,84 @@ TEST-023 + TEST-024 最终服务器验证：专项 15 passed；全量 228 passed
 Branch：test-025-memory-update-synthesis
 状态：IMPLEMENTED，待服务器批次验收
 
-目标：在既有 memory candidate / synthesis 基础上锁定 source identity 契约，使每一个候选记忆更新都能稳定追溯到 action decision、action outcome 和 outcome 时间戳。
-
-核心边界：
-- source_decision_id 必须保留
-- source_outcome_id 必须保留
-- source_created_at 必须保留
-- stable source identity
-- 只有存在真实 outcome 的记录才能成为 memory candidate
-- must_not_infer_from_missing_outcome=true
-- must_not_auto_persist=true
-- 不修改 Relationship
-- 不接真实 LLM
-
-新增专项测试：backend/tests/test_memory_update_contract.py
+目标：锁定 memory candidate 的 source identity，使每个候选更新都能稳定追溯到 action decision、action outcome 和 outcome 时间戳。
 
 ---
 
 ## TEST-026 Action Feedback Synthesis
 
 Branch：test-026-action-feedback-synthesis
-状态：IMPLEMENTED，待服务器批次验收
+状态：IMPLEMENTED，服务器批次验收待 TEST-025 + TEST-026 一起执行
 
-目标：把 action decision + action outcome 组合成确定性的 feedback synthesis，同时严格区分“已有决策”“已观察到的执行结果”和“仍未知的信息”。
+目标：把 action decision + action outcome 组合成确定性的 feedback synthesis，严格区分已观察结果和未知信息。
 
 API：GET /api/v1/persons/{person_id}/action-plan/feedback/context
 
-新增输出：feedback_synthesis
+核心边界：decision/outcome 必须 source-backed；缺少 outcome 时保持 unknown；不推断关系影响；不自动执行；不修改 Relationship；不接真实 LLM。
 
-feedback_status：
-- outcome_observed：存在真实 action outcome
-- outcome_unknown：只有 decision，没有 outcome
+---
+
+## TEST-027 Action Feedback Aggregation
+
+Branch：test-027-action-feedback-synthesis
+状态：IMPLEMENTED，待服务器批次验收
+
+目标：在 TEST-026 的逐条 feedback synthesis 之上建立只读、确定性的聚合摘要，为后续长期关系跟踪提供稳定输入；不把统计结果升级为关系判断。
+
+API：GET /api/v1/persons/{person_id}/action-plan/feedback/summary
+
+输出：
+- total_decisions
+- decision_counts
+- outcome_observed_count
+- outcome_unknown_count
+- outcome_counts
+- latest_observed_outcome
 
 核心边界：
-- decision_signal 必须来自真实 action decision
-- outcome_signal 在缺少 outcome 时必须为 unknown
-- 不得把缺失 outcome 推断为成功
-- action_effect 与 relationship_impact 保持 unknown
-- 保留 source decision/outcome identity
-- must_not_auto_execute=true
-- must_not_change_relationship=true
+- 只统计真实 action decision / action outcome
+- 缺失 outcome 单独计入 outcome_unknown_count
+- 不把缺失 outcome 推断为成功
+- 不推断 relationship impact
+- 不修改 Relationship
+- 不自动执行
 - user_id / person_id isolation
-- 不接真实 LLM
+- read-only
 
-新增专项测试：backend/tests/test_action_feedback_synthesis.py
+新增/扩展专项测试：backend/tests/test_action_feedback_synthesis.py
+
+---
+
+## TEST-028 Action Feedback Trend Synthesis
+
+Branch：test-028-action-feedback-synthesis
+状态：DESIGN NEXT
+
+目标：将 TEST-027 的聚合摘要进一步形成确定性的时间序列反馈观察，供后续关系长期跟踪使用；只表达观察，不生成关系结论。
+
+计划 API：GET /api/v1/persons/{person_id}/action-plan/feedback/trend
+
+计划输出：按 action outcome 时间排序的 observed / unknown feedback observations，并保留 decision_id、outcome_id、source timestamps。
+
+核心边界：
+- 只使用已有 decision/outcome source
+- missing outcome 保持 unknown
+- deterministic ordering
+- 不进行成功率以外的心理或关系推断
+- 不修改 Relationship
+- 不自动执行
+- 不接真实 LLM
 
 ---
 
 ## 服务器测试规则
 
-相邻两个 TEST-No 合并为一次服务器测试批次：
+相邻两个 TEST-No 合并为一次服务器测试批次。
 
-TEST-025 + TEST-026：一次专项 + 一次全量。
+TEST-025 + TEST-026：待用户执行的历史服务器批次已在前一阶段准备完成。
+TEST-027 + TEST-028：TEST-028 完成后一次专项 + 一次全量。
 
-推荐命令：
-
-PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_memory_update_contract.py \
-  backend/tests/test_action_feedback_synthesis.py
-
-PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
-
-每个 TEST 仍保持独立代码边界、测试文件和验收记录。
+每个 TEST 保持独立代码边界、测试文件和验收记录。
 
 ---
 
