@@ -141,3 +141,65 @@ class ActionFeedbackService:
             },
             "observations": observations,
         }
+
+    def get_signals(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
+        context, feedback = self._load(conn, user_id, person_id)
+        grouped: dict[str | None, dict] = {}
+
+        for item in feedback:
+            recommendation_id = item.get("recommendation_id")
+            if recommendation_id not in grouped:
+                grouped[recommendation_id] = {
+                    "recommendation_id": recommendation_id,
+                    "decision_count": 0,
+                    "decision_counts": {"confirmed": 0, "rejected": 0},
+                    "outcome_observed_count": 0,
+                    "outcome_unknown_count": 0,
+                    "outcome_counts": {"completed": 0, "skipped": 0, "failed": 0},
+                    "latest_observed_outcome": None,
+                }
+
+            signal = grouped[recommendation_id]
+            signal["decision_count"] += 1
+            decision = item["decision"]
+            if decision in signal["decision_counts"]:
+                signal["decision_counts"][decision] += 1
+
+            observed = bool(item.get("outcome_id") and item.get("outcome"))
+            if not observed:
+                signal["outcome_unknown_count"] += 1
+                continue
+
+            signal["outcome_observed_count"] += 1
+            outcome = item["outcome"]
+            if outcome in signal["outcome_counts"]:
+                signal["outcome_counts"][outcome] += 1
+            if signal["latest_observed_outcome"] is None:
+                signal["latest_observed_outcome"] = {
+                    "decision_id": item["decision_id"],
+                    "outcome_id": item["outcome_id"],
+                    "outcome": outcome,
+                    "created_at": item["outcome_created_at"],
+                }
+
+        signals = list(grouped.values())
+        signals.sort(
+            key=lambda item: (
+                item["recommendation_id"] is None,
+                item["recommendation_id"] or "",
+            )
+        )
+        return {
+            "person": context["person"],
+            "relationship": context["relationship"],
+            "feedback_signal_constraints": {
+                "must_be_source_backed": True,
+                "must_preserve_unknowns": True,
+                "must_group_only_by_recommendation_identity": True,
+                "must_not_infer_recommendation_quality": True,
+                "must_not_infer_relationship_impact": True,
+                "must_not_change_relationship": True,
+                "must_not_auto_execute": True,
+            },
+            "signals": signals,
+        }
