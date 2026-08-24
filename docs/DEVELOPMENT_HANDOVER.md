@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-08-24
-当前阶段：TEST-029 + TEST-030 action feedback learning layer
+当前阶段：TEST-031 + TEST-032 action feedback learning layer
 当前状态：IMPLEMENTED，待服务器批次验收
-当前 Branch：test-030-action-feedback-synthesis
+当前 Branch：test-032-action-feedback-learning-synthesis-final5
 
 ---
 
@@ -26,44 +26,48 @@ TEST-021 Action Feedback Synthesis — VERIFIED
 TEST-022 Memory Update Foundation — VERIFIED
 TEST-023 Memory Update Synthesis — VERIFIED
 TEST-024 Memory Update Persistence Foundation — VERIFIED
+TEST-025 Memory Update Synthesis Contract — VERIFIED
+TEST-026 Action Feedback Synthesis — VERIFIED
 TEST-027 Action Feedback Aggregation — VERIFIED
 TEST-028 Action Feedback Trend Synthesis — VERIFIED
+TEST-029 Action Feedback Learning Signals — VERIFIED
+TEST-030 Action Feedback Learning Context — VERIFIED
 
-TEST-027 + TEST-028 最终服务器验证：专项 16 passed；全量 246 passed。
-
----
-
-## TEST-029
-
-Action Feedback Learning Signals
-
-Branch：test-029-action-feedback-synthesis
-状态：IMPLEMENTED，待服务器批次验收
-
-API：GET /api/v1/persons/{person_id}/action-plan/feedback/signals
-
-目标：按 recommendation identity 提供可追溯的 feedback learning signals。
-
-核心边界：仅按 recommendation_id 分组；observed / unknown 严格分离；不推断 recommendation quality、success 或 relationship impact；不修改 Relationship；不自动执行；不接真实 LLM；user_id / person_id isolation；read-only；deterministic ordering。
-
-专项测试：backend/tests/test_action_feedback_signals.py
+TEST-029 + TEST-030 最终服务器验证：专项 15 passed；全量 261 passed。
 
 ---
 
-## TEST-030
+## TEST-031
 
-Action Feedback Learning Context
+Action Feedback Learning Input
 
-Branch：test-030-action-feedback-synthesis
+Branch：test-031-action-feedback-learning-input-final9
 状态：IMPLEMENTED，待服务器批次验收
 
-API：GET /api/v1/persons/{person_id}/action-plan/feedback/learning-context
+API：GET /api/v1/persons/{person_id}/action-plan/feedback/learning-input
 
-目标：将 TEST-027 summary、TEST-028 trend、TEST-029 learning signals 组合成统一、稳定、只读的后续学习输入上下文。
+目标：把 TEST-030 recommendation-level feedback signals 转换为 source-backed learning input，仅整理已观察 outcome，不解释 recommendation quality、success 或 relationship impact。
 
-核心边界：三视图来自同一 user/person 数据边界；observed / unknown 保持一致；不推断 recommendation quality、success 或 relationship impact；不修改 Relationship；不自动执行；不调用真实 LLM；read-only；deterministic。
+核心边界：observed / unknown 严格分离；保留 decision/outcome counts 和 source；unknowns 显式保留；不修改 Relationship；不自动执行；不调用真实 LLM；read-only；deterministic；user/person isolation。
 
-专项测试：backend/tests/test_action_feedback_learning_context.py
+专项测试：backend/tests/test_action_feedback_learning.py
+
+---
+
+## TEST-032
+
+Action Feedback Learning Synthesis
+
+Branch：test-032-action-feedback-learning-synthesis-final5
+状态：IMPLEMENTED，待服务器批次验收
+
+API：GET /api/v1/persons/{person_id}/action-plan/feedback/learning-synthesis
+
+目标：在 TEST-031 learning input 之上形成 source-backed learning candidate；仅标记是否存在已观察 outcome，不生成 recommendation quality、success 或 relationship impact 推断。
+
+核心边界：candidate source-backed；unknown outcome 保持 unknown；outcome counts 原样保留；不修改 Relationship；不自动执行；不调用真实 LLM；read-only；deterministic；user/person isolation。
+
+专项测试：backend/tests/test_action_feedback_learning_synthesis.py
 
 ---
 
@@ -71,12 +75,12 @@ API：GET /api/v1/persons/{person_id}/action-plan/feedback/learning-context
 
 相邻两个 TEST-No 合并为一次服务器测试批次。
 
-下一批：TEST-029 + TEST-030。
+下一批：TEST-031 + TEST-032。
 
 推荐命令：
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_action_feedback_signals.py \
-  backend/tests/test_action_feedback_learning_context.py
+  backend/tests/test_action_feedback_learning.py \
+  backend/tests/test_action_feedback_learning_synthesis.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
