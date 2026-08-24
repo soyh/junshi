@@ -8,6 +8,8 @@ class MemoryUpdateCandidate(BaseModel):
     status: str
     category: str
     content: dict[str, Any]
+    recommendation_id: str | None
+    learning_source: dict[str, Any]
     source_decision_id: str
     source_outcome_id: str
     source_created_at: str | None
