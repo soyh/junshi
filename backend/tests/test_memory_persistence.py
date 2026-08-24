@@ -14,6 +14,7 @@ def create_relationship(client, person_id):
         json={"person_id": person_id, "status": "active", "stage": "dating"},
     )
     assert response.status_code == 201
+    return response.json()
 
 
 def seed_confirmed_decision(person_id):
@@ -127,9 +128,9 @@ def test_memory_persistence_isolated_by_user(client):
     assert response.status_code == 404
 
 
-def test_memory_persistence_preserves_unknowns_by_not_changing_relationship(client):
+def test_memory_persistence_does_not_change_relationship(client):
     person = create_person(client)
-    create_relationship(client, person["id"])
+    relationship = create_relationship(client, person["id"])
     decision = seed_confirmed_decision(person["id"])
     create_outcome(client, person["id"], decision["id"])
     before = client.get(f"/api/v1/persons/{person['id']}/profile").json()
@@ -141,4 +142,5 @@ def test_memory_persistence_preserves_unknowns_by_not_changing_relationship(clie
     )
     assert response.status_code == 201
     after = client.get(f"/api/v1/persons/{person['id']}/profile").json()
-    assert before["relationship"] == after["relationship"]
+    assert before["relationships"] == after["relationships"]
+    assert after["relationships"][0]["id"] == relationship["id"]
