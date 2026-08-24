@@ -26,7 +26,7 @@ class StrategyDecisionConfirmationSynthesisService:
                 "decision_count": len(decisions),
                 "confirmed_count": len(confirmed),
                 "rejected_count": len(rejected),
-                "latest_decision_id": decisions[-1]["id"] if decisions else None,
+                "latest_decision_id": decisions[0]["id"] if decisions else None,
             },
             "confirmed_recommendation_ids": [item["recommendation_id"] for item in confirmed],
             "rejected_recommendation_ids": [item["recommendation_id"] for item in rejected],
