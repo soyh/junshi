@@ -83,3 +83,12 @@ class ActionFeedbackSignalResponse(BaseModel):
     relationship: dict[str, Any]
     feedback_signal_constraints: dict[str, Any]
     signals: list[ActionFeedbackSignal]
+
+
+class ActionFeedbackLearningContextResponse(BaseModel):
+    person: dict[str, Any]
+    relationship: dict[str, Any]
+    feedback_learning_constraints: dict[str, Any]
+    summary: ActionFeedbackSummary
+    trend: list[ActionFeedbackTrendObservation]
+    signals: list[ActionFeedbackSignal]
