@@ -104,3 +104,40 @@ class ActionFeedbackService:
                 "latest_observed_outcome": latest_observed,
             },
         }
+
+    def get_trend(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
+        context, feedback = self._load(conn, user_id, person_id)
+        observations = []
+        for item in feedback:
+            observed = bool(item.get("outcome_id") and item.get("outcome"))
+            observations.append(
+                {
+                    "event_at": item["outcome_created_at"] if observed else item["decision_created_at"],
+                    "feedback_status": "outcome_observed" if observed else "outcome_unknown",
+                    "decision_id": item["decision_id"],
+                    "decision": item["decision"],
+                    "decision_created_at": item["decision_created_at"],
+                    "outcome_id": item["outcome_id"],
+                    "outcome": item["outcome"] if observed else "unknown",
+                    "outcome_created_at": item["outcome_created_at"],
+                    "source": {
+                        "decision_id": item["decision_id"],
+                        "outcome_id": item["outcome_id"],
+                    },
+                }
+            )
+
+        observations.sort(key=lambda item: (item["event_at"], item["decision_id"]), reverse=True)
+        return {
+            "person": context["person"],
+            "relationship": context["relationship"],
+            "feedback_trend_constraints": {
+                "must_be_source_backed": True,
+                "must_preserve_unknowns": True,
+                "must_have_deterministic_ordering": True,
+                "must_not_infer_relationship_impact": True,
+                "must_not_change_relationship": True,
+                "must_not_auto_execute": True,
+            },
+            "observations": observations,
+        }
