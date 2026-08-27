@@ -3,7 +3,7 @@ import sqlite3
 from app.services.action_feedback_learning_synthesis import ActionFeedbackLearningSynthesisService
 from app.services.memory_learning_synthesis import MemoryLearningSynthesisService
 from app.services.recommendation import RecommendationService
-from app.services.strategy_decision_learning import StrategyDecisionLearningService
+from app.services.strategy_decision_learning_bridge import StrategyDecisionLearningBridgeService
 
 
 class LearningStrategyContextService:
@@ -12,20 +12,20 @@ class LearningStrategyContextService:
         recommendation_service: RecommendationService | None = None,
         feedback_learning_service: ActionFeedbackLearningSynthesisService | None = None,
         memory_learning_service: MemoryLearningSynthesisService | None = None,
-        strategy_decision_learning_service: StrategyDecisionLearningService | None = None,
+        strategy_decision_learning_service: StrategyDecisionLearningBridgeService | None = None,
     ):
         self.recommendation_service = recommendation_service or RecommendationService()
         self.feedback_learning_service = feedback_learning_service or ActionFeedbackLearningSynthesisService()
         self.memory_learning_service = memory_learning_service or MemoryLearningSynthesisService()
         self.strategy_decision_learning_service = (
-            strategy_decision_learning_service or StrategyDecisionLearningService()
+            strategy_decision_learning_service or StrategyDecisionLearningBridgeService()
         )
 
     def get_context(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
         recommendation = self.recommendation_service.get_context(conn, user_id, person_id)
         feedback = self.feedback_learning_service.get_synthesis(conn, user_id, person_id)
         memory = self.memory_learning_service.get_context(conn, user_id, person_id)
-        strategy_decision = self.strategy_decision_learning_service.get_learning_input(
+        strategy_decision = self.strategy_decision_learning_service.get_context(
             conn, user_id, person_id
         )
 
