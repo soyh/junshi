@@ -13,7 +13,7 @@ class StrategyDecisionLearningBridgeService:
         learning = self.learning_service.get_learning_input(conn, user_id, person_id)
         return {
             "items": learning["items"],
-            "constraints": {
+            "learning_constraints": {
                 **learning["learning_constraints"],
                 "source_backed": True,
                 "read_only": True,
