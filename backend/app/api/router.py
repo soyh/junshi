@@ -31,6 +31,7 @@ from app.api.routes.strategy_decision_confirmation import router as strategy_dec
 from app.api.routes.strategy_decision_confirmation_synthesis import router as strategy_decision_confirmation_synthesis_router
 from app.api.routes.strategy_decision_execution import router as strategy_decision_execution_router
 from app.api.routes.strategy_decision_execution_synthesis import router as strategy_decision_execution_synthesis_router
+from app.api.routes.strategy_decision_learning import router as strategy_decision_learning_router
 from app.api.routes.strategy_decision_lifecycle import router as strategy_decision_lifecycle_router
 from app.api.routes.strategy_decision_lifecycle_synthesis import router as strategy_decision_lifecycle_synthesis_router
 from app.api.routes.strategy_decision_result import router as strategy_decision_result_router
@@ -67,6 +68,7 @@ api_router.include_router(strategy_decision_confirmation_synthesis_router)
 api_router.include_router(strategy_decision_execution_router)
 api_router.include_router(strategy_decision_execution_synthesis_router)
 api_router.include_router(strategy_decision_result_router)
+api_router.include_router(strategy_decision_learning_router)
 api_router.include_router(strategy_decision_lifecycle_router)
 api_router.include_router(strategy_decision_lifecycle_synthesis_router)
 api_router.include_router(memory_persistence_router)
