@@ -34,6 +34,7 @@ def test_recommendation_context_returns_evidence_backed_input_and_empty_recommen
         "inferences",
         "unknowns",
         "recommendations",
+        "learning_strategy",
     }
     assert body["person"]["id"] == person["id"]
     assert body["relationship"]["id"] == relationship["id"]
@@ -48,6 +49,8 @@ def test_recommendation_context_returns_evidence_backed_input_and_empty_recommen
     assert body["inferences"] == []
     assert body["unknowns"] == []
     assert body["recommendations"] == []
+    assert body["learning_strategy"]["candidates"] == []
+    assert body["learning_strategy"]["strategy_decision_learning"]["learning_candidate_count"] == 0
 
 
 def test_recommendation_context_reuses_relationship_state_evidence(client):
