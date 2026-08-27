@@ -3,7 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
 from app.schemas.recommendation import RecommendationContextResponse
-from app.services.recommendation import RecommendationService
+from app.services.recommendation_learning_strategy_bridge import (
+    RecommendationLearningStrategyBridgeService,
+)
 
 
 router = APIRouter(
@@ -11,7 +13,7 @@ router = APIRouter(
     tags=["recommendation-analysis"],
 )
 
-service = RecommendationService()
+service = RecommendationLearningStrategyBridgeService()
 
 
 @router.get(
