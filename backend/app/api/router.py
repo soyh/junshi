@@ -31,6 +31,7 @@ from app.api.routes.strategy_decision_confirmation import router as strategy_dec
 from app.api.routes.strategy_decision_confirmation_synthesis import router as strategy_decision_confirmation_synthesis_router
 from app.api.routes.strategy_decision_execution import router as strategy_decision_execution_router
 from app.api.routes.strategy_decision_execution_synthesis import router as strategy_decision_execution_synthesis_router
+from app.api.routes.strategy_decision_result import router as strategy_decision_result_router
 from app.api.routes.strategy_decision_synthesis import router as strategy_decision_synthesis_router
 from app.api.routes.text_imports import router as text_imports_router
 from app.api.routes.timeline import router as timeline_router
@@ -63,6 +64,7 @@ api_router.include_router(strategy_decision_confirmation_router)
 api_router.include_router(strategy_decision_confirmation_synthesis_router)
 api_router.include_router(strategy_decision_execution_router)
 api_router.include_router(strategy_decision_execution_synthesis_router)
+api_router.include_router(strategy_decision_result_router)
 api_router.include_router(memory_persistence_router)
 api_router.include_router(interactions_router)
 api_router.include_router(messages_router)
