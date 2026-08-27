@@ -1,112 +1,82 @@
 # Development Handover
 
 更新时间：2026-08-27
-当前阶段：TEST-043 + TEST-044 strategy decision result bridge
+当前阶段：TEST-047 + TEST-048 strategy decision learning bridge
 当前状态：IMPLEMENTED，待服务器批次验收
-当前 Branch：test-043-044-strategy-decision-result
+当前 Branch：test-047-048-strategy-decision-learning
 
 ---
 
 ## 已完成阶段
 
-TEST-008 Person Timeline — VERIFIED
-TEST-009 Text Import — VERIFIED
-TEST-010 Conversation Analysis Foundation — VERIFIED
-TEST-011 Evidence — VERIFIED
-TEST-012 Person Profile — VERIFIED
-TEST-013 Relationship State Analysis — VERIFIED
-TEST-014 Recommendation Foundation — VERIFIED
-TEST-015 Strategic Reply Foundation — VERIFIED
-TEST-016 Action Plan Foundation — VERIFIED
-TEST-017 Action Plan Synthesis — VERIFIED
-TEST-018 Strategic Reply Synthesis — VERIFIED
-TEST-019 Action Confirmation Foundation — VERIFIED
-TEST-020 Action Outcome Foundation — VERIFIED
-TEST-021 Action Feedback Synthesis — VERIFIED
-TEST-022 Memory Update Foundation — VERIFIED
-TEST-023 Memory Update Synthesis — VERIFIED
-TEST-024 Memory Update Persistence Foundation — VERIFIED
-TEST-025 Memory Update Synthesis Contract — VERIFIED
-TEST-026 Action Feedback Synthesis — VERIFIED
-TEST-027 Action Feedback Aggregation — VERIFIED
-TEST-028 Action Feedback Trend Synthesis — VERIFIED
-TEST-029 Action Feedback Learning Signals — VERIFIED
-TEST-030 Action Feedback Learning Context — VERIFIED
-TEST-031 Action Feedback Learning Input — VERIFIED
-TEST-032 Action Feedback Learning Synthesis — VERIFIED
-TEST-033 Memory Learning Provenance — VERIFIED
-TEST-034 Memory Learning Synthesis — VERIFIED
-TEST-035 Learning Strategy Context — VERIFIED
-TEST-036 Learning Strategy Synthesis — VERIFIED
-TEST-037 Strategy Decision Context — VERIFIED
-TEST-038 Strategy Decision Synthesis — VERIFIED
-TEST-039 Strategy Decision Confirmation — VERIFIED
-TEST-040 Strategy Decision Confirmation Synthesis — VERIFIED
-TEST-041 Strategy Decision Execution — VERIFIED
-TEST-042 Strategy Decision Execution Synthesis — VERIFIED
-TEST-043 Strategy Decision Result — IMPLEMENTED，待服务器验收
-TEST-044 Strategy Decision Result Synthesis — IMPLEMENTED，待服务器验收
+TEST-008 ~ TEST-044：VERIFIED
+TEST-045 Strategy Decision Lifecycle — VERIFIED
+TEST-046 Strategy Decision Lifecycle Synthesis — VERIFIED
 
-TEST-041 + TEST-042 服务器专项验收：16 passed；全量测试：349 passed。
-TEST-039 + TEST-040 服务器专项验收：15 passed；全量测试：333 passed。
-TEST-037 + TEST-038 服务器专项验收：15 passed；全量测试：318 passed。
+最近服务器验收：TEST-045 + TEST-046 专项 12 passed；全量 375 passed。
 
 ---
 
-## TEST-043 Strategy Decision Result
+## TEST-045 / TEST-046
 
-API：GET /api/v1/persons/{person_id}/strategy-decision/result-context
+Lifecycle 统一表达 decision → result → execution → outcome → feedback。
 
-提供 confirmed decision、execution、outcome 的 deterministic 统一结果视图，不改变三者生命周期。
+API：
+GET /api/v1/persons/{person_id}/strategy-decision/lifecycle-context
+GET /api/v1/persons/{person_id}/strategy-decision/lifecycle-synthesis
 
-状态：confirmed_pending_execution / executed_pending_outcome / outcome_recorded / not_actionable。
-
-边界：不自动执行；不自动创建 outcome；不自动发送；execution 与 outcome 独立；user/person isolation。
-
-专项测试：backend/tests/test_strategy_decision_result.py
+核心边界：read-only；execution 与 outcome 独立；feedback source-backed；unknown 保留；不推断 recommendation quality、success、relationship impact；不自动执行、不自动发送、不调用 LLM；user/person isolation。
 
 ---
 
-## TEST-044 Strategy Decision Result Synthesis
+## TEST-047 Strategy Decision Learning Input
 
-API：GET /api/v1/persons/{person_id}/strategy-decision/result-synthesis
+API：
+GET /api/v1/persons/{person_id}/strategy-decision/learning-input
 
-汇总 TEST-043 结果，并输出当前仍可行动的 decision：confirmed_pending_execution 与 executed_pending_outcome。
+目标：把 lifecycle context 转换为后续 learning layer 可消费的 deterministic、source-backed learning input。
 
-边界：deterministic；保留历史记录；不自动执行；不自动创建 outcome；不自动发送；user/person isolation。
+每个 item 保留 decision_id、recommendation_id、decision_status、result_status、feedback_status、learning_status、learning_eligible、outcome、feedback、unknowns、source。
 
-专项测试：backend/tests/test_strategy_decision_result_synthesis.py
+只有 observed feedback 才进入 learning candidates；pending execution、pending outcome、rejected/not_actionable 等 unknown 状态不得被视为学习结果。
+
+专项测试：backend/tests/test_strategy_decision_learning.py
+
+---
+
+## TEST-048 Strategy Decision Learning Synthesis
+
+API：
+GET /api/v1/persons/{person_id}/strategy-decision/learning-synthesis
+
+汇总 learning input，输出 learning_candidate_decision_ids、unknown_decision_ids、recommendation_observed_counts、learning_summary 和完整 learning_items。
+
+核心边界：deterministic、read-only、source-backed only、preserve unknowns；不改变关系、不自动执行、不自动发送、不调用 LLM；user/person isolation。
+
+专项测试：backend/tests/test_strategy_decision_learning_synthesis.py
 
 ---
 
 ## 数据库
 
-TEST-043/044 不新增 migration，不改变既有 action_decisions、action_executions、action_outcomes 生命周期。
+当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
+TEST-045 ~ TEST-048 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ---
 
-## 服务器测试规则
+## 服务器测试
 
-相邻两个 TEST-No 合并为一次服务器测试批次。
-
-当前批次：TEST-043 + TEST-044。
-
-推荐命令：
+当前批次：TEST-047 + TEST-048。
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_strategy_decision_result.py \
-  backend/tests/test_strategy_decision_result_synthesis.py
+  backend/tests/test_strategy_decision_learning.py \
+  backend/tests/test_strategy_decision_learning_synthesis.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
-
-每个 TEST 保持独立代码边界、测试文件和验收记录。
 
 ---
 
 ## 开发原则
 
-不要随意改变现有架构。
-优先采用：Route → Service → Repository → SQLite
-所有用户数据必须进行 user_id 隔离。API Key 不得明文保存。系统不得自动向第三方发送消息。不得使用 8899。MVP 阶段不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
-
-每完成一个明确阶段：代码 → 测试 → Git status → Git commit → 更新交接文档。
+Route → Service → Repository → SQLite。
+所有用户数据必须 user_id 隔离；不得自动向第三方发送消息；不得使用 8899；MVP 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
