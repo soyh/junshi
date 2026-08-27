@@ -36,7 +36,7 @@ def execute(client, person_id, decision_id):
 def outcome(client, person_id, decision_id):
     response = client.post(
         f"/api/v1/persons/{person_id}/action-plan/outcomes/{decision_id}",
-        json={"outcome": "observed result", "note": "bridge test"},
+        json={"outcome": "completed", "note": "bridge test"},
     )
     assert response.status_code == 201
 
