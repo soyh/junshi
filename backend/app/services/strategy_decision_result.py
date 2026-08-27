@@ -3,24 +3,24 @@ import sqlite3
 from app.repositories.action_decision import ActionDecisionRepository
 from app.repositories.action_execution import ActionExecutionRepository
 from app.repositories.action_outcome import ActionOutcomeRepository
-from app.services.strategy_decision_execution import StrategyDecisionExecutionService
+from app.services.relationship_state import RelationshipStateService
 
 
 class StrategyDecisionResultService:
     def __init__(
         self,
-        execution_service=None,
+        state_service=None,
         decision_repository=None,
         execution_repository=None,
         outcome_repository=None,
     ):
-        self.execution_service = execution_service or StrategyDecisionExecutionService()
+        self.state_service = state_service or RelationshipStateService()
         self.decision_repository = decision_repository or ActionDecisionRepository()
         self.execution_repository = execution_repository or ActionExecutionRepository()
         self.outcome_repository = outcome_repository or ActionOutcomeRepository()
 
     def get_context(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
-        context = self.execution_service.get_context(conn, user_id, person_id)
+        context = self.state_service.get_state(conn, user_id, person_id)
         decisions = self.decision_repository.list_for_person(conn, user_id, person_id)
         executions = self.execution_repository.list_for_person(conn, user_id, person_id)
         outcomes = self.outcome_repository.list_for_person(conn, user_id, person_id)
