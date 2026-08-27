@@ -33,7 +33,10 @@ class StrategyDecisionResultSynthesisService:
 
         actionable = [
             item["id"]
-            for item in results
+            for item in sorted(
+                results,
+                key=lambda item: (item["created_at"], item["id"]),
+            )
             if item["result_status"] in {
                 "confirmed_pending_execution",
                 "executed_pending_outcome",
