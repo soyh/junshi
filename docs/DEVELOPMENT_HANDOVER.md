@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-08-27
-当前阶段：TEST-047 + TEST-048 strategy decision learning bridge
+当前阶段：TEST-049 + TEST-050 strategy decision learning bridge
 当前状态：IMPLEMENTED，待服务器批次验收
-当前 Branch：test-047-048-strategy-decision-learning
+当前 Branch：test-049-050-strategy-decision-learning-bridge
 
 ---
 
@@ -12,65 +12,62 @@
 TEST-008 ~ TEST-044：VERIFIED
 TEST-045 Strategy Decision Lifecycle — VERIFIED
 TEST-046 Strategy Decision Lifecycle Synthesis — VERIFIED
+TEST-047 Strategy Decision Learning Input — VERIFIED
+TEST-048 Strategy Decision Learning Synthesis — VERIFIED
 
-最近服务器验收：TEST-045 + TEST-046 专项 12 passed；全量 375 passed。
-
----
-
-## TEST-045 / TEST-046
-
-Lifecycle 统一表达 decision → result → execution → outcome → feedback。
-
-API：
-GET /api/v1/persons/{person_id}/strategy-decision/lifecycle-context
-GET /api/v1/persons/{person_id}/strategy-decision/lifecycle-synthesis
-
-核心边界：read-only；execution 与 outcome 独立；feedback source-backed；unknown 保留；不推断 recommendation quality、success、relationship impact；不自动执行、不自动发送、不调用 LLM；user/person isolation。
+最近服务器验收：TEST-047 + TEST-048 专项 14 passed；全量 389 passed。
 
 ---
 
-## TEST-047 Strategy Decision Learning Input
+## TEST-049 Strategy Decision Learning Bridge
 
-API：
-GET /api/v1/persons/{person_id}/strategy-decision/learning-input
+目标：把 strategy decision learning input 接入既有 learning-strategy context，而不是创建第二套学习事实。
 
-目标：把 lifecycle context 转换为后续 learning layer 可消费的 deterministic、source-backed learning input。
+既有 API：
+GET /api/v1/persons/{person_id}/learning-strategy/context
 
-每个 item 保留 decision_id、recommendation_id、decision_status、result_status、feedback_status、learning_status、learning_eligible、outcome、feedback、unknowns、source。
+新增 learning_inputs.strategy_decision，直接复用 TEST-047 source-backed learning input。
 
-只有 observed feedback 才进入 learning candidates；pending execution、pending outcome、rejected/not_actionable 等 unknown 状态不得被视为学习结果。
+核心边界：不改变 decision / execution / outcome 生命周期；不新增 migration；不把 unknown 转换成成功或失败；不推断 recommendation quality、success、relationship impact；read-only；user/person isolation。
 
-专项测试：backend/tests/test_strategy_decision_learning.py
+专项测试：backend/tests/test_strategy_decision_learning_bridge.py
 
 ---
 
-## TEST-048 Strategy Decision Learning Synthesis
+## TEST-050 Strategy Decision Learning Synthesis Bridge
 
-API：
-GET /api/v1/persons/{person_id}/strategy-decision/learning-synthesis
+目标：把 TEST-048 synthesis 接入既有 learning-strategy synthesis，使策略学习层同时看到 action feedback、memory updates 和 strategy decision learning。
 
-汇总 learning input，输出 learning_candidate_decision_ids、unknown_decision_ids、recommendation_observed_counts、learning_summary 和完整 learning_items。
+既有 API：
+GET /api/v1/persons/{person_id}/learning-strategy/synthesis
 
-核心边界：deterministic、read-only、source-backed only、preserve unknowns；不改变关系、不自动执行、不自动发送、不调用 LLM；user/person isolation。
+新增 strategy_decision_learning：
+- learning_candidate_decision_ids
+- unknown_decision_ids
+- recommendation_observed_counts
+- learning_candidate_count
+- unknown_count
+- constraints
 
-专项测试：backend/tests/test_strategy_decision_learning_synthesis.py
+核心边界：deterministic、read-only、source-backed only、preserve unknowns；不排名推荐、不把学习结果写成事实、不自动执行、不自动发送、不调用 LLM。
+
+专项测试：backend/tests/test_strategy_decision_learning_bridge.py
 
 ---
 
 ## 数据库
 
 当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-048 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-045 ~ TEST-050 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ---
 
 ## 服务器测试
 
-当前批次：TEST-047 + TEST-048。
+当前批次：TEST-049 + TEST-050。
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_strategy_decision_learning.py \
-  backend/tests/test_strategy_decision_learning_synthesis.py
+  backend/tests/test_strategy_decision_learning_bridge.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
 
