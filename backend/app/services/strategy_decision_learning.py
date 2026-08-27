@@ -18,6 +18,11 @@ class StrategyDecisionLearningService:
             feedback = lifecycle_item["feedback"]
             outcome = decision.get("outcome")
             observed = lifecycle_item["feedback_status"] == "outcome_observed"
+            unknowns = (
+                feedback.get("unknowns")
+                if feedback is not None and feedback.get("unknowns") is not None
+                else ["action_effect", "relationship_impact"]
+            )
 
             items.append(
                 {
@@ -30,20 +35,15 @@ class StrategyDecisionLearningService:
                     "learning_eligible": observed,
                     "outcome": outcome,
                     "feedback": feedback,
-                    "unknowns": [
-                        "recommendation_quality",
-                        "success",
-                        "relationship_impact",
-                    ],
+                    "unknowns": unknowns,
                     "source": {
                         "decision_id": lifecycle_item["decision_id"],
+                        "recommendation_id": decision["recommendation_id"],
                         "outcome_id": outcome["id"] if outcome else None,
                         "feedback_status": lifecycle_item["feedback_status"],
                     },
                 }
             )
-
-        items.sort(key=lambda item: (item["decision_id"],))
 
         return {
             "person": context["person"],
