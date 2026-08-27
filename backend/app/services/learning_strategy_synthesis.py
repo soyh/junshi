@@ -1,11 +1,19 @@
 import sqlite3
 
 from app.services.learning_strategy_context import LearningStrategyContextService
+from app.services.strategy_decision_learning_bridge import StrategyDecisionLearningBridgeService
 
 
 class LearningStrategySynthesisService:
-    def __init__(self, context_service: LearningStrategyContextService | None = None):
+    def __init__(
+        self,
+        context_service: LearningStrategyContextService | None = None,
+        strategy_decision_learning_service: StrategyDecisionLearningBridgeService | None = None,
+    ):
         self.context_service = context_service or LearningStrategyContextService()
+        self.strategy_decision_learning_service = (
+            strategy_decision_learning_service or StrategyDecisionLearningBridgeService()
+        )
 
     def get_synthesis(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
         context = self.context_service.get_context(conn, user_id, person_id)
@@ -33,19 +41,9 @@ class LearningStrategySynthesisService:
             if recommendation_id in grouped:
                 grouped[recommendation_id]["memory_update_count"] += 1
 
-        strategy_decision = context["learning_inputs"]["strategy_decision"]
-        strategy_decision_observed = [
-            item for item in strategy_decision["items"] if item["learning_eligible"]
-        ]
-        strategy_decision_unknown = [
-            item for item in strategy_decision["items"] if not item["learning_eligible"]
-        ]
-        strategy_decision_counts = {}
-        for item in strategy_decision_observed:
-            recommendation_id = item["recommendation_id"]
-            strategy_decision_counts[recommendation_id] = (
-                strategy_decision_counts.get(recommendation_id, 0) + 1
-            )
+        strategy_decision_learning = self.strategy_decision_learning_service.get_synthesis(
+            conn, user_id, person_id
+        )
 
         return {
             "person": context["person"],
@@ -56,25 +54,5 @@ class LearningStrategySynthesisService:
                 "must_not_rank_recommendations": True,
             },
             "candidates": list(grouped.values()),
-            "strategy_decision_learning": {
-                "learning_candidate_decision_ids": [
-                    item["decision_id"] for item in strategy_decision_observed
-                ],
-                "unknown_decision_ids": [item["decision_id"] for item in strategy_decision_unknown],
-                "recommendation_observed_counts": strategy_decision_counts,
-                "learning_candidate_count": len(strategy_decision_observed),
-                "unknown_count": len(strategy_decision_unknown),
-                "constraints": {
-                    "read_only": True,
-                    "source_backed_only": True,
-                    "must_preserve_unknowns": True,
-                    "must_not_infer_recommendation_quality": True,
-                    "must_not_infer_success": True,
-                    "must_not_infer_relationship_impact": True,
-                    "must_not_change_relationship": True,
-                    "must_not_auto_execute": True,
-                    "must_not_auto_send": True,
-                    "must_not_call_llm": True,
-                },
-            },
+            "strategy_decision_learning": strategy_decision_learning,
         }
