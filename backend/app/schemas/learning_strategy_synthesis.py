@@ -8,3 +8,4 @@ class LearningStrategySynthesisResponse(BaseModel):
     relationship: dict[str, Any]
     strategy_constraints: dict[str, bool]
     candidates: list[dict[str, Any]]
+    strategy_decision_learning: dict[str, Any]
