@@ -90,7 +90,12 @@ def test_learning_strategy_context_is_person_isolated(client):
     create_relationship(client, second["id"])
     decision = seed_decision(first["id"])
     create_outcome(client, first["id"], decision["id"])
-    assert get_context(client, second["id"]).json()["learning_inputs"] == {"action_feedback": [], "memory_updates": []}
+
+    learning_inputs = get_context(client, second["id"]).json()["learning_inputs"]
+    assert learning_inputs["action_feedback"] == []
+    assert learning_inputs["memory_updates"] == []
+    assert learning_inputs["strategy_decision"]["items"] == []
+    assert learning_inputs["strategy_decision"]["learning_constraints"]["source_backed"] is True
 
 
 def test_learning_strategy_context_is_user_isolated(client):
