@@ -33,6 +33,20 @@ class LearningStrategySynthesisService:
             if recommendation_id in grouped:
                 grouped[recommendation_id]["memory_update_count"] += 1
 
+        strategy_decision = context["learning_inputs"]["strategy_decision"]
+        strategy_decision_observed = [
+            item for item in strategy_decision["items"] if item["learning_eligible"]
+        ]
+        strategy_decision_unknown = [
+            item for item in strategy_decision["items"] if not item["learning_eligible"]
+        ]
+        strategy_decision_counts = {}
+        for item in strategy_decision_observed:
+            recommendation_id = item["recommendation_id"]
+            strategy_decision_counts[recommendation_id] = (
+                strategy_decision_counts.get(recommendation_id, 0) + 1
+            )
+
         return {
             "person": context["person"],
             "relationship": context["relationship"],
@@ -42,4 +56,25 @@ class LearningStrategySynthesisService:
                 "must_not_rank_recommendations": True,
             },
             "candidates": list(grouped.values()),
+            "strategy_decision_learning": {
+                "learning_candidate_decision_ids": [
+                    item["decision_id"] for item in strategy_decision_observed
+                ],
+                "unknown_decision_ids": [item["decision_id"] for item in strategy_decision_unknown],
+                "recommendation_observed_counts": strategy_decision_counts,
+                "learning_candidate_count": len(strategy_decision_observed),
+                "unknown_count": len(strategy_decision_unknown),
+                "constraints": {
+                    "read_only": True,
+                    "source_backed_only": True,
+                    "must_preserve_unknowns": True,
+                    "must_not_infer_recommendation_quality": True,
+                    "must_not_infer_success": True,
+                    "must_not_infer_relationship_impact": True,
+                    "must_not_change_relationship": True,
+                    "must_not_auto_execute": True,
+                    "must_not_auto_send": True,
+                    "must_not_call_llm": True,
+                },
+            },
         }
