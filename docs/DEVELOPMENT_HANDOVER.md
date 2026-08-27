@@ -1,9 +1,10 @@
 # Development Handover
 
-更新时间：2026-08-27
-当前阶段：TEST-049 + TEST-050 strategy decision learning bridge
-当前状态：IMPLEMENTED，待服务器批次验收
+更新时间：2026-08-28
+当前阶段：TEST-050 Strategy Decision Learning Synthesis Bridge — COMPLETED
+当前状态：VERIFIED，392 passed
 当前 Branch：test-049-050-strategy-decision-learning-bridge
+当前基线提交：5df1810d6f07c358a03d685152d716e882b4bf73
 
 ---
 
@@ -14,8 +15,10 @@ TEST-045 Strategy Decision Lifecycle — VERIFIED
 TEST-046 Strategy Decision Lifecycle Synthesis — VERIFIED
 TEST-047 Strategy Decision Learning Input — VERIFIED
 TEST-048 Strategy Decision Learning Synthesis — VERIFIED
+TEST-049 Strategy Decision Learning Bridge — VERIFIED
+TEST-050 Strategy Decision Learning Synthesis Bridge — VERIFIED
 
-最近服务器验收：TEST-047 + TEST-048 专项 14 passed；全量 389 passed。
+TEST-049 + TEST-050 最终服务器验收：专项 10 passed；全量 392 passed；失败 0。
 
 ---
 
@@ -41,15 +44,11 @@ GET /api/v1/persons/{person_id}/learning-strategy/context
 既有 API：
 GET /api/v1/persons/{person_id}/learning-strategy/synthesis
 
-新增 strategy_decision_learning：
-- learning_candidate_decision_ids
-- unknown_decision_ids
-- recommendation_observed_counts
-- learning_candidate_count
-- unknown_count
-- constraints
+新增 strategy_decision_learning：learning_candidate_decision_ids、unknown_decision_ids、recommendation_observed_counts、learning_candidate_count、unknown_count、constraints。
 
 核心边界：deterministic、read-only、source-backed only、preserve unknowns；不排名推荐、不把学习结果写成事实、不自动执行、不自动发送、不调用 LLM。
+
+最终修复：补齐 LearningStrategySynthesisResponse 的 strategy_decision_learning 响应字段，service/bridge 逻辑不变。
 
 专项测试：backend/tests/test_strategy_decision_learning_bridge.py
 
@@ -64,12 +63,13 @@ TEST-045 ~ TEST-050 不新增 migration，不改变 action_decisions、action_ex
 
 ## 服务器测试
 
-当前批次：TEST-049 + TEST-050。
+当前完成基线：TEST-049 + TEST-050，392 passed。
 
-PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_strategy_decision_learning_bridge.py
+PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q backend/tests/test_strategy_decision_learning_bridge.py backend/tests/test_learning_strategy_context.py
+结果：10 passed。
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
+结果：392 passed。
 
 ---
 
