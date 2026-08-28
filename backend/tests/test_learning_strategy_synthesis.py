@@ -122,7 +122,7 @@ def test_learning_strategy_synthesis_source_provenance_includes_decision_cardina
     assert candidate["source"] == {
         "recommendation_id": "recommendation-cardinality",
         "decision_count": 2,
-        "decision_counts": {"confirmed": 2, "proposed": 0, "cancelled": 0, "executed": 0},
+        "decision_counts": {"confirmed": 2, "rejected": 0},
         "observed_outcomes": 1,
         "unknown_outcomes": 1,
     }
