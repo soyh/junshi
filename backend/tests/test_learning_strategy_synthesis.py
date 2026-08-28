@@ -111,6 +111,39 @@ def test_learning_strategy_synthesis_source_provenance_does_not_create_inference
     assert body["strategy_constraints"]["must_not_turn_learning_into_fact"] is True
 
 
+def test_learning_strategy_synthesis_source_provenance_includes_decision_cardinality(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    first = seed_decision(person["id"], "recommendation-cardinality")
+    second = seed_decision(person["id"], "recommendation-cardinality")
+    create_outcome(client, person["id"], first["id"], "completed")
+
+    candidate = get_synthesis(client, person["id"]).json()["candidates"][0]
+    assert candidate["source"] == {
+        "recommendation_id": "recommendation-cardinality",
+        "decision_count": 2,
+        "decision_counts": {"confirmed": 2, "proposed": 0, "cancelled": 0, "executed": 0},
+        "observed_outcomes": 1,
+        "unknown_outcomes": 1,
+    }
+    assert second["id"] != first["id"]
+
+
+def test_learning_strategy_synthesis_source_counts_remain_distinct_from_outcome_counts(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    first = seed_decision(person["id"], "recommendation-cardinality")
+    second = seed_decision(person["id"], "recommendation-cardinality")
+    create_outcome(client, person["id"], first["id"], "completed")
+    create_outcome(client, person["id"], second["id"], "failed")
+
+    candidate = get_synthesis(client, person["id"]).json()["candidates"][0]
+    assert candidate["source"]["decision_count"] == 2
+    assert candidate["source"]["observed_outcomes"] == 2
+    assert candidate["source"]["unknown_outcomes"] == 0
+    assert candidate["outcome_counts"] == {"completed": 1, "skipped": 0, "failed": 1}
+
+
 def test_learning_strategy_synthesis_is_person_isolated(client):
     first = create_person(client, "策略综合A")
     second = create_person(client, "策略综合B")
