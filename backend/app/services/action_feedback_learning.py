@@ -24,6 +24,8 @@ class ActionFeedbackLearningService:
                     "unknowns": ["recommendation_quality", "success", "relationship_impact"],
                     "source": {
                         "recommendation_id": signal["recommendation_id"],
+                        "decision_count": signal["decision_count"],
+                        "decision_counts": dict(signal["decision_counts"]),
                         "observed_outcomes": signal["outcome_observed_count"],
                         "unknown_outcomes": signal["outcome_unknown_count"],
                     },
