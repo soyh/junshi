@@ -1,10 +1,10 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-29
-当前阶段：TEST-052 + TEST-053 Learning Strategy downstream bridges — FIXED, AWAITING SERVER VERIFICATION
-当前状态：修复了 downstream learning constraint contract；最近一次已验证基线仍为 398 passed（TEST-051）
-当前 Branch：test-053-learning-strategy-action-plan-bridge
-当前开发基线提交：f63a4706c141be38abc8d300730f3533536f64ee
+当前阶段：TEST-054 + TEST-055 Learning Strategy downstream contract hardening — IMPLEMENTED, AWAITING SERVER VERIFICATION
+当前状态：已修复 Strategic Reply learning candidate contract，并统一 Action Plan / Strategic Reply downstream learning candidate projection；最近一次已验证基线仍为 398 passed（TEST-051）
+当前 Branch：test-055-learning-strategy-downstream-constraints
+当前开发基线提交：cc46903fe7c6f5c4d402c714db8f0b2d13d4cd31
 最近一次已验证基线提交：b1a9f93e71c221d2020d94912f2309ec918d8d3e
 
 ---
@@ -21,68 +21,63 @@ TEST-050 Strategy Decision Learning Synthesis Bridge — VERIFIED
 TEST-051 Learning Strategy Recommendation Bridge — VERIFIED
 TEST-052 Learning Strategy Strategic Reply Bridge — IMPLEMENTED，待服务器验收
 TEST-053 Learning Strategy Action Plan Bridge — IMPLEMENTED，待服务器验收
+TEST-054 Learning Strategy Downstream Candidate Contract — IMPLEMENTED，待服务器验收
+TEST-055 Learning Strategy Downstream Constraint Contract — IMPLEMENTED，待服务器验收
 
 TEST-049 + TEST-050 最终服务器验收：专项 10 passed；全量 392 passed；失败 0。
 TEST-051 最终服务器验收：Recommendation 专项 15 passed；全量 398 passed；失败 0。
 
 ---
 
-## TEST-052 Learning Strategy Strategic Reply Bridge
+## TEST-054 Learning Strategy Downstream Candidate Contract
 
-目标：把既有 learning-strategy synthesis 以 source-backed 方式继续接入 Strategic Reply context，不让 StrategicReplyService 重新计算学习事实。
+目标：修复 Strategic Reply downstream learning candidate 的输出契约，使其只暴露 canonical learning candidate 字段，不把 synthesis 内部字段泄漏到 downstream response。
 
 既有 API：
 GET /api/v1/persons/{person_id}/strategic-reply/context
+GET /api/v1/persons/{person_id}/action-plan/context
 
-新增 response.learning_strategy：
-- candidates
-- strategy_decision_learning
-- constraints
+本轮实现：
+- StrategicReplyLearningStrategyBridgeService 增加 canonical candidate projection。
+- 保留 recommendation_id、observed_outcome_count、outcome_counts、unknown_outcome_count、memory_update_count、synthesis_status、unknowns。
+- 继续只暴露 observed outcome candidates；unobserved decisions 保持 unknown。
 
-新增 StrategicReplyLearningStrategyBridgeService，组合既有 StrategicReplyService 与 LearningStrategySynthesisService。
+核心边界：不重新计算 learning facts；不改变 action decision / outcome 生命周期；read-only；source-backed；preserve unknowns；不自动发送；不自动执行；不调用 LLM。
 
-核心边界：只暴露已观察 outcome 的 learning candidates；未观察 outcome 的 decision 保持 unknown；继续保留 strategy decision learning unknown 信息；不生成未经证据支持的回复；不自动发送；不改变 relationship；read-only；user/person isolation；不调用 LLM。
-
-本轮修复：统一下游 learning strategy context 的 canonical unknown preservation constraint，确保 strategic reply 与 action plan 均暴露 must_preserve_unknowns。
-
-专项测试：
-backend/tests/test_strategic_reply.py
+专项覆盖：
 backend/tests/test_strategic_reply_learning_strategy_bridge.py
+backend/tests/test_action_plan_learning_strategy_bridge.py
 
-状态：代码修复完成，尚未进行本轮服务器验收。
+状态：代码完成，尚未进行本轮服务器验收。
 
 ---
 
-## TEST-053 Learning Strategy Action Plan Bridge
+## TEST-055 Learning Strategy Downstream Constraint Contract
 
-目标：把既有 learning-strategy synthesis 继续接入 Action Plan context，使行动计划层能够看到 source-backed learning，同时保持行动计划本身的证据约束与用户确认边界。
+目标：确保 Action Plan 与 Strategic Reply 两个 downstream bridge 对 learning candidate 使用同一 canonical 字段契约，同时保留各自独有的执行/发送约束。
 
-既有 API：
-GET /api/v1/persons/{person_id}/action-plan/context
+本轮实现：
+- ActionPlanLearningStrategyBridgeService 增加相同 canonical candidate projection。
+- Strategic Reply 继续暴露 must_not_auto_send。
+- Action Plan 继续暴露 must_not_auto_execute。
+- 两者均继承 learning-strategy synthesis 的 must_preserve_unknowns、must_not_turn_learning_into_fact 等约束。
 
-新增 response.learning_strategy：
-- candidates
-- strategy_decision_learning
-- constraints
+核心边界：两个 downstream context 只消费既有 LearningStrategySynthesisService；不创建第二套学习事实；不排名推荐；不改变 relationship；read-only；user/person isolation；不调用 LLM。
 
-新增 ActionPlanLearningStrategyBridgeService，组合既有 ActionPlanService 与 LearningStrategySynthesisService。
-
-核心边界：只暴露已观察 outcome 的 learning candidates；未观察 outcome 的 decision 保持 unknown；不把 learning 转换为 fact；不自动执行；必须保留用户确认；不改变 relationship；read-only；user/person isolation；不调用 LLM。
-
-本轮修复：复用统一 strategy_constraints 中的 must_preserve_unknowns，保持 action plan learning bridge 与 strategic reply learning bridge 的约束契约一致。
-
-专项测试：
+专项覆盖：
+backend/tests/test_strategic_reply.py
+backend/tests/test_strategic_reply_learning_strategy_bridge.py
 backend/tests/test_action_plan.py
 backend/tests/test_action_plan_learning_strategy_bridge.py
 
-状态：代码修复完成，尚未进行本轮服务器验收。
+状态：代码完成，尚未进行本轮服务器验收。
 
 ---
 
 ## 数据库
 
 当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-053 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-045 ~ TEST-055 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ---
 
@@ -90,7 +85,7 @@ TEST-045 ~ TEST-053 不新增 migration，不改变 action_decisions、action_ex
 
 最近一次完成基线：TEST-051，398 passed。
 
-本轮 TEST-052 + TEST-053 修复完成后，等待一次统一服务器验收。
+TEST-052 ~ TEST-055 代码已完成，本轮等待一次统一服务器验收。
 
 建议验收命令：
 
