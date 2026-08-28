@@ -1,8 +1,8 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-29
-当前阶段：TEST-058 + TEST-059 Learning Strategy provenance contract — IMPLEMENTED, AWAITING SERVER VERIFICATION
-当前 Branch：test-059-learning-strategy-provenance-immutability
+当前阶段：TEST-060 + TEST-061 Learning Strategy provenance completeness/parity — IMPLEMENTED, AWAITING SERVER VERIFICATION
+当前 Branch：test-061-learning-strategy-provenance-parity
 最近一次服务器验收：TEST-057 专项 30 passed；全量 408 passed。
 
 ---
@@ -25,30 +25,32 @@ TEST-056 Learning Strategy Downstream Memory Update Semantics — IMPLEMENTED
 TEST-057 Learning Strategy Downstream Candidate Parity — VERIFIED
 TEST-058 Learning Strategy Source Provenance — IMPLEMENTED，待服务器验收
 TEST-059 Learning Strategy Provenance Immutability — IMPLEMENTED，待服务器验收
+TEST-060 Learning Strategy Source Provenance Completeness — IMPLEMENTED，待服务器验收
+TEST-061 Learning Strategy Provenance Parity — IMPLEMENTED，待服务器验收
 
 ---
 
-## TEST-058 Learning Strategy Source Provenance
+## TEST-060 Learning Strategy Source Provenance Completeness
 
-目标：让 LearningStrategySynthesisService 在生成 source-backed candidate 时保留明确、可审计的 source provenance，而不是只保留聚合后的 outcome 数字。
+目标：让 source provenance 不仅记录 observed/unknown outcome 数字，还完整保留其上游 decision cardinality，避免 downstream 只有 outcome 聚合而失去 source evidence 的决策规模信息。
 
 本轮实现：
-- candidate 增加 `source`：`recommendation_id`、`observed_outcomes`、`unknown_outcomes`。
-- Strategic Reply / Action Plan 两个 downstream bridge 原样投影该 canonical source provenance。
-- provenance 来自既有 ActionFeedbackLearningSynthesis 输入，不新增学习推断。
+- ActionFeedbackLearningService 的 canonical `source` 增加 `decision_count` 与 `decision_counts`。
+- LearningStrategySynthesisService 不再重新构造 provenance，而是原样保留上游 canonical source。
+- 保持 observed / unknown outcome counts 与既有 candidate 字段一致。
 - 不新增 migration，不改变 persistence，不排名，不调用 LLM。
 
 ---
 
-## TEST-059 Learning Strategy Provenance Immutability
+## TEST-061 Learning Strategy Provenance Parity
 
-目标：验证 downstream 使用 provenance 时不会把 source-backed evidence 误转化为 recommendation quality、success 或 relationship impact 等推断事实。
+目标：验证同一 source provenance 在 Action Feedback Learning Input → Learning Strategy Synthesis → Strategic Reply / Action Plan 三层之间保持完全一致。
 
 本轮实现：
-- Strategic Reply 增加 provenance boundary test。
-- Action Plan 增加 provenance boundary test。
-- 两个 downstream candidate contract 同时包含 canonical provenance，并继续保持完全一致。
-- 保留 `must_not_infer_recommendation_quality`、`must_not_infer_success`、`must_not_infer_relationship_impact`、`must_not_change_relationship` 等约束。
+- 新增跨层 provenance parity tests。
+- 验证 mixed observed/unknown feedback 的 source cardinality 在各层完全一致。
+- 验证 Strategic Reply / Action Plan 只投影 canonical source，不产生新的事实推断。
+- 继续验证 unknown preservation、read-only、no auto-execution、no auto-send、no LLM 等约束。
 
 核心边界：read-only；source-backed；preserve unknowns；user/person isolation；不自动持久化；不自动发送；不自动执行；不调用 LLM。
 
@@ -57,7 +59,7 @@ TEST-059 Learning Strategy Provenance Immutability — IMPLEMENTED，待服务�
 ## 数据库
 
 当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-059 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-045 ~ TEST-061 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ---
 
@@ -65,10 +67,11 @@ TEST-045 ~ TEST-059 不新增 migration，不改变 action_decisions、action_ex
 
 TEST-057 最终服务器验收：专项 30 passed；全量 408 passed。
 
-本轮建议统一验收：
+TEST-058 ~ TEST-061 本轮统一验收：
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
   backend/tests/test_learning_strategy_synthesis.py \
+  backend/tests/test_learning_strategy_provenance_parity.py \
   backend/tests/test_strategic_reply.py \
   backend/tests/test_strategic_reply_learning_strategy_bridge.py \
   backend/tests/test_action_plan.py \
