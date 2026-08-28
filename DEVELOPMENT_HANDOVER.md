@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-29
-当前阶段：TEST-062 Learning Strategy decision provenance parity — IMPLEMENTED，待服务器验证
-当前 Branch：test-062-learning-strategy-decision-provenance-parity
-最近一次服务器验收：TEST-061 专项 47 passed；全量 418 passed。
+当前阶段：TEST-063 Learning Strategy decision constraint parity — IMPLEMENTED，待服务器验证
+当前 Branch：test-063-learning-strategy-decision-constraint-parity
+最近一次服务器验收：TEST-062 专项 3 passed；TEST-061 全量基线 418 passed。
 
 ---
 
@@ -28,18 +28,29 @@ TEST-059 Learning Strategy Provenance Immutability — VERIFIED
 TEST-060 Learning Strategy Source Provenance Completeness — VERIFIED
 TEST-061 Learning Strategy Provenance Parity — VERIFIED
 TEST-062 Learning Strategy Decision Provenance Parity — IMPLEMENTED，待服务器验证
+TEST-063 Learning Strategy Decision Constraint Parity — IMPLEMENTED，待服务器验证
 
 ---
 
-## TEST-060 / TEST-061 验收结果
+## TEST-063 Learning Strategy Decision Constraint Parity
 
-TEST-060：canonical learning `source` 保留 `decision_count` 与 `decision_counts`，并继续保留 observed / unknown outcome provenance。
+目标：确保 strategy-decision learning 的 provenance preservation constraint 在 Learning Strategy Context、Learning Strategy Synthesis、Strategic Reply、Action Plan 四层保持一致，并继续保留 source-backed、read-only、unknown-preserving 边界。
 
-TEST-061：验证 Action Feedback Learning Input → Learning Strategy Synthesis → Strategic Reply / Action Plan 三层之间 canonical source provenance 完全一致。
+本轮实现：
+- StrategyDecisionLearningBridgeService 的 synthesis constraints 增加 `must_preserve_source_provenance`。
+- LearningStrategyContextService 将 `must_preserve_source_provenance` 作为 canonical strategy constraint 向上游/下游传播。
+- 新增 `backend/tests/test_learning_strategy_decision_constraint_parity.py`。
+- 验证 Learning Strategy Synthesis / Strategic Reply / Action Plan 三层 constraint parity。
+- 验证 Learning Strategy Context 中 strategy-decision learning constraints 的 source provenance / unknown preservation 声明。
+- 验证 read-only 与 person/user isolation 边界。
+- 不新增 migration，不改变 persistence，不改变 decision/outcome lifecycle，不调用 LLM，不自动执行，不自动发送。
 
-服务器最终验收：
-- TEST-058~061 专项：47 passed
-- 全量：418 passed
+核心边界：source-backed；preserve source provenance；preserve unknowns；read-only；deterministic；person/user isolation；不把 learning 转成 fact；不排名推荐；不自动执行；不自动发送；不调用 LLM。
+
+专项覆盖：
+`backend/tests/test_learning_strategy_decision_constraint_parity.py`
+
+状态：代码完成，待服务器验收。
 
 ---
 
@@ -47,38 +58,23 @@ TEST-061：验证 Action Feedback Learning Input → Learning Strategy Synthesis
 
 目标：验证 Learning Strategy 中的 strategy-decision learning evidence 在 Learning Strategy Synthesis、Strategic Reply、Action Plan 三层之间保持同一事实来源与完全一致的 decision provenance。
 
-本轮实现：
-- 新增 `backend/tests/test_learning_strategy_decision_provenance_parity.py`。
-- 验证 observed decision 与 outcome-unknown decision 的 decision ID 分流保持一致。
-- 验证 synthesis / Strategic Reply / Action Plan 三层的 `strategy_decision_learning` 完全一致。
-- 验证 repeated read deterministic / read-only。
-- 验证 person isolation 与 user isolation。
-- 不新增 migration，不改变 persistence，不改变 decision/outcome lifecycle，不调用 LLM，不自动执行，不自动发送。
-
-核心边界：source-backed；preserve unknowns；read-only；deterministic；person/user isolation；不把 learning 转成 fact；不排名推荐；不自动执行；不自动发送；不调用 LLM。
-
-专项覆盖：
-`backend/tests/test_learning_strategy_decision_provenance_parity.py`
-
-状态：代码完成，待服务器验收。
+服务器验收待更新；TEST-061 已完成专项 47 passed、全量 418 passed。
 
 ---
 
 ## 数据库
 
 当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-062 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-045 ~ TEST-063 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ---
 
 ## 服务器测试
 
-TEST-061 最终服务器验收：专项 47 passed；全量 418 passed。
-
-TEST-062 建议验收：
+TEST-063 建议验收：
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_learning_strategy_decision_provenance_parity.py
+  backend/tests/test_learning_strategy_decision_constraint_parity.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
 
