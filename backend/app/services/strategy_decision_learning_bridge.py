@@ -38,6 +38,7 @@ class StrategyDecisionLearningBridgeService:
             "constraints": {
                 "read_only": True,
                 "source_backed_only": True,
+                "must_preserve_source_provenance": True,
                 "must_preserve_unknowns": True,
                 "must_not_infer_recommendation_quality": True,
                 "must_not_infer_success": True,
