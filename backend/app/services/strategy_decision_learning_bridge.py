@@ -32,6 +32,8 @@ class StrategyDecisionLearningBridgeService:
         return {
             "learning_candidate_decision_ids": [item["decision_id"] for item in observed],
             "unknown_decision_ids": [item["decision_id"] for item in unknown],
+            "learning_candidate_provenance": [dict(item["source"]) for item in observed],
+            "unknown_decision_provenance": [dict(item["source"]) for item in unknown],
             "recommendation_observed_counts": counts,
             "learning_candidate_count": len(observed),
             "unknown_count": len(unknown),
