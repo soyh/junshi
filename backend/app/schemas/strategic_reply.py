@@ -14,3 +14,4 @@ class StrategicReplyContextResponse(BaseModel):
     recommendations: list[Any]
     reply_constraints: dict[str, Any]
     draft: str | None
+    learning_strategy: dict[str, Any]
