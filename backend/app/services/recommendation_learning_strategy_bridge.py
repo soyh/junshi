@@ -28,10 +28,16 @@ class RecommendationLearningStrategyBridgeService:
             conn, user_id, person_id
         )
 
+        candidates = [
+            candidate
+            for candidate in synthesis["candidates"]
+            if candidate["observed_outcome_count"] > 0
+        ]
+
         return {
             **recommendation,
             "learning_strategy": {
-                "candidates": synthesis["candidates"],
+                "candidates": candidates,
                 "strategy_decision_learning": synthesis["strategy_decision_learning"],
                 "constraints": synthesis["strategy_constraints"],
             },
