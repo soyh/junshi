@@ -27,6 +27,7 @@ class ActionPlanLearningStrategyBridgeService:
             "memory_update_count": candidate["memory_update_count"],
             "synthesis_status": candidate["synthesis_status"],
             "unknowns": list(candidate["unknowns"]),
+            "source": dict(candidate["source"]),
         }
 
     def get_context(
