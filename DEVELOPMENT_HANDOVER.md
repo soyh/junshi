@@ -2,7 +2,7 @@
 
 更新时间：2026-08-29
 当前阶段：TEST-058 + TEST-059 Learning Strategy provenance contract — IMPLEMENTED, AWAITING SERVER VERIFICATION
-当前 Branch：test-058-learning-strategy-source-provenance
+当前 Branch：test-059-learning-strategy-provenance-immutability
 最近一次服务器验收：TEST-057 专项 30 passed；全量 408 passed。
 
 ---
