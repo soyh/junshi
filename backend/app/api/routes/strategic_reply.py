@@ -3,7 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
 from app.schemas.strategic_reply import StrategicReplyContextResponse
-from app.services.strategic_reply import StrategicReplyService
+from app.services.strategic_reply_learning_strategy_bridge import (
+    StrategicReplyLearningStrategyBridgeService,
+)
 
 
 router = APIRouter(
@@ -11,7 +13,7 @@ router = APIRouter(
     tags=["strategic-reply"],
 )
 
-service = StrategicReplyService()
+service = StrategicReplyLearningStrategyBridgeService()
 
 
 @router.get(
