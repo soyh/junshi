@@ -19,9 +19,6 @@ class LearningStrategySynthesisService:
         context = self.context_service.get_context(conn, user_id, person_id)
         grouped = {}
         for item in context["learning_inputs"]["action_feedback"]:
-            if item["observed_outcome_count"] <= 0:
-                continue
-
             recommendation_id = item["recommendation_id"]
             grouped[recommendation_id] = {
                 "recommendation_id": recommendation_id,
@@ -29,7 +26,9 @@ class LearningStrategySynthesisService:
                 "outcome_counts": item["outcome_counts"],
                 "unknown_outcome_count": item["unknown_outcome_count"],
                 "memory_update_count": 0,
-                "synthesis_status": "source_backed_candidate",
+                "synthesis_status": "source_backed_candidate"
+                if item["observed_outcome_count"] > 0
+                else "outcome_unknown",
                 "unknowns": [
                     "recommendation_quality",
                     "success",
