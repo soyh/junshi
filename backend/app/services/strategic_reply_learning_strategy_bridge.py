@@ -17,6 +17,18 @@ class StrategicReplyLearningStrategyBridgeService:
             learning_strategy_synthesis_service or LearningStrategySynthesisService()
         )
 
+    @staticmethod
+    def _project_candidate(candidate: dict) -> dict:
+        return {
+            "recommendation_id": candidate["recommendation_id"],
+            "observed_outcome_count": candidate["observed_outcome_count"],
+            "outcome_counts": candidate["outcome_counts"],
+            "unknown_outcome_count": candidate["unknown_outcome_count"],
+            "memory_update_count": candidate["memory_update_count"],
+            "synthesis_status": candidate["synthesis_status"],
+            "unknowns": list(candidate["unknowns"]),
+        }
+
     def get_context(
         self,
         conn: sqlite3.Connection,
@@ -29,7 +41,7 @@ class StrategicReplyLearningStrategyBridgeService:
         )
 
         candidates = [
-            candidate
+            self._project_candidate(candidate)
             for candidate in synthesis["candidates"]
             if candidate["observed_outcome_count"] > 0
         ]
