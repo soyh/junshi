@@ -34,6 +34,11 @@ class LearningStrategySynthesisService:
                     "success",
                     "relationship_impact",
                 ],
+                "source": {
+                    "recommendation_id": recommendation_id,
+                    "observed_outcomes": item["observed_outcome_count"],
+                    "unknown_outcomes": item["unknown_outcome_count"],
+                },
             }
 
         for update in context["learning_inputs"]["memory_updates"]:
