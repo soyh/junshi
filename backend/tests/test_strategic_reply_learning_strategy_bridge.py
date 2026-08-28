@@ -59,7 +59,7 @@ def test_strategic_reply_context_exposes_observed_learning(client):
             "observed_outcome_count": 1,
             "outcome_counts": {"completed": 1, "failed": 0, "skipped": 0},
             "unknown_outcome_count": 0,
-            "memory_update_count": 0,
+            "memory_update_count": 1,
             "synthesis_status": "source_backed_candidate",
             "unknowns": [
                 "recommendation_quality",
@@ -118,3 +118,29 @@ def test_strategic_reply_context_learning_is_read_only_and_deterministic(client)
     assert second.status_code == 200
     assert second.json() == first.json()
     assert second.json()["learning_strategy"]["constraints"]["must_not_turn_learning_into_fact"] is True
+
+
+def test_strategic_reply_context_learning_candidate_projection_preserves_memory_update_count(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    first = seed_decision(person["id"], "recommendation-a")
+    second = seed_decision(person["id"], "recommendation-a")
+    create_outcome(client, person["id"], first["id"])
+    create_outcome(client, person["id"], second["id"])
+
+    learning = get_context(client, person["id"]).json()["learning_strategy"]
+    assert learning["candidates"] == [
+        {
+            "recommendation_id": "recommendation-a",
+            "observed_outcome_count": 2,
+            "outcome_counts": {"completed": 2, "failed": 0, "skipped": 0},
+            "unknown_outcome_count": 0,
+            "memory_update_count": 2,
+            "synthesis_status": "source_backed_candidate",
+            "unknowns": [
+                "recommendation_quality",
+                "success",
+                "relationship_impact",
+            ],
+        }
+    ]
