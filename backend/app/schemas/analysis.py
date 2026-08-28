@@ -11,3 +11,4 @@ class AnalysisContextResponse(BaseModel):
     inferences: list[Any]
     unknowns: list[Any]
     recommendations: list[Any]
+    learning_strategy: dict[str, Any]
