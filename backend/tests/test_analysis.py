@@ -56,6 +56,7 @@ def test_analysis_context_returns_persisted_context_and_empty_analysis_lists(cli
     assert body["inferences"] == []
     assert body["unknowns"] == []
     assert body["recommendations"] == []
+    assert set(body["learning_strategy"]) == {"learning_inputs", "strategy_constraints"}
 
 
 def test_analysis_context_response_has_stable_top_level_contract(client):
@@ -74,6 +75,7 @@ def test_analysis_context_response_has_stable_top_level_contract(client):
         "inferences",
         "unknowns",
         "recommendations",
+        "learning_strategy",
     }
     assert isinstance(body["conversation"], dict)
     assert isinstance(body["person"], dict)
@@ -82,6 +84,7 @@ def test_analysis_context_response_has_stable_top_level_contract(client):
     assert isinstance(body["inferences"], list)
     assert isinstance(body["unknowns"], list)
     assert isinstance(body["recommendations"], list)
+    assert isinstance(body["learning_strategy"], dict)
 
 
 def test_analysis_context_returns_empty_messages_for_empty_conversation(client):
@@ -99,6 +102,8 @@ def test_analysis_context_returns_empty_messages_for_empty_conversation(client):
     assert body["inferences"] == []
     assert body["unknowns"] == []
     assert body["recommendations"] == []
+    assert body["learning_strategy"]["learning_inputs"]["action_feedback"] == []
+    assert body["learning_strategy"]["learning_inputs"]["memory_updates"] == []
 
 
 def test_analysis_context_preserves_message_order_contract(client):
@@ -200,3 +205,4 @@ def test_analysis_context_does_not_persist_analysis_results(client):
     assert response.json()["inferences"] == []
     assert response.json()["unknowns"] == []
     assert response.json()["recommendations"] == []
+    assert response.json()["learning_strategy"]["strategy_constraints"]["must_not_auto_execute"] is True
