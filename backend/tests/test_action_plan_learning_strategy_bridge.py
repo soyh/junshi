@@ -55,8 +55,21 @@ def test_action_plan_context_exposes_observed_learning(client):
     learning = body["learning_strategy"]
 
     assert body["action_plan"] == []
-    assert learning["candidates"][0]["recommendation_id"] == "recommendation-observed"
-    assert learning["candidates"][0]["observed_outcome_count"] == 1
+    assert learning["candidates"] == [
+        {
+            "recommendation_id": "recommendation-observed",
+            "observed_outcome_count": 1,
+            "outcome_counts": {"completed": 1, "failed": 0, "skipped": 0},
+            "unknown_outcome_count": 0,
+            "memory_update_count": 1,
+            "synthesis_status": "source_backed_candidate",
+            "unknowns": [
+                "recommendation_quality",
+                "success",
+                "relationship_impact",
+            ],
+        }
+    ]
     assert learning["strategy_decision_learning"]["learning_candidate_decision_ids"] == [decision["id"]]
     assert learning["constraints"]["must_not_auto_execute"] is True
 
@@ -107,3 +120,33 @@ def test_action_plan_context_learning_is_read_only_and_deterministic(client):
     assert second.status_code == 200
     assert second.json() == first.json()
     assert second.json()["learning_strategy"]["constraints"]["must_not_turn_learning_into_fact"] is True
+
+
+def test_downstream_learning_candidate_contract_is_identical_between_action_plan_and_strategic_reply(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    first = seed_decision(person["id"], "recommendation-a")
+    second = seed_decision(person["id"], "recommendation-a")
+    create_outcome(client, person["id"], first["id"], "completed")
+    create_outcome(client, person["id"], second["id"], "failed")
+
+    action_plan_learning = get_context(client, person["id"]).json()["learning_strategy"]
+    strategic_reply_learning = client.get(
+        f"/api/v1/persons/{person['id']}/strategic-reply/context"
+    ).json()["learning_strategy"]
+
+    expected_candidate = {
+        "recommendation_id": "recommendation-a",
+        "observed_outcome_count": 2,
+        "outcome_counts": {"completed": 1, "failed": 1, "skipped": 0},
+        "unknown_outcome_count": 0,
+        "memory_update_count": 2,
+        "synthesis_status": "source_backed_candidate",
+        "unknowns": [
+            "recommendation_quality",
+            "success",
+            "relationship_impact",
+        ],
+    }
+    assert action_plan_learning["candidates"] == [expected_candidate]
+    assert strategic_reply_learning["candidates"] == [expected_candidate]
