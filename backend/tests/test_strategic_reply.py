@@ -40,10 +40,13 @@ def test_strategic_reply_context_locks_response_shape_and_constraints(client):
         "recommendations",
         "reply_constraints",
         "draft",
+        "learning_strategy",
     }
     assert body["person"]["id"] == person["id"]
     assert body["relationship"]["id"] == relationship["id"]
     assert body["draft"] is None
+    assert body["learning_strategy"]["candidates"] == []
+    assert body["learning_strategy"]["strategy_decision_learning"]["unknown_count"] == 0
     assert body["reply_constraints"] == {
         "must_be_evidence_backed": True,
         "must_preserve_unknowns": True,
