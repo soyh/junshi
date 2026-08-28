@@ -20,11 +20,7 @@ class ActionFeedbackLearningSynthesisService:
                     "outcome_counts": item["outcome_counts"],
                     "unknown_outcome_count": item["outcome_unknown_count"],
                     "unknowns": ["recommendation_quality", "success", "relationship_impact"],
-                    "source": {
-                        "recommendation_id": item["recommendation_id"],
-                        "observed_outcomes": item["outcome_observed_count"],
-                        "unknown_outcomes": item["outcome_unknown_count"],
-                    },
+                    "source": dict(item["source"]),
                 }
             )
 
