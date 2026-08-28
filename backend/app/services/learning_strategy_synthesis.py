@@ -29,16 +29,8 @@ class LearningStrategySynthesisService:
                 "synthesis_status": "source_backed_candidate"
                 if item["observed_outcome_count"] > 0
                 else "outcome_unknown",
-                "unknowns": [
-                    "recommendation_quality",
-                    "success",
-                    "relationship_impact",
-                ],
-                "source": {
-                    "recommendation_id": recommendation_id,
-                    "observed_outcomes": item["observed_outcome_count"],
-                    "unknown_outcomes": item["unknown_outcome_count"],
-                },
+                "unknowns": list(item["unknowns"]),
+                "source": dict(item["source"]),
             }
 
         for update in context["learning_inputs"]["memory_updates"]:
