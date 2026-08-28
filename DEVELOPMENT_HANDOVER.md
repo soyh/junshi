@@ -1,11 +1,11 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-29
-当前阶段：TEST-054 + TEST-055 Learning Strategy downstream contract hardening — IMPLEMENTED, AWAITING SERVER VERIFICATION
-当前状态：已修复 Strategic Reply learning candidate contract，并统一 Action Plan / Strategic Reply downstream learning candidate projection；最近一次已验证基线仍为 398 passed（TEST-051）
+当前阶段：TEST-056 + TEST-057 Learning Strategy downstream contract consistency — IMPLEMENTED, AWAITING SERVER VERIFICATION
+当前状态：已确认 TEST-055 唯一失败并非生产逻辑错误，而是 downstream 测试仍按旧语义期待 `memory_update_count=0`；既有 LearningStrategySynthesisService 已定义 observed outcome 对应的 memory update proposal count，因此 downstream canonical candidate 应保持该值。TEST-056 已同步该语义并补充 1/2 个 observed outcomes 的覆盖；TEST-057 已增加 Action Plan / Strategic Reply 完全一致的 canonical candidate contract 验证。
 当前 Branch：test-055-learning-strategy-downstream-constraints
-当前开发基线提交：cc46903fe7c6f5c4d402c714db8f0b2d13d4cd31
 最近一次已验证基线提交：b1a9f93e71c221d2020d94912f2309ec918d8d3e
+最近一次服务器专项结果：TEST-054 + TEST-055 相关专项 27 passed / 1 failed；全量 405 passed / 1 failed。唯一失败为 Strategic Reply downstream candidate 对 `memory_update_count` 的旧测试期待。
 
 ---
 
@@ -23,61 +23,58 @@ TEST-052 Learning Strategy Strategic Reply Bridge — IMPLEMENTED，待服务器
 TEST-053 Learning Strategy Action Plan Bridge — IMPLEMENTED，待服务器验收
 TEST-054 Learning Strategy Downstream Candidate Contract — IMPLEMENTED，待服务器验收
 TEST-055 Learning Strategy Downstream Constraint Contract — IMPLEMENTED，待服务器验收
+TEST-056 Learning Strategy Downstream Memory Update Semantics — IMPLEMENTED，待服务器验收
+TEST-057 Learning Strategy Downstream Candidate Parity — IMPLEMENTED，待服务器验收
 
 TEST-049 + TEST-050 最终服务器验收：专项 10 passed；全量 392 passed；失败 0。
 TEST-051 最终服务器验收：Recommendation 专项 15 passed；全量 398 passed；失败 0。
 
 ---
 
-## TEST-054 Learning Strategy Downstream Candidate Contract
+## TEST-056 Learning Strategy Downstream Memory Update Semantics
 
-目标：修复 Strategic Reply downstream learning candidate 的输出契约，使其只暴露 canonical learning candidate 字段，不把 synthesis 内部字段泄漏到 downstream response。
+目标：使 downstream canonical learning candidate 正确继承既有 LearningStrategySynthesisService 的 `memory_update_count` 语义，不把 memory update proposal count 错误归零。
 
-既有 API：
-GET /api/v1/persons/{person_id}/strategic-reply/context
-GET /api/v1/persons/{person_id}/action-plan/context
+依据：TEST-048 已验证一个 observed outcome 对应 `memory_update_count=1`，两个 observed outcomes 对应 `memory_update_count=2`。该字段统计 source-backed learning memory update proposals，不表示 downstream 已自动持久化 memory update。
 
 本轮实现：
-- StrategicReplyLearningStrategyBridgeService 增加 canonical candidate projection。
-- 保留 recommendation_id、observed_outcome_count、outcome_counts、unknown_outcome_count、memory_update_count、synthesis_status、unknowns。
-- 继续只暴露 observed outcome candidates；unobserved decisions 保持 unknown。
+- 修正 Strategic Reply downstream contract test 对 `memory_update_count` 的旧期待。
+- 增加单 outcome 与双 outcome 的 canonical candidate projection 覆盖。
+- 不修改 LearningStrategySynthesisService，不重新计算 learning facts，不改变 persistence 行为。
 
-核心边界：不重新计算 learning facts；不改变 action decision / outcome 生命周期；read-only；source-backed；preserve unknowns；不自动发送；不自动执行；不调用 LLM。
+核心边界：read-only；source-backed；preserve unknowns；不自动持久化；不自动发送；不自动执行；不调用 LLM。
 
 专项覆盖：
 backend/tests/test_strategic_reply_learning_strategy_bridge.py
 backend/tests/test_action_plan_learning_strategy_bridge.py
 
-状态：代码完成，尚未进行本轮服务器验收。
+状态：代码/测试完成，尚未进行本轮服务器验收。
 
 ---
 
-## TEST-055 Learning Strategy Downstream Constraint Contract
+## TEST-057 Learning Strategy Downstream Candidate Parity
 
-目标：确保 Action Plan 与 Strategic Reply 两个 downstream bridge 对 learning candidate 使用同一 canonical 字段契约，同时保留各自独有的执行/发送约束。
+目标：确保 Action Plan 与 Strategic Reply downstream context 对同一 person、同一 learning synthesis 输出完全一致的 canonical candidate projection。
 
 本轮实现：
-- ActionPlanLearningStrategyBridgeService 增加相同 canonical candidate projection。
-- Strategic Reply 继续暴露 must_not_auto_send。
-- Action Plan 继续暴露 must_not_auto_execute。
-- 两者均继承 learning-strategy synthesis 的 must_preserve_unknowns、must_not_turn_learning_into_fact 等约束。
+- Action Plan observed candidate 测试改为验证完整 canonical candidate。
+- 增加 Action Plan / Strategic Reply candidate parity 测试，覆盖 completed + failed 两种 outcome。
+- 保留两者各自独有的 `must_not_auto_execute` / `must_not_auto_send` 约束，不混淆 downstream 行为边界。
 
 核心边界：两个 downstream context 只消费既有 LearningStrategySynthesisService；不创建第二套学习事实；不排名推荐；不改变 relationship；read-only；user/person isolation；不调用 LLM。
 
 专项覆盖：
-backend/tests/test_strategic_reply.py
-backend/tests/test_strategic_reply_learning_strategy_bridge.py
-backend/tests/test_action_plan.py
 backend/tests/test_action_plan_learning_strategy_bridge.py
+backend/tests/test_strategic_reply_learning_strategy_bridge.py
 
-状态：代码完成，尚未进行本轮服务器验收。
+状态：代码/测试完成，尚未进行本轮服务器验收。
 
 ---
 
 ## 数据库
 
 当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-055 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-045 ~ TEST-057 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ---
 
@@ -85,7 +82,7 @@ TEST-045 ~ TEST-055 不新增 migration，不改变 action_decisions、action_ex
 
 最近一次完成基线：TEST-051，398 passed。
 
-TEST-052 ~ TEST-055 代码已完成，本轮等待一次统一服务器验收。
+TEST-052 ~ TEST-057 代码/测试已完成，本轮等待一次统一服务器验收。
 
 建议验收命令：
 
