@@ -26,3 +26,4 @@ class ActionPlanContextResponse(BaseModel):
     recommendations: list[dict[str, Any]]
     action_plan: list[dict[str, Any]] = Field(default_factory=list)
     action_constraints: ActionPlanConstraints
+    learning_strategy: dict[str, Any]
