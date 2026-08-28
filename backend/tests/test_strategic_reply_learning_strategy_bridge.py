@@ -68,6 +68,8 @@ def test_strategic_reply_context_exposes_observed_learning(client):
             ],
             "source": {
                 "recommendation_id": "recommendation-observed",
+                "decision_count": 1,
+                "decision_counts": {"confirmed": 1, "rejected": 0},
                 "observed_outcomes": 1,
                 "unknown_outcomes": 0,
             },
@@ -149,6 +151,8 @@ def test_strategic_reply_context_learning_candidate_projection_preserves_memory_
             ],
             "source": {
                 "recommendation_id": "recommendation-a",
+                "decision_count": 2,
+                "decision_counts": {"confirmed": 2, "rejected": 0},
                 "observed_outcomes": 2,
                 "unknown_outcomes": 0,
             },
@@ -166,5 +170,7 @@ def test_strategic_reply_context_learning_source_is_not_inferred_success(client)
     candidate = learning["candidates"][0]
     assert candidate["source"]["observed_outcomes"] == 1
     assert candidate["source"]["unknown_outcomes"] == 0
+    assert candidate["source"]["decision_count"] == 1
+    assert candidate["source"]["decision_counts"] == {"confirmed": 1, "rejected": 0}
     assert learning["constraints"]["must_not_infer_success"] is True
     assert learning["constraints"]["must_not_infer_relationship_impact"] is True
