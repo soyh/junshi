@@ -51,6 +51,8 @@ class StrategyDecisionLearningService:
             "items": items,
             "learning_constraints": {
                 "source_backed": True,
+                "read_only": True,
+                "must_preserve_source_provenance": True,
                 "must_preserve_unknowns": True,
                 "must_not_infer_recommendation_quality": True,
                 "must_not_infer_success": True,
