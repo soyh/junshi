@@ -68,6 +68,11 @@ def test_action_plan_context_exposes_observed_learning(client):
                 "success",
                 "relationship_impact",
             ],
+            "source": {
+                "recommendation_id": "recommendation-observed",
+                "observed_outcomes": 1,
+                "unknown_outcomes": 0,
+            },
         }
     ]
     assert learning["strategy_decision_learning"]["learning_candidate_decision_ids"] == [decision["id"]]
@@ -147,6 +152,25 @@ def test_downstream_learning_candidate_contract_is_identical_between_action_plan
             "success",
             "relationship_impact",
         ],
+        "source": {
+            "recommendation_id": "recommendation-a",
+            "observed_outcomes": 2,
+            "unknown_outcomes": 0,
+        },
     }
     assert action_plan_learning["candidates"] == [expected_candidate]
     assert strategic_reply_learning["candidates"] == [expected_candidate]
+
+
+def test_action_plan_context_learning_source_is_not_inferred_quality(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    decision = seed_decision(person["id"], "recommendation-source")
+    create_outcome(client, person["id"], decision["id"], "completed")
+
+    learning = get_context(client, person["id"]).json()["learning_strategy"]
+    candidate = learning["candidates"][0]
+    assert candidate["source"]["recommendation_id"] == "recommendation-source"
+    assert candidate["source"]["observed_outcomes"] == 1
+    assert learning["constraints"]["must_not_infer_recommendation_quality"] is True
+    assert learning["constraints"]["must_not_change_relationship"] is True
