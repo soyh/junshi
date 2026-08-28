@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-29
-当前阶段：TEST-063 Learning Strategy decision constraint parity — IMPLEMENTED，待服务器验证
-当前 Branch：test-063-learning-strategy-decision-constraint-parity
-最近一次服务器验收：TEST-062 专项 3 passed；TEST-061 全量基线 418 passed。
+当前阶段：TEST-064 Learning Strategy decision learning evidence completeness — IMPLEMENTED，待服务器验证
+当前 Branch：test-064-learning-strategy-decision-learning-evidence-completeness
+最近一次服务器验收：TEST-063 专项 3 passed；TEST-063 后全量 424 passed。
 
 ---
 
@@ -27,8 +27,32 @@ TEST-058 Learning Strategy Source Provenance — VERIFIED
 TEST-059 Learning Strategy Provenance Immutability — VERIFIED
 TEST-060 Learning Strategy Source Provenance Completeness — VERIFIED
 TEST-061 Learning Strategy Provenance Parity — VERIFIED
-TEST-062 Learning Strategy Decision Provenance Parity — IMPLEMENTED，待服务器验证
-TEST-063 Learning Strategy Decision Constraint Parity — IMPLEMENTED，待服务器验证
+TEST-062 Learning Strategy Decision Provenance Parity — VERIFIED
+TEST-063 Learning Strategy Decision Constraint Parity — VERIFIED
+TEST-064 Learning Strategy Decision Learning Evidence Completeness — IMPLEMENTED，待服务器验证
+
+---
+
+## TEST-064 Learning Strategy Decision Learning Evidence Completeness
+
+目标：确保 strategy-decision learning synthesis 不仅保留 observed/unknown decision IDs 与计数，还完整暴露每个 learning candidate 和 unknown decision 对应的 canonical source provenance，并在 Strategic Reply / Action Plan 下游保持完全一致。
+
+本轮实现：
+- StrategyDecisionLearningBridgeService 新增 `learning_candidate_provenance`。
+- StrategyDecisionLearningBridgeService 新增 `unknown_decision_provenance`。
+- 两组 provenance 直接来自 strategy-decision learning item 的 canonical `source`，不重新推导事实。
+- 新增 `backend/tests/test_learning_strategy_decision_learning_evidence_completeness.py`。
+- 验证 observed / unknown 两类 evidence 的 provenance 完整性。
+- 验证 provenance 与 decision IDs、counts 的一致性。
+- 验证 Learning Strategy Synthesis / Strategic Reply / Action Plan 三层保持完全一致。
+- 不新增 migration，不改变 persistence，不改变 decision/outcome lifecycle，不调用 LLM，不自动执行，不自动发送。
+
+核心边界：source-backed；canonical source provenance；preserve unknowns；read-only；deterministic；person/user isolation；不把 learning 转成 fact；不排名推荐；不自动执行；不自动发送；不调用 LLM。
+
+专项覆盖：
+`backend/tests/test_learning_strategy_decision_learning_evidence_completeness.py`
+
+状态：代码完成，待服务器验收。
 
 ---
 
@@ -50,31 +74,23 @@ TEST-063 Learning Strategy Decision Constraint Parity — IMPLEMENTED，待服�
 专项覆盖：
 `backend/tests/test_learning_strategy_decision_constraint_parity.py`
 
-状态：代码完成，待服务器验收。
-
----
-
-## TEST-062 Learning Strategy Decision Provenance Parity
-
-目标：验证 Learning Strategy 中的 strategy-decision learning evidence 在 Learning Strategy Synthesis、Strategic Reply、Action Plan 三层之间保持同一事实来源与完全一致的 decision provenance。
-
-服务器验收待更新；TEST-061 已完成专项 47 passed、全量 418 passed。
+状态：代码完成，已通过服务器验收。
 
 ---
 
 ## 数据库
 
 当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-063 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-045 ~ TEST-064 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ---
 
 ## 服务器测试
 
-TEST-063 建议验收：
+TEST-064 建议验收：
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q \
-  backend/tests/test_learning_strategy_decision_constraint_parity.py
+  backend/tests/test_learning_strategy_decision_learning_evidence_completeness.py
 
 PYTHONPATH=/opt/ai-love-strategist/backend python -m pytest -q
 
