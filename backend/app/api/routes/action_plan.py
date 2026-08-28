@@ -3,7 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
 from app.schemas.action_plan import ActionPlanContextResponse
-from app.services.action_plan import ActionPlanService
+from app.services.action_plan_learning_strategy_bridge import (
+    ActionPlanLearningStrategyBridgeService,
+)
 
 
 router = APIRouter(
@@ -11,7 +13,7 @@ router = APIRouter(
     tags=["action-plan"],
 )
 
-service = ActionPlanService()
+service = ActionPlanLearningStrategyBridgeService()
 
 
 @router.get(
