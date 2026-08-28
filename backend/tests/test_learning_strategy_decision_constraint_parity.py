@@ -63,7 +63,7 @@ def test_strategy_decision_learning_constraint_declares_source_provenance_and_un
     create_relationship(client, person["id"])
     seed_decision(person["id"], "recommendation-a")
 
-    response = client.get(f"/api/v1/persons/{person['id']}/learning-strategy")
+    response = client.get(f"/api/v1/persons/{person['id']}/learning-strategy/context")
     assert response.status_code == 200
 
     constraints = response.json()["learning_inputs"]["strategy_decision"]["learning_constraints"]
