@@ -70,6 +70,8 @@ def test_action_plan_context_exposes_observed_learning(client):
             ],
             "source": {
                 "recommendation_id": "recommendation-observed",
+                "decision_count": 1,
+                "decision_counts": {"confirmed": 1, "rejected": 0},
                 "observed_outcomes": 1,
                 "unknown_outcomes": 0,
             },
@@ -154,6 +156,8 @@ def test_downstream_learning_candidate_contract_is_identical_between_action_plan
         ],
         "source": {
             "recommendation_id": "recommendation-a",
+            "decision_count": 2,
+            "decision_counts": {"confirmed": 2, "rejected": 0},
             "observed_outcomes": 2,
             "unknown_outcomes": 0,
         },
@@ -172,5 +176,7 @@ def test_action_plan_context_learning_source_is_not_inferred_quality(client):
     candidate = learning["candidates"][0]
     assert candidate["source"]["recommendation_id"] == "recommendation-source"
     assert candidate["source"]["observed_outcomes"] == 1
+    assert candidate["source"]["decision_count"] == 1
+    assert candidate["source"]["decision_counts"] == {"confirmed": 1, "rejected": 0}
     assert learning["constraints"]["must_not_infer_recommendation_quality"] is True
     assert learning["constraints"]["must_not_change_relationship"] is True
