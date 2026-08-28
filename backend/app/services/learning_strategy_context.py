@@ -47,6 +47,7 @@ class LearningStrategyContextService:
                 "must_be_source_backed": True,
                 "must_preserve_facts_inferences_unknowns": True,
                 "must_preserve_learning_unknowns": True,
+                "must_preserve_source_provenance": True,
                 "must_preserve_unknowns": True,
                 "must_not_infer_recommendation_quality": True,
                 "must_not_infer_success": True,
