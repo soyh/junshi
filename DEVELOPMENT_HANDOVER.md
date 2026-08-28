@@ -1,10 +1,10 @@
 # AI Love Strategist Development Handover
 
-更新时间：2026-08-28
-当前阶段：TEST-052 + TEST-053 Learning Strategy downstream bridges — IMPLEMENTED, AWAITING SERVER VERIFICATION
-当前状态：代码已完成；最近一次已验证基线仍为 398 passed（TEST-051）
+更新时间：2026-08-29
+当前阶段：TEST-052 + TEST-053 Learning Strategy downstream bridges — FIXED, AWAITING SERVER VERIFICATION
+当前状态：修复了 downstream learning constraint contract；最近一次已验证基线仍为 398 passed（TEST-051）
 当前 Branch：test-053-learning-strategy-action-plan-bridge
-当前开发基线提交：457c67902886f2343d7621893f1a947ba1a60f71
+当前开发基线提交：f63a4706c141be38abc8d300730f3533536f64ee
 最近一次已验证基线提交：b1a9f93e71c221d2020d94912f2309ec918d8d3e
 
 ---
@@ -43,11 +43,13 @@ GET /api/v1/persons/{person_id}/strategic-reply/context
 
 核心边界：只暴露已观察 outcome 的 learning candidates；未观察 outcome 的 decision 保持 unknown；继续保留 strategy decision learning unknown 信息；不生成未经证据支持的回复；不自动发送；不改变 relationship；read-only；user/person isolation；不调用 LLM。
 
+本轮修复：统一下游 learning strategy context 的 canonical unknown preservation constraint，确保 strategic reply 与 action plan 均暴露 must_preserve_unknowns。
+
 专项测试：
 backend/tests/test_strategic_reply.py
 backend/tests/test_strategic_reply_learning_strategy_bridge.py
 
-状态：代码完成，尚未进行本轮服务器验收。
+状态：代码修复完成，尚未进行本轮服务器验收。
 
 ---
 
@@ -67,11 +69,13 @@ GET /api/v1/persons/{person_id}/action-plan/context
 
 核心边界：只暴露已观察 outcome 的 learning candidates；未观察 outcome 的 decision 保持 unknown；不把 learning 转换为 fact；不自动执行；必须保留用户确认；不改变 relationship；read-only；user/person isolation；不调用 LLM。
 
+本轮修复：复用统一 strategy_constraints 中的 must_preserve_unknowns，保持 action plan learning bridge 与 strategic reply learning bridge 的约束契约一致。
+
 专项测试：
 backend/tests/test_action_plan.py
 backend/tests/test_action_plan_learning_strategy_bridge.py
 
-状态：代码完成，尚未进行本轮服务器验收。
+状态：代码修复完成，尚未进行本轮服务器验收。
 
 ---
 
@@ -86,7 +90,7 @@ TEST-045 ~ TEST-053 不新增 migration，不改变 action_decisions、action_ex
 
 最近一次完成基线：TEST-051，398 passed。
 
-本轮 TEST-052 + TEST-053 完成后，等待一次统一服务器验收。
+本轮 TEST-052 + TEST-053 修复完成后，等待一次统一服务器验收。
 
 建议验收命令：
 
