@@ -88,6 +88,8 @@ def test_learning_strategy_synthesis_preserves_explicit_source_provenance(client
     candidate = get_synthesis(client, person["id"]).json()["candidates"][0]
     assert candidate["source"] == {
         "recommendation_id": "recommendation-source",
+        "decision_count": 1,
+        "decision_counts": {"confirmed": 1, "rejected": 0},
         "observed_outcomes": 1,
         "unknown_outcomes": 0,
     }
@@ -103,6 +105,8 @@ def test_learning_strategy_synthesis_source_provenance_does_not_create_inference
     candidate = body["candidates"][0]
     assert candidate["source"]["observed_outcomes"] == candidate["observed_outcome_count"]
     assert candidate["source"]["unknown_outcomes"] == candidate["unknown_outcome_count"]
+    assert candidate["source"]["decision_count"] == 1
+    assert candidate["source"]["decision_counts"] == {"confirmed": 1, "rejected": 0}
     assert candidate["unknowns"] == [
         "recommendation_quality",
         "success",
