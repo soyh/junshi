@@ -79,6 +79,38 @@ def test_learning_strategy_synthesis_preserves_unknowns(client):
     assert body["strategy_constraints"]["must_not_turn_learning_into_fact"] is True
 
 
+def test_learning_strategy_synthesis_preserves_explicit_source_provenance(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    decision = seed_decision(person["id"], "recommendation-source")
+    create_outcome(client, person["id"], decision["id"], "completed")
+
+    candidate = get_synthesis(client, person["id"]).json()["candidates"][0]
+    assert candidate["source"] == {
+        "recommendation_id": "recommendation-source",
+        "observed_outcomes": 1,
+        "unknown_outcomes": 0,
+    }
+
+
+def test_learning_strategy_synthesis_source_provenance_does_not_create_inference(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    decision = seed_decision(person["id"], "recommendation-source")
+    create_outcome(client, person["id"], decision["id"], "completed")
+
+    body = get_synthesis(client, person["id"]).json()
+    candidate = body["candidates"][0]
+    assert candidate["source"]["observed_outcomes"] == candidate["observed_outcome_count"]
+    assert candidate["source"]["unknown_outcomes"] == candidate["unknown_outcome_count"]
+    assert candidate["unknowns"] == [
+        "recommendation_quality",
+        "success",
+        "relationship_impact",
+    ]
+    assert body["strategy_constraints"]["must_not_turn_learning_into_fact"] is True
+
+
 def test_learning_strategy_synthesis_is_person_isolated(client):
     first = create_person(client, "策略综合A")
     second = create_person(client, "策略综合B")
