@@ -35,11 +35,12 @@ def test_action_plan_context_locks_shape_and_requires_confirmation(client):
     assert set(body) == {
         "person", "relationship", "current_state", "evidence", "facts",
         "inferences", "unknowns", "recommendations", "action_plan",
-        "action_constraints",
+        "action_constraints", "learning_strategy",
     }
     assert body["person"]["id"] == person["id"]
     assert body["relationship"]["id"] == relationship["id"]
     assert body["action_plan"] == []
+    assert body["learning_strategy"]["candidates"] == []
     assert body["action_constraints"] == {
         "must_be_evidence_backed": True,
         "must_preserve_unknowns": True,
