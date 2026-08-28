@@ -3,7 +3,7 @@
 更新时间：2026-08-29
 当前阶段：TEST-056 + TEST-057 Learning Strategy downstream contract consistency — IMPLEMENTED, AWAITING SERVER VERIFICATION
 当前状态：已确认 TEST-055 唯一失败并非生产逻辑错误，而是 downstream 测试仍按旧语义期待 `memory_update_count=0`；既有 LearningStrategySynthesisService 已定义 observed outcome 对应的 memory update proposal count，因此 downstream canonical candidate 应保持该值。TEST-056 已同步该语义并补充 1/2 个 observed outcomes 的覆盖；TEST-057 已增加 Action Plan / Strategic Reply 完全一致的 canonical candidate contract 验证。
-当前 Branch：test-055-learning-strategy-downstream-constraints
+当前 Branch：test-057-learning-strategy-downstream-parity
 最近一次已验证基线提交：b1a9f93e71c221d2020d94912f2309ec918d8d3e
 最近一次服务器专项结果：TEST-054 + TEST-055 相关专项 27 passed / 1 failed；全量 405 passed / 1 failed。唯一失败为 Strategic Reply downstream candidate 对 `memory_update_count` 的旧测试期待。
 
