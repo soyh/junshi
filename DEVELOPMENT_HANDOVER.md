@@ -8,6 +8,14 @@
 
 ---
 
+## 信息检索优先级（新增，强制执行）
+
+凡是需要检索、确认或定位的内容，必须首先从 GitHub 仓库 `soyh/junshi` 当前开发分支及其相关历史代码、测试、文档中查找。只有在 GitHub 仓库中找不到所需信息时，才能要求用户从服务器端查找，并明确说明需要执行的服务器端命令及原因。
+
+不得在尚未完成 GitHub 仓库检索的情况下，直接要求用户通过服务器端 `grep`、`sed`、日志或数据库查询来提供本应可以从 GitHub 确认的信息。
+
+---
+
 ## 架构冻结：Analysis → LLM → StructuredAnalysis → Strategy
 
 正式架构契约：`docs/ANALYSIS_LLM_STRATEGY_CONTRACT.md`
