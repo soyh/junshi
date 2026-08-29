@@ -25,7 +25,14 @@ class AnalysisLLMService:
         provider: LLMProvider | None = None,
     ) -> StructuredAnalysis:
         context = self.analysis_service.get_context(conn, user_id, conversation_id)
+        return self.analyze_context(context, provider=provider)
 
+    def analyze_context(
+        self,
+        context: dict,
+        *,
+        provider: LLMProvider | None = None,
+    ) -> StructuredAnalysis:
         if self.llm_service is not None:
             llm_service = self.llm_service
         elif provider is not None:
