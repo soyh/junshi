@@ -24,12 +24,13 @@ class AnalysisLLMService:
         *,
         provider: LLMProvider | None = None,
     ) -> StructuredAnalysis:
-        context = self.analysis_service.get_context(
-            conn,
-            user_id,
-            conversation_id,
-        )
-        llm_service = self.llm_service or LLMAnalysisService(provider) if provider else self.llm_service
-        if llm_service is None:
+        context = self.analysis_service.get_context(conn, user_id, conversation_id)
+
+        if self.llm_service is not None:
+            llm_service = self.llm_service
+        elif provider is not None:
+            llm_service = LLMAnalysisService(provider)
+        else:
             raise ValueError("LLM provider is required")
+
         return llm_service.analyze(context)
