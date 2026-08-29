@@ -21,7 +21,13 @@ class LLMAnalysisService:
         self.provider = provider
 
     def analyze(self, context: dict[str, Any]) -> StructuredAnalysis:
-        result = self.provider.analyze(context)
+        try:
+            result = self.provider.analyze(context)
+        except LLMAnalysisError:
+            raise
+        except Exception as exc:
+            raise LLMAnalysisError("LLM provider failed") from exc
+
         if not isinstance(result, dict):
             raise LLMAnalysisError("LLM provider returned a non-object result")
 
