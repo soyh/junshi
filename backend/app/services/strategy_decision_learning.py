@@ -18,11 +18,19 @@ class StrategyDecisionLearningService:
             feedback = lifecycle_item["feedback"]
             outcome = decision.get("outcome")
             observed = lifecycle_item["feedback_status"] == "outcome_observed"
-            unknowns = (
-                feedback.get("unknowns")
-                if feedback is not None and feedback.get("unknowns") is not None
-                else ["action_effect", "relationship_impact"]
-            )
+
+            # An observed outcome resolves the action-effect unknown at this layer.
+            # Relationship impact remains a separate boundary and is not inferred here.
+            # When no outcome is observed, preserve the canonical unknowns emitted by
+            # the feedback layer (or the lifecycle-level fallback).
+            if observed:
+                unknowns = []
+            else:
+                unknowns = (
+                    feedback.get("unknowns")
+                    if feedback is not None and feedback.get("unknowns") is not None
+                    else ["action_effect", "relationship_impact"]
+                )
 
             items.append(
                 {
