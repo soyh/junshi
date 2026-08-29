@@ -21,6 +21,40 @@ class LearningStrategyContextService:
             strategy_decision_learning_service or StrategyDecisionLearningBridgeService()
         )
 
+    @staticmethod
+    def _strategy_constraints() -> dict:
+        return {
+            "must_be_source_backed": True,
+            "must_preserve_facts_inferences_unknowns": True,
+            "must_preserve_learning_unknowns": True,
+            "must_preserve_source_provenance": True,
+            "must_preserve_unknowns": True,
+            "must_not_infer_recommendation_quality": True,
+            "must_not_infer_success": True,
+            "must_not_infer_relationship_impact": True,
+            "must_not_change_relationship": True,
+            "must_not_auto_execute": True,
+            "must_not_auto_send": True,
+            "must_not_call_llm": True,
+        }
+
+    @classmethod
+    def _empty_learning_context(cls) -> dict:
+        return {
+            "learning_inputs": {
+                "action_feedback": [],
+                "memory_updates": [],
+                "strategy_decision": {
+                    "items": [],
+                    "learning_constraints": {
+                        "source_backed": True,
+                        "read_only": True,
+                    },
+                },
+            },
+            "strategy_constraints": cls._strategy_constraints(),
+        }
+
     def _get_learning_inputs_and_constraints(
         self,
         conn: sqlite3.Connection,
@@ -39,22 +73,7 @@ class LearningStrategyContextService:
             "strategy_decision": strategy_decision,
         }
 
-        strategy_constraints = {
-            "must_be_source_backed": True,
-            "must_preserve_facts_inferences_unknowns": True,
-            "must_preserve_learning_unknowns": True,
-            "must_preserve_source_provenance": True,
-            "must_preserve_unknowns": True,
-            "must_not_infer_recommendation_quality": True,
-            "must_not_infer_success": True,
-            "must_not_infer_relationship_impact": True,
-            "must_not_change_relationship": True,
-            "must_not_auto_execute": True,
-            "must_not_auto_send": True,
-            "must_not_call_llm": True,
-        }
-
-        return learning_inputs, strategy_constraints
+        return learning_inputs, self._strategy_constraints()
 
     def get_learning_context(
         self,
@@ -62,10 +81,16 @@ class LearningStrategyContextService:
         user_id: str,
         person_id: str,
     ) -> dict:
-        """Return only the learning-strategy bridge, without requiring a relationship."""
-        learning_inputs, strategy_constraints = self._get_learning_inputs_and_constraints(
-            conn, user_id, person_id
-        )
+        """Return the learning-strategy bridge; relationship state is optional."""
+        try:
+            learning_inputs, strategy_constraints = self._get_learning_inputs_and_constraints(
+                conn, user_id, person_id
+            )
+        except ValueError as exc:
+            if str(exc) != "Relationship not found":
+                raise
+            return self._empty_learning_context()
+
         return {
             "learning_inputs": learning_inputs,
             "strategy_constraints": strategy_constraints,
