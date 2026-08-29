@@ -1,5 +1,7 @@
 from app.core.database import get_connection
 from app.repositories.action_decision import ActionDecisionRepository
+from app.schemas.structured_analysis import StructuredAnalysis, StructuredAnalysisItem
+from app.services.strategy_decision import StrategyDecisionContextService
 
 USER_ID = "00000000-0000-0000-0000-000000000001"
 
@@ -35,6 +37,40 @@ def create_outcome(client, person_id, decision_id, outcome="completed"):
 
 def get_context(client, person_id):
     return client.get(f"/api/v1/persons/{person_id}/strategy-decision/context")
+
+
+def make_structured_analysis() -> StructuredAnalysis:
+    return StructuredAnalysis(
+        summary="derived summary",
+        observed_facts=[
+            StructuredAnalysisItem(
+                content="fact",
+                confidence=0.9,
+                evidence_source_ids=["message-1"],
+            )
+        ],
+        inferences=[
+            StructuredAnalysisItem(
+                content="inference",
+                confidence=0.7,
+                evidence_source_ids=["message-1"],
+            )
+        ],
+        unknowns=[
+            StructuredAnalysisItem(
+                content="unknown",
+                confidence=0.0,
+                evidence_source_ids=[],
+            )
+        ],
+        hypotheses=[],
+        emotional_signals=[],
+        relationship_signals=[],
+        risk_signals=[],
+        intent_signals=[],
+        evidence_links=[{"source_id": "message-1"}],
+        analysis_constraints=["preserve_unknowns"],
+    )
 
 
 def test_strategy_decision_context_is_empty_without_candidates(client):
@@ -112,3 +148,63 @@ def test_strategy_decision_context_is_deterministic_and_read_only(client):
     assert first == second
     assert first["strategy_constraints"]["must_not_auto_execute"] is True
     assert first["strategy_constraints"]["must_not_auto_send"] is True
+
+
+def test_strategy_decision_context_consumes_structured_analysis_as_derived_input(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    seed_decision(person["id"], "recommendation-a")
+
+    with get_connection() as conn:
+        context = StrategyDecisionContextService().get_context(
+            conn, USER_ID, person["id"], structured_analysis=make_structured_analysis()
+        )
+
+    decision_inputs = context["decision_inputs"]
+    assert decision_inputs["candidate_ids"] == ["recommendation-a"]
+    assert decision_inputs["selection_status"] == "requires_explicit_decision"
+    assert decision_inputs["analysis_is_derived"] is True
+    assert decision_inputs["structured_analysis"]["observed_facts"][0]["evidence_source_ids"] == ["message-1"]
+    assert decision_inputs["structured_analysis"]["inferences"][0]["evidence_source_ids"] == ["message-1"]
+    assert decision_inputs["structured_analysis"]["unknowns"][0]["content"] == "unknown"
+    assert context["candidates"][0]["recommendation_id"] == "recommendation-a"
+    assert "decision" not in context
+
+
+def test_structured_analysis_cannot_create_decision_or_execution_side_effect(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+
+    with get_connection() as conn:
+        context = StrategyDecisionContextService().get_context(
+            conn, USER_ID, person["id"], structured_analysis=make_structured_analysis()
+        )
+
+    assert context["candidates"] == []
+    assert context["decision_inputs"]["candidate_count"] == 0
+    assert context["decision_inputs"]["selection_status"] == "requires_explicit_decision"
+
+    with get_connection() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM action_decisions").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM action_executions").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM action_outcomes").fetchone()[0] == 0
+
+
+def test_structured_analysis_preserves_existing_decision_inputs_without_confirmation(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    seed_decision(person["id"], "recommendation-a")
+
+    with get_connection() as conn:
+        context = StrategyDecisionContextService().get_context(
+            conn, USER_ID, person["id"], structured_analysis=make_structured_analysis()
+        )
+
+    assert context["decision_inputs"]["candidate_count"] == 1
+    assert context["decision_inputs"]["candidate_ids"] == ["recommendation-a"]
+    assert context["decision_inputs"]["selection_status"] == "requires_explicit_decision"
+    assert context["decision_inputs"]["analysis_is_derived"] is True
+    assert context["strategy_constraints"]["must_not_auto_select"] is True
+    assert context["strategy_constraints"]["must_treat_llm_output_as_derived"] is True
+    assert context["strategy_constraints"]["must_preserve_evidence_provenance"] is True
+    assert context["strategy_constraints"]["must_preserve_unknowns"] is True
