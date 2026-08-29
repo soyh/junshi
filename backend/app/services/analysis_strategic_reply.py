@@ -3,6 +3,9 @@ import sqlite3
 from app.services.analysis_llm import AnalysisLLMService
 from app.services.strategic_reply import StrategicReplyService
 from app.services.strategic_reply_analysis_bridge import StrategicReplyAnalysisBridgeService
+from app.services.strategic_reply_learning_strategy_bridge import (
+    StrategicReplyLearningStrategyBridgeService,
+)
 
 
 class AnalysisStrategicReplyService:
@@ -13,11 +16,18 @@ class AnalysisStrategicReplyService:
         analysis_llm_service: AnalysisLLMService | None = None,
         strategic_reply_service: StrategicReplyService | None = None,
         analysis_bridge_service: StrategicReplyAnalysisBridgeService | None = None,
+        learning_strategy_bridge_service: StrategicReplyLearningStrategyBridgeService | None = None,
     ):
         self.analysis_llm_service = analysis_llm_service or AnalysisLLMService()
         self.strategic_reply_service = strategic_reply_service or StrategicReplyService()
         self.analysis_bridge_service = (
             analysis_bridge_service or StrategicReplyAnalysisBridgeService()
+        )
+        self.learning_strategy_bridge_service = (
+            learning_strategy_bridge_service
+            or StrategicReplyLearningStrategyBridgeService(
+                strategic_reply_service=self.strategic_reply_service,
+            )
         )
 
     def build_context(
@@ -36,7 +46,7 @@ class AnalysisStrategicReplyService:
             analysis_context,
             provider=provider,
         )
-        reply_context = self.strategic_reply_service.get_context(
+        reply_context = self.learning_strategy_bridge_service.get_context(
             conn, user_id, person_id
         )
         return self.analysis_bridge_service.build_context(
