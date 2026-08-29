@@ -57,6 +57,14 @@ def test_analysis_context_returns_persisted_context_and_empty_analysis_lists(cli
     assert body["unknowns"] == []
     assert body["recommendations"] == []
     assert set(body["learning_strategy"]) == {"learning_inputs", "strategy_constraints"}
+    assert body["relationship_state"] == {
+        "current_state": None,
+        "evidence": [],
+        "facts": [],
+        "inferences": [],
+        "unknowns": [],
+        "recommendations": [],
+    }
 
 
 def test_analysis_context_response_has_stable_top_level_contract(client):
@@ -76,6 +84,7 @@ def test_analysis_context_response_has_stable_top_level_contract(client):
         "unknowns",
         "recommendations",
         "learning_strategy",
+        "relationship_state",
     }
     assert isinstance(body["conversation"], dict)
     assert isinstance(body["person"], dict)
@@ -85,6 +94,7 @@ def test_analysis_context_response_has_stable_top_level_contract(client):
     assert isinstance(body["unknowns"], list)
     assert isinstance(body["recommendations"], list)
     assert isinstance(body["learning_strategy"], dict)
+    assert isinstance(body["relationship_state"], dict)
 
 
 def test_analysis_context_returns_empty_messages_for_empty_conversation(client):
@@ -104,6 +114,8 @@ def test_analysis_context_returns_empty_messages_for_empty_conversation(client):
     assert body["recommendations"] == []
     assert body["learning_strategy"]["learning_inputs"]["action_feedback"] == []
     assert body["learning_strategy"]["learning_inputs"]["memory_updates"] == []
+    assert body["relationship_state"]["current_state"] is None
+    assert body["relationship_state"]["evidence"] == []
 
 
 def test_analysis_context_preserves_message_order_contract(client):
@@ -174,6 +186,7 @@ def test_analysis_context_reflects_deleted_message(client):
     response = client.get(f"/api/v1/conversations/{conversation_id}/analysis/context")
     assert response.status_code == 200
     assert response.json()["messages"] == []
+    assert response.json()["relationship_state"]["evidence"] == []
 
 
 def test_analysis_context_does_not_persist_analysis_results(client):
@@ -206,3 +219,4 @@ def test_analysis_context_does_not_persist_analysis_results(client):
     assert response.json()["unknowns"] == []
     assert response.json()["recommendations"] == []
     assert response.json()["learning_strategy"]["strategy_constraints"]["must_not_auto_execute"] is True
+    assert response.json()["relationship_state"]["current_state"] is None
