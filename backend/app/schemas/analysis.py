@@ -12,3 +12,4 @@ class AnalysisContextResponse(BaseModel):
     unknowns: list[Any]
     recommendations: list[Any]
     learning_strategy: dict[str, Any]
+    relationship_state: dict[str, Any]
