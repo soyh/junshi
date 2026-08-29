@@ -1,0 +1,1 @@
+TEST-075 implementation remains intentionally narrow: derived analysis is exposed to Strategy Decision as input context only; candidate identity, explicit confirmation, persistence, execution, outcome, and user/person isolation remain unchanged.
