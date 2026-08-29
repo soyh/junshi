@@ -1,16 +1,30 @@
 import sqlite3
 
+from app.schemas.structured_analysis import StructuredAnalysis
 from app.services.learning_strategy_synthesis import LearningStrategySynthesisService
+from app.services.strategy_analysis_bridge import StrategyAnalysisBridgeService
 
 
 class StrategyDecisionContextService:
-    def __init__(self, synthesis_service: LearningStrategySynthesisService | None = None):
+    def __init__(
+        self,
+        synthesis_service: LearningStrategySynthesisService | None = None,
+        analysis_bridge_service: StrategyAnalysisBridgeService | None = None,
+    ):
         self.synthesis_service = synthesis_service or LearningStrategySynthesisService()
+        self.analysis_bridge_service = analysis_bridge_service or StrategyAnalysisBridgeService()
 
-    def get_context(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
+    def get_context(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+        *,
+        structured_analysis: StructuredAnalysis | None = None,
+    ) -> dict:
         synthesis = self.synthesis_service.get_synthesis(conn, user_id, person_id)
         candidates = synthesis["candidates"]
-        return {
+        context = {
             "person": synthesis["person"],
             "relationship": synthesis["relationship"],
             "current_state": self._current_state(synthesis["relationship"]),
@@ -33,6 +47,11 @@ class StrategyDecisionContextService:
                 },
             },
         }
+
+        if structured_analysis is not None:
+            context = self.analysis_bridge_service.build_input(context, structured_analysis)
+
+        return context
 
     @staticmethod
     def _current_state(relationship: dict) -> dict:
