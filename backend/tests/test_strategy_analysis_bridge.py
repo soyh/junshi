@@ -70,3 +70,44 @@ def test_bridge_rejects_invalid_strategy_context():
         assert str(exc) == "strategy_context must be a dict"
     else:
         raise AssertionError("expected TypeError")
+
+
+def test_bridge_exposes_only_derived_analysis_as_decision_input():
+    context = {
+        "decision_inputs": {
+            "candidate_count": 1,
+            "candidate_ids": ["candidate-1"],
+            "selection_status": "requires_explicit_decision",
+        },
+        "strategy_constraints": {"must_not_auto_select": True},
+        "candidates": [{"recommendation_id": "candidate-1"}],
+    }
+
+    result = StrategyAnalysisBridgeService().build_input(context, make_analysis())
+    analysis_input = result["decision_inputs"]["structured_analysis"]
+
+    assert result["decision_inputs"]["candidate_ids"] == ["candidate-1"]
+    assert result["decision_inputs"]["selection_status"] == "requires_explicit_decision"
+    assert result["decision_inputs"]["analysis_is_derived"] is True
+    assert analysis_input["observed_facts"][0]["evidence_source_ids"] == ["message-1"]
+    assert analysis_input["inferences"][0]["evidence_source_ids"] == ["message-1"]
+    assert analysis_input["unknowns"][0]["content"] == "unknown"
+
+
+def test_bridge_does_not_create_or_confirm_a_decision_from_analysis():
+    context = {
+        "decision_inputs": {
+            "candidate_count": 0,
+            "candidate_ids": [],
+            "selection_status": "requires_explicit_decision",
+        },
+        "candidates": [],
+    }
+
+    result = StrategyAnalysisBridgeService().build_input(context, make_analysis())
+
+    assert result["decision_inputs"]["candidate_count"] == 0
+    assert result["decision_inputs"]["candidate_ids"] == []
+    assert result["decision_inputs"]["selection_status"] == "requires_explicit_decision"
+    assert "decision" not in result
+    assert "confirmed" not in result
