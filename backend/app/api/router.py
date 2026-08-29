@@ -8,6 +8,7 @@ from app.api.routes.action_outcome import router as action_outcome_router
 from app.api.routes.action_plan import router as action_plan_router
 from app.api.routes.analysis import router as analysis_router
 from app.api.routes.analysis_strategy import router as analysis_strategy_router
+from app.api.routes.analysis_strategic_reply import router as analysis_strategic_reply_router
 from app.api.routes.analysis_structured import router as analysis_structured_router
 from app.api.routes.conversations import router as conversations_router
 from app.api.routes.evidence import router as evidence_router
@@ -53,6 +54,7 @@ api_router = APIRouter(
 api_router.include_router(analysis_router)
 api_router.include_router(analysis_structured_router)
 api_router.include_router(analysis_strategy_router)
+api_router.include_router(analysis_strategic_reply_router)
 
 api_router.include_router(persons_router)
 api_router.include_router(person_profiles_router)
