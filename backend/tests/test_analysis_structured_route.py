@@ -1,7 +1,8 @@
 from fastapi.testclient import TestClient
 
-from app.main import app
 from app.api.routes import analysis_structured
+from app.main import app
+from app.services.llm import LLMAnalysisError
 
 
 class FakeService:
@@ -49,11 +50,15 @@ def test_structured_analysis_route_uses_qwen_provider(monkeypatch):
     assert response.status_code == 200
     assert response.json()["summary"] == "A recent conversation signal was observed."
     assert len(fake_service.calls) == 1
-    assert fake_service.calls[0][1:] == ("00000000-0000-0000-0000-000000000001", "conversation-1", fake_provider)
+    assert fake_service.calls[0][1:] == (
+        "00000000-0000-0000-0000-000000000001",
+        "conversation-1",
+        fake_provider,
+    )
 
 
 def test_structured_analysis_route_translates_llm_failure(monkeypatch):
-    fake_service = FakeService(error=RuntimeError("provider unavailable"))
+    fake_service = FakeService(error=LLMAnalysisError("provider unavailable"))
     monkeypatch.setattr(analysis_structured, "service", fake_service)
     monkeypatch.setattr(analysis_structured, "QwenProvider", FakeProvider)
 
