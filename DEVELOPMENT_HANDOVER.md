@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-29
-当前阶段：TEST-075 — StructuredAnalysis → Strategy Decision 最小消费契约
-当前 Branch：test-074-analysis-strategy-entrypoint
-最近一次服务器验收：TEST-074 Analysis → Strategy 正式入口全链路验收通过；专项测试 19 passed；全量 456 passed；Strategy Context API 实际调用 Qwen 返回 200 OK，且无 decision / execution side effect。
+当前阶段：TEST-077 — Strategic Reply downstream boundary
+当前 Branch：test-076-structured-analysis-strategic-reply-consumption
+最近一次服务器验收：TEST-076 全量回归 468 passed；18080 实际 HTTP smoke test 已验证 StructuredAnalysis → Strategic Reply derived-input 链路成功；LLM failure 映射为 HTTP 502；未产生 reply draft / auto-send / relationship mutation side effect。
 
 ---
 
@@ -23,6 +23,7 @@
 - StructuredAnalysis 中的 inference / hypothesis / material signal 应保留 canonical evidence provenance。
 - unknown 必须在证据不足时保持 unknown，不得被模型猜测自动提升为事实。
 - Strategy 消费 StructuredAnalysis，但不得绕过现有 decision / confirmation / execution 生命周期。
+- Strategic Reply 只能在既有 Strategy / Decision 边界内消费 derived analysis，不得因为 LLM 输出而自动生成、确认或发送消息。
 - 不允许 LLM 直接发送第三方消息、自动执行 action、修改 relationship state、写入 learning history 或伪造 outcome success。
 - 现有 Persistence、Evidence、Relationship State、Learning Strategy、Strategy Decision、Strategic Reply、Action Plan、Execution 生命周期不因引入 LLM 而重写。
 - 当前全局 no-LLM 约束解除；改为仅对 deterministic Context / Evidence / Learning / Persistence / Decision / Execution 层保持 no-LLM。
@@ -66,6 +67,8 @@ TEST-071 Structured Analysis Strategy Bridge — VERIFIED
 TEST-072 Analysis → Strategy Orchestration — VERIFIED
 TEST-073 Qwen Provider Integration — VERIFIED
 TEST-074 Analysis → Strategy formal entrypoint — VERIFIED
+TEST-075 StructuredAnalysis → Strategy Decision 最小消费契约 — VERIFIED
+TEST-076 StructuredAnalysis → Strategic Reply 消费契约 — VERIFIED
 
 ---
 
@@ -101,37 +104,13 @@ No database migration was added.
 
 TEST-074 在既有 `AnalysisStrategyService` 上增加正式 API entrypoint，而不是建立第二套 Strategy 体系。
 
-新增：
-- `backend/app/api/routes/analysis_strategy.py`
-- `backend/app/schemas/analysis_strategy.py`
-- `backend/tests/test_analysis_strategy_route.py`
-
 正式入口：
 `GET /api/v1/conversations/{conversation_id}/strategy/context`
 
 执行链：
 `conversation_id → AnalysisContext → Qwen → StructuredAnalysis → StrategyDecisionContext`
 
-该入口：
-- 使用当前用户身份获取 conversation-scoped AnalysisContext。
-- 使用 QwenProvider 产生 StructuredAnalysis。
-- 将 StructuredAnalysis 注入现有 StrategyDecisionContextService。
-- 返回 candidates / decision_inputs / current_state 等既有 Strategy context，同时附带 derived StructuredAnalysis。
-- 保持 `requires_explicit_decision` 与 `must_not_auto_select`。
-- 保持 LLM derived / provenance / unknown 约束。
-- 将 LLM provider failure 映射为 HTTP 502。
-- 不新增数据库表，不持久化 StructuredAnalysis，不创建新的 decision / execution 生命周期。
-
-TEST-074 服务器最终验收：
-- `backend/tests/test_analysis_strategy_route.py`：2 passed
-- TEST-070 ~ TEST-074 相关专项测试：19 passed
-- 全量回归：456 passed
-- FastAPI server：127.0.0.1:18080 正常运行
-- `/health`：HTTP 200
-- `/api/v1/conversations/{conversation_id}/analysis/structured`：HTTP 200，实际 Qwen 分析成功
-- `/api/v1/conversations/{conversation_id}/strategy/context`：HTTP 200，实际 Qwen → StructuredAnalysis → Strategy Context 链路成功
-- Strategy Context 调用前后 `action_decisions` / `action_executions` / `action_outcomes` 均保持 0
-- 未发现 StructuredAnalysis persistence 或 decision / execution side effect
+该入口保持 `requires_explicit_decision` 与 `must_not_auto_select`，不新增数据库表，不持久化 StructuredAnalysis，不创建新的 decision / execution 生命周期。
 
 TEST-074 正式标记为 VERIFIED。
 
@@ -139,55 +118,117 @@ TEST-074 正式标记为 VERIFIED。
 
 ## TEST-075 StructuredAnalysis → Strategy Decision 最小消费契约
 
-TEST-075 的目标不是建立新的 Strategy 体系，而是定义 StructuredAnalysis 如何作为 derived input 被现有 Strategy Decision 消费。
+TEST-075 定义 StructuredAnalysis 如何作为 derived input 被现有 Strategy Decision 消费。
 
 目标链：
 `StructuredAnalysis → Strategy Decision Context → Existing Decision Lifecycle`
 
-本阶段只允许做最小消费契约：
-- 明确哪些 StructuredAnalysis 字段可以作为 Strategy Decision 的输入证据。
-- 保留每个被消费信号的 evidence provenance。
-- 明确 observed facts / inferences / hypotheses / unknowns 在 Strategy 层的语义边界。
-- unknown 不得被转换为确定性 decision fact。
+验收边界：
+- 明确可消费的 StructuredAnalysis 信号。
+- 保留被消费信号的 evidence provenance。
+- observed facts / inferences / hypotheses / unknowns 保持不同语义。
+- unknown 不转换为确定性 decision fact。
 - LLM 输出不得直接生成、确认、执行 decision。
-- candidate selection 仍必须保持显式决策；不得自动选择 candidate。
-- 不改变现有 `action_decisions` / `action_executions` / `action_outcomes` 生命周期。
+- candidate selection 仍保持显式决策。
+- 不改变 `action_decisions` / `action_executions` / `action_outcomes` 生命周期。
 - 不新增 StructuredAnalysis persistence。
-- 不让 LLM 进入 decision persistence、execution、learning history 或 canonical evidence 层。
 
-TEST-075 验收重点：
-1. 为 StructuredAnalysis → Strategy Decision 定义明确、可测试的输入契约。
-2. 验证 provenance / unknown / derived semantics 不丢失。
-3. 验证现有 decision confirmation boundary 不被绕过。
-4. 验证 user / person isolation 不被改变。
-5. 验证无自动 decision、无 execution、无 outcome success 伪造。
-6. 保持现有全量回归稳定。
+TEST-075 正式标记为 VERIFIED。
 
-TEST-075 初期不涉及 Strategic Reply / Action Plan 的进一步消费；待 Decision 消费契约稳定后再分别推进下游边界。
+---
+
+## TEST-076 StructuredAnalysis → Strategic Reply 消费契约
+
+TEST-076 在既有 Strategic Reply 体系中增加最小 derived-analysis consumption boundary，不建立第二套回复体系。
+
+新增/使用的核心边界：
+- `backend/app/services/analysis_strategic_reply.py`
+- `backend/app/services/strategic_reply_analysis_bridge.py`
+- `backend/app/api/routes/analysis_strategic_reply.py`
+- `backend/tests/test_strategic_reply_analysis_bridge.py`
+- `backend/tests/test_analysis_strategic_reply_route.py`
+
+正式入口：
+`GET /api/v1/conversations/{conversation_id}/strategic-reply/context`
+
+执行链：
+`conversation_id → AnalysisContext → LLMAnalysisService/Qwen → StructuredAnalysis → existing Strategic Reply context → derived reply_inputs`
+
+`StrategicReplyAnalysisBridgeService`：
+- 将 `StructuredAnalysis` 保留为 `structured_analysis` derived output。
+- 仅把 summary、observed_facts、inferences、hypotheses、emotional_signals、relationship_signals、risk_signals、intent_signals、unknowns 投影到 `reply_inputs.signals`。
+- 保留 `evidence_source_ids` provenance。
+- 明确 `analysis_is_derived = true`。
+- 强制保留 `must_be_evidence_backed`、`must_preserve_unknowns`、`must_preserve_evidence_provenance`、`must_treat_llm_output_as_derived`、`must_not_auto_send`、`must_not_change_relationship` 等约束。
+- 不把 LLM 分析直接转换为 reply draft 或 recommendation。
+
+正式 route：
+- 当前用户身份仍通过 `get_current_user_id` 获取。
+- conversation scope 仍由既有 AnalysisContext service 校验。
+- Qwen provider failure 映射为 HTTP 502。
+- 不发送消息，不执行 action，不修改 relationship，不持久化 StructuredAnalysis。
+
+TEST-076 测试覆盖：
+- derived input 返回契约。
+- provenance 与 unknown 保留。
+- 不生成 reply draft / recommendation。
+- 既有 reply constraints 语义不被改变。
+- 非 dict reply context 输入校验。
+- route 的 LLM failure → 502。
+
+TEST-076 服务器验收（本次实际提供）：
+- FastAPI：127.0.0.1:18080
+- `/health`：HTTP 200
+- `/api/v1/conversations/{conversation_id}/strategic-reply/context`：实际 Qwen 调用 HTTP 200
+- 返回 `structured_analysis`、`reply_inputs`，其中 `analysis_is_derived=true`
+- `draft=null`
+- 全量回归：468 passed
+- 未产生自动发送或 relationship / decision / execution side effect
+
+TEST-076 正式标记为 VERIFIED。
 
 ---
 
 ## 数据库
 
 当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-075 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-045 ~ TEST-076 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ---
 
-## 下一实现阶段
+## TEST-077 — Strategic Reply downstream boundary
 
-下一工作分支应从 TEST-074 已验收提交继续创建：
-`test-075-structured-analysis-strategy-decision-consumption`
+TEST-077 必须继续从 TEST-076 的 Strategic Reply derived-input 边界向下推进，但不能把 LLM 直接变成发送器，也不能建立第二套 Strategic Reply / Decision 生命周期。
+
+目标方向：
+`StructuredAnalysis → Existing Strategy / Strategic Reply Inputs → Explicit Candidate / Human Confirmation Boundary`
+
+实现前必须先从 GitHub 读取：
+1. `docs/ANALYSIS_LLM_STRATEGY_CONTRACT.md`
+2. TEST-075 StructuredAnalysis → Strategy Decision 相关代码、schema、tests
+3. TEST-076 Strategic Reply analysis bridge / route / schema / tests
+4. 现有 Strategic Reply service、Decision、Action Plan、Execution 相关代码和测试
+
+TEST-077 实现原则：
+- 不改变 canonical evidence / AnalysisContext contract。
+- 不让 LLM 进入 persistence / decision persistence / execution。
+- 不自动生成并发送第三方消息。
+- 不自动确认 decision。
+- 不把 `reply_inputs` 直接视为 canonical fact。
+- 保持 evidence provenance 与 unknown semantics。
+- 保持 user/person/conversation isolation。
+- 优先建立最小、可测试的 downstream contract，再决定是否需要新增 route/service/schema。
+- 不新增数据库表；除非后续证明 persistence 是独立产品需求，并先完成单独设计与 migration。
 
 实现顺序：
-1. 先读取 `docs/ANALYSIS_LLM_STRATEGY_CONTRACT.md` 以及现有 Strategy Decision 相关 service / schema / tests。
-2. 找到现有 Strategy Decision 的最小输入边界，不修改其生命周期。
-3. 设计 StructuredAnalysis → Decision input 的最小 adapter / contract。
-4. 先补契约测试，再实现最小代码。
-5. 执行 TEST-075 专项测试。
-6. 执行相关 Strategy 回归测试。
+1. GitHub 读取 TEST-076 及相关 Strategic Reply / Decision / Action Plan / Execution 代码、测试和文档。
+2. 明确 TEST-077 的最小真实产品边界。
+3. 先补契约测试。
+4. 实现最小代码。
+5. 执行 TEST-077 专项测试。
+6. 执行 Strategic Reply / Decision 相关回归。
 7. 执行全量 pytest。
-8. 最后进行服务器专项验收；真实 Qwen smoke test 只验证 derived input 链路，不允许产生 decision / execution side effect。
+8. 最后服务器专项验收；真实 Qwen smoke test 只验证 derived downstream input，不允许发送、执行或写入 outcome。
 
 ---
 
@@ -195,9 +236,9 @@ TEST-045 ~ TEST-075 不新增 migration，不改变 action_decisions、action_ex
 
 - 新增数据库表用于暂存或持久化 StructuredAnalysis，除非先完成独立 persistence 设计并新增 migration。
 - 让 LLM 进入 canonical evidence、persistence、learning context、decision persistence 或 execution 层。
-- 让模型自动选择 candidate、自动确认 decision、自动执行 action 或伪造 outcome。
+- 让模型自动选择 candidate、自动确认 decision、自动执行 action、自动发送消息或伪造 outcome。
 - 为了测试方便修改既有业务语义或绕过 user / person isolation。
-- 建立第二套 Strategy / Decision 生命周期。
+- 建立第二套 Strategy / Decision / Strategic Reply 生命周期。
 - 使用 8899。
 - MVP 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
