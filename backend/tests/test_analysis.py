@@ -52,6 +52,7 @@ def test_analysis_context_returns_persisted_context_and_empty_analysis_lists(cli
     assert body["conversation"]["person_id"] == person_id
     assert body["person"]["id"] == person_id
     assert [message["content"] for message in body["messages"]] == ["你好", "你好呀"]
+    assert body["evidence"]
     assert body["facts"] == []
     assert body["inferences"] == []
     assert body["unknowns"] == []
@@ -79,6 +80,7 @@ def test_analysis_context_response_has_stable_top_level_contract(client):
         "conversation",
         "person",
         "messages",
+        "evidence",
         "facts",
         "inferences",
         "unknowns",
@@ -89,6 +91,7 @@ def test_analysis_context_response_has_stable_top_level_contract(client):
     assert isinstance(body["conversation"], dict)
     assert isinstance(body["person"], dict)
     assert isinstance(body["messages"], list)
+    assert isinstance(body["evidence"], list)
     assert isinstance(body["facts"], list)
     assert isinstance(body["inferences"], list)
     assert isinstance(body["unknowns"], list)
@@ -108,6 +111,7 @@ def test_analysis_context_returns_empty_messages_for_empty_conversation(client):
     assert body["conversation"]["id"] == conversation_id
     assert body["person"]["id"] == person_id
     assert body["messages"] == []
+    assert body["evidence"] == []
     assert body["facts"] == []
     assert body["inferences"] == []
     assert body["unknowns"] == []
@@ -186,6 +190,7 @@ def test_analysis_context_reflects_deleted_message(client):
     response = client.get(f"/api/v1/conversations/{conversation_id}/analysis/context")
     assert response.status_code == 200
     assert response.json()["messages"] == []
+    assert response.json()["evidence"] == []
     assert response.json()["relationship_state"]["evidence"] == []
 
 
