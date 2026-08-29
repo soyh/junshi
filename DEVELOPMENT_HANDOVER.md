@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-29
-当前阶段：ARCHITECTURE FREEZE — Analysis → LLM → StructuredAnalysis → Strategy contract 已固化
-当前 Branch：test-065-analysis-context-learning-strategy-bridge
-最近一次服务器验收：TEST-069 后全量 444 passed。
+当前阶段：QWEN PROVIDER INTEGRATION — AnalysisContext → Qwen → StructuredAnalysis 已接入 API 边界，待服务器专项/全量验收
+当前 Branch：test-073-qwen-provider
+最近一次服务器验收：TEST-073 Provider 层前置全量 452 passed；API route 集成后的服务器验收待执行。
 
 ---
 
@@ -29,16 +29,7 @@
 
 第一阶段不新增数据库表；StructuredAnalysis 初期视为 derived request-scoped output。未来如需持久化，必须另行设计并新增 migration。
 
-后续实现顺序：
-1. 保持现有 AnalysisContext contract 不变。
-2. 新增 provider-neutral LLM adapter boundary。
-3. 定义严格校验的最小 StructuredAnalysis schema。
-4. 实现 AnalysisContext → StructuredAnalysis。
-5. 覆盖 provenance、unknowns、isolation、malformed output、provider failure、no-side-effect。
-6. 将 StructuredAnalysis 接入现有 Strategy，同时不改变 decision/execution 语义。
-7. 专项回归后执行全量测试。
-
-冻结后禁止继续通过 TEST 单纯逐字段扩张 AnalysisContext；只有真实架构需求才新增字段或 bridge。
+Provider 当前选择：Qwen，通过 DashScope OpenAI-compatible API；provider adapter 与上层 LLM contract 解耦。
 
 ---
 
@@ -70,28 +61,47 @@ TEST-066 Analysis Context relationship-state bridge — VERIFIED
 TEST-067 Analysis Context canonical evidence bridge — VERIFIED
 TEST-068 Analysis Context conversation evidence bridge — VERIFIED
 TEST-069 Analysis Context evidence contract sync — VERIFIED
+TEST-070 Analysis LLM Service — VERIFIED
+TEST-071 Structured Analysis Strategy Bridge — VERIFIED
+TEST-072 Analysis → Strategy Orchestration — VERIFIED
+TEST-073 Qwen Provider Integration — CODE COMPLETE, SERVER ROUTE ACCEPTANCE PENDING
 
 ---
 
-## TEST-069 Analysis Context evidence contract sync
+## TEST-070 ~ TEST-073
 
-目标：同步 Analysis Context 与 canonical conversation evidence contract，并保持 evidence 在 conversation analysis 边界上的 canonical reuse。
+TEST-070 established the provider-neutral `LLMAnalysisService` boundary and provider failure translation.
 
-服务器最终验收：
-`backend/tests/test_analysis_conversation_evidence_bridge.py`
-`backend/tests/test_evidence.py`
-`backend/tests/test_analysis_canonical_evidence_bridge.py`
-`backend/tests/test_analysis_relationship_state_bridge.py`
-`backend/tests/test_analysis_learning_strategy_bridge.py`
-`backend/tests/test_analysis.py`
-以上专项 37 passed；全量 444 passed。
+TEST-071 connected validated `StructuredAnalysis` to the existing strategy decision context without changing decision/execution semantics.
+
+TEST-072 established `AnalysisStrategyService` orchestration:
+`AnalysisContext → LLMAnalysisService → StructuredAnalysis → StrategyDecisionContext`.
+
+TEST-073 adds the first concrete provider, Qwen, while preserving the provider-neutral boundary. Qwen configuration uses DashScope credentials and the OpenAI-compatible endpoint. A request-scoped API endpoint now exposes:
+`GET /api/v1/conversations/{conversation_id}/analysis/structured`
+which obtains canonical AnalysisContext, invokes Qwen, validates the response as StructuredAnalysis, and returns only the derived structured result.
+
+The route translates LLMAnalysisError to HTTP 502 and does not persist StructuredAnalysis.
+
+No database migration was added.
 
 ---
 
 ## 数据库
 
 当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-069 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-045 ~ TEST-073 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+
+---
+
+## 下一阶段
+
+1. 服务器拉取 `test-073-qwen-provider`。
+2. 运行新增 structured-analysis route 专项测试与全量测试。
+3. 若专项/全量通过，再配置真实 DashScope API key，仅进行受控单次 Qwen smoke test。
+4. 验证真实 Qwen 输出能稳定通过 StructuredAnalysis contract，尤其是 evidence_source_ids、unknowns、analysis_constraints 与 provenance 约束。
+5. 再将同一 provider composition 接入 Analysis → Strategy orchestration 的正式调用入口；不得让 Strategy 绕过 StructuredAnalysis。
+6. 最后才进入真实产品层的回复生成、human confirmation、action plan / execution UI/API 编排。
 
 ---
 
