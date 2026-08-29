@@ -36,6 +36,7 @@ class AnalysisActionPlanService:
         )
         analysis = structured_analysis.model_dump(mode="json")
         result = dict(action_plan_context)
+        result["learning_strategy"] = analysis_context["learning_strategy"]
         result["structured_analysis"] = analysis
         result["action_plan_inputs"] = {
             "summary": analysis["summary"],
