@@ -7,6 +7,7 @@ from app.api.routes.action_feedback_learning_synthesis import router as action_f
 from app.api.routes.action_outcome import router as action_outcome_router
 from app.api.routes.action_plan import router as action_plan_router
 from app.api.routes.analysis import router as analysis_router
+from app.api.routes.analysis_structured import router as analysis_structured_router
 from app.api.routes.conversations import router as conversations_router
 from app.api.routes.evidence import router as evidence_router
 from app.api.routes.interactions import router as interactions_router
@@ -49,6 +50,7 @@ api_router = APIRouter(
 # This keeps the analysis sub-resource from being shadowed by any dynamic
 # conversation routes as the API surface grows.
 api_router.include_router(analysis_router)
+api_router.include_router(analysis_structured_router)
 
 api_router.include_router(persons_router)
 api_router.include_router(person_profiles_router)
