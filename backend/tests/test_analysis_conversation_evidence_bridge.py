@@ -1,5 +1,8 @@
 def create_person(client, name="分析会话证据对象"):
-    response = client.post("/api/v1/persons", json={"name": name})
+    response = client.post(
+        "/api/v1/persons",
+        json={"name": name},
+    )
     assert response.status_code == 201
     return response.json()
 
@@ -55,8 +58,12 @@ def test_analysis_context_reuses_canonical_conversation_evidence(client):
     assert message.status_code == 201
     assert interaction.status_code == 201
 
-    canonical = client.get(f"/api/v1/conversations/{conversation['id']}/evidence")
-    analysis = client.get(f"/api/v1/conversations/{conversation['id']}/analysis/context")
+    canonical = client.get(
+        f"/api/v1/conversations/{conversation['id']}/analysis/evidence"
+    )
+    analysis = client.get(
+        f"/api/v1/conversations/{conversation['id']}/analysis/context"
+    )
     assert canonical.status_code == 200
     assert analysis.status_code == 200
     assert analysis.json()["evidence"] == canonical.json()["evidence"]
@@ -67,7 +74,9 @@ def test_analysis_context_evidence_is_empty_for_empty_conversation(client):
     create_relationship(client, person["id"])
     conversation = create_conversation(client, person["id"])
 
-    response = client.get(f"/api/v1/conversations/{conversation['id']}/analysis/context")
+    response = client.get(
+        f"/api/v1/conversations/{conversation['id']}/analysis/context"
+    )
     assert response.status_code == 200
     assert response.json()["evidence"] == []
 
@@ -88,7 +97,9 @@ def test_analysis_context_evidence_reflects_deleted_message(client):
     message_id = message.json()["id"]
 
     assert client.delete(f"/api/v1/messages/{message_id}").status_code == 204
-    response = client.get(f"/api/v1/conversations/{conversation['id']}/analysis/context")
+    response = client.get(
+        f"/api/v1/conversations/{conversation['id']}/analysis/context"
+    )
     assert response.status_code == 200
     assert response.json()["evidence"] == []
 
@@ -113,7 +124,9 @@ def test_analysis_context_evidence_isolated_to_target_conversation(client):
         )
         assert response.status_code == 201
 
-    response = client.get(f"/api/v1/conversations/{conversation_a['id']}/analysis/context")
+    response = client.get(
+        f"/api/v1/conversations/{conversation_a['id']}/analysis/context"
+    )
     assert response.status_code == 200
     evidence = response.json()["evidence"]
     assert [item["content"] for item in evidence] == ["A消息"]
