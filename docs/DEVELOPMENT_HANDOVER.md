@@ -1,10 +1,10 @@
 # Development Handover
 
-更新时间：2026-08-29
-当前阶段：TEST-078 — StructuredAnalysis → Action Plan 消费契约
-当前 Branch：test-078-structured-analysis-action-plan-consumption
-上一阶段：TEST-077 — Strategic Reply downstream boundary — VERIFIED
-最近一次服务器验收：TEST-077 全量 471 passed；18080 Strategic Reply Context 实际 Qwen HTTP 200；无 decision / execution / outcome side effect。
+更新时间：2026-08-30
+当前阶段：TEST-079 — Learning Strategy → Action Plan HTTP Response Contract
+当前 Branch：test-079-learning-strategy-action-plan-contract
+上一阶段：TEST-078 — StructuredAnalysis → Action Plan 消费契约 — VERIFIED
+最近一次服务器验收：TEST-079 全量 478 passed；18080 Action Plan Context 实际 Qwen HTTP 200；learning_strategy HTTP response contract 通过；无 decision / execution / outcome side effect。
 
 ## 信息检索优先级（新增，强制执行）
 
@@ -31,6 +31,8 @@ TEST-074 Analysis → Strategy formal entrypoint — VERIFIED
 TEST-075 StructuredAnalysis → Strategy Decision 最小消费契约 — VERIFIED
 TEST-076 StructuredAnalysis → Strategic Reply 消费契约 — VERIFIED
 TEST-077 Strategic Reply downstream boundary — VERIFIED
+TEST-078 StructuredAnalysis → Action Plan 消费契约 — VERIFIED
+TEST-079 Learning Strategy → Action Plan HTTP Response Contract — VERIFIED
 
 ## TEST-077 验收摘要
 
@@ -85,13 +87,42 @@ TEST-077 Strategic Reply downstream boundary — VERIFIED
 
 全部通过后才能将 TEST-078 标记 VERIFIED。
 
+## TEST-079 — Learning Strategy → Action Plan HTTP Response Contract
+
+TEST-079 锁定 Action Plan Context response 中 `learning_strategy` 的 HTTP contract，不建立新的生命周期。
+
+Git commit：`bdedc820c99590b642a419f8b5bff1e05a72d5ab`。
+
+本阶段验证：
+- `learning_strategy` 在 HTTP response 中完整保留；
+- `action_plan_inputs.analysis_is_derived=true`；
+- `action_plan=[]`，不得自动产生 proposal；
+- 既有 learning strategy 的 source-backed、read-only、provenance、unknown、no-auto-execution、no-auto-send、no-LLM constraints 保持；
+- LLM failure 返回 HTTP 502；
+- 不自动确认 decision、不执行 action、不发送消息、不修改 relationship、不伪造 outcome。
+
+### TEST-079 服务器验收
+
+- Branch：`test-079-learning-strategy-action-plan-contract`
+- HEAD：`bdedc820c99590b642a419f8b5bff1e05a72d5ab`
+- 全量 pytest：`478 passed`
+- `/health`：200
+- Action Plan Context：200
+- 实际 Qwen HTTP：200
+- 缺失 conversation：404
+- `action_decisions` / `action_executions` / `action_outcomes`：无新增 side effect
+
+TEST-079 正式标记为 VERIFIED。
+
 ## 数据库
 
-当前 migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。TEST-045 ~ TEST-078 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+当前 migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。TEST-045 ~ TEST-079 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ## 下一阶段
 
-TEST-078 验收通过后，必须再次从 GitHub 读取 TEST-078 实际代码、测试、文档及相关 Action Plan / Decision / Execution contract，再决定 TEST-079 的真实最小边界。
+TEST-079 已完成并 VERIFIED。下一阶段开始前，必须再次从 GitHub 当前开发分支读取 TEST-079 实际代码、测试、文档及相关 Action Plan / Decision / Execution / Learning Strategy contract，再决定下一个 TEST 的最小真实产品边界。
+
+不得预先假定继续增加字段、扩大 LLM 消费范围或直接进入自动执行。
 
 ## 持续禁止
 

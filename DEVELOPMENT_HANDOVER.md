@@ -1,10 +1,10 @@
 # AI Love Strategist Development Handover
 
-更新时间：2026-08-29
-当前阶段：TEST-078 — StructuredAnalysis → Action Plan 消费契约
-当前 Branch：test-078-structured-analysis-action-plan-consumption
-上一阶段：TEST-077 — Strategic Reply downstream boundary — VERIFIED
-上一阶段服务器验收：全量 471 passed；Strategic Reply Context 实际 Qwen HTTP 200；未产生 action_decisions / action_executions / action_outcomes side effect。
+更新时间：2026-08-30
+当前阶段：TEST-079 — Learning Strategy → Action Plan HTTP Response Contract
+当前 Branch：test-079-learning-strategy-action-plan-contract
+上一阶段：TEST-078 — StructuredAnalysis → Action Plan 消费契约 — VERIFIED
+最近一次服务器验收：全量 478 passed；Action Plan Context 实际 Qwen HTTP 200；learning_strategy HTTP response contract 通过；未产生 action_decisions / action_executions / action_outcomes side effect。
 
 ---
 
@@ -78,6 +78,8 @@ TEST-074 Analysis → Strategy formal entrypoint — VERIFIED
 TEST-075 StructuredAnalysis → Strategy Decision 最小消费契约 — VERIFIED
 TEST-076 StructuredAnalysis → Strategic Reply 消费契约 — VERIFIED
 TEST-077 Strategic Reply downstream boundary — VERIFIED
+TEST-078 StructuredAnalysis → Action Plan 消费契约 — VERIFIED
+TEST-079 Learning Strategy → Action Plan HTTP Response Contract — VERIFIED
 
 ---
 
@@ -160,16 +162,62 @@ TEST-077 正式标记为 VERIFIED。
 
 ---
 
+## TEST-079 — Learning Strategy → Action Plan HTTP Response Contract
+
+TEST-079 在 TEST-078 已建立的 Action Plan derived-analysis consumption boundary 上，锁定 `learning_strategy` 的 HTTP response contract。
+
+目标链：
+
+`AnalysisContext → LLM → StructuredAnalysis → Existing Action Plan Context → learning_strategy HTTP projection`
+
+本阶段不新增业务生命周期，不新增数据库表，不改变 Action Plan / Decision / Execution / Outcome 生命周期。
+
+### TEST-079 实际变更
+
+Git commit：
+
+`bdedc820c99590b642a419f8b5bff1e05a72d5ab` — `test: lock learning strategy HTTP response contract`
+
+TEST-079 相对于 TEST-078 仅强化 `backend/tests/test_analysis_action_plan_route.py` 的 HTTP response contract，确保 Action Plan Context response 中的 `learning_strategy` 与 service 输出保持一致，并继续验证：
+
+- `action_plan_inputs.analysis_is_derived = true`
+- `action_plan = []`
+- `action_constraints.must_not_auto_execute = true`
+- `learning_strategy` 完整保留
+- `learning_strategy` 的 source-backed / read-only / provenance / unknown / no-auto-execution / no-auto-send / no-LLM 约束保持不变
+- LLM provider failure 继续转换为 HTTP 502 `LLM analysis failed`
+- 不因 learning strategy projection 自动生成 action proposal
+- 不自动确认 decision、不执行 action、不发送消息、不修改 relationship、不伪造 outcome
+
+### TEST-079 服务器验收
+
+- Branch：`test-079-learning-strategy-action-plan-contract`
+- HEAD：`bdedc820c99590b642a419f8b5bff1e05a72d5ab`
+- 全量 pytest：`478 passed`
+- `127.0.0.1:18080`：正常监听
+- `GET /health`：HTTP 200
+- `GET /api/v1/conversations/{conversation_id}/action-plan/context`：HTTP 200
+- Action Plan Context 实际 Qwen 调用：HTTP 200
+- `learning_strategy`：正常出现在 HTTP response 中
+- `action_plan`：保持空数组，不自动产生 proposal
+- 缺失 conversation：HTTP 404 `Conversation not found`
+- `action_decisions` / `action_executions` / `action_outcomes`：无新增 side effect
+- 未产生自动发送、relationship mutation、decision、execution、outcome side effect
+
+TEST-079 正式标记为 VERIFIED。
+
 ## 数据库
 
 当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-078 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-045 ~ TEST-079 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ---
 
 ## 下一阶段方向
 
-TEST-078 验收通过后，再从 GitHub 读取 TEST-078 实际代码、测试、文档和相关 Action Plan / Decision / Execution contract，决定 TEST-079 的最小真实产品边界。不得预先假定继续增加字段或直接进入自动执行。
+TEST-079 已完成并 VERIFIED。下一阶段开始前，必须再次从 GitHub 当前开发分支读取 TEST-079 实际代码、测试、文档及相关 Action Plan / Decision / Execution / Learning Strategy contract，再决定下一个 TEST 的最小真实产品边界。
+
+不得预先假定继续增加字段、扩大 LLM 消费范围或直接进入自动执行。
 
 ---
 
