@@ -1,7 +1,7 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-29
-当前阶段：TEST-065 Analysis Context learning-strategy bridge — IMPLEMENTED，待服务器验证
+当前阶段：TEST-065 Analysis Context learning-strategy bridge — IMPLEMENTED，路由注册已修复，待服务器专项/全量验收
 当前 Branch：test-065-analysis-context-learning-strategy-bridge
 最近一次服务器验收：TEST-064 专项 3 passed；TEST-063 后全量 424 passed；TEST-064 后全量 427 passed。
 
@@ -30,7 +30,7 @@ TEST-061 Learning Strategy Provenance Parity — VERIFIED
 TEST-062 Learning Strategy Decision Provenance Parity — VERIFIED
 TEST-063 Learning Strategy Decision Constraint Parity — VERIFIED
 TEST-064 Learning Strategy Decision Learning Evidence Completeness — IMPLEMENTED，已通过服务器验收
-TEST-065 Analysis Context learning-strategy bridge — IMPLEMENTED，待服务器验证
+TEST-065 Analysis Context learning-strategy bridge — IMPLEMENTED，路由注册已修复，待服务器专项/全量验收
 
 ---
 
@@ -49,6 +49,8 @@ TEST-065 Analysis Context learning-strategy bridge — IMPLEMENTED，待服务�
 - 验证 Analysis Context 与 Person Learning Strategy Context 的 learning inputs / strategy constraints 完全一致。
 - 验证 strategy-decision source provenance 与 unknowns 在 Analysis Context 中保持不变。
 - 验证 user isolation、determinism、read-only、no-auto-execution、no-auto-send、no-LLM 边界。
+- 修复 `backend/app/api/router.py` 未注册 `analysis_router` 的路由接线问题，确保 `/api/v1/conversations/{conversation_id}/analysis/context` 实际进入 Analysis route。
+- 服务器直接 TestClient smoke test 已确认 Analysis Context 路由返回预期的 conversation-not-found 404，而不是路由不存在的 404；同时 `/api/v1/persons` 正常返回 200。
 - 不新增 migration，不改变 persistence，不改变 decision/outcome lifecycle。
 
 核心边界：conversation-scoped entry；source-backed learning；canonical reuse；preserve source provenance；preserve unknowns；read-only；deterministic；person/user isolation；不把 learning 转成 fact；不排名推荐；不自动执行；不自动发送；不调用 LLM。
@@ -57,7 +59,7 @@ TEST-065 Analysis Context learning-strategy bridge — IMPLEMENTED，待服务�
 `backend/tests/test_analysis_learning_strategy_bridge.py`
 `backend/tests/test_analysis.py`
 
-状态：代码完成，待服务器验收。
+状态：代码完成，路由接线已修复，服务器 smoke test 已通过，待专项测试与全量回归。
 
 ---
 
