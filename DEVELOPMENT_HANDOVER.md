@@ -1,7 +1,7 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-29
-当前阶段：POST-TEST-073 — Analysis → Qwen → StructuredAnalysis → Strategy 主链已完成服务器验收，进入下一阶段架构实现
+当前阶段：TEST-074 — Analysis → Strategy 正式入口实现，服务器验收待执行
 当前 Branch：test-073-qwen-provider
 最近一次服务器验收：TEST-073 Qwen Provider Integration 全链路验收通过；专项测试 15 passed；全量 454 passed；Structured Analysis API 实际调用 Qwen 返回 200 OK。
 
@@ -65,6 +65,7 @@ TEST-070 Analysis LLM Service — VERIFIED
 TEST-071 Structured Analysis Strategy Bridge — VERIFIED
 TEST-072 Analysis → Strategy Orchestration — VERIFIED
 TEST-073 Qwen Provider Integration — VERIFIED
+TEST-074 Analysis → Strategy formal entrypoint — IMPLEMENTED, SERVER ACCEPTANCE PENDING
 
 ---
 
@@ -100,24 +101,54 @@ No database migration was added.
 
 ---
 
-## 数据库
+## TEST-074 Analysis → Strategy 正式入口
 
-当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-073 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-074 在既有 `AnalysisStrategyService` 上增加正式 API entrypoint，而不是建立第二套 Strategy 体系。
+
+新增：
+- `backend/app/api/routes/analysis_strategy.py`
+- `backend/app/schemas/analysis_strategy.py`
+- `backend/tests/test_analysis_strategy_route.py`
+
+正式入口：
+`GET /api/v1/conversations/{conversation_id}/strategy/context`
+
+执行链：
+`conversation_id → AnalysisContext → Qwen → StructuredAnalysis → StrategyDecisionContext`
+
+该入口：
+- 使用当前用户身份获取 conversation-scoped AnalysisContext。
+- 使用 QwenProvider 产生 StructuredAnalysis。
+- 将 StructuredAnalysis 注入现有 StrategyDecisionContextService。
+- 返回 candidates / decision_inputs / current_state 等既有 Strategy context，同时附带 derived StructuredAnalysis。
+- 保持 `requires_explicit_decision` 与 `must_not_auto_select`。
+- 保持 LLM derived / provenance / unknown 约束。
+- 将 LLM provider failure 映射为 HTTP 502。
+- 不新增数据库表，不持久化 StructuredAnalysis，不创建新的 decision / execution 生命周期。
+
+TEST-074 当前状态为 CODE IMPLEMENTED，尚未执行服务器专项验收，因此不得标记 VERIFIED。
 
 ---
 
-## 下一阶段：Analysis → Strategy 的实际产品化
+## 数据库
 
-TEST-073 已完成 provider 接入、API route acceptance 与真实 Qwen smoke test。下一阶段不再继续扩张 AnalysisContext 字段，而是在现有冻结 contract 上推进真实 Strategy 消费链。
+当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
+TEST-045 ~ TEST-074 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
-下一阶段目标：
-1. 明确 StructuredAnalysis → Strategy Decision 的最小消费契约，继续保持 derived / non-canonical 语义。
-2. 将 AnalysisStrategyService 接入需要分析驱动的真实 Strategy entrypoint，而不是新增平行决策体系。
-3. 保持 Human Confirmation 为 action 执行前的显式边界；LLM 不得自动确认、执行或发送。
-4. 为 Analysis → Strategy 产品链增加端到端 contract / isolation / no-side-effect 测试。
-5. 验证 Qwen provider failure、malformed output、unknown preservation、provenance preservation 在实际 Strategy entrypoint 中仍成立。
-6. 在上述专项完成后执行服务器专项验收及全量回归。
+---
+
+## 下一阶段：TEST-074 验收 → Strategy 消费深化
+
+首先完成 TEST-074 的服务器验收：
+1. 拉取 `test-073-qwen-provider` 最新提交。
+2. 运行 `backend/tests/test_analysis_strategy_route.py`。
+3. 运行 TEST-070 ~ TEST-074 相关专项测试。
+4. 运行全量 pytest。
+5. 验证 `/health`、现有 Structured Analysis endpoint，以及新的 `/api/v1/conversations/{conversation_id}/strategy/context`。
+6. 对新的 Strategy entrypoint 执行真实 Qwen smoke test。
+7. 验证调用前后数据库无新增 StructuredAnalysis persistence / 无 decision / execution side effect。
+
+TEST-074 验收通过后，下一实现阶段继续推进 StructuredAnalysis 对现有 Strategy Decision / Strategic Reply / Action Plan 的最小消费契约，但不得新增平行 decision 体系。
 
 下一阶段仍禁止：
 - 新增数据库表用于暂存或持久化 StructuredAnalysis，除非先完成独立 persistence 设计并新增 migration。
