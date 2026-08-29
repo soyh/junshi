@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-29
-当前阶段：QWEN PROVIDER INTEGRATION — AnalysisContext → Qwen → StructuredAnalysis 已接入 API 边界，待服务器专项/全量验收
+当前阶段：POST-TEST-073 — Analysis → Qwen → StructuredAnalysis → Strategy 主链已完成服务器验收，进入下一阶段架构实现
 当前 Branch：test-073-qwen-provider
-最近一次服务器验收：TEST-073 Provider 层前置全量 452 passed；API route 集成后的服务器验收待执行。
+最近一次服务器验收：TEST-073 Qwen Provider Integration 全链路验收通过；专项测试 15 passed；全量 454 passed；Structured Analysis API 实际调用 Qwen 返回 200 OK。
 
 ---
 
@@ -64,7 +64,7 @@ TEST-069 Analysis Context evidence contract sync — VERIFIED
 TEST-070 Analysis LLM Service — VERIFIED
 TEST-071 Structured Analysis Strategy Bridge — VERIFIED
 TEST-072 Analysis → Strategy Orchestration — VERIFIED
-TEST-073 Qwen Provider Integration — CODE COMPLETE, SERVER ROUTE ACCEPTANCE PENDING
+TEST-073 Qwen Provider Integration — VERIFIED
 
 ---
 
@@ -77,9 +77,22 @@ TEST-071 connected validated `StructuredAnalysis` to the existing strategy decis
 TEST-072 established `AnalysisStrategyService` orchestration:
 `AnalysisContext → LLMAnalysisService → StructuredAnalysis → StrategyDecisionContext`.
 
-TEST-073 adds the first concrete provider, Qwen, while preserving the provider-neutral boundary. Qwen configuration uses DashScope credentials and the OpenAI-compatible endpoint. A request-scoped API endpoint now exposes:
+TEST-073 adds the first concrete provider, Qwen, while preserving the provider-neutral boundary. Qwen configuration uses DashScope credentials and the OpenAI-compatible endpoint. A request-scoped API endpoint exposes:
 `GET /api/v1/conversations/{conversation_id}/analysis/structured`
 which obtains canonical AnalysisContext, invokes Qwen, validates the response as StructuredAnalysis, and returns only the derived structured result.
+
+TEST-073 服务器最终验收：
+- `backend/tests/test_qwen_provider.py`：5 passed
+- `backend/tests/test_analysis_llm_service.py`：4 passed
+- `backend/tests/test_structured_analysis.py`：4 passed
+- `backend/tests/test_analysis_structured_route.py`：2 passed
+- TEST-073 直接专项合计：15 passed
+- 全量回归：454 passed
+- FastAPI server：127.0.0.1:18080 正常运行
+- `/health`：HTTP 200
+- `/api/v1/conversations/{conversation_id}/analysis/structured`：实际调用 Qwen 成功并返回 HTTP 200
+
+TEST-073 同时修复 Qwen API key 的 omitted / explicit semantics：未提供 key 与显式提供 key 的配置语义被区分处理。
 
 The route translates LLMAnalysisError to HTTP 502 and does not persist StructuredAnalysis.
 
@@ -94,14 +107,24 @@ TEST-045 ~ TEST-073 不新增 migration，不改变 action_decisions、action_ex
 
 ---
 
-## 下一阶段
+## 下一阶段：Analysis → Strategy 的实际产品化
 
-1. 服务器拉取 `test-073-qwen-provider`。
-2. 运行新增 structured-analysis route 专项测试与全量测试。
-3. 若专项/全量通过，再配置真实 DashScope API key，仅进行受控单次 Qwen smoke test。
-4. 验证真实 Qwen 输出能稳定通过 StructuredAnalysis contract，尤其是 evidence_source_ids、unknowns、analysis_constraints 与 provenance 约束。
-5. 再将同一 provider composition 接入 Analysis → Strategy orchestration 的正式调用入口；不得让 Strategy 绕过 StructuredAnalysis。
-6. 最后才进入真实产品层的回复生成、human confirmation、action plan / execution UI/API 编排。
+TEST-073 已完成 provider 接入、API route acceptance 与真实 Qwen smoke test。下一阶段不再继续扩张 AnalysisContext 字段，而是在现有冻结 contract 上推进真实 Strategy 消费链。
+
+下一阶段目标：
+1. 明确 StructuredAnalysis → Strategy Decision 的最小消费契约，继续保持 derived / non-canonical 语义。
+2. 将 AnalysisStrategyService 接入需要分析驱动的真实 Strategy entrypoint，而不是新增平行决策体系。
+3. 保持 Human Confirmation 为 action 执行前的显式边界；LLM 不得自动确认、执行或发送。
+4. 为 Analysis → Strategy 产品链增加端到端 contract / isolation / no-side-effect 测试。
+5. 验证 Qwen provider failure、malformed output、unknown preservation、provenance preservation 在实际 Strategy entrypoint 中仍成立。
+6. 在上述专项完成后执行服务器专项验收及全量回归。
+
+下一阶段仍禁止：
+- 新增数据库表用于暂存或持久化 StructuredAnalysis，除非先完成独立 persistence 设计并新增 migration。
+- 让 LLM 进入 canonical evidence、persistence、learning、decision persistence 或 execution 层。
+- 让模型自动选择 candidate、自动确认 decision、自动执行 action 或伪造 outcome。
+- 为了测试方便修改既有业务语义或绕过 user / person isolation。
+- 使用 8899。
 
 ---
 
