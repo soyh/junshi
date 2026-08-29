@@ -17,13 +17,13 @@ class StructuredAnalysis(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     summary: str
-    observed_facts: list[StructuredAnalysisItem] = Field(default_factory=list)
-    inferences: list[StructuredAnalysisItem] = Field(default_factory=list)
-    unknowns: list[StructuredAnalysisItem] = Field(default_factory=list)
-    hypotheses: list[StructuredAnalysisItem] = Field(default_factory=list)
-    emotional_signals: list[StructuredAnalysisItem] = Field(default_factory=list)
-    relationship_signals: list[StructuredAnalysisItem] = Field(default_factory=list)
-    risk_signals: list[StructuredAnalysisItem] = Field(default_factory=list)
-    intent_signals: list[StructuredAnalysisItem] = Field(default_factory=list)
-    evidence_links: list[dict[str, Any]] = Field(default_factory=list)
-    analysis_constraints: list[str] = Field(default_factory=list)
+    observed_facts: list[StructuredAnalysisItem]
+    inferences: list[StructuredAnalysisItem]
+    unknowns: list[StructuredAnalysisItem]
+    hypotheses: list[StructuredAnalysisItem]
+    emotional_signals: list[StructuredAnalysisItem]
+    relationship_signals: list[StructuredAnalysisItem]
+    risk_signals: list[StructuredAnalysisItem]
+    intent_signals: list[StructuredAnalysisItem]
+    evidence_links: list[dict[str, Any]]
+    analysis_constraints: list[str]
