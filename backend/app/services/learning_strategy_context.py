@@ -21,11 +21,59 @@ class LearningStrategyContextService:
             strategy_decision_learning_service or StrategyDecisionLearningBridgeService()
         )
 
-    def get_context(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
-        recommendation = self.recommendation_service.get_context(conn, user_id, person_id)
+    def _get_learning_inputs_and_constraints(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+    ) -> tuple[dict, dict]:
         feedback = self.feedback_learning_service.get_synthesis(conn, user_id, person_id)
         memory = self.memory_learning_service.get_context(conn, user_id, person_id)
         strategy_decision = self.strategy_decision_learning_service.get_context(
+            conn, user_id, person_id
+        )
+
+        learning_inputs = {
+            "action_feedback": feedback["candidates"],
+            "memory_updates": memory["updates"],
+            "strategy_decision": strategy_decision,
+        }
+
+        strategy_constraints = {
+            "must_be_source_backed": True,
+            "must_preserve_facts_inferences_unknowns": True,
+            "must_preserve_learning_unknowns": True,
+            "must_preserve_source_provenance": True,
+            "must_preserve_unknowns": True,
+            "must_not_infer_recommendation_quality": True,
+            "must_not_infer_success": True,
+            "must_not_infer_relationship_impact": True,
+            "must_not_change_relationship": True,
+            "must_not_auto_execute": True,
+            "must_not_auto_send": True,
+            "must_not_call_llm": True,
+        }
+
+        return learning_inputs, strategy_constraints
+
+    def get_learning_context(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+    ) -> dict:
+        """Return only the learning-strategy bridge, without requiring a relationship."""
+        learning_inputs, strategy_constraints = self._get_learning_inputs_and_constraints(
+            conn, user_id, person_id
+        )
+        return {
+            "learning_inputs": learning_inputs,
+            "strategy_constraints": strategy_constraints,
+        }
+
+    def get_context(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
+        recommendation = self.recommendation_service.get_context(conn, user_id, person_id)
+        learning_inputs, strategy_constraints = self._get_learning_inputs_and_constraints(
             conn, user_id, person_id
         )
 
@@ -38,23 +86,6 @@ class LearningStrategyContextService:
             "inferences": recommendation["inferences"],
             "unknowns": recommendation["unknowns"],
             "recommendations": recommendation["recommendations"],
-            "learning_inputs": {
-                "action_feedback": feedback["candidates"],
-                "memory_updates": memory["updates"],
-                "strategy_decision": strategy_decision,
-            },
-            "strategy_constraints": {
-                "must_be_source_backed": True,
-                "must_preserve_facts_inferences_unknowns": True,
-                "must_preserve_learning_unknowns": True,
-                "must_preserve_source_provenance": True,
-                "must_preserve_unknowns": True,
-                "must_not_infer_recommendation_quality": True,
-                "must_not_infer_success": True,
-                "must_not_infer_relationship_impact": True,
-                "must_not_change_relationship": True,
-                "must_not_auto_execute": True,
-                "must_not_auto_send": True,
-                "must_not_call_llm": True,
-            },
+            "learning_inputs": learning_inputs,
+            "strategy_constraints": strategy_constraints,
         }

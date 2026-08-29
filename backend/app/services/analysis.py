@@ -32,7 +32,7 @@ class AnalysisService:
         if person is None:
             raise PersonNotFoundError("Person not found")
 
-        learning_strategy = self.learning_strategy_service.get_context(
+        learning_strategy = self.learning_strategy_service.get_learning_context(
             conn,
             user_id,
             person["id"],
@@ -46,8 +46,5 @@ class AnalysisService:
             "inferences": [],
             "unknowns": [],
             "recommendations": [],
-            "learning_strategy": {
-                "learning_inputs": learning_strategy["learning_inputs"],
-                "strategy_constraints": learning_strategy["strategy_constraints"],
-            },
+            "learning_strategy": learning_strategy,
         }
