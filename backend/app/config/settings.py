@@ -17,6 +17,11 @@ class Settings(BaseSettings):
 
     local_user_id: str = "00000000-0000-0000-0000-000000000001"
 
+    qwen_api_key: str | None = None
+    qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    qwen_model: str = "qwen-plus"
+    qwen_timeout_seconds: float = 60.0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
