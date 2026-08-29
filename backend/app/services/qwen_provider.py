@@ -4,6 +4,7 @@ from typing import Any
 import httpx
 
 from app.config.settings import get_settings
+from app.core.sentinels import UNSET, _Unset
 from app.services.llm import LLMAnalysisError, LLMProvider
 
 
@@ -13,14 +14,18 @@ class QwenProvider(LLMProvider):
     def __init__(
         self,
         *,
-        api_key: str | None = None,
+        api_key: str | None | _Unset = UNSET,
         base_url: str | None = None,
         model: str | None = None,
         timeout_seconds: float | None = None,
         client: httpx.Client | None = None,
     ):
         settings = get_settings()
-        self.api_key = api_key if api_key is not None else settings.dashscope_api_key
+        self.api_key = (
+            settings.dashscope_api_key
+            if api_key is UNSET
+            else api_key
+        )
         self.base_url = (base_url or settings.qwen_base_url).rstrip("/")
         self.model = model or settings.qwen_model
         self.timeout_seconds = (
