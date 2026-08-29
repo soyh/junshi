@@ -2,7 +2,7 @@
 
 更新时间：2026-08-29
 当前阶段：TEST-074 — Analysis → Strategy 正式入口实现，服务器验收待执行
-当前 Branch：test-073-qwen-provider
+当前 Branch：test-074-analysis-strategy-entrypoint
 最近一次服务器验收：TEST-073 Qwen Provider Integration 全链路验收通过；专项测试 15 passed；全量 454 passed；Structured Analysis API 实际调用 Qwen 返回 200 OK。
 
 ---
@@ -140,7 +140,7 @@ TEST-045 ~ TEST-074 不新增 migration，不改变 action_decisions、action_ex
 ## 下一阶段：TEST-074 验收 → Strategy 消费深化
 
 首先完成 TEST-074 的服务器验收：
-1. 拉取 `test-073-qwen-provider` 最新提交。
+1. 拉取 `test-074-analysis-strategy-entrypoint` 最新提交。
 2. 运行 `backend/tests/test_analysis_strategy_route.py`。
 3. 运行 TEST-070 ~ TEST-074 相关专项测试。
 4. 运行全量 pytest。
