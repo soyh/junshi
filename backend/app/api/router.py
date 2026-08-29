@@ -45,6 +45,11 @@ api_router = APIRouter(
     prefix="/api/v1",
 )
 
+# Register conversation analysis before the broader conversation/message routes.
+# This keeps the analysis sub-resource from being shadowed by any dynamic
+# conversation routes as the API surface grows.
+api_router.include_router(analysis_router)
+
 api_router.include_router(persons_router)
 api_router.include_router(person_profiles_router)
 api_router.include_router(relationships_router)
@@ -78,7 +83,6 @@ api_router.include_router(interactions_router)
 api_router.include_router(messages_router)
 api_router.include_router(conversation_messages_router)
 api_router.include_router(conversations_router)
-api_router.include_router(analysis_router)
 api_router.include_router(timeline_router)
 api_router.include_router(text_imports_router)
 api_router.include_router(evidence_router)
