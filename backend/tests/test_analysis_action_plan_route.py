@@ -42,7 +42,38 @@ def result():
             "must_treat_llm_output_as_derived": True,
             "must_preserve_evidence_provenance": True,
         },
-        "learning_strategy": {"candidates": []},
+        "learning_strategy": {
+            "candidates": [{
+                "recommendation_id": "recommendation-1",
+                "observed_outcome_count": 1,
+                "outcome_counts": {"positive": 1},
+                "unknown_outcome_count": 0,
+                "memory_update_count": 1,
+                "synthesis_status": "source_backed",
+                "unknowns": [],
+                "source": {"type": "recommendation"},
+            }],
+            "strategy_decision_learning": {
+                "learning_candidate_decision_ids": ["decision-1"],
+                "unknown_decision_ids": [],
+                "learning_candidate_provenance": [{"decision_id": "decision-1"}],
+                "unknown_decision_provenance": [],
+                "recommendation_observed_counts": {"recommendation-1": 1},
+            },
+            "constraints": {
+                "read_only": True,
+                "source_backed_only": True,
+                "must_preserve_source_provenance": True,
+                "must_preserve_unknowns": True,
+                "must_not_infer_recommendation_quality": True,
+                "must_not_infer_success": True,
+                "must_not_infer_relationship_impact": True,
+                "must_not_change_relationship": True,
+                "must_not_auto_execute": True,
+                "must_not_auto_send": True,
+                "must_not_call_llm": True,
+            },
+        },
         "structured_analysis": {
             "summary": "derived action plan input",
             "observed_facts": [],
@@ -73,7 +104,8 @@ def result():
 
 
 def test_route_returns_derived_action_plan_input(monkeypatch):
-    fake_service = FakeService(result=result())
+    expected = result()
+    fake_service = FakeService(result=expected)
     fake_provider = FakeProvider()
     monkeypatch.setattr(analysis_action_plan, "service", fake_service)
     monkeypatch.setattr(analysis_action_plan, "QwenProvider", lambda: fake_provider)
@@ -89,6 +121,7 @@ def test_route_returns_derived_action_plan_input(monkeypatch):
     assert body["action_plan_inputs"]["analysis_is_derived"] is True
     assert body["action_constraints"]["must_not_auto_execute"] is True
     assert body["action_plan"] == []
+    assert body["learning_strategy"] == expected["learning_strategy"]
     assert len(fake_service.calls) == 1
     assert fake_service.calls[0][1:] == (
         "00000000-0000-0000-0000-000000000001",
