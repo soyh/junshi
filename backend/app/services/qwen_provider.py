@@ -98,7 +98,9 @@ class QwenProvider(LLMProvider):
             "observed_facts, inferences, unknowns, hypotheses, emotional_signals, "
             "relationship_signals, risk_signals, intent_signals, evidence_links, "
             "analysis_constraints. Each item in the first eight item lists must have "
-            "content, optional confidence from 0 to 1, and evidence_source_ids."
+            "content, optional confidence from 0 to 1, and evidence_source_ids. "
+            "analysis_constraints must be an array of strings (list[str]), not an object "
+            "or key-value map. Each constraint should be expressed as a concise string."
         )
 
     @staticmethod
