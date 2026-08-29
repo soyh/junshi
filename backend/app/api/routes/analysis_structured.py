@@ -4,6 +4,7 @@ from app.core.context import get_current_user_id
 from app.core.database import get_connection
 from app.schemas.structured_analysis import StructuredAnalysis
 from app.services.analysis_llm import AnalysisLLMService
+from app.services.llm import LLMAnalysisError
 from app.services.qwen_provider import QwenProvider
 
 
@@ -37,7 +38,7 @@ def get_structured_analysis(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
-    except Exception as exc:
+    except LLMAnalysisError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="LLM analysis failed",
