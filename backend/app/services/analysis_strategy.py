@@ -1,6 +1,5 @@
 import sqlite3
 
-from app.schemas.structured_analysis import StructuredAnalysis
 from app.services.analysis_llm import AnalysisLLMService
 from app.services.strategy_decision import StrategyDecisionContextService
 
@@ -24,12 +23,13 @@ class AnalysisStrategyService:
         *,
         provider=None,
     ) -> dict:
-        analysis = self.analysis_llm_service.analysis_service.get_context(
+        analysis_context = self.analysis_llm_service.analysis_service.get_context(
             conn, user_id, conversation_id
         )
-        person_id = analysis["person"]["id"]
-        structured_analysis: StructuredAnalysis = self.analysis_llm_service.analyze(
-            conn, user_id, conversation_id, provider=provider
+        person_id = analysis_context["person"]["id"]
+        structured_analysis = self.analysis_llm_service.analyze_context(
+            analysis_context,
+            provider=provider,
         )
         return self.strategy_decision_service.get_context(
             conn,
