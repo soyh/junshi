@@ -3,6 +3,7 @@ import sqlite3
 from app.domain.errors import PersonNotFoundError
 from app.repositories.analysis import AnalysisRepository
 from app.services.learning_strategy_context import LearningStrategyContextService
+from app.services.relationship_state import RelationshipStateService
 
 
 class AnalysisService:
@@ -10,9 +11,11 @@ class AnalysisService:
         self,
         repository: AnalysisRepository | None = None,
         learning_strategy_service: LearningStrategyContextService | None = None,
+        relationship_state_service: RelationshipStateService | None = None,
     ):
         self.repository = repository or AnalysisRepository()
         self.learning_strategy_service = learning_strategy_service or LearningStrategyContextService()
+        self.relationship_state_service = relationship_state_service or RelationshipStateService()
 
     def get_context(
         self,
@@ -38,6 +41,12 @@ class AnalysisService:
             person["id"],
         )
 
+        relationship_state = self._get_relationship_state(
+            conn,
+            user_id,
+            person["id"],
+        )
+
         return {
             "conversation": dict(conversation),
             "person": dict(person),
@@ -47,4 +56,38 @@ class AnalysisService:
             "unknowns": [],
             "recommendations": [],
             "learning_strategy": learning_strategy,
+            "relationship_state": relationship_state,
+        }
+
+    def _get_relationship_state(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+    ) -> dict:
+        try:
+            state = self.relationship_state_service.get_state(
+                conn,
+                user_id,
+                person_id,
+            )
+        except ValueError as exc:
+            if str(exc) != "Relationship not found":
+                raise
+            return {
+                "current_state": None,
+                "evidence": [],
+                "facts": [],
+                "inferences": [],
+                "unknowns": [],
+                "recommendations": [],
+            }
+
+        return {
+            "current_state": state["current_state"],
+            "evidence": state["evidence"],
+            "facts": state["facts"],
+            "inferences": state["inferences"],
+            "unknowns": state["unknowns"],
+            "recommendations": state["recommendations"],
         }
