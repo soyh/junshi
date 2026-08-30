@@ -1,4 +1,5 @@
 from app.schemas.structured_analysis import StructuredAnalysis, StructuredAnalysisItem
+from app.services.action_plan import ActionPlanService
 from app.services.analysis_action_plan import AnalysisActionPlanService
 
 
@@ -307,6 +308,8 @@ def test_service_bridges_source_backed_recommendation_into_action_plan():
     class FakeActionPlanService:
         def get_context(self, conn, user_id, person_id):
             return action_plan_context()
+
+        build_action_plan = staticmethod(ActionPlanService.build_action_plan)
 
     result = AnalysisActionPlanService(
         analysis_llm_service=FakeAnalysisLLMService(),
