@@ -3,7 +3,7 @@
 更新时间：2026-08-30
 当前阶段：TEST-087 — Outcome → Re-analysis Closure — VERIFIED
 当前 Branch：test-087-outcome-reanalysis-closure
-当前 HEAD：e139b860d31e765c42f2025162f6c6353faa6b60
+当前 HEAD：d7e26623a07f30524798ab6cd2b6052c0cf21daa
 上一阶段：TEST-086 — Action Decision → Execution Bridge — VERIFIED
 下一阶段：TEST-088 — Real LLM + Real User Workflow — ACCEPTANCE
 
@@ -154,7 +154,7 @@ TEST-086 → TEST-087 的代码变更仅涉及：
 TEST-087 已完成正式验收并锁定：
 
 - Branch：`test-087-outcome-reanalysis-closure`
-- HEAD：`e139b860d31e765c42f2025162f6c6353faa6b60`
+- HEAD：`d7e26623a07f30524798ab6cd2b6052c0cf21daa`
 - commit message：`fix: preserve canonical unknown outcome field in learning synthesis`
 - working tree：验收结论为 clean
 - migration / database schema：无变化
