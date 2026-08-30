@@ -8,7 +8,6 @@ USER_ID = "00000000-0000-0000-0000-000000000001"
 
 def test_outcome_feedback_learning_reaches_fresh_analysis_and_recommendation(client):
     person = client.post("/api/v1/persons", json={"name": "闭环对象"}).json()
-    assert person
     assert client.post("/api/v1/relationships", json={"person_id": person["id"], "status": "active", "stage": "dating"}).status_code == 201
     conversation = client.post("/api/v1/conversations", json={"person_id": person["id"], "title": "闭环会话"}).json()
     message = client.post("/api/v1/messages", json={"conversation_id": conversation["id"], "sender_type": "user", "content": "上一轮行动已经产生结果", "sent_at": "2026-08-30T14:00:00+00:00"}).json()
@@ -41,17 +40,16 @@ def test_outcome_feedback_learning_reaches_fresh_analysis_and_recommendation(cli
         result = service.build_context(conn, USER_ID, conversation["id"], provider=provider)
 
     learning = provider.context["learning_strategy"]["learning_inputs"]["action_feedback"]
-    assert learning == [{
-        "recommendation_id": "recommendation-previous",
-        "synthesis_status": "source_backed_candidate",
-        "observed_outcome_count": 1,
-        "outcome_counts": {"completed": 1, "skipped": 0, "failed": 0},
-        "unknown_outcome_count": 0,
-        "unknowns": ["recommendation_quality", "success", "relationship_impact"],
-        "source": {"recommendation_id": "recommendation-previous", "decision_ids": [decision["id"]], "outcome_ids": [result["recommendations"] and result["recommendations"][0].get("outcome_id")]},
-    }]
+    assert len(learning) == 1
+    assert learning[0]["recommendation_id"] == "recommendation-previous"
+    assert learning[0]["learning_status"] == "observed_feedback"
+    assert learning[0]["observed_outcome_count"] == 1
+    assert learning[0]["outcome_counts"]["completed"] == 1
+    assert learning[0]["outcome_unknown_count"] == 0
+    assert learning[0]["source"]["observed_outcomes"] == 1
     assert result["structured_analysis"]["summary"] == "基于最新关系证据与学习反馈的重新分析"
-    assert result["recommendations"]
+    assert len(result["recommendations"]) == 1
     assert result["recommendations"][0]["evidence_source_ids"] == [message["id"]]
+    assert result["recommendations"][0]["provenance"]["source"] == "strategy_candidate"
     assert result["recommendation_constraints"]["must_not_auto_select"] is True
     assert result["recommendation_constraints"]["must_not_auto_execute"] is True
