@@ -46,17 +46,22 @@ class AnalysisRecommendationService:
             person_id,
             structured_analysis=structured_analysis,
         )
+        recommendation_context = self.recommendation_service.get_context(
+            conn,
+            user_id,
+            person_id,
+        )
         candidates = self.candidate_service.build_candidates(analysis)
         recommendations = self.recommendation_service.produce_recommendations(
             candidates,
-            strategy_context["evidence"],
+            recommendation_context["evidence"],
         )
 
         return {
             "person": strategy_context["person"],
             "relationship": strategy_context["relationship"],
             "current_state": strategy_context["current_state"],
-            "evidence": strategy_context["evidence"],
+            "evidence": recommendation_context["evidence"],
             "facts": analysis.get("observed_facts", []),
             "inferences": analysis.get("inferences", []),
             "unknowns": analysis.get("unknowns", []),
