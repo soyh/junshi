@@ -115,3 +115,67 @@ def test_service_requires_confirmed_decisions_to_name_an_action():
         assert str(exc) == "confirmed decision requires recommendation_id"
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_service_exposes_action_plan_candidate_to_decision_context():
+    action_plan = [{
+        "recommendation_id": "recommendation-1",
+        "action": "提出轻量邀请",
+        "evidence_source_ids": ["message-1"],
+        "status": "proposed",
+        "requires_user_confirmation": True,
+    }]
+
+    class FakeActionPlanService:
+        def get_context(self, conn, user_id, person_id):
+            return {
+                "person": {"id": person_id},
+                "relationship": {"id": "relationship-1"},
+                "action_plan": list(action_plan),
+                "action_constraints": {
+                    "must_be_evidence_backed": True,
+                    "must_preserve_unknowns": True,
+                    "requires_user_confirmation": True,
+                    "must_not_auto_execute": True,
+                    "must_not_change_relationship": True,
+                },
+            }
+
+    class FakeRepository:
+        def list_for_person(self, conn, user_id, person_id):
+            return []
+
+    result = ActionDecisionService(
+        action_plan_service=FakeActionPlanService(),
+        repository=FakeRepository(),
+    ).get_context(None, "user-1", "person-1")
+
+    assert result["action_plan"] == action_plan
+    assert result["decisions"] == []
+    assert result["action_constraints"]["must_record_user_decision"] is True
+    assert result["action_constraints"]["must_not_auto_execute"] is True
+
+
+def test_service_rejects_decision_for_unavailable_action_plan_candidate():
+    class FakeActionPlanService:
+        def get_context(self, conn, user_id, person_id):
+            return {
+                "person": {"id": person_id},
+                "relationship": {"id": "relationship-1"},
+                "action_plan": [],
+            }
+
+    class FakeRepository:
+        def create(self, *args):
+            raise AssertionError("repository must not receive an unavailable recommendation")
+
+    service = ActionDecisionService(
+        action_plan_service=FakeActionPlanService(),
+        repository=FakeRepository(),
+    )
+    try:
+        service.create_decision(None, "user-1", "person-1", "recommendation-1", "confirmed", None)
+    except ValueError as exc:
+        assert str(exc) == "recommendation is not an available evidence-backed action"
+    else:
+        raise AssertionError("expected ValueError")
