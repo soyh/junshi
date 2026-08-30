@@ -87,6 +87,34 @@ def action_plan_context():
     }
 
 
+def recommendation_context(recommendations=None):
+    return {
+        "recommendations": list(recommendations or []),
+        "evidence": [{"source_id": "message-1", "content": "原始证据"}],
+    }
+
+
+class FakeAnalysisRecommendationService:
+    def __init__(self, recommendations=None):
+        self.recommendations = list(recommendations or [])
+        self.calls = []
+
+    def build_context(
+        self,
+        conn,
+        user_id,
+        conversation_id,
+        *,
+        provider=None,
+        structured_analysis=None,
+    ):
+        self.calls.append({
+            "provider": provider,
+            "structured_analysis": structured_analysis,
+        })
+        return recommendation_context(self.recommendations)
+
+
 def test_service_projects_analysis_as_derived_action_plan_input():
     expected_learning_strategy = learning_strategy()
 
@@ -111,6 +139,7 @@ def test_service_projects_analysis_as_derived_action_plan_input():
     result = AnalysisActionPlanService(
         analysis_llm_service=FakeAnalysisLLMService(),
         action_plan_service=FakeActionPlanService(),
+        analysis_recommendation_service=FakeAnalysisRecommendationService(),
     ).build_context(None, "user-1", "conversation-1")
 
     assert result["structured_analysis"]["summary"] == "derived action-plan context"
@@ -145,6 +174,7 @@ def test_service_preserves_learning_strategy_from_analysis_context():
     result = AnalysisActionPlanService(
         analysis_llm_service=FakeAnalysisLLMService(),
         action_plan_service=FakeActionPlanService(),
+        analysis_recommendation_service=FakeAnalysisRecommendationService(),
     ).build_context(None, "user-1", "conversation-1")
 
     assert result["learning_strategy"] == expected_learning_strategy
@@ -172,6 +202,7 @@ def test_service_preserves_provenance_unknowns_and_confirmation_boundary():
     result = AnalysisActionPlanService(
         analysis_llm_service=FakeAnalysisLLMService(),
         action_plan_service=FakeActionPlanService(),
+        analysis_recommendation_service=FakeAnalysisRecommendationService(),
     ).build_context(None, "user-1", "conversation-1")
 
     signals = result["action_plan_inputs"]["signals"]
@@ -209,6 +240,7 @@ def test_service_does_not_turn_analysis_into_action_plan_or_mutate_context():
     result = AnalysisActionPlanService(
         analysis_llm_service=FakeAnalysisLLMService(),
         action_plan_service=FakeActionPlanService(),
+        analysis_recommendation_service=FakeAnalysisRecommendationService(),
     ).build_context(None, "user-1", "conversation-1")
 
     assert result["recommendations"] == []
@@ -216,9 +248,10 @@ def test_service_does_not_turn_analysis_into_action_plan_or_mutate_context():
     assert base["action_plan"] == []
 
 
-def test_service_passes_provider_to_llm_boundary():
+def test_service_passes_provider_to_llm_boundary_and_recommendation_bridge():
     provider = object()
-    calls = []
+    llm_calls = []
+    recommendation_service = FakeAnalysisRecommendationService()
 
     class FakeAnalysisService:
         def get_context(self, conn, user_id, conversation_id):
@@ -231,7 +264,7 @@ def test_service_passes_provider_to_llm_boundary():
         analysis_service = FakeAnalysisService()
 
         def analyze_context(self, context, *, provider=None):
-            calls.append(provider)
+            llm_calls.append(provider)
             return structured_analysis()
 
     class FakeActionPlanService:
@@ -241,9 +274,57 @@ def test_service_passes_provider_to_llm_boundary():
     AnalysisActionPlanService(
         analysis_llm_service=FakeAnalysisLLMService(),
         action_plan_service=FakeActionPlanService(),
+        analysis_recommendation_service=recommendation_service,
     ).build_context(None, "user-1", "conversation-1", provider=provider)
 
-    assert calls == [provider]
+    assert llm_calls == [provider]
+    assert recommendation_service.calls[0]["provider"] is provider
+    assert recommendation_service.calls[0]["structured_analysis"] is not None
+
+
+def test_service_bridges_source_backed_recommendation_into_action_plan():
+    recommendation = {
+        "id": "recommendation-1",
+        "action": "提出轻量邀请",
+        "evidence_source_ids": ["message-1"],
+        "priority": "medium",
+        "time_horizon": "near_term",
+    }
+
+    class FakeAnalysisService:
+        def get_context(self, conn, user_id, conversation_id):
+            return {
+                "person": {"id": "person-1"},
+                "learning_strategy": learning_strategy(),
+            }
+
+    class FakeAnalysisLLMService:
+        analysis_service = FakeAnalysisService()
+
+        def analyze_context(self, context, *, provider=None):
+            return structured_analysis()
+
+    class FakeActionPlanService:
+        def get_context(self, conn, user_id, person_id):
+            return action_plan_context()
+
+    result = AnalysisActionPlanService(
+        analysis_llm_service=FakeAnalysisLLMService(),
+        action_plan_service=FakeActionPlanService(),
+        analysis_recommendation_service=FakeAnalysisRecommendationService([recommendation]),
+    ).build_context(None, "user-1", "conversation-1")
+
+    assert result["recommendations"] == [recommendation]
+    assert result["action_plan"] == [{
+        "recommendation_id": "recommendation-1",
+        "action": "提出轻量邀请",
+        "evidence_source_ids": ["message-1"],
+        "status": "proposed",
+        "requires_user_confirmation": True,
+        "priority": "medium",
+        "time_horizon": "near_term",
+    }]
+    assert result["action_plan_inputs"]["recommendations_are_source_backed"] is True
 
 
 def test_service_does_not_promote_structured_analysis_into_action_candidate():
@@ -282,6 +363,7 @@ def test_service_does_not_promote_structured_analysis_into_action_candidate():
     result = AnalysisActionPlanService(
         analysis_llm_service=FakeAnalysisLLMService(),
         action_plan_service=FakeActionPlanService(),
+        analysis_recommendation_service=FakeAnalysisRecommendationService(),
     ).build_context(None, "user-1", "conversation-1")
 
     assert result["action_plan_inputs"]["signals"]["hypotheses"]
@@ -324,6 +406,7 @@ def test_service_keeps_existing_action_candidate_boundary_separate_from_analysis
     result = AnalysisActionPlanService(
         analysis_llm_service=FakeAnalysisLLMService(),
         action_plan_service=FakeActionPlanService(),
+        analysis_recommendation_service=FakeAnalysisRecommendationService(),
     ).build_context(None, "user-1", "conversation-1")
 
     assert result["recommendations"] == [{
