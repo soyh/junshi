@@ -46,14 +46,15 @@ def test_strategy_candidate_preserves_unknowns_as_provenance():
     assert "inferences" not in candidate
 
 
-def test_strategy_candidate_rejects_unbacked_hypotheses():
+def test_strategy_candidate_rejects_hypotheses_without_evidence_ids():
     value = analysis()
     value["hypotheses"] = [
         {"content": "立即升级关系", "confidence": 0.9},
         {"content": "未知来源", "evidence_source_ids": ["missing"]},
     ]
     candidates = StrategyRecommendationCandidateService.build_candidates(value)
-    assert len(candidates) == 2
+    assert len(candidates) == 1
+    assert candidates[0]["recommendation"] == "未知来源"
     assert RecommendationProducer.produce(candidates, evidence()) == []
 
 
