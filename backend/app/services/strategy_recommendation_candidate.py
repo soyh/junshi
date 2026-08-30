@@ -1,4 +1,5 @@
 import hashlib
+import json
 
 
 class StrategyRecommendationCandidateService:
@@ -25,8 +26,12 @@ class StrategyRecommendationCandidateService:
 
             recommendation = content.strip()
             evidence_source_ids = list(dict.fromkeys(source_ids))
+            identity_payload = {
+                "recommendation": recommendation,
+                "evidence_source_ids": evidence_source_ids,
+            }
             candidate_id = "strategy-recommendation-" + hashlib.sha256(
-                recommendation.encode("utf-8")
+                json.dumps(identity_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
             ).hexdigest()[:24]
             candidates.append(
                 {
