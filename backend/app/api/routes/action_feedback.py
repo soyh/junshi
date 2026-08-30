@@ -20,6 +20,26 @@ router = APIRouter(
 service = ActionFeedbackService()
 
 
+def _get_context_response(person_id: str, user_id: str):
+    with get_connection() as conn:
+        return service.get_context(conn, user_id, person_id)
+
+
+@router.get(
+    "",
+    response_model=ActionFeedbackContextResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_action_feedback(
+    person_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    try:
+        return _get_context_response(person_id, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
 @router.get(
     "/context",
     response_model=ActionFeedbackContextResponse,
@@ -30,8 +50,7 @@ def get_action_feedback_context(
     user_id: str = Depends(get_current_user_id),
 ):
     try:
-        with get_connection() as conn:
-            return service.get_context(conn, user_id, person_id)
+        return _get_context_response(person_id, user_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
