@@ -22,6 +22,7 @@ class LearningStrategySynthesisService:
             recommendation_id = item["recommendation_id"]
             grouped[recommendation_id] = {
                 "recommendation_id": recommendation_id,
+                "learning_status": item["learning_status"],
                 "observed_outcome_count": item["observed_outcome_count"],
                 "outcome_counts": item["outcome_counts"],
                 "unknown_outcome_count": item["unknown_outcome_count"],
