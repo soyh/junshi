@@ -22,7 +22,7 @@ class FakeAnalysisLLMService:
             summary="保持正常互动",
             observed_facts=[{"content": "对方主动联系"}],
             inferences=[{"content": "仍有互动意愿"}],
-            unknowns=["对方真实动机未知"],
+            unknowns=[{"content": "对方真实动机未知"}],
             hypotheses=[
                 {
                     "content": "保持正常互动，不立即升级关系",
