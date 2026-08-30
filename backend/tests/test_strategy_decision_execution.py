@@ -82,6 +82,7 @@ def test_execution_is_blocked_after_outcome(client):
     person = create_person(client)
     create_relationship(client, person["id"])
     decision = seed_decision(person["id"])
+    assert execute(client, person["id"], decision["id"]).status_code == 201
     outcome = client.post(
         f"/api/v1/persons/{person['id']}/action-plan/outcomes/{decision['id']}",
         json={"outcome": "completed", "note": "结果"},
