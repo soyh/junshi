@@ -28,15 +28,17 @@ class AnalysisRecommendationService:
         conversation_id: str,
         *,
         provider=None,
+        structured_analysis=None,
     ) -> dict:
         analysis_context = self.analysis_llm_service.analysis_service.get_context(
             conn, user_id, conversation_id
         )
         person_id = analysis_context["person"]["id"]
-        structured_analysis = self.analysis_llm_service.analyze_context(
-            analysis_context,
-            provider=provider,
-        )
+        if structured_analysis is None:
+            structured_analysis = self.analysis_llm_service.analyze_context(
+                analysis_context,
+                provider=provider,
+            )
         analysis = structured_analysis.model_dump(mode="json")
         strategy_context = self.strategy_decision_service.get_context(
             conn,
