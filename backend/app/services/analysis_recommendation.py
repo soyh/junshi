@@ -1,0 +1,79 @@
+import sqlite3
+
+from app.services.analysis_llm import AnalysisLLMService
+from app.services.recommendation_producer import RecommendationProducer
+from app.services.strategy_recommendation_candidate import StrategyRecommendationCandidateService
+
+
+class AnalysisRecommendationService:
+    """Orchestrate derived Analysis -> explicit Strategy candidates -> Recommendations."""
+
+    def __init__(
+        self,
+        analysis_llm_service: AnalysisLLMService | None = None,
+        candidate_service: StrategyRecommendationCandidateService | None = None,
+        recommendation_producer: RecommendationProducer | None = None,
+    ):
+        self.analysis_llm_service = analysis_llm_service or AnalysisLLMService()
+        self.candidate_service = candidate_service or StrategyRecommendationCandidateService()
+        self.recommendation_producer = recommendation_producer or RecommendationProducer()
+
+    def build_context(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        conversation_id: str,
+        *,
+        provider=None,
+    ) -> dict:
+        analysis_context = self.analysis_llm_service.analysis_service.get_context(
+            conn, user_id, conversation_id
+        )
+        person_id = analysis_context["person"]["id"]
+        structured_analysis = self.analysis_llm_service.analyze_context(
+            analysis_context,
+            provider=provider,
+        )
+        analysis = structured_analysis.model_dump(mode="json")
+        strategy_context = self.candidate_service.strategy_decision_service.get_context(
+            conn,
+            user_id,
+            person_id,
+            structured_analysis=structured_analysis,
+        )
+        candidates = self.candidate_service.build_candidates(
+            conn,
+            user_id,
+            person_id,
+            structured_analysis=analysis,
+        )
+        recommendations = self.recommendation_producer.produce(
+            candidates,
+            strategy_context["evidence"],
+        )
+
+        result = {
+            "person": strategy_context["person"],
+            "relationship": strategy_context["relationship"],
+            "current_state": strategy_context["current_state"],
+            "evidence": strategy_context["evidence"],
+            "facts": strategy_context.get("structured_analysis", {}).get("observed_facts", []),
+            "inferences": strategy_context.get("structured_analysis", {}).get("inferences", []),
+            "unknowns": analysis.get("unknowns", []),
+            "recommendations": recommendations,
+            "learning_strategy": {
+                "candidates": strategy_context.get("candidates", []),
+                "strategy_decision_learning": strategy_context.get("decision_inputs", {}),
+                "constraints": strategy_context["strategy_constraints"],
+            },
+            "structured_analysis": analysis,
+            "recommendation_constraints": {
+                "must_be_evidence_backed": True,
+                "must_preserve_unknowns": True,
+                "must_treat_llm_output_as_derived": True,
+                "must_preserve_evidence_provenance": True,
+                "must_not_auto_select": True,
+                "must_not_auto_execute": True,
+            },
+        }
+        return result
