@@ -1,44 +1,59 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-30
-当前阶段：TEST-079 — Learning Strategy → Action Plan HTTP Response Contract
-当前 Branch：test-079-learning-strategy-action-plan-contract
-上一阶段：TEST-078 — StructuredAnalysis → Action Plan 消费契约 — VERIFIED
-最近一次服务器验收：全量 478 passed；Action Plan Context 实际 Qwen HTTP 200；learning_strategy HTTP response contract 通过；未产生 action_decisions / action_executions / action_outcomes side effect。
+当前阶段：TEST-081 — Recommendation Producer Contract — IMPLEMENTED, PENDING SERVER ACCEPTANCE
+当前 Branch：test-081-recommendation-producer-contract
+当前 HEAD：9aadc18e37581c42d932cc5da5bd7373e6511b11
+上一阶段：TEST-080 — StructuredAnalysis → Action Plan Candidate Boundary — VERIFIED
 
 ---
 
-## 信息检索优先级（新增，强制执行）
+## 信息检索优先级（强制）
 
-凡是需要检索、确认或定位的内容，必须首先从 GitHub 仓库 `soyh/junshi` 当前开发分支及其相关历史代码、测试、文档中查找。只有在 GitHub 仓库中找不到所需信息时，才能要求用户从服务器端查找，并明确说明需要执行的服务器端命令及原因。
+凡是需要检索、确认或定位的内容，首先从 GitHub 仓库 `soyh/junshi` 当前开发分支及历史代码、测试、文档中查找。只有 GitHub 找不到时，才能要求服务器端查询，并必须说明原因及命令。
 
-不得在尚未完成 GitHub 仓库检索的情况下，直接要求用户通过服务器端 `grep`、`sed`、日志或数据库查询来提供本应可以从 GitHub 确认的信息。
+不得在尚未完成 GitHub 检索前，要求用户通过服务器端 grep、sed、日志或数据库查询来确认本可由仓库确认的信息。
 
 ---
 
-## 架构冻结：Analysis → LLM → StructuredAnalysis → Strategy
+## 产品核心目标
 
-正式架构契约：`docs/ANALYSIS_LLM_STRATEGY_CONTRACT.md`
+本项目不是单纯聊天机器人或回复生成器，而是长期关系管理 + AI 恋爱决策辅助系统。
 
-冻结后的主链：
+核心闭环：
+
+`关系对象 → 人物档案 → 聊天/现实互动 → 时间线 → Canonical Evidence → Fact / Inference / Unknown → 关系状态 → Recommendation → Action Candidate → User Confirmation → Execution → Outcome / Feedback → Learning / Memory Update → 重新判断`
+
+必须严格区分：
+
+- Fact：canonical data / canonical evidence 支持的现实信息。
+- Inference：基于事实形成的 derived interpretation，必须保留 provenance。
+- Unknown：证据不足时保持未知，不得由模型猜测补全。
+- Recommendation：基于当前证据、推断、未知及关系状态形成的决策建议；不等同于事实、推断或 action candidate。
+
+最终系统目标是形成“AI 恋爱军师”，而不是“AI 回复生成器”。
+
+---
+
+## 架构冻结
+
+正式契约：`docs/ANALYSIS_LLM_STRATEGY_CONTRACT.md`
+
+主链：
 
 `Canonical Data → Canonical Evidence / Domain Context → AnalysisContext → LLM Analysis → StructuredAnalysis → Strategy → Human Confirmation → Execution / Outcome`
 
-核心边界：
-- AnalysisContext 是 deterministic、source-backed、read-only 的 LLM 输入，不是 AI 分析结果。
+冻结规则：
+
+- AnalysisContext 是 deterministic、source-backed、read-only 的 LLM 输入。
 - LLM 不访问 Repository / SQLite，不修改 canonical data，不执行 action，不发送消息。
-- LLM 只在 AnalysisContext 边界之后出现。
 - StructuredAnalysis 是 derived interpretation，不是 canonical truth。
-- StructuredAnalysis 中的 inference / hypothesis / material signal 应保留 canonical evidence provenance。
-- unknown 必须在证据不足时保持 unknown，不得被模型猜测自动提升为事实。
-- Strategy、Strategic Reply、Action Plan 只能在既有生命周期内消费 derived analysis。
-- 不允许 LLM 直接发送第三方消息、自动执行 action、修改 relationship state、写入 learning history 或伪造 outcome success。
-- 现有 Persistence、Evidence、Relationship State、Learning Strategy、Strategy Decision、Strategic Reply、Action Plan、Execution 生命周期不因引入 LLM 而重写。
-- 当前全局 no-LLM 约束解除；deterministic Context / Evidence / Learning / Persistence / Decision / Execution 层仍保持 no-LLM。
-
-第一阶段不新增数据库表；StructuredAnalysis 初期视为 derived request-scoped output。未来如需持久化，必须另行设计并新增 migration。
-
-Provider：Qwen，通过 DashScope OpenAI-compatible API；provider adapter 与上层 LLM contract 解耦。
+- StructuredAnalysis 中 inference / hypothesis / material signal 必须保留 evidence provenance。
+- unknown 不得被模型猜测自动提升为事实。
+- Strategy、Strategic Reply、Action Plan 只能消费既有 derived analysis，不建立第二套生命周期。
+- LLM 不得自动确认 decision、执行 action、发送消息、修改 relationship state、写入 learning history 或伪造 outcome。
+- StructuredAnalysis 当前为 request-scoped output；如未来持久化，必须独立设计并新增 migration。
+- Provider：Qwen / DashScope OpenAI-compatible API；provider adapter 与上层 contract 解耦。
 
 ---
 
@@ -80,160 +95,176 @@ TEST-076 StructuredAnalysis → Strategic Reply 消费契约 — VERIFIED
 TEST-077 Strategic Reply downstream boundary — VERIFIED
 TEST-078 StructuredAnalysis → Action Plan 消费契约 — VERIFIED
 TEST-079 Learning Strategy → Action Plan HTTP Response Contract — VERIFIED
+TEST-080 StructuredAnalysis → Action Plan Candidate Boundary — VERIFIED
 
 ---
 
-## TEST-077 服务器验收
+## TEST-080 正式边界
 
-TEST-077 实际验证：
-- Branch：`test-077-strategic-reply-downstream-boundary`
-- HEAD：`994ebb4bcd83c29f892572f23bf199e9751bfdf3`
-- 专项 bridge：3 passed
-- Strategic Reply / Decision regression：49 passed
-- 全量回归：471 passed
-- FastAPI `127.0.0.1:18080`：HTTP 200
-- `GET /api/v1/conversations/{conversation_id}/strategic-reply/context`：实际 Qwen HTTP 200
-- 返回 `structured_analysis`、`reply_inputs`，且 `analysis_is_derived=true`
-- `draft=null`
-- `action_decisions` / `action_executions` / `action_outcomes` 均保持 0
-- 未产生自动发送、relationship mutation、decision、execution、outcome side effect
+Commit：`e7b431bf7364b9f5c2aa4861f90c9c1b66456090` — `test: enforce analysis action candidate boundary`
 
-TEST-077 正式标记为 VERIFIED。
+TEST-080 focused regression：23 passed；full regression：480 passed。
+
+锁定规则：
+
+- StructuredAnalysis 是 derived interpretation。
+- StructuredAnalysis 不能直接成为 Recommendation。
+- StructuredAnalysis 不能直接成为 Action Candidate / proposal。
+- 即使 hypothesis / intent signal 高置信度且文本具有 action-like 内容，也不能自动进入 `recommendations` 或 `action_plan`。
+- 只有 explicit、evidence-backed recommendation 才能进入既有 Action Plan promotion。
+- 不新增 migration，不修改 Action Plan / Decision / Execution 生命周期。
 
 ---
 
-## TEST-078 — StructuredAnalysis → Action Plan 消费契约
+## TEST-081 — Recommendation Producer Contract
 
-目标：在现有 Action Plan 生命周期中增加最小 derived-analysis consumption boundary，不建立第二套 Action Plan / Execution 生命周期。
+### 审计结论
 
-目标链：
-`AnalysisContext → LLM → StructuredAnalysis → Existing Action Plan Context → Explicit Confirmation / Execution Boundary`
+TEST-080 后从 GitHub 当前分支完成 Recommendation 全量审计，确认：
 
-本阶段采用与 TEST-076 / TEST-077 一致的最小投影原则：
-- `StructuredAnalysis` 保留为 request-scoped derived output。
-- 将可消费的 analysis buckets 投影到 `action_plan_inputs.signals`。
-- 保留每个信号的 `evidence_source_ids` provenance。
-- 保留 unknown，不把 unknown 转换为 action fact。
-- `action_plan` 不因为 LLM 分析自动新增 proposal。
-- `requires_user_confirmation` 必须继续为 true。
-- `must_not_auto_execute` 必须继续为 true。
-- 不自动确认、不执行、不发送消息、不修改 relationship。
-- 不新增数据库表、不持久化 StructuredAnalysis。
+1. `RecommendationService.get_context()` 原先只是 Recommendation Context façade，`recommendations` 固定为空。
+2. `backend/app/schemas/recommendation.py` 原先没有 Recommendation Item schema，仅有 `recommendations: list[Any]`。
+3. Strategic Reply 与 Action Plan 都消费 `RecommendationService` 输出，但不存在真实 typed producer。
+4. Action Plan 唯一 promotion 边界已经存在于 `ActionPlanService.build_action_plan()`：必须有非空 action、非空 evidence_source_ids，且所有 source id 必须命中 canonical evidence；生成 proposal 后必须 user confirmation。
+5. Strategic Reply 也要求 reply + evidence_source_ids，并且不会自动发送。
+6. Learning Strategy candidates 是学习层 candidate，不得被误认为 Recommendation。
+7. Confirmation / Decision / Execution 已保持独立生命周期，TEST-081 不应修改这些层。
 
-### TEST-078 当前实现
+因此 TEST-081 的真实缺口确定为：建立 typed、evidence-backed、显式 candidate 驱动的 Recommendation Producer，而不是把 StructuredAnalysis 自动转换为 Recommendation。
 
-新增：
-- `backend/app/services/analysis_action_plan.py`
-- `backend/app/schemas/analysis_action_plan.py`
-- `backend/app/api/routes/analysis_action_plan.py`
-- `backend/tests/test_analysis_action_plan.py`
-- `backend/tests/test_analysis_action_plan_route.py`
+### TEST-081 实现
 
-正式入口：
-`GET /api/v1/conversations/{conversation_id}/action-plan/context`
+新增/修改：
 
-执行链：
-`conversation_id → AnalysisContext → LLMAnalysisService/Qwen → StructuredAnalysis → existing ActionPlan context → action_plan_inputs`
+- `backend/app/schemas/recommendation.py`
+- `backend/app/services/recommendation_producer.py`
+- `backend/app/services/recommendation.py`
+- `backend/tests/test_recommendation_producer.py`
 
-`AnalysisActionPlanService`：
-- 从现有 `AnalysisLLMService` 获取 conversation-scoped derived analysis。
-- 从现有 `ActionPlanService` 获取 canonical action-plan context。
-- 仅投影 observed_facts、inferences、hypotheses、emotional_signals、relationship_signals、risk_signals、intent_signals、unknowns。
-- 明确 `action_plan_inputs.analysis_is_derived = true`。
-- 保留 `evidence_source_ids` provenance。
-- 强化 action constraints：evidence-backed、preserve unknowns、requires confirmation、no auto execution、no relationship change、derived output、provenance preservation。
-- 不把 StructuredAnalysis 直接转换成 action-plan proposal。
+核心 schema：`Recommendation`
 
-### TEST-078 验收要求
+字段：
 
-1. 先执行新增专项测试：
-   - `backend/tests/test_analysis_action_plan.py`
-   - `backend/tests/test_analysis_action_plan_route.py`
-2. 执行现有 Action Plan / Strategic Reply / Decision / Execution 回归。
-3. 执行全量 `pytest -q`。
-4. 服务器最终验收：
-   - `GET /health` → 200
-   - 新 Action Plan derived-context endpoint → 200
-   - 实际 Qwen 调用成功
-   - `action_plan` 不因 LLM 自动产生 proposal
-   - `action_decisions` / `action_executions` / `action_outcomes` 无新增 side effect
+- `id`
+- `recommendation`
+- `evidence_source_ids`
+- `action`（可选）
+- `reply`（可选）
+- `priority`（可选）
+- `time_horizon`（可选）
+- `provenance`
 
-在上述验收全部通过前，TEST-078 不得标记 VERIFIED。
+schema 使用 `extra="forbid"`，Recommendation Context 的 `recommendations` 从 `list[Any]` 收紧为 `list[Recommendation]`。
 
----
+Producer：`RecommendationProducer.produce(candidates, evidence)`。
 
-## TEST-079 — Learning Strategy → Action Plan HTTP Response Contract
+Producer 规则：
 
-TEST-079 在 TEST-078 已建立的 Action Plan derived-analysis consumption boundary 上，锁定 `learning_strategy` 的 HTTP response contract。
+- 只接受显式 candidate dict，不接受 `StructuredAnalysis` 类型作为输入协议。
+- candidate 必须有非空 id、recommendation、evidence_source_ids、provenance。
+- 所有 evidence_source_ids 必须命中 canonical evidence 的 `source_id`。
+- malformed / unprovenanced / unknown-source candidate 被拒绝。
+- 保持 candidate 顺序，输出 deterministic。
+- producer 不写数据库、不修改 canonical evidence、不确认 decision、不执行 action、不发送消息。
+- producer 不把 unknown 写入 facts，也不把 StructuredAnalysis 的 action-like 文本直接提升为 recommendation。
 
-目标链：
+`RecommendationService.produce_recommendations()` 仅作为既有 Service 层的 producer façade；`get_context()` 的 canonical read-only 行为保持不变。
 
-`AnalysisContext → LLM → StructuredAnalysis → Existing Action Plan Context → learning_strategy HTTP projection`
+### TEST-081 下游兼容边界
 
-本阶段不新增业务生命周期，不新增数据库表，不改变 Action Plan / Decision / Execution / Outcome 生命周期。
+合法 Recommendation 进入既有 downstream：
 
-### TEST-079 实际变更
+`Recommendation → ActionPlanService.build_action_plan() → proposed → requires_user_confirmation`
 
-Git commit：
+以及：
 
-`bdedc820c99590b642a419f8b5bff1e05a72d5ab` — `test: lock learning strategy HTTP response contract`
+`Recommendation → StrategicReplyService.build_draft() → user-controlled draft`
 
-TEST-079 相对于 TEST-078 仅强化 `backend/tests/test_analysis_action_plan_route.py` 的 HTTP response contract，确保 Action Plan Context response 中的 `learning_strategy` 与 service 输出保持一致，并继续验证：
+TEST-081 不改变：
 
-- `action_plan_inputs.analysis_is_derived = true`
-- `action_plan = []`
-- `action_constraints.must_not_auto_execute = true`
-- `learning_strategy` 完整保留
-- `learning_strategy` 的 source-backed / read-only / provenance / unknown / no-auto-execution / no-auto-send / no-LLM 约束保持不变
-- LLM provider failure 继续转换为 HTTP 502 `LLM analysis failed`
-- 不因 learning strategy projection 自动生成 action proposal
-- 不自动确认 decision、不执行 action、不发送消息、不修改 relationship、不伪造 outcome
+`Action Decision → Confirmation → Execution → Outcome`
 
-### TEST-079 服务器验收
+也不改变 Learning / Memory 生命周期。
 
-- Branch：`test-079-learning-strategy-action-plan-contract`
-- HEAD：`bdedc820c99590b642a419f8b5bff1e05a72d5ab`
-- 全量 pytest：`478 passed`
-- `127.0.0.1:18080`：正常监听
-- `GET /health`：HTTP 200
-- `GET /api/v1/conversations/{conversation_id}/action-plan/context`：HTTP 200
-- Action Plan Context 实际 Qwen 调用：HTTP 200
-- `learning_strategy`：正常出现在 HTTP response 中
-- `action_plan`：保持空数组，不自动产生 proposal
-- 缺失 conversation：HTTP 404 `Conversation not found`
-- `action_decisions` / `action_executions` / `action_outcomes`：无新增 side effect
-- 未产生自动发送、relationship mutation、decision、execution、outcome side effect
+### TEST-081 测试覆盖
 
-TEST-079 正式标记为 VERIFIED。
+`backend/tests/test_recommendation_producer.py` 已锁定：
 
-## 数据库
+- Recommendation schema typed contract。
+- unknown field rejection。
+- explicit evidence-backed candidate production。
+- missing / unknown / partial evidence provenance rejection。
+- StructuredAnalysis 不得直接 promotion。
+- Unknown preservation。
+- deterministic ordering。
+- 与既有 Action Plan / Strategic Reply downstream contract 的兼容性。
+- Recommendation Context response 的 typed validation。
 
-当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-079 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+### TEST-081 提交记录
+
+`eb649c30c06a1532740744759a6e56e144ff9781` — `feat: add typed recommendation contract`
+
+`408d2cc19590c906392e68a806d88d2687baeaac` — `feat: add recommendation producer boundary`
+
+`84b58d583f45f01f388d912ebdcfb9a5dd69a4c3` — `feat: expose recommendation producer through service`
+
+`9aadc18e37581c42d932cc5da5bd7373e6511b11` — `test: lock recommendation producer contract`
+
+本 handover 更新为独立文档 commit；TEST-081 在服务器完整回归通过前保持 `PENDING SERVER ACCEPTANCE`。
 
 ---
 
-## 下一阶段方向
+## TEST-081 服务器最终验收门槛
 
-TEST-079 已完成并 VERIFIED。下一阶段开始前，必须再次从 GitHub 当前开发分支读取 TEST-079 实际代码、测试、文档及相关 Action Plan / Decision / Execution / Learning Strategy contract，再决定下一个 TEST 的最小真实产品边界。
+用户验收前必须在服务器执行：
 
-不得预先假定继续增加字段、扩大 LLM 消费范围或直接进入自动执行。
+1. `git fetch origin`
+2. 切换到 `test-081-recommendation-producer-contract`
+3. 确认 HEAD 与 GitHub 分支一致，working tree clean。
+4. 执行 Recommendation 专项测试：
+   - `pytest -q backend/tests/test_recommendation.py backend/tests/test_recommendation_producer.py`
+5. 执行 downstream 回归：
+   - Recommendation
+   - Strategic Reply
+   - Action Plan
+   - Strategy Decision / Confirmation
+   - Execution / Outcome
+   - Learning Strategy
+6. 执行完整 `pytest -q`。
+7. `git diff --check` 必须通过。
+8. 验证没有新增 migration、没有数据库 schema 变化。
+9. 验证没有 action_decisions / action_executions / action_outcomes 自动 side effect。
+10. 验证 `GET /health` 正常，若进行 HTTP 验证则继续使用 `127.0.0.1:18080`，禁止使用 8899。
+
+TEST-081 在上述服务器验收完成前不得标记 VERIFIED。
+
+---
+
+## 数据库与运行约束
+
+当前 migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
+
+TEST-045 ~ TEST-081 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+
+Route → Service → Repository → SQLite。
+
+所有用户数据必须 user_id 隔离；不得自动向第三方发送消息；不得使用 8899；MVP 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
 ---
 
 ## 持续禁止事项
 
-- 新增数据库表用于暂存或持久化 StructuredAnalysis，除非先完成独立 persistence 设计并新增 migration。
-- 让 LLM 进入 canonical evidence、persistence、learning context、decision persistence 或 execution 层。
-- 让模型自动生成或选择 action、自动确认 decision、自动执行 action、自动发送消息或伪造 outcome。
-- 为了测试方便修改既有业务语义或绕过 user / person / conversation isolation。
-- 建立第二套 Strategy / Decision / Strategic Reply / Action Plan 生命周期。
-- 使用 8899。
-- MVP 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+- 不得把 StructuredAnalysis 直接转换为 Recommendation。
+- 不得把 StructuredAnalysis 直接转换为 Action Candidate。
+- 不得让 LLM 进入 canonical evidence、persistence、learning context、decision persistence 或 execution 层。
+- 不得自动确认 decision、执行 action、发送消息、修改 relationship 或伪造 outcome。
+- 不得为了测试方便绕过 user / person / conversation isolation。
+- 不得建立第二套 Strategy / Decision / Strategic Reply / Action Plan 生命周期。
+- 不得为了填充 Action Plan 而绕过 canonical evidence → recommendation → confirmation 链。
+- 不得在 GitHub 已能确认时要求服务器端查询。
 
-## 开发原则
+---
 
-Route → Service → Repository → SQLite。
-所有用户数据必须 user_id 隔离；不得自动向第三方发送消息；不得使用 8899；MVP 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+## 下一阶段
 
-架构冻结后：LLM 仅位于 AnalysisContext → StructuredAnalysis 边界之后；不得进入 canonical evidence、persistence、learning context、decision persistence 或 execution 层。
+TEST-081 服务器验收完成后，先根据实际结果决定是否 VERIFIED，再重新从 GitHub 当前分支审计下一阶段真实产品缺口；不得预先假定继续扩大 LLM、自动执行或新增持久化。
