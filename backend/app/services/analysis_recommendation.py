@@ -1,7 +1,7 @@
 import sqlite3
 
 from app.services.analysis_llm import AnalysisLLMService
-from app.services.recommendation_producer import RecommendationProducer
+from app.services.recommendation import RecommendationService
 from app.services.strategy_decision import StrategyDecisionContextService
 from app.services.strategy_recommendation_candidate import StrategyRecommendationCandidateService
 
@@ -14,12 +14,12 @@ class AnalysisRecommendationService:
         analysis_llm_service: AnalysisLLMService | None = None,
         strategy_decision_service: StrategyDecisionContextService | None = None,
         candidate_service: StrategyRecommendationCandidateService | None = None,
-        recommendation_producer: RecommendationProducer | None = None,
+        recommendation_service: RecommendationService | None = None,
     ):
         self.analysis_llm_service = analysis_llm_service or AnalysisLLMService()
         self.strategy_decision_service = strategy_decision_service or StrategyDecisionContextService()
         self.candidate_service = candidate_service or StrategyRecommendationCandidateService()
-        self.recommendation_producer = recommendation_producer or RecommendationProducer()
+        self.recommendation_service = recommendation_service or RecommendationService()
 
     def build_context(
         self,
@@ -45,7 +45,7 @@ class AnalysisRecommendationService:
             structured_analysis=structured_analysis,
         )
         candidates = self.candidate_service.build_candidates(analysis)
-        recommendations = self.recommendation_producer.produce(
+        recommendations = self.recommendation_service.produce_recommendations(
             candidates,
             strategy_context["evidence"],
         )
