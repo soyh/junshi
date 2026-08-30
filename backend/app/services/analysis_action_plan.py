@@ -48,12 +48,18 @@ class AnalysisActionPlanService:
         )
         analysis = structured_analysis.model_dump(mode="json")
         recommendations = list(recommendation_context["recommendations"])
+        if recommendations:
+            action_plan = self.action_plan_service.build_action_plan(
+                recommendations,
+                recommendation_context["evidence"],
+            )
+        else:
+            recommendations = list(action_plan_context.get("recommendations") or [])
+            action_plan = list(action_plan_context.get("action_plan") or [])
+
         result = dict(action_plan_context)
         result["recommendations"] = recommendations
-        result["action_plan"] = self.action_plan_service.build_action_plan(
-            recommendations,
-            recommendation_context["evidence"],
-        )
+        result["action_plan"] = action_plan
         result["learning_strategy"] = analysis_context["learning_strategy"]
         result["structured_analysis"] = analysis
         result["action_plan_inputs"] = {
@@ -72,7 +78,7 @@ class AnalysisActionPlanService:
                 )
             },
             "analysis_is_derived": True,
-            "recommendations_are_source_backed": True,
+            "recommendations_are_source_backed": bool(recommendation_context["recommendations"]),
         }
         result["action_constraints"] = {
             **dict(action_plan_context.get("action_constraints") or {}),
