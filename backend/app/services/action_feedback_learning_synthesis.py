@@ -15,6 +15,7 @@ class ActionFeedbackLearningSynthesisService:
             candidates.append(
                 {
                     "recommendation_id": item["recommendation_id"],
+                    "learning_status": item["learning_status"],
                     "synthesis_status": "source_backed_candidate" if observed else "outcome_unknown",
                     "observed_outcome_count": item["outcome_observed_count"],
                     "outcome_counts": item["outcome_counts"],
