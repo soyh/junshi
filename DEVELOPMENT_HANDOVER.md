@@ -1,10 +1,11 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-30
-当前阶段：TEST-079 — Learning Strategy → Action Plan HTTP Response Contract
-当前 Branch：test-079-learning-strategy-action-plan-contract
-上一阶段：TEST-078 — StructuredAnalysis → Action Plan 消费契约 — VERIFIED
-最近一次服务器验收：全量 478 passed；Action Plan Context 实际 Qwen HTTP 200；learning_strategy HTTP response contract 通过；未产生 action_decisions / action_executions / action_outcomes side effect。
+当前阶段：TEST-080 — StructuredAnalysis → Action Plan Candidate Boundary — VERIFIED
+当前 Branch：test-080-structured-analysis-action-plan-candidate-contract
+当前 HEAD：e7b431bf7364b9f5c2aa4861f90c9c1b66456090
+上一阶段：TEST-079 — Learning Strategy → Action Plan HTTP Response Contract — VERIFIED
+最近一次服务器验收：全量 480 passed；TEST-080 专项回归 23 passed；Action Plan candidate boundary 已锁定；StructuredAnalysis 不得直接晋升为 action candidate；无 action_decisions / action_executions / action_outcomes side effect。
 
 ---
 
@@ -80,6 +81,7 @@ TEST-076 StructuredAnalysis → Strategic Reply 消费契约 — VERIFIED
 TEST-077 Strategic Reply downstream boundary — VERIFIED
 TEST-078 StructuredAnalysis → Action Plan 消费契约 — VERIFIED
 TEST-079 Learning Strategy → Action Plan HTTP Response Contract — VERIFIED
+TEST-080 StructuredAnalysis → Action Plan Candidate Boundary — VERIFIED
 
 ---
 
@@ -158,7 +160,7 @@ TEST-077 正式标记为 VERIFIED。
    - `action_plan` 不因 LLM 自动产生 proposal
    - `action_decisions` / `action_executions` / `action_outcomes` 无新增 side effect
 
-在上述验收全部通过前，TEST-078 不得标记 VERIFIED。
+TEST-078 已由后续 TEST-079 / TEST-080 继续强化并保持 VERIFIED。
 
 ---
 
@@ -206,16 +208,71 @@ TEST-079 相对于 TEST-078 仅强化 `backend/tests/test_analysis_action_plan_r
 
 TEST-079 正式标记为 VERIFIED。
 
+---
+
+## TEST-080 — StructuredAnalysis → Action Plan Candidate Boundary
+
+TEST-080 的目标不是增加新的 Action Plan 生命周期，而是锁定一个关键安全边界：`StructuredAnalysis` 是 derived interpretation，不能直接晋升为 action candidate / recommendation / proposal。
+
+### TEST-080 实际变更
+
+Git commit：
+
+`e7b431bf7364b9f5c2aa4861f90c9c1b66456090` — `test: enforce analysis action candidate boundary`
+
+仅修改：
+- `backend/tests/test_analysis_action_plan.py`
+
+主要强化：
+- 使用 `StructuredAnalysisItem` 构造 hypothesis / intent signal，避免测试通过不严格的 `model_copy(update=...)` 绕过真实 Pydantic 类型边界。
+- 增加 `test_service_does_not_promote_structured_analysis_into_action_candidate`，明确验证高置信度 hypothesis / intent signal 即使表达出“应该立即发送消息”“对方明确希望继续推进”等 action-like 内容，也不能自动进入 `recommendations` 或 `action_plan`。
+- 增加/保留既有 candidate boundary contract：只有 existing explicit recommendations 才能进入 Action Plan promotion；derived analysis 本身不是 recommendation。
+- 保留 existing action candidate 与 derived analysis 的边界隔离：existing evidence-backed recommendation 可以继续生成 proposal，但不能因为 StructuredAnalysis 的存在而被改写或自动新增。
+
+### TEST-080 验收
+
+- Branch：`test-080-structured-analysis-action-plan-candidate-contract`
+- HEAD：`e7b431bf7364b9f5c2aa4861f90c9c1b66456090`
+- focused regression：23 passed
+- 全量 regression：480 passed in 74.16s
+- `git diff --check`：通过
+- commit 已 push 至 `origin/test-080-structured-analysis-action-plan-candidate-contract`
+- working tree 在提交前已清理；误生成的临时文件已删除
+- 未新增 migration
+- 未修改 Action Plan / Decision / Execution 生命周期
+- 未产生自动 confirmation / decision / execution / outcome side effect
+
+TEST-080 正式标记为 VERIFIED。
+
+---
+
+## TEST-080 后的关键产品边界
+
+当前 Action Plan promotion 的 deterministic 边界仍由现有 `ActionPlanService.build_action_plan()` 控制：
+- recommendation 必须是显式 dict。
+- `action` 必须是非空字符串。
+- `evidence_source_ids` 必须为非空 list。
+- 所有 `evidence_source_ids` 必须命中 canonical evidence 的 `source_id` 集合。
+- 合法 recommendation 才能生成 `status="proposed"` 的 action-plan item。
+- proposal 必须继续 `requires_user_confirmation=true`。
+- StructuredAnalysis 可以作为 derived interpretation / signal input，但不得冒充 canonical evidence，也不得自行创建 recommendation。
+
+因此，下一阶段不得继续扩大 StructuredAnalysis → candidate 的直接映射。应首先检查 recommendation 的真实生产边界，以及 recommendation → action-plan promotion 的 provenance / candidate contract。
+
+---
+
 ## 数据库
 
 当前 schema migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-TEST-045 ~ TEST-079 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
+TEST-045 ~ TEST-080 不新增 migration，不改变 action_decisions、action_executions、action_outcomes 生命周期。
 
 ---
 
 ## 下一阶段方向
 
-TEST-079 已完成并 VERIFIED。下一阶段开始前，必须再次从 GitHub 当前开发分支读取 TEST-079 实际代码、测试、文档及相关 Action Plan / Decision / Execution / Learning Strategy contract，再决定下一个 TEST 的最小真实产品边界。
+TEST-080 已完成并 VERIFIED。下一阶段暂定围绕 **Action Recommendation Provenance / Candidate Promotion Contract** 进行仓库级审查，正式 TEST 编号与范围必须在读取当前分支实际 recommendation producer、schema、Action Plan promotion tests、Decision / Confirmation lifecycle 后确定。
+
+必须优先从 GitHub 当前开发分支读取实际代码、测试、文档，再决定下一个 TEST 的最小真实产品边界。
 
 不得预先假定继续增加字段、扩大 LLM 消费范围或直接进入自动执行。
 
