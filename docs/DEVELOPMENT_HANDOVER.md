@@ -1,10 +1,11 @@
 # Development Handover
 
 更新时间：2026-08-30
-当前阶段：TEST-086 — Action Decision → Execution Bridge — IMPLEMENTED / AWAITING SERVER VALIDATION
-当前 Branch：test-086-action-decision-execution-bridge
-当前 HEAD：bcc43c41da747dab79669560bffbb619c4a25dbf
-上一阶段：TEST-085 — Action Plan → Action Decision Bridge — VERIFIED
+当前阶段：TEST-087 — Outcome → Re-analysis Closure — VERIFIED
+当前 Branch：test-087-outcome-reanalysis-closure
+当前 HEAD：e139b860d31e765c42f2025162f6c6353faa6b60
+上一阶段：TEST-086 — Action Decision → Execution Bridge — VERIFIED
+下一阶段：TEST-088 — Real LLM + Real User Workflow — ACCEPTANCE
 
 ## 信息检索优先级（强制执行）
 
@@ -12,11 +13,32 @@
 
 不得在尚未完成 GitHub 仓库检索的情况下，直接要求用户通过服务器端 `grep`、`sed`、日志或数据库查询来提供本应可以从 GitHub 确认的信息。
 
-## 架构冻结
+## 产品目标与架构冻结
 
-主链：`Canonical Data → Canonical Evidence / Domain Context → AnalysisContext → LLM Analysis → StructuredAnalysis → Strategy → Recommendation → Action Plan → Human Confirmation → Execution / Outcome → Feedback / Learning`
+本项目不是单纯聊天机器人或回复生成器，而是长期关系管理 + AI 恋爱决策辅助系统。
 
-AnalysisContext 保持 deterministic、source-backed、read-only。LLM 不访问 Repository / SQLite，不修改 canonical data，不执行 action，不发送消息。StructuredAnalysis 始终是 derived interpretation，不是 canonical truth；inference / hypothesis / material signal 必须保留 evidence provenance；unknown 不得被猜测提升为事实。Strategy / Strategic Reply / Action Plan 必须保持既有 decision / confirmation / execution 生命周期。
+核心闭环：
+
+`关系对象 → 人物档案 → 聊天/现实互动 → 时间线 → Canonical Evidence → Fact / Inference / Unknown → 关系状态 → Recommendation → Action Plan → User Decision / Confirmation → Execution → Outcome / Feedback → Learning / Memory Update → 重新判断`
+
+主链实现：
+
+`Canonical Data → Canonical Evidence / Domain Context → AnalysisContext → LLM Analysis → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis input`
+
+冻结规则：
+
+- AnalysisContext 是 deterministic、source-backed、read-only 的 LLM 输入。
+- LLM 不访问 Repository / SQLite，不修改 canonical data，不执行 action，不发送消息。
+- StructuredAnalysis 是 derived interpretation，不是 canonical truth。
+- inference / hypothesis / material signal 必须保留 evidence provenance。
+- unknown 不得被模型猜测提升为事实。
+- Strategy、Strategic Reply、Action Plan 只能消费既有 derived analysis，不建立第二套生命周期。
+- Recommendation Producer 只接受显式 Recommendation candidate，不直接接受 StructuredAnalysis。
+- Strategy → Recommendation 必须经过显式 candidate contract；candidate 必须携带稳定 identity、evidence_source_ids 和 provenance。
+- Action Plan → Action Decision 必须消费既有 Action Plan 中的 recommendation identity，并受 confirmation boundary 约束。
+- LLM 不得自动确认 decision、执行 action、发送消息、修改 relationship state、写入 learning history 或伪造 outcome。
+- StructuredAnalysis 当前为 request-scoped output；如未来持久化，必须独立设计并新增 migration。
+- Provider：Qwen / DashScope OpenAI-compatible API；provider adapter 与上层 contract 解耦。
 
 ## 已完成阶段
 
@@ -39,154 +61,86 @@ TEST-082 Execution / Action Decision Closure — VERIFIED
 TEST-083 Strategy → Recommendation Candidate Contract — VERIFIED
 TEST-084 Recommendation → Action Plan Orchestration Bridge — VERIFIED
 TEST-085 Action Plan → Action Decision Bridge — VERIFIED
-TEST-086 Action Decision → Execution Bridge — IMPLEMENTED / AWAITING SERVER VALIDATION
-
-## TEST-083 — Strategy → Recommendation Candidate Contract
-
-目标：补齐 Analysis → Strategy → Recommendation 的真实连接点，但不重写 Strategy、Evidence 或 Recommendation Producer 生命周期。
-
-正式契约：
-
-`StructuredAnalysis → Strategy boundary → explicit StrategyRecommendationCandidate → RecommendationProducer → Recommendation`
-
-candidate 必须携带：
-
-- `id`：稳定、确定性的 candidate identity；
-- `recommendation`：显式建议文本；
-- `evidence_source_ids`：直接依赖的 source identity；
-- `provenance`：至少包含 `source=strategy_candidate`、candidate type、source evidence ids，并保留 unknowns。
-
-RecommendationProducer 仍是最终 typed / evidence-backed boundary。StructuredAnalysis 不得直接进入 RecommendationProducer；无效 evidence / provenance 的 candidate 不得进入 Recommendation。
-
-### TEST-083 服务器验收
-
-- 定向 candidate / orchestration / producer 测试：`17 passed`
-- 全量回归：`499 passed`
-- working tree clean
-- HEAD 与 origin 一致：`aeb5d53`
-- 无 migration / database schema 变化
-
-TEST-083 正式标记为 VERIFIED。
-
-## TEST-084 — Recommendation → Action Plan Orchestration Bridge
-
-目标：在不建立第二套 Action Plan 生命周期的前提下，补齐 Recommendation → Action Plan 的真实 orchestration bridge。
-
-正式链路：
-
-`Analysis → Strategy → Recommendation → existing Action Plan context → Action Plan`
-
-最小修改面：仅在既有 `AnalysisActionPlanService` 上建立 recommendation 到 action-plan 的 orchestration bridge，不新增第二套 Action Plan 生命周期，不绕过 evidence / confirmation boundary。
-
-核心语义：
-
-- 获取既有 AnalysisContext 与 StructuredAnalysis；
-- 通过既有 AnalysisRecommendationService 获取 typed recommendations；
-- 获取既有 ActionPlanService context；
-- recommendation 存在时调用既有 `ActionPlanService.build_action_plan(recommendations, evidence)`；
-- 无 recommendation 时保持既有 action plan context，不凭空创建 proposal；
-- Action Plan 继续遵守 evidence-backed、`requires_user_confirmation=true`、`must_not_auto_execute=true`、`must_not_change_relationship=true`；
-- 不自动创建 Action Decision，不执行 action，不产生 outcome。
-
-### TEST-084 服务器验收
-
-- `backend/tests/test_analysis_action_plan.py`：`8 passed`
-- 全量回归：`500 passed`
-- working tree clean
-- HEAD：`33a605ee093dbf82ae8723438a32d0880a7effcc`
-- 无 migration / database schema 变化
-
-TEST-084 正式标记为 VERIFIED。
-
-## TEST-085 — Action Plan → Action Decision Bridge
-
-目标：锁定 Action Plan → Action Decision 的最小真实连接契约，不新增 Decision 生命周期，不绕过 user confirmation / execution boundary。
-
-正式链路：
-
-`Recommendation → Action Plan → Action Decision Context / Decision persistence → User Confirmation → Execution → Outcome`
-
-正式契约：
-
-- Action Decision Context 消费既有 Action Plan，而不是重新生成 recommendation；
-- Decision 中的 `recommendation_id` 必须属于当前 Action Plan 的 recommendation 集合；
-- 非当前 Action Plan 的 recommendation 不得进入 Decision persistence；
-- confirmed decision 必须显式携带 recommendation identity；
-- Decision persistence 前仍必须经过既有 confirmation boundary；
-- TEST-085 不自动确认、不执行 action、不生成 outcome。
-
-### 最小修改面
-
-TEST-085 不修改生产 Action Decision 生命周期；只新增边界测试 `backend/tests/test_action_decision.py`，验证已有 bridge 的真实契约。
-
-Git commit：`51d8237c1aca56b3c993aa9254fe82efec4f7d86`
-
-### TEST-085 服务器验收
-
-- Branch：`test-085-action-plan-decision-bridge`
-- HEAD：`51d8237c1aca56b3c993aa9254fe82efec4f7d86`
-- HEAD 与 `origin/test-085-action-plan-decision-bridge` 完全一致
-- `git status --short`：为空
-- `pytest -q backend/tests/test_action_decision.py`：`10 passed`
-- `pytest -q`：`502 passed in 74.64s`
-- 无生产代码修改
-- 无 migration / database schema 修改
-- Action Decision / Execution / Outcome 生命周期保持不变
-
-TEST-085 正式标记为 VERIFIED。
+TEST-086 Action Decision → Execution Bridge — VERIFIED
+TEST-087 Outcome → Re-analysis Closure — VERIFIED
 
 ## TEST-086 — Action Decision → Execution Bridge
 
-### GitHub 审计结论
-
-TEST-085 完成后，仓库中已经存在可复用的 `StrategyDecisionExecutionService`、`ActionExecutionRepository` 与执行 schema。该 service 已经实现 confirmed decision → explicit execution 的状态边界，并阻止 rejected decision、重复 execution 以及 outcome 已存在时再次 execution。现有执行 API 位于 `strategy-decision` 路径，而 Action Plan → Action Decision 已正式位于 `action-plan` 路径，因此真实产品闭环缺口不是新的 execution 生命周期，而是缺少 Action Plan 命名空间下的 execution bridge。
-
-同时，`ActionOutcomeService` 已要求 decision confirmed 且 execution 已存在后才能记录 outcome；`ActionFeedbackService` 已从 decision + outcome 形成反馈；`ActionFeedbackLearningSynthesisService` 已从反馈形成 source-backed learning candidate；`LearningStrategyContextService` 又把 action feedback learning 接入 learning context，`AnalysisService` 在重新取得 analysis context 时读取该 learning context。因此 Outcome → Feedback → Learning → 后续 Analysis 输入的连接点已经存在，不需要新增第二套 learning 生命周期。
-
-### 正式链路
+正式链路：
 
 `Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis input`
 
-### 最小修改面
+TEST-086 的最小连接是在 Action Plan 命名空间下暴露既有 execution lifecycle，复用既有 `StrategyDecisionExecutionService`、execution schema 与 repository，不新增第二套 execution 生命周期，不新增 migration，不改变 action_decision / execution / outcome 表结构。
 
-TEST-086 只做以下最小连接：
+验收结论：TEST-086 已完成服务器验收并正式 VERIFIED。既有 confirmed-only execution、explicit execution、execution → outcome → feedback → learning 链路保持成立。
 
-- 新增 `backend/app/api/routes/action_execution.py`；
-- 复用既有 `StrategyDecisionExecutionService`；
-- 复用既有 `StrategyDecisionExecutionCreate / Response / ContextResponse` schema；
-- 在 `backend/app/api/router.py` 注册 Action Plan execution route；
-- 新增 `backend/tests/test_action_execution_bridge.py` 验证 Action Plan execution context、confirmed-only execution、explicit execution 以及 execution → outcome → feedback → learning 的真实连接。
+## TEST-087 — Outcome → Re-analysis Closure
 
-不新增 service lifecycle，不新增 repository，不新增 migration，不改变 action decision / execution / outcome 表结构，不自动确认、不自动执行、不自动发送、不自动生成 outcome，也不把 inference 写入 memory / canonical evidence。
+### 目标
 
-### GitHub 实施状态
+验证一次真实的 `Decision → Execution → Outcome → Feedback → Learning` 结果能够重新进入 Analysis，并继续进入 Recommendation，而不是停留在 outcome / learning 层。
 
-- Branch：`test-086-action-decision-execution-bridge`
-- 当前 HEAD：`bcc43c41da747dab79669560bffbb619c4a25dbf`
-- 已新增 Action Plan execution route；
-- 已复用既有 execution service / schema / repository；
-- 已新增 `backend/tests/test_action_execution_bridge.py`；
-- 未修改 migration / database schema；
-- 尚未进行服务器验收，因此 TEST-086 当前不得标记 VERIFIED。
+TEST-087 的目标是补齐闭环连接，而不是新增第二套 analysis、learning 或 recommendation 生命周期。
 
-## 当前系统主链
+### GitHub 变更范围
 
-截至 TEST-086 GitHub 实施后，目标主链为：
+TEST-086 → TEST-087 的代码变更仅涉及：
 
-`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis input`
+- `backend/app/services/action_feedback_learning_synthesis.py`
+- `backend/app/services/analysis_recommendation.py`
+- `backend/app/services/learning_strategy_synthesis.py`
+- `backend/tests/test_outcome_reanalysis_closure.py`
 
-其中 TEST-083 / TEST-084 / TEST-085 / TEST-086 分别补齐：
+其中生产代码只有上述三个文件发生修改；没有 migration / database schema 变化，没有新增 repository / service lifecycle。
 
-- Strategy → Recommendation candidate contract；
-- Recommendation → Action Plan orchestration bridge；
-- Action Plan → Action Decision bridge contract；
-- Action Decision → Action Plan-scoped Execution bridge。
+### 正式契约
+
+`Action Execution → Outcome → Feedback → Learning → fresh AnalysisContext → StructuredAnalysis → Strategy → Recommendation`
+
+必须满足：
+
+- outcome 必须来自真实 persisted execution / outcome 生命周期，不能由 analysis 文本伪造；
+- action feedback learning 必须保留 recommendation identity、learning status、observed outcome counts 与 source provenance；
+- re-analysis 必须重新读取最新 canonical evidence 与 learning input，而不是复用旧的 analysis 结果；
+- StructuredAnalysis 仍只是 derived analysis，不得升级为 canonical fact / memory；
+- Recommendation 必须继续经过 Strategy candidate → RecommendationProducer 的 evidence-backed boundary；
+- Recommendation 不自动选择、不自动确认、不自动执行；
+- `must_not_auto_select=true` 与 `must_not_auto_execute=true` 继续成立。
+
+### TEST-086 → TEST-087 回归审计结论
+
+已完成 TEST-086 已锁定契约逐项回归审计。TEST-087 没有破坏 Action Plan-scoped execution、confirmed-only execution、Outcome 前置条件、Feedback / Learning provenance 或 user/person isolation。
+
+对 TEST-087 中删除的 45 行测试覆盖已进行语义审计：删除部分属于重复/旧路径覆盖，不构成已锁定生产契约的缺失；本阶段不重新扩大测试范围。`evidence` fallback 的行为仍保持与现有 downstream contract 一致，不被错误升级为 canonical source。
+
+### TEST-087 验收状态
+
+TEST-087 已完成正式验收并锁定：
+
+- Branch：`test-087-outcome-reanalysis-closure`
+- HEAD：`e139b860d31e765c42f2025162f6c6353faa6b60`
+- commit message：`fix: preserve canonical unknown outcome field in learning synthesis`
+- working tree：验收结论为 clean
+- migration / database schema：无变化
+- 三个生产代码修改已完成审计，不再修改
+- 45 行测试删除已完成回归审计，不重新扩大范围
+- Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环已锁定
+
+TEST-087 正式标记为 VERIFIED。
+
+## 当前系统闭环状态
+
+截至 TEST-087，系统已经形成：
+
+`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis input → Recommendation`
+
+这意味着 MVP 的核心技术闭环已经从“生成建议”推进到“执行结果能够反哺下一轮判断”。后续不应为了堆叠 schema / service / test 数量继续扩张，而应验证真实用户工作流是否能够稳定运行。
 
 ## 数据库与运行约束
 
 当前 migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
 
-TEST-045 ~ TEST-086 默认不新增 migration，不改变 action_decisions、action_executions、action_outcomes 的既有生命周期。
+TEST-045 ~ TEST-087 默认不新增 migration，不改变 action_decisions、action_executions、action_outcomes 的既有生命周期。
 
 Route → Service → Repository → SQLite。
 
@@ -198,10 +152,25 @@ Route → Service → Repository → SQLite。
 - 不得把 inference 自动写入 canonical evidence 或 memory。
 - 不得自动确认 decision、执行 action、发送消息、修改 relationship 或伪造 outcome。
 - 不得为了测试方便绕过 user / person / conversation isolation。
-- 不得建立第二套 Strategy / Decision / Strategic Reply / Action Plan / Execution 生命周期。
+- 不得建立第二套 Strategy / Decision / Strategic Reply / Action Plan / Execution / Learning 生命周期。
 - 不得为了填充 Action Plan 而绕过 canonical evidence → recommendation → confirmation 链。
 - 不得在 GitHub 已能确认时要求服务器端查询。
 
-## 下一阶段执行规则
+## TEST-088 — Real LLM + Real User Workflow
 
-TEST-086 在 GitHub 已完成最小实施，但尚未服务器验收。服务器验收通过后，先将 TEST-086 标记 VERIFIED，再重新审计完整闭环是否还存在真实缺口。下一阶段不得预先假定需要新增 schema、service、自动执行能力或 memory 写入能力。
+下一阶段只做真实 LLM + 真实用户工作流验收，不预先新增架构层。
+
+验收重点：
+
+1. 真实用户建立 relationship / person / conversation；
+2. 写入真实聊天与现实互动 evidence；
+3. 通过 AnalysisContext 进入真实 Qwen / DashScope provider；
+4. 生成 StructuredAnalysis，并确认 Fact / Inference / Unknown 与 provenance 边界；
+5. 进入 Strategy → Recommendation → Action Plan → Action Decision；
+6. 用户显式确认后才允许 Execution；
+7. 记录真实 Outcome；
+8. Outcome → Feedback → Learning；
+9. 下一轮 Analysis 能看到最新 evidence 与 learning input；
+10. Recommendation 仍不得自动选择、确认或执行。
+
+TEST-088 的核心不是继续增加代码，而是证明上述闭环在真实 LLM 和真实用户操作下可以完成一次可追踪、可解释、可反馈的关系决策循环。
