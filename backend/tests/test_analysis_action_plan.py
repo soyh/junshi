@@ -1,4 +1,4 @@
-from app.schemas.structured_analysis import StructuredAnalysis
+from app.schemas.structured_analysis import StructuredAnalysis, StructuredAnalysisItem
 from app.services.analysis_action_plan import AnalysisActionPlanService
 
 
@@ -244,3 +244,98 @@ def test_service_passes_provider_to_llm_boundary():
     ).build_context(None, "user-1", "conversation-1", provider=provider)
 
     assert calls == [provider]
+
+
+def test_service_does_not_promote_structured_analysis_into_action_candidate():
+    class FakeAnalysisService:
+        def get_context(self, conn, user_id, conversation_id):
+            return {
+                "person": {"id": "person-1"},
+                "learning_strategy": learning_strategy(),
+            }
+
+    class FakeAnalysisLLMService:
+        analysis_service = FakeAnalysisService()
+
+        def analyze_context(self, context, *, provider=None):
+            analysis = structured_analysis()
+            return analysis.model_copy(update={
+                "hypotheses": [StructuredAnalysisItem(
+                    content="应该立即发送消息",
+                    confidence=0.99,
+                    evidence_source_ids=["message-1"],
+                )],
+                "intent_signals": [StructuredAnalysisItem(
+                    content="对方明确希望继续推进",
+                    confidence=0.99,
+                    evidence_source_ids=["message-1"],
+                )],
+            })
+
+    class FakeActionPlanService:
+        def get_context(self, conn, user_id, person_id):
+            context = action_plan_context()
+            context["recommendations"] = []
+            context["action_plan"] = []
+            return context
+
+    result = AnalysisActionPlanService(
+        analysis_llm_service=FakeAnalysisLLMService(),
+        action_plan_service=FakeActionPlanService(),
+    ).build_context(None, "user-1", "conversation-1")
+
+    assert result["action_plan_inputs"]["signals"]["hypotheses"]
+    assert result["action_plan_inputs"]["signals"]["intent_signals"]
+    assert result["recommendations"] == []
+    assert result["action_plan"] == []
+
+
+def test_service_keeps_existing_action_candidate_boundary_separate_from_analysis():
+    class FakeAnalysisService:
+        def get_context(self, conn, user_id, conversation_id):
+            return {
+                "person": {"id": "person-1"},
+                "learning_strategy": learning_strategy(),
+            }
+
+    class FakeAnalysisLLMService:
+        analysis_service = FakeAnalysisService()
+
+        def analyze_context(self, context, *, provider=None):
+            return structured_analysis()
+
+    class FakeActionPlanService:
+        def get_context(self, conn, user_id, person_id):
+            context = action_plan_context()
+            context["recommendations"] = [{
+                "id": "recommendation-existing",
+                "action": "提出轻量邀请",
+                "evidence_source_ids": ["message-1"],
+            }]
+            context["action_plan"] = [{
+                "recommendation_id": "recommendation-existing",
+                "action": "提出轻量邀请",
+                "evidence_source_ids": ["message-1"],
+                "status": "proposed",
+                "requires_user_confirmation": True,
+            }]
+            return context
+
+    result = AnalysisActionPlanService(
+        analysis_llm_service=FakeAnalysisLLMService(),
+        action_plan_service=FakeActionPlanService(),
+    ).build_context(None, "user-1", "conversation-1")
+
+    assert result["recommendations"] == [{
+        "id": "recommendation-existing",
+        "action": "提出轻量邀请",
+        "evidence_source_ids": ["message-1"],
+    }]
+    assert result["action_plan"] == [{
+        "recommendation_id": "recommendation-existing",
+        "action": "提出轻量邀请",
+        "evidence_source_ids": ["message-1"],
+        "status": "proposed",
+        "requires_user_confirmation": True,
+    }]
+    assert result["action_plan_inputs"]["analysis_is_derived"] is True
