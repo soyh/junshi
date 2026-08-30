@@ -2,18 +2,23 @@ import sqlite3
 
 from app.services.action_plan import ActionPlanService
 from app.services.analysis_llm import AnalysisLLMService
+from app.services.analysis_recommendation import AnalysisRecommendationService
 
 
 class AnalysisActionPlanService:
-    """Project derived StructuredAnalysis into Action Plan without auto-execution."""
+    """Project derived Analysis -> Recommendation into Action Plan without auto-execution."""
 
     def __init__(
         self,
         analysis_llm_service: AnalysisLLMService | None = None,
         action_plan_service: ActionPlanService | None = None,
+        analysis_recommendation_service: AnalysisRecommendationService | None = None,
     ):
         self.analysis_llm_service = analysis_llm_service or AnalysisLLMService()
         self.action_plan_service = action_plan_service or ActionPlanService()
+        self.analysis_recommendation_service = (
+            analysis_recommendation_service or AnalysisRecommendationService()
+        )
 
     def build_context(
         self,
@@ -31,11 +36,24 @@ class AnalysisActionPlanService:
             analysis_context,
             provider=provider,
         )
+        recommendation_context = self.analysis_recommendation_service.build_context(
+            conn,
+            user_id,
+            conversation_id,
+            provider=provider,
+            structured_analysis=structured_analysis,
+        )
         action_plan_context = self.action_plan_service.get_context(
             conn, user_id, person_id
         )
         analysis = structured_analysis.model_dump(mode="json")
+        recommendations = list(recommendation_context["recommendations"])
         result = dict(action_plan_context)
+        result["recommendations"] = recommendations
+        result["action_plan"] = self.action_plan_service.build_action_plan(
+            recommendations,
+            recommendation_context["evidence"],
+        )
         result["learning_strategy"] = analysis_context["learning_strategy"]
         result["structured_analysis"] = analysis
         result["action_plan_inputs"] = {
@@ -54,6 +72,7 @@ class AnalysisActionPlanService:
                 )
             },
             "analysis_is_derived": True,
+            "recommendations_are_source_backed": True,
         }
         result["action_constraints"] = {
             **dict(action_plan_context.get("action_constraints") or {}),
