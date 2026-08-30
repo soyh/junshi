@@ -1,31 +1,15 @@
 import hashlib
-import sqlite3
-
-from app.services.strategy_decision import StrategyDecisionContextService
 
 
 class StrategyRecommendationCandidateService:
     """Build explicit recommendation candidates at the Strategy -> Recommendation boundary."""
 
-    def __init__(self, strategy_decision_service: StrategyDecisionContextService | None = None):
-        self.strategy_decision_service = strategy_decision_service or StrategyDecisionContextService()
+    @staticmethod
+    def build_candidates(structured_analysis: dict) -> list[dict]:
+        if not isinstance(structured_analysis, dict):
+            return []
 
-    def build_candidates(
-        self,
-        conn: sqlite3.Connection,
-        user_id: str,
-        person_id: str,
-        *,
-        structured_analysis: dict | None = None,
-    ) -> list[dict]:
-        context = self.strategy_decision_service.get_context(
-            conn,
-            user_id,
-            person_id,
-        )
-        analysis = structured_analysis or context.get("structured_analysis") or {}
-        hypotheses = analysis.get("hypotheses") or []
-
+        hypotheses = structured_analysis.get("hypotheses") or []
         candidates: list[dict] = []
         for hypothesis in hypotheses:
             if not isinstance(hypothesis, dict):
@@ -40,6 +24,7 @@ class StrategyRecommendationCandidateService:
                 continue
 
             recommendation = content.strip()
+            evidence_source_ids = list(dict.fromkeys(source_ids))
             candidate_id = "strategy-recommendation-" + hashlib.sha256(
                 recommendation.encode("utf-8")
             ).hexdigest()[:24]
@@ -47,12 +32,12 @@ class StrategyRecommendationCandidateService:
                 {
                     "id": candidate_id,
                     "recommendation": recommendation,
-                    "evidence_source_ids": list(dict.fromkeys(source_ids)),
+                    "evidence_source_ids": evidence_source_ids,
                     "provenance": {
                         "source": "strategy_candidate",
                         "strategy_candidate_type": "analysis_hypothesis",
-                        "source_evidence_ids": list(dict.fromkeys(source_ids)),
-                        "unknowns_preserved": list(analysis.get("unknowns") or []),
+                        "source_evidence_ids": evidence_source_ids,
+                        "unknowns_preserved": list(structured_analysis.get("unknowns") or []),
                     },
                 }
             )
