@@ -1,11 +1,20 @@
 import sqlite3
 
+from app.services.recommendation_producer import RecommendationProducer
 from app.services.relationship_state import RelationshipStateService
 
 
 class RecommendationService:
-    def __init__(self, relationship_state_service: RelationshipStateService | None = None):
+    def __init__(
+        self,
+        relationship_state_service: RelationshipStateService | None = None,
+        recommendation_producer: RecommendationProducer | None = None,
+    ):
         self.relationship_state_service = relationship_state_service or RelationshipStateService()
+        self.recommendation_producer = recommendation_producer or RecommendationProducer()
+
+    def produce_recommendations(self, candidates: list, evidence: list[dict]) -> list[dict]:
+        return self.recommendation_producer.produce(candidates, evidence)
 
     def get_context(
         self,
