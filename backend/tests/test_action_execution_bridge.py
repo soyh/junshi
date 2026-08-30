@@ -103,3 +103,14 @@ def test_action_plan_execution_closes_into_existing_outcome_and_feedback_chain(c
     assert candidate["observed_outcome_count"] == 1
     assert candidate["outcome_counts"]["completed"] == 1
     assert candidate["unknown_outcome_count"] == 0
+
+
+def test_action_plan_execution_cannot_repeat_same_decision(client):
+    person = create_person(client)
+    create_relationship(client, person["id"])
+    decision = seed_decision(person["id"])
+
+    assert execute(client, person["id"], decision["id"]).status_code == 201
+    response = execute(client, person["id"], decision["id"], note="重复执行")
+
+    assert response.status_code == 409
