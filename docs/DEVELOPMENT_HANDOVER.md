@@ -1,10 +1,10 @@
 # Development Handover
 
 更新时间：2026-08-30
-当前阶段：TEST-085 — Action Plan → Action Decision Bridge — VERIFIED
-当前 Branch：test-085-action-plan-decision-bridge
-当前 HEAD：51d8237c1aca56b3c993aa9254fe82efec4f7d86
-上一阶段：TEST-084 — Recommendation → Action Plan Orchestration Bridge — VERIFIED
+当前阶段：TEST-086 — Action Decision → Execution Bridge — IMPLEMENTED / AWAITING SERVER VALIDATION
+当前 Branch：test-086-action-decision-execution-bridge
+当前 HEAD：bcc43c41da747dab79669560bffbb619c4a25dbf
+上一阶段：TEST-085 — Action Plan → Action Decision Bridge — VERIFIED
 
 ## 信息检索优先级（强制执行）
 
@@ -39,6 +39,7 @@ TEST-082 Execution / Action Decision Closure — VERIFIED
 TEST-083 Strategy → Recommendation Candidate Contract — VERIFIED
 TEST-084 Recommendation → Action Plan Orchestration Bridge — VERIFIED
 TEST-085 Action Plan → Action Decision Bridge — VERIFIED
+TEST-086 Action Decision → Execution Bridge — IMPLEMENTED / AWAITING SERVER VALIDATION
 
 ## TEST-083 — Strategy → Recommendation Candidate Contract
 
@@ -134,25 +135,58 @@ Git commit：`51d8237c1aca56b3c993aa9254fe82efec4f7d86`
 
 TEST-085 正式标记为 VERIFIED。
 
+## TEST-086 — Action Decision → Execution Bridge
+
+### GitHub 审计结论
+
+TEST-085 完成后，仓库中已经存在可复用的 `StrategyDecisionExecutionService`、`ActionExecutionRepository` 与执行 schema。该 service 已经实现 confirmed decision → explicit execution 的状态边界，并阻止 rejected decision、重复 execution 以及 outcome 已存在时再次 execution。现有执行 API 位于 `strategy-decision` 路径，而 Action Plan → Action Decision 已正式位于 `action-plan` 路径，因此真实产品闭环缺口不是新的 execution 生命周期，而是缺少 Action Plan 命名空间下的 execution bridge。
+
+同时，`ActionOutcomeService` 已要求 decision confirmed 且 execution 已存在后才能记录 outcome；`ActionFeedbackService` 已从 decision + outcome 形成反馈；`ActionFeedbackLearningSynthesisService` 已从反馈形成 source-backed learning candidate；`LearningStrategyContextService` 又把 action feedback learning 接入 learning context，`AnalysisService` 在重新取得 analysis context 时读取该 learning context。因此 Outcome → Feedback → Learning → 后续 Analysis 输入的连接点已经存在，不需要新增第二套 learning 生命周期。
+
+### 正式链路
+
+`Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis input`
+
+### 最小修改面
+
+TEST-086 只做以下最小连接：
+
+- 新增 `backend/app/api/routes/action_execution.py`；
+- 复用既有 `StrategyDecisionExecutionService`；
+- 复用既有 `StrategyDecisionExecutionCreate / Response / ContextResponse` schema；
+- 在 `backend/app/api/router.py` 注册 Action Plan execution route；
+- 新增 `backend/tests/test_action_execution_bridge.py` 验证 Action Plan execution context、confirmed-only execution、explicit execution 以及 execution → outcome → feedback → learning 的真实连接。
+
+不新增 service lifecycle，不新增 repository，不新增 migration，不改变 action decision / execution / outcome 表结构，不自动确认、不自动执行、不自动发送、不自动生成 outcome，也不把 inference 写入 memory / canonical evidence。
+
+### GitHub 实施状态
+
+- Branch：`test-086-action-decision-execution-bridge`
+- 当前 HEAD：`bcc43c41da747dab79669560bffbb619c4a25dbf`
+- 已新增 Action Plan execution route；
+- 已复用既有 execution service / schema / repository；
+- 已新增 `backend/tests/test_action_execution_bridge.py`；
+- 未修改 migration / database schema；
+- 尚未进行服务器验收，因此 TEST-086 当前不得标记 VERIFIED。
+
 ## 当前系统主链
 
-截至 TEST-085，代码与测试形成：
+截至 TEST-086 GitHub 实施后，目标主链为：
 
-`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Execution → Outcome`
+`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis input`
 
-其中 TEST-083 / TEST-084 / TEST-085 分别补齐：
+其中 TEST-083 / TEST-084 / TEST-085 / TEST-086 分别补齐：
 
 - Strategy → Recommendation candidate contract；
 - Recommendation → Action Plan orchestration bridge；
-- Action Plan → Action Decision bridge contract。
-
-这些阶段均未建立第二套生命周期，也未引入新的数据库 migration。
+- Action Plan → Action Decision bridge contract；
+- Action Decision → Action Plan-scoped Execution bridge。
 
 ## 数据库与运行约束
 
 当前 migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
 
-TEST-045 ~ TEST-085 默认不新增 migration，不改变 action_decisions、action_executions、action_outcomes 的既有生命周期。
+TEST-045 ~ TEST-086 默认不新增 migration，不改变 action_decisions、action_executions、action_outcomes 的既有生命周期。
 
 Route → Service → Repository → SQLite。
 
@@ -164,17 +198,10 @@ Route → Service → Repository → SQLite。
 - 不得把 inference 自动写入 canonical evidence 或 memory。
 - 不得自动确认 decision、执行 action、发送消息、修改 relationship 或伪造 outcome。
 - 不得为了测试方便绕过 user / person / conversation isolation。
-- 不得建立第二套 Strategy / Decision / Strategic Reply / Action Plan 生命周期。
+- 不得建立第二套 Strategy / Decision / Strategic Reply / Action Plan / Execution 生命周期。
 - 不得为了填充 Action Plan 而绕过 canonical evidence → recommendation → confirmation 链。
 - 不得在 GitHub 已能确认时要求服务器端查询。
 
 ## 下一阶段执行规则
 
-TEST-085 已完成并 VERIFIED。下一阶段必须先从 GitHub 当前 `test-085-action-plan-decision-bridge` 分支审计真实代码、测试与文档，重点检查：
-
-1. Recommendation → Action Plan → Action Decision 是否已经形成可验证的 request-scoped / persistence-safe 闭环；
-2. User Confirmation → Execution → Outcome 是否仍保持真实状态边界；
-3. Execution / Outcome → Feedback / Learning 的现有连接点是否存在真实缺口；
-4. 是否存在无需新增架构、只需最小 orchestration / contract test 即可补齐的下一项闭环缺口。
-
-不得预先假定下一项一定是新 schema、新 service 或自动执行能力。必须先审计，再锁定下一个 TEST 的最小真实产品边界。
+TEST-086 在 GitHub 已完成最小实施，但尚未服务器验收。服务器验收通过后，先将 TEST-086 标记 VERIFIED，再重新审计完整闭环是否还存在真实缺口。下一阶段不得预先假定需要新增 schema、service、自动执行能力或 memory 写入能力。
