@@ -1,9 +1,10 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-30
-当前阶段：TEST-083 — Strategy → Recommendation Candidate Contract — IMPLEMENTED / AWAITING SERVER VALIDATION
-当前 Branch：test-083-strategy-recommendation-candidate-contract
-上一阶段：TEST-082 — Execution / Action Decision Closure — VERIFIED
+当前阶段：TEST-085 — Action Plan → Action Decision Bridge — VERIFIED
+当前 Branch：test-085-action-plan-decision-bridge
+当前 HEAD：51d8237c1aca56b3c993aa9254fe82efec4f7d86
+上一阶段：TEST-084 — Recommendation → Action Plan Orchestration Bridge — VERIFIED
 
 ---
 
@@ -42,7 +43,7 @@ Phase 2 — Evidence / Analysis / Strategy：主体已完成，持续完善边�
 
 Phase 3 — Decision → Execution Closure：已完成 TEST-082，后续只补齐真正进入闭环所需的最小连接。
 
-Phase 4 — End-to-End AI Relationship Loop：当前重点。建立 Person → Conversation / Interaction → Timeline → Evidence → Analysis → Strategy → Recommendation → Action Plan → Decision → Execution → Outcome → Feedback → Re-analysis 的系统级闭环。
+Phase 4 — End-to-End AI Relationship Loop：当前重点。已打通 Analysis → Strategy → Recommendation → Action Plan → Action Decision 的主要 orchestration / contract bridge，下一步应继续根据真实闭环缺口推进，而不是预设新增架构层。
 
 Phase 5 — Real LLM + Real User Workflow：在闭环稳定后接入真实 LLM 与真实用户工作流，确保 LLM 只负责解释、归纳、推断和候选建议，系统负责事实、provenance、状态、确认、执行和结果记录。
 
@@ -79,6 +80,7 @@ Phase 7 — Optimization / Scale：在 MVP 闭环稳定后，再增加人物画�
 - Strategy、Strategic Reply、Action Plan 只能消费既有 derived analysis，不建立第二套生命周期。
 - Recommendation Producer 只接受显式的 Recommendation candidate，不直接接受 StructuredAnalysis。
 - Strategy → Recommendation 必须经过显式 candidate contract；candidate 必须携带 recommendation identity、evidence_source_ids 和 provenance。
+- Action Plan → Action Decision 必须消费既有 Action Plan 中的 recommendation identity；Decision persistence 仍受 confirmation boundary 约束。
 - LLM 不得自动确认 decision、执行 action、发送消息、修改 relationship state、写入 learning history 或伪造 outcome。
 - StructuredAnalysis 当前为 request-scoped output；如未来持久化，必须独立设计并新增 migration。
 - Provider：Qwen / DashScope OpenAI-compatible API；provider adapter 与上层 contract 解耦。
@@ -126,6 +128,9 @@ TEST-079 Learning Strategy → Action Plan HTTP Response Contract — VERIFIED
 TEST-080 StructuredAnalysis → Action Plan Candidate Boundary — VERIFIED
 TEST-081 Recommendation Producer Contract — VERIFIED
 TEST-082 Execution / Action Decision Closure — VERIFIED
+TEST-083 Strategy → Recommendation Candidate Contract — VERIFIED
+TEST-084 Recommendation → Action Plan Orchestration Bridge — VERIFIED
+TEST-085 Action Plan → Action Decision Bridge — VERIFIED
 
 ---
 
@@ -167,42 +172,112 @@ Strategy → Recommendation 的最小 candidate contract：
 - StructuredAnalysis 不得直接作为 Recommendation 输入。
 - Recommendation 不自动选择、不自动执行、不自动确认 decision。
 
-### TEST-083 已实现内容
+### TEST-083 验收状态
 
-新增：
+服务器已完成验证：
 
-- `backend/app/services/strategy_recommendation_candidate.py`：Strategy → Recommendation candidate adapter。
-- `backend/app/services/analysis_recommendation.py`：Analysis → Strategy → Recommendation orchestration。
-- `backend/app/schemas/analysis_recommendation.py`：request-scoped response contract。
-- `backend/app/api/routes/analysis_recommendation.py`：`GET /api/v1/conversations/{conversation_id}/recommendation/context`。
-- 对应 TEST-083 candidate / orchestration contract tests。
+- 定向 candidate / orchestration / producer 测试：`17 passed`
+- 全量回归：`499 passed`
+- working tree clean
+- HEAD 与 origin 一致：`aeb5d53`
 
-修改：
+TEST-083 正式标记为 VERIFIED。
 
-- `backend/app/api/router.py` 注册新的 analysis recommendation route。
+---
 
-明确未修改：
+## TEST-084 — Recommendation → Action Plan Orchestration Bridge
 
-- Recommendation schema 的核心 typed boundary。
-- RecommendationProducer 的 evidence validation。
-- Strategy Decision persistence / confirmation / execution / outcome lifecycle。
-- 数据库 schema / migration。
-- Action Decision / Execution / Outcome 生命周期。
+### 目标
 
-### TEST-083 验收门槛
+在不建立第二套 Action Plan 生命周期的前提下，补齐 Recommendation → Action Plan 的真实 orchestration bridge。
 
-服务器端拉取本分支后必须至少验证：
+### 正式链路
 
-1. `pytest -q backend/tests/test_strategy_recommendation_candidate.py backend/tests/test_analysis_recommendation.py backend/tests/test_recommendation_producer.py`
-2. `pytest -q`
-3. `git diff --check`
-4. `git status --short` 必须为空。
-5. 新 endpoint 可以在真实 conversation 上返回 typed recommendations，且 recommendation 的 evidence_source_ids 能在返回 evidence 中找到。
-6. 无证据 candidate 被 RecommendationProducer 丢弃。
-7. recommendation 不自动进入 confirmation / execution。
-8. 未发生 migration / database schema 变化。
+`Analysis → Strategy → Recommendation → existing Action Plan context → Action Plan`
 
-TEST-083 在服务器完整回归通过前，不得标记 VERIFIED，也不得进入 TEST-084。
+### 最小修改面
+
+TEST-084 只在既有 `AnalysisActionPlanService` 上建立 recommendation 到 action-plan 的 orchestration bridge；不新增第二套 Action Plan service，不绕过既有 evidence / confirmation boundary。
+
+核心语义：
+
+- AnalysisActionPlanService 获取现有 AnalysisContext 与 StructuredAnalysis。
+- 通过既有 AnalysisRecommendationService 获取 typed recommendations。
+- 获取既有 ActionPlanService context。
+- 当 recommendation 存在时，调用既有 ActionPlanService 的 `build_action_plan(recommendations, evidence)`。
+- 没有 recommendation 时保持既有 action plan context，不凭空创建 proposal。
+- Action Plan 仍必须遵守 evidence-backed 与 `requires_user_confirmation=true` / `must_not_auto_execute=true` / `must_not_change_relationship=true` 约束。
+- 不自动创建 Action Decision，不执行 action，不产生 outcome。
+
+### TEST-084 验收状态
+
+服务器已完成验证：
+
+- `backend/tests/test_analysis_action_plan.py`：`8 passed`
+- 全量回归：`500 passed`
+- working tree clean
+- HEAD：`33a605ee093dbf82ae8723438a32d0880a7effcc`
+
+TEST-084 正式标记为 VERIFIED。
+
+---
+
+## TEST-085 — Action Plan → Action Decision Bridge
+
+### 目标
+
+锁定 Action Plan → Action Decision 的最小真实连接契约，不新增 Decision 生命周期，不绕过 user confirmation / execution boundary。
+
+### 正式链路
+
+`Recommendation → Action Plan → Action Decision Context / Decision persistence → User Confirmation → Execution → Outcome`
+
+### 正式契约
+
+- Action Decision Context 消费既有 Action Plan，而不是重新生成 recommendation。
+- Decision 中的 `recommendation_id` 必须属于当前 Action Plan 的 recommendation 集合。
+- 非当前 Action Plan 的 recommendation 不得进入 Decision persistence。
+- confirmed decision 必须显式携带 recommendation identity。
+- Decision persistence 前仍必须经过既有 confirmation boundary。
+- TEST-085 不自动确认、不执行 action、不生成 outcome。
+
+### 最小修改面
+
+TEST-085 不修改生产 Action Decision 生命周期；只新增边界测试 `backend/tests/test_action_decision.py`，验证已有 bridge 的真实契约。
+
+Git commit：`51d8237c1aca56b3c993aa9254fe82efec4f7d86`
+
+### TEST-085 服务器验收
+
+服务器已完成正式验收：
+
+- Branch：`test-085-action-plan-decision-bridge`
+- HEAD：`51d8237c1aca56b3c993aa9254fe82efec4f7d86`
+- HEAD 与 `origin/test-085-action-plan-decision-bridge` 完全一致
+- `git status --short`：为空
+- `pytest -q backend/tests/test_action_decision.py`：`10 passed`
+- `pytest -q`：`502 passed in 74.64s`
+- 无生产代码修改
+- 无 migration / database schema 修改
+- Action Decision / Execution / Outcome 生命周期保持不变
+
+TEST-085 正式标记为 VERIFIED。
+
+---
+
+## 当前系统已打通的主链
+
+截至 TEST-085，代码与测试已经形成：
+
+`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Execution → Outcome`
+
+其中 TEST-083 / TEST-084 / TEST-085 分别补齐了：
+
+- Strategy → Recommendation candidate contract；
+- Recommendation → Action Plan orchestration bridge；
+- Action Plan → Action Decision bridge contract。
+
+这些阶段均未建立第二套生命周期，也未引入新的数据库 migration。
 
 ---
 
@@ -210,7 +285,7 @@ TEST-083 在服务器完整回归通过前，不得标记 VERIFIED，也不得�
 
 当前 migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
 
-TEST-045 ~ 当前阶段默认不新增 migration，不改变 action_decisions、action_executions、action_outcomes 的既有生命周期。
+TEST-045 ~ TEST-085 默认不新增 migration，不改变 action_decisions、action_executions、action_outcomes 的既有生命周期。
 
 Route → Service → Repository → SQLite。
 
@@ -230,6 +305,13 @@ Route → Service → Repository → SQLite。
 
 ---
 
-## 下一步执行规则
+## 下一阶段执行规则
 
-TEST-083 已在 GitHub 当前分支完成实现，当前只等待服务器端验证。服务器验证通过后，先更新 TEST-083 为 VERIFIED，再根据真实 end-to-end 链路缺口决定 TEST-084；不得在 TEST-083 未验收时继续堆叠下一层功能。
+TEST-085 已完成并 VERIFIED。下一阶段必须先从 GitHub 当前 `test-085-action-plan-decision-bridge` 分支审计真实代码、测试与文档，重点检查：
+
+1. Recommendation → Action Plan → Action Decision 是否已经形成可验证的 request-scoped / persistence-safe 闭环；
+2. User Confirmation → Execution → Outcome 是否仍保持真实状态边界；
+3. Execution / Outcome → Feedback / Learning 的现有连接点是否存在真实缺口；
+4. 是否存在无需新增架构、只需最小 orchestration / contract test 即可补齐的下一项闭环缺口。
+
+不得预先假定下一项一定是新 schema、新 service 或自动执行能力。必须先审计，再锁定下一个 TEST 的最小真实产品边界。
