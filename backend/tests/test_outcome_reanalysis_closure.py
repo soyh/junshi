@@ -35,7 +35,7 @@ def test_outcome_feedback_learning_reaches_fresh_analysis_and_recommendation(cli
             }
 
     provider = Provider()
-    service = AnalysisRecommendationService(analysis_llm_service=AnalysisLLMService(provider=provider))
+    service = AnalysisRecommendationService(analysis_llm_service=AnalysisLLMService())
     with get_connection() as conn:
         result = service.build_context(conn, USER_ID, conversation["id"], provider=provider)
 
