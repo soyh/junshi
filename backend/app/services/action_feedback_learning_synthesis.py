@@ -12,6 +12,7 @@ class ActionFeedbackLearningSynthesisService:
         candidates = []
         for item in learning["items"]:
             observed = item["outcome_observed_count"] > 0
+            unknown_outcome_count = item["outcome_unknown_count"]
             candidates.append(
                 {
                     "recommendation_id": item["recommendation_id"],
@@ -19,7 +20,8 @@ class ActionFeedbackLearningSynthesisService:
                     "synthesis_status": "source_backed_candidate" if observed else "outcome_unknown",
                     "observed_outcome_count": item["outcome_observed_count"],
                     "outcome_counts": item["outcome_counts"],
-                    "unknown_outcome_count": item["outcome_unknown_count"],
+                    "outcome_unknown_count": unknown_outcome_count,
+                    "unknown_outcome_count": unknown_outcome_count,
                     "unknowns": ["recommendation_quality", "success", "relationship_impact"],
                     "source": dict(item["source"]),
                 }
