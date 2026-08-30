@@ -1,9 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-08-30
-当前阶段：TEST-082 — Execution / Action Decision Closure — IN PROGRESS
-当前 Branch：test-082-execution-action-decision-closure
-上一阶段：TEST-081 — Recommendation Producer Contract — VERIFIED
+当前阶段：TEST-083 — Strategy → Recommendation Candidate Contract — IMPLEMENTED / AWAITING SERVER VALIDATION
+当前 Branch：test-083-strategy-recommendation-candidate-contract
+上一阶段：TEST-082 — Execution / Action Decision Closure — VERIFIED
 
 ---
 
@@ -40,9 +40,9 @@ Phase 1 — Core Data Foundation：基本完成。
 
 Phase 2 — Evidence / Analysis / Strategy：主体已完成，持续完善边界。
 
-Phase 3 — Decision → Execution Closure：当前阶段。优先打通 Recommendation → Action Plan → User Decision / Confirmation → Execution → Outcome。
+Phase 3 — Decision → Execution Closure：已完成 TEST-082，后续只补齐真正进入闭环所需的最小连接。
 
-Phase 4 — End-to-End AI Relationship Loop：建立 Person → Conversation / Interaction → Timeline → Evidence → Analysis → Recommendation → Action Plan → Decision → Execution → Outcome → Feedback → Re-analysis 的系统级闭环。
+Phase 4 — End-to-End AI Relationship Loop：当前重点。建立 Person → Conversation / Interaction → Timeline → Evidence → Analysis → Strategy → Recommendation → Action Plan → Decision → Execution → Outcome → Feedback → Re-analysis 的系统级闭环。
 
 Phase 5 — Real LLM + Real User Workflow：在闭环稳定后接入真实 LLM 与真实用户工作流，确保 LLM 只负责解释、归纳、推断和候选建议，系统负责事实、provenance、状态、确认、执行和结果记录。
 
@@ -67,7 +67,7 @@ Phase 7 — Optimization / Scale：在 MVP 闭环稳定后，再增加人物画�
 
 主链：
 
-`Canonical Data → Canonical Evidence / Domain Context → AnalysisContext → LLM Analysis → StructuredAnalysis → Strategy → Human Confirmation → Execution / Outcome`
+`Canonical Data → Canonical Evidence / Domain Context → AnalysisContext → LLM Analysis → StructuredAnalysis → Strategy → Recommendation → Human Confirmation → Execution / Outcome`
 
 冻结规则：
 
@@ -77,6 +77,8 @@ Phase 7 — Optimization / Scale：在 MVP 闭环稳定后，再增加人物画�
 - StructuredAnalysis 中 inference / hypothesis / material signal 必须保留 evidence provenance。
 - unknown 不得被模型猜测自动提升为事实。
 - Strategy、Strategic Reply、Action Plan 只能消费既有 derived analysis，不建立第二套生命周期。
+- Recommendation Producer 只接受显式的 Recommendation candidate，不直接接受 StructuredAnalysis。
+- Strategy → Recommendation 必须经过显式 candidate contract；candidate 必须携带 recommendation identity、evidence_source_ids 和 provenance。
 - LLM 不得自动确认 decision、执行 action、发送消息、修改 relationship state、写入 learning history 或伪造 outcome。
 - StructuredAnalysis 当前为 request-scoped output；如未来持久化，必须独立设计并新增 migration。
 - Provider：Qwen / DashScope OpenAI-compatible API；provider adapter 与上层 contract 解耦。
@@ -123,72 +125,84 @@ TEST-078 StructuredAnalysis → Action Plan 消费契约 — VERIFIED
 TEST-079 Learning Strategy → Action Plan HTTP Response Contract — VERIFIED
 TEST-080 StructuredAnalysis → Action Plan Candidate Boundary — VERIFIED
 TEST-081 Recommendation Producer Contract — VERIFIED
+TEST-082 Execution / Action Decision Closure — VERIFIED
 
 ---
 
-## TEST-081 正式状态
+## TEST-082 正式状态
 
-TEST-081 已完成服务器验收并通过完整回归：Recommendation 专项及相关 downstream 测试通过，完整 `pytest -q`：489 passed；`git diff --check` 通过；working tree clean；无 migration / database schema 变化；未改变 action_decisions / action_executions / action_outcomes 生命周期。
+TEST-082 已完成服务器验收：在执行边界正式要求 execution 先于 action outcome 后，所有 downstream outcome / learning / provenance 测试已对齐；完整回归最终为 `491 passed`；`git diff --check` 通过；working tree clean；无 migration / database schema 变化。
 
-核心边界：
-
-- Recommendation 是 typed、explicit、evidence-backed candidate。
-- StructuredAnalysis 不得直接成为 Recommendation 或 Action Candidate。
-- Recommendation Producer 不写数据库、不确认 decision、不执行 action、不发送消息。
-- 合法 Recommendation 进入既有 Action Plan / Strategic Reply downstream。
-- Decision / Confirmation / Execution / Outcome 保持独立生命周期。
-
-TEST-081 提交链已保留于 `test-081-recommendation-producer-contract` 历史；最终验收状态为 VERIFIED。
-
----
-
-## TEST-082 — Execution / Action Decision Closure
-
-### 目标
-
-不新增第二套执行生命周期，而是审计并锁定现有 `Action Decision → Confirmation → Execution → Outcome` 的正式业务闭环，使 Recommendation / Action Plan 能够安全进入用户确认与执行边界，并明确系统不得自动执行。
-
-### 精确契约
+正式生命周期：
 
 `Recommendation → Action Plan → Action Decision → User Confirmation → Execution → Outcome`
 
-必须满足：
+未确认 decision 不得执行；未执行不得产生 outcome；Execution 与 Outcome 保持独立记录；不得由 analysis / recommendation / decision 文本伪造真实执行结果。
 
-- Recommendation / Action Plan 只能产生候选或 proposal，不能自动创建已确认、已执行或已完成的业务结果。
-- Action Decision 必须保留其来源 action / recommendation / evidence provenance（以当前代码已有字段和生命周期为准），不得凭空产生事实。
-- Confirmation 是明确的人类控制边界；未确认的 proposal 不得进入 execution。
-- Execution 只能消费已确认 decision；禁止 pending / rejected / unconfirmed decision 自动执行。
-- Outcome 必须代表真实执行结果；系统不得由 recommendation、analysis 或 decision 文本伪造 outcome。
-- Execution / Outcome 不应反向修改 canonical evidence，除非现有正式生命周期明确允许且经过独立契约；本 TEST-082 不新增隐式副作用。
-- 不修改数据库 schema，不新增 migration，不创建第二套 Decision / Execution / Outcome 生命周期。
-- 不允许 LLM 直接确认、执行、发送消息或伪造结果。
+---
 
-### TEST-082 最小修改面
+## TEST-083 — Strategy → Recommendation Candidate Contract
 
-优先只修改：
+### 目标
 
-- 现有 Action Decision / Confirmation / Execution 边界中实际缺失的 contract 或 validation。
-- 对应最小测试文件，用于锁定未确认不得执行、确认后才能执行、outcome 只能来自真实 execution result 等边界。
-- 如现有实现已经满足某项契约，只补测试，不改生产代码。
+补齐 Analysis → Strategy → Recommendation 的真实连接点，但不重写 Strategy、Evidence 或 Recommendation Producer 生命周期。
 
-明确禁止：
+当前仓库审计确认：现有 learning strategy candidate 主要是历史反馈/学习 candidate，字段以 `recommendation_id`、outcome counts、memory update count、unknowns、source 为主，不能直接满足 Recommendation Producer 所要求的 `id / recommendation / evidence_source_ids / provenance` contract。因此 TEST-083 不把 learning candidate 强行伪装成 Recommendation。
 
-- 不扩张 Recommendation Producer。
-- 不重新设计 Action Plan。
-- 不新增数据库表 / migration。
-- 不接入新的 LLM 能力。
-- 不自动发送真实消息。
-- 不把 execution outcome 当成 AI inference。
+### 正式契约
 
-### TEST-082 验收门槛
+`StructuredAnalysis → Strategy boundary → explicit StrategyRecommendationCandidate → RecommendationProducer → Recommendation`
 
-- 针对现有 Action Decision / Confirmation / Execution / Outcome 的专项测试全部通过。
-- 相关 Recommendation / Action Plan downstream 回归全部通过。
-- 完整 `pytest -q` 通过。
-- `git diff --check` 通过。
-- working tree clean。
-- 无新增 migration / schema 变化。
-- 明确证明 unconfirmed decision 无法执行，confirmed decision 才能进入 execution，outcome 不由 analysis / recommendation 自动生成。
+Strategy → Recommendation 的最小 candidate contract：
+
+- `id`：稳定、确定性的 candidate identity。
+- `recommendation`：显式建议文本。
+- `evidence_source_ids`：该建议直接依赖的 source identity。
+- `provenance`：至少标记 `source=strategy_candidate`、candidate type、source evidence ids，并保留 unknowns。
+
+`RecommendationProducer` 仍是最终 typed / evidence-backed boundary：
+
+- source id 不存在于 evidence 时，candidate 不得进入 Recommendation。
+- provenance 缺失时，candidate 不得进入 Recommendation。
+- StructuredAnalysis 不得直接作为 Recommendation 输入。
+- Recommendation 不自动选择、不自动执行、不自动确认 decision。
+
+### TEST-083 已实现内容
+
+新增：
+
+- `backend/app/services/strategy_recommendation_candidate.py`：Strategy → Recommendation candidate adapter。
+- `backend/app/services/analysis_recommendation.py`：Analysis → Strategy → Recommendation orchestration。
+- `backend/app/schemas/analysis_recommendation.py`：request-scoped response contract。
+- `backend/app/api/routes/analysis_recommendation.py`：`GET /api/v1/conversations/{conversation_id}/recommendation/context`。
+- 对应 TEST-083 candidate / orchestration contract tests。
+
+修改：
+
+- `backend/app/api/router.py` 注册新的 analysis recommendation route。
+
+明确未修改：
+
+- Recommendation schema 的核心 typed boundary。
+- RecommendationProducer 的 evidence validation。
+- Strategy Decision persistence / confirmation / execution / outcome lifecycle。
+- 数据库 schema / migration。
+- Action Decision / Execution / Outcome 生命周期。
+
+### TEST-083 验收门槛
+
+服务器端拉取本分支后必须至少验证：
+
+1. `pytest -q backend/tests/test_strategy_recommendation_candidate.py backend/tests/test_analysis_recommendation.py backend/tests/test_recommendation_producer.py`
+2. `pytest -q`
+3. `git diff --check`
+4. `git status --short` 必须为空。
+5. 新 endpoint 可以在真实 conversation 上返回 typed recommendations，且 recommendation 的 evidence_source_ids 能在返回 evidence 中找到。
+6. 无证据 candidate 被 RecommendationProducer 丢弃。
+7. recommendation 不自动进入 confirmation / execution。
+8. 未发生 migration / database schema 变化。
+
+TEST-083 在服务器完整回归通过前，不得标记 VERIFIED，也不得进入 TEST-084。
 
 ---
 
@@ -206,9 +220,8 @@ Route → Service → Repository → SQLite。
 
 ## 持续禁止事项
 
-- 不得把 StructuredAnalysis 直接转换为 Recommendation。
-- 不得把 StructuredAnalysis 直接转换为 Action Candidate。
-- 不得让 LLM 进入 canonical evidence、persistence、learning context、decision persistence 或 execution 层。
+- 不得让 RecommendationProducer 直接消费 StructuredAnalysis。
+- 不得把 inference 自动写入 canonical evidence 或 memory。
 - 不得自动确认 decision、执行 action、发送消息、修改 relationship 或伪造 outcome。
 - 不得为了测试方便绕过 user / person / conversation isolation。
 - 不得建立第二套 Strategy / Decision / Strategic Reply / Action Plan 生命周期。
@@ -219,4 +232,4 @@ Route → Service → Repository → SQLite。
 
 ## 下一步执行规则
 
-TEST-082 从 GitHub 当前分支开始。先审计现有 Action Decision / Confirmation / Execution / Outcome 实现与测试，只有确认真实缺口后才进行最小修改。完成后执行专项回归和完整回归，再更新 handover 并进入 TEST-083。
+TEST-083 已在 GitHub 当前分支完成实现，当前只等待服务器端验证。服务器验证通过后，先更新 TEST-083 为 VERIFIED，再根据真实 end-to-end 链路缺口决定 TEST-084；不得在 TEST-083 未验收时继续堆叠下一层功能。
