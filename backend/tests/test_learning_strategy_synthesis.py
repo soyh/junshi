@@ -26,6 +26,12 @@ def seed_decision(person_id, recommendation_id):
 
 
 def create_outcome(client, person_id, decision_id, outcome="completed"):
+    execution = client.post(
+        f"/api/v1/persons/{person_id}/strategy-decision/executions/{decision_id}",
+        json={"note": "测试执行"},
+    )
+    assert execution.status_code == 201
+
     response = client.post(
         f"/api/v1/persons/{person_id}/action-plan/outcomes/{decision_id}",
         json={"outcome": outcome, "note": "策略综合测试结果"},

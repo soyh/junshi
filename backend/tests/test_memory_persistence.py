@@ -30,6 +30,12 @@ def seed_confirmed_decision(person_id):
 
 
 def create_outcome(client, person_id, decision_id):
+    execution = client.post(
+        f"/api/v1/persons/{person_id}/strategy-decision/executions/{decision_id}",
+        json={"note": "测试执行"},
+    )
+    assert execution.status_code == 201
+
     response = client.post(
         f"/api/v1/persons/{person_id}/action-plan/outcomes/{decision_id}",
         json={"outcome": "completed", "note": "持久化测试结果"},
