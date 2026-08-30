@@ -2,6 +2,7 @@ import sqlite3
 
 from app.services.analysis_llm import AnalysisLLMService
 from app.services.recommendation_producer import RecommendationProducer
+from app.services.strategy_decision import StrategyDecisionContextService
 from app.services.strategy_recommendation_candidate import StrategyRecommendationCandidateService
 
 
@@ -11,10 +12,12 @@ class AnalysisRecommendationService:
     def __init__(
         self,
         analysis_llm_service: AnalysisLLMService | None = None,
+        strategy_decision_service: StrategyDecisionContextService | None = None,
         candidate_service: StrategyRecommendationCandidateService | None = None,
         recommendation_producer: RecommendationProducer | None = None,
     ):
         self.analysis_llm_service = analysis_llm_service or AnalysisLLMService()
+        self.strategy_decision_service = strategy_decision_service or StrategyDecisionContextService()
         self.candidate_service = candidate_service or StrategyRecommendationCandidateService()
         self.recommendation_producer = recommendation_producer or RecommendationProducer()
 
@@ -35,30 +38,25 @@ class AnalysisRecommendationService:
             provider=provider,
         )
         analysis = structured_analysis.model_dump(mode="json")
-        strategy_context = self.candidate_service.strategy_decision_service.get_context(
+        strategy_context = self.strategy_decision_service.get_context(
             conn,
             user_id,
             person_id,
             structured_analysis=structured_analysis,
         )
-        candidates = self.candidate_service.build_candidates(
-            conn,
-            user_id,
-            person_id,
-            structured_analysis=analysis,
-        )
+        candidates = self.candidate_service.build_candidates(analysis)
         recommendations = self.recommendation_producer.produce(
             candidates,
             strategy_context["evidence"],
         )
 
-        result = {
+        return {
             "person": strategy_context["person"],
             "relationship": strategy_context["relationship"],
             "current_state": strategy_context["current_state"],
             "evidence": strategy_context["evidence"],
-            "facts": strategy_context.get("structured_analysis", {}).get("observed_facts", []),
-            "inferences": strategy_context.get("structured_analysis", {}).get("inferences", []),
+            "facts": analysis.get("observed_facts", []),
+            "inferences": analysis.get("inferences", []),
             "unknowns": analysis.get("unknowns", []),
             "recommendations": recommendations,
             "learning_strategy": {
@@ -76,4 +74,3 @@ class AnalysisRecommendationService:
                 "must_not_auto_execute": True,
             },
         }
-        return result
