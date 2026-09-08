@@ -1,176 +1,80 @@
 # Development Handover
 
-更新时间：2026-08-30
-当前阶段：TEST-087 — Outcome → Re-analysis Closure — VERIFIED
-当前 Branch：test-087-outcome-reanalysis-closure
-当前 HEAD：d7e26623a07f30524798ab6cd2b6052c0cf21daa
-上一阶段：TEST-086 — Action Decision → Execution Bridge — VERIFIED
-下一阶段：TEST-088 — Real LLM + Real User Workflow — ACCEPTANCE
+更新时间：2026-09-08
+当前阶段：TEST-088 — Real LLM + Real User Workflow — ACCEPTANCE / 补证与运行时诊断
+当前 Branch：test-088-real-llm-user-workflow
+当前 HEAD：b1b6f2eac46ab9c6ad3c039c161a370e6cf9c32c
 
-## 信息检索优先级（强制执行）
+## 项目目标
 
-凡是需要检索、确认或定位的内容，必须首先从 GitHub 仓库 `soyh/junshi` 当前开发分支及其相关历史代码、测试、文档中查找。只有 GitHub 仓库中找不到所需信息时，才能要求用户从服务器端查找，并明确说明需要执行的服务器端命令及原因。
+本项目是长期关系管理 + AI 恋爱决策辅助系统，不是单纯聊天机器人或回复生成器。
 
-不得在尚未完成 GitHub 仓库检索的情况下，直接要求用户通过服务器端 `grep`、`sed`、日志或数据库查询来提供本应可以从 GitHub 确认的信息。
+核心链路：
 
-## 产品目标与架构冻结
+`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis`
 
-本项目不是单纯聊天机器人或回复生成器，而是长期关系管理 + AI 恋爱决策辅助系统。
+## 架构与安全边界
 
-核心闭环：
-
-`关系对象 → 人物档案 → 聊天/现实互动 → 时间线 → Canonical Evidence → Fact / Inference / Unknown → 关系状态 → Recommendation → Action Plan → User Decision / Confirmation → Execution → Outcome / Feedback → Learning / Memory Update → 重新判断`
-
-主链实现：
-
-`Canonical Data → Canonical Evidence / Domain Context → AnalysisContext → LLM Analysis → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis input`
-
-冻结规则：
-
-- AnalysisContext 是 deterministic、source-backed、read-only 的 LLM 输入。
+- AnalysisContext 必须 deterministic、source-backed、read-only。
 - LLM 不访问 Repository / SQLite，不修改 canonical data，不执行 action，不发送消息。
 - StructuredAnalysis 是 derived interpretation，不是 canonical truth。
-- inference / hypothesis / material signal 必须保留 evidence provenance。
-- unknown 不得被模型猜测提升为事实。
-- Strategy、Strategic Reply、Action Plan 只能消费既有 derived analysis，不建立第二套生命周期。
-- Recommendation Producer 只接受显式 Recommendation candidate，不直接接受 StructuredAnalysis。
-- Strategy → Recommendation 必须经过显式 candidate contract；candidate 必须携带稳定 identity、evidence_source_ids 和 provenance。
-- Action Plan → Action Decision 必须消费既有 Action Plan 中的 recommendation identity，并受 confirmation boundary 约束。
-- LLM 不得自动确认 decision、执行 action、发送消息、修改 relationship state、写入 learning history 或伪造 outcome。
-- StructuredAnalysis 当前为 request-scoped output；如未来持久化，必须独立设计并新增 migration。
-- Provider：Qwen / DashScope OpenAI-compatible API；provider adapter 与上层 contract 解耦。
+- Fact / Inference / Unknown 必须严格区分；inference、hypothesis、material signal 必须保留 provenance。
+- Recommendation 必须经过显式 candidate contract 与 RecommendationProducer。
+- 不得自动选择、确认、执行 action，不得自动发送消息、修改 relationship 或伪造 outcome。
+- 所有数据必须 user_id 隔离。
+- MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
+- 不得修改历史 migration、重写 migrations.py、修改 conversations/messages 业务逻辑或通过修改测试掩盖错误。
 
 ## 已完成阶段
 
 TEST-008 ~ TEST-044：VERIFIED
 TEST-045 ~ TEST-064：VERIFIED
-TEST-065 ~ TEST-069：Analysis Context bridges / evidence contract — VERIFIED
-TEST-070 Analysis LLM Service — VERIFIED
-TEST-071 Structured Analysis Strategy Bridge — VERIFIED
-TEST-072 Analysis → Strategy Orchestration — VERIFIED
-TEST-073 Qwen Provider Integration — VERIFIED
-TEST-074 Analysis → Strategy formal entrypoint — VERIFIED
-TEST-075 StructuredAnalysis → Strategy Decision 最小消费契约 — VERIFIED
-TEST-076 StructuredAnalysis → Strategic Reply 消费契约 — VERIFIED
-TEST-077 Strategic Reply downstream boundary — VERIFIED
-TEST-078 StructuredAnalysis → Action Plan 消费契约 — VERIFIED
-TEST-079 Learning Strategy → Action Plan HTTP Response Contract — VERIFIED
-TEST-080 StructuredAnalysis → Action Plan Candidate Boundary — VERIFIED
-TEST-081 Recommendation Producer Contract — VERIFIED
-TEST-082 Execution / Action Decision Closure — VERIFIED
-TEST-083 Strategy → Recommendation Candidate Contract — VERIFIED
-TEST-084 Recommendation → Action Plan Orchestration Bridge — VERIFIED
-TEST-085 Action Plan → Action Decision Bridge — VERIFIED
-TEST-086 Action Decision → Execution Bridge — VERIFIED
-TEST-087 Outcome → Re-analysis Closure — VERIFIED
+TEST-065 ~ TEST-087：VERIFIED
 
-## TEST-086 — Action Decision → Execution Bridge
+TEST-087 已锁定 Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环，未新增第二套生命周期、migration 或数据库结构。
 
-正式链路：
+## TEST-088 当前验收状态
 
-`Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis input`
+TEST-088 尚未 VERIFIED。当前结论是：自动化回归通过，真实 LLM 的部分链路已经验证，但真实用户完整闭环尚未完成验收。
 
-TEST-086 的最小连接是在 Action Plan 命名空间下暴露既有 execution lifecycle，复用既有 `StrategyDecisionExecutionService`、execution schema 与 repository，不新增第二套 execution 生命周期，不新增 migration，不改变 action_decision / execution / outcome 表结构。
+已确认：
 
-验收结论：TEST-086 已完成服务器验收并正式 VERIFIED。既有 confirmed-only execution、explicit execution、execution → outcome → feedback → learning 链路保持成立。
+- 当前分支与 origin 同步，HEAD 为 `b1b6f2eac46ab9c6ad3c039c161a370e6cf9c32c`。
+- 工作树 clean。
+- 全量自动化测试：`509 passed`。
+- 真实 Qwen / DashScope 请求曾返回 HTTP 200。
+- StructuredAnalysis 路由曾成功返回，并保留 Fact / Inference / Unknown、evidence provenance 与禁止自动执行约束。
+- 真实 person、relationship、conversation、message 数据曾成功写入。
 
-## TEST-087 — Outcome → Re-analysis Closure
+尚未完成或未定位：
 
-### 目标
+1. 曾出现一次 `POST /persons` 500，异常为 SQLite foreign key constraint failed。数据库结构当前未见明显异常，但失败请求使用的真实 user_id、请求体及当时数据库状态尚未核实，因此不得直接修改 Person 逻辑或数据库 FK。
+2. StructuredAnalysis 曾出现间歇性 502；DashScope HTTP 请求同时为 200，应用层具体异常尚未定位。不得将其直接归因于 LLM provider 不稳定。
+3. 尚未完成一次从真实用户数据开始，经 Strategy、Recommendation、Action Plan、Action Decision、显式确认、Execution、Outcome、Feedback、Learning，再回到下一轮 Analysis 的完整可追踪闭环。
 
-验证一次真实的 `Decision → Execution → Outcome → Feedback → Learning` 结果能够重新进入 Analysis，并继续进入 Recommendation，而不是停留在 outcome / learning 层。
+## 下一次新对话的第一步
 
-TEST-087 的目标是补齐闭环连接，而不是新增第二套 analysis、learning 或 recommendation 生命周期。
+先不要修改生产代码、测试、migration、数据库或重启服务。首先读取并核对当前 GitHub 分支上的：
 
-### GitHub 变更范围
+- `DEVELOPMENT_HANDOVER.md`
+- `docs/DEVELOPMENT_HANDOVER.md`
+- TEST-088 相关代码、测试与最近提交
 
-TEST-086 → TEST-087 的代码变更仅涉及：
+随后继续执行只读诊断，优先确认：
 
-- `backend/app/services/action_feedback_learning_synthesis.py`
-- `backend/app/services/analysis_recommendation.py`
-- `backend/app/services/learning_strategy_synthesis.py`
-- `backend/tests/test_outcome_reanalysis_closure.py`
+- 当前运行实例与 GitHub HEAD 是否一致；
+- `context.py`、persons route/service/repository/schema 及 users/persons migration 的真实契约；
+- Person FK 500 的真实请求 user_id 与数据库存在性；
+- StructuredAnalysis 502 的完整应用层 traceback；
+- 真实用户闭环每个阶段的输入、输出、持久化记录和 provenance。
 
-其中生产代码只有上述三个文件发生修改；没有 migration / database schema 变化，没有新增 repository / service lifecycle。
-
-### 正式契约
-
-`Action Execution → Outcome → Feedback → Learning → fresh AnalysisContext → StructuredAnalysis → Strategy → Recommendation`
-
-必须满足：
-
-- outcome 必须来自真实 persisted execution / outcome 生命周期，不能由 analysis 文本伪造；
-- action feedback learning 必须保留 recommendation identity、learning status、observed outcome counts 与 source provenance；
-- re-analysis 必须重新读取最新 canonical evidence 与 learning input，而不是复用旧的 analysis 结果；
-- StructuredAnalysis 仍只是 derived analysis，不得升级为 canonical fact / memory；
-- Recommendation 必须继续经过 Strategy candidate → RecommendationProducer 的 evidence-backed boundary；
-- Recommendation 不自动选择、不自动确认、不自动执行；
-- `must_not_auto_select=true` 与 `must_not_auto_execute=true` 继续成立。
-
-### TEST-086 → TEST-087 回归审计结论
-
-已完成 TEST-086 已锁定契约逐项回归审计。TEST-087 没有破坏 Action Plan-scoped execution、confirmed-only execution、Outcome 前置条件、Feedback / Learning provenance 或 user/person isolation。
-
-对 TEST-087 中删除的 45 行测试覆盖已进行语义审计：删除部分属于重复/旧路径覆盖，不构成已锁定生产契约的缺失；本阶段不重新扩大测试范围。`evidence` fallback 的行为仍保持与现有 downstream contract 一致，不被错误升级为 canonical source。
-
-### TEST-087 验收状态
-
-TEST-087 已完成正式验收并锁定：
-
-- Branch：`test-087-outcome-reanalysis-closure`
-- HEAD：`d7e26623a07f30524798ab6cd2b6052c0cf21daa`
-- commit message：`fix: preserve canonical unknown outcome field in learning synthesis`
-- working tree：验收结论为 clean
-- migration / database schema：无变化
-- 三个生产代码修改已完成审计，不再修改
-- 45 行测试删除已完成回归审计，不重新扩大范围
-- Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环已锁定
-
-TEST-087 正式标记为 VERIFIED。
-
-## 当前系统闭环状态
-
-截至 TEST-087，系统已经形成：
-
-`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis input → Recommendation`
-
-这意味着 MVP 的核心技术闭环已经从“生成建议”推进到“执行结果能够反哺下一轮判断”。后续不应为了堆叠 schema / service / test 数量继续扩张，而应验证真实用户工作流是否能够稳定运行。
-
-## 数据库与运行约束
-
-当前 migrations：001 / 002 / 003 / 004 / 005 / 006 / 007。
-
-TEST-045 ~ TEST-087 默认不新增 migration，不改变 action_decisions、action_executions、action_outcomes 的既有生命周期。
-
-Route → Service → Repository → SQLite。
-
-所有用户数据必须 user_id 隔离；不得自动向第三方发送消息；不得使用 8899；MVP 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+只有在根因确认后，才允许提出最小修复；未完成真实闭环前不得开始 TEST-089。
 
 ## 持续禁止事项
 
 - 不得让 RecommendationProducer 直接消费 StructuredAnalysis。
 - 不得把 inference 自动写入 canonical evidence 或 memory。
 - 不得自动确认 decision、执行 action、发送消息、修改 relationship 或伪造 outcome。
-- 不得为了测试方便绕过 user / person / conversation isolation。
-- 不得建立第二套 Strategy / Decision / Strategic Reply / Action Plan / Execution / Learning 生命周期。
-- 不得为了填充 Action Plan 而绕过 canonical evidence → recommendation → confirmation 链。
-- 不得在 GitHub 已能确认时要求服务器端查询。
-
-## TEST-088 — Real LLM + Real User Workflow
-
-下一阶段只做真实 LLM + 真实用户工作流验收，不预先新增架构层。
-
-验收重点：
-
-1. 真实用户建立 relationship / person / conversation；
-2. 写入真实聊天与现实互动 evidence；
-3. 通过 AnalysisContext 进入真实 Qwen / DashScope provider；
-4. 生成 StructuredAnalysis，并确认 Fact / Inference / Unknown 与 provenance 边界；
-5. 进入 Strategy → Recommendation → Action Plan → Action Decision；
-6. 用户显式确认后才允许 Execution；
-7. 记录真实 Outcome；
-8. Outcome → Feedback → Learning；
-9. 下一轮 Analysis 能看到最新 evidence 与 learning input；
-10. Recommendation 仍不得自动选择、确认或执行。
-
-TEST-088 的核心不是继续增加代码，而是证明上述闭环在真实 LLM 和真实用户操作下可以完成一次可追踪、可解释、可反馈的关系决策循环。
+- 不得绕过 user / person / conversation isolation。
+- 不得建立第二套 Strategy / Decision / Action Plan / Execution / Learning 生命周期。
+- GitHub 能确认的信息不得先要求服务器端查询。
