@@ -1,8 +1,8 @@
 # Development Handover
 
-更新时间：2026-09-08
-当前阶段：TEST-091 — Action Plan → Action Decision — CONTRACT LOCKED
-当前 Branch：test-088-real-llm-user-workflow
+更新时间：2026-09-16
+当前阶段：TEST-092 — Strategy Decision → Action Decision Lifecycle Convergence — VERIFIED
+当前 Branch：test-092-strategy-decision-lifecycle-convergence
 
 ## 项目目标
 
@@ -20,6 +20,8 @@ TEST-065 ~ TEST-087：VERIFIED
 TEST-088：VERIFIED
 TEST-089：VERIFIED
 TEST-090：VERIFIED
+TEST-091：CONTRACT LOCKED
+TEST-092：VERIFIED
 
 TEST-087 已锁定 Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环，未新增第二套生命周期、migration 或数据库结构。
 
@@ -131,7 +133,48 @@ TEST-088 已完成真实用户工作流最小验收：
 - `ActionPlanService`：只提升显式、evidence-backed、带 action 的 Recommendation 为 `status="proposed"` Action Plan，并要求用户确认。
 - `ActionDecisionService`：只允许 Decision 引用当前可用的 evidence-backed action plan recommendation；confirmed 必须带 recommendation_id。
 - Action Decision API 提供显式 POST Decision 入口；不存在由 Action Plan 自动确认 Decision 的路径。
-- 当前实现未显示需要 production code 修改才能满足 TEST-091 contract；下一步优先做 targeted acceptance，再决定是否需要最小修复。
+- TEST-091 审计发现 `strategy-decision/confirmations` 曾作为独立 ActionDecision 写入入口，且其 decisionable 语义依赖 Outcome / Learning；因此 TEST-091 未直接标记 VERIFIED，而转入 TEST-092 做 lifecycle convergence。
+
+## TEST-092 — VERIFIED
+
+目标：收敛 Strategy Decision 与 Action Decision，消除第二个 canonical Decision 写入生命周期，同时保留 Strategy / Learning / Re-analysis 的只读派生智能职责。
+
+### Canonical Boundary
+
+`Strategy / Learning / Re-analysis`
+
+`→ read-only derived intelligence`
+
+`→ Action Plan`
+
+`→ Explicit User Decision`
+
+`→ ActionDecisionService`
+
+`→ Action Decision`
+
+`→ Execution`
+
+`→ Outcome`
+
+`→ Feedback / Learning`
+
+`→ Re-analysis`
+
+### 已完成验收
+
+- `StrategyDecisionConfirmationService` 已收敛为 read-only context/synthesis service，不再持有 `ActionDecisionRepository`，不再提供 `create_confirmation()`。
+- 已移除 `POST /persons/{person_id}/strategy-decision/confirmations`，因此 Strategy Decision 不再拥有独立 canonical ActionDecision 写入入口。
+- 新的 Action Decision 写入仍统一经过 `ActionDecisionService`，并校验当前 Action Plan 中的 evidence-backed recommendation identity。
+- Strategy Decision / Learning / Re-analysis 继续保留为 read-only derived intelligence，不负责确认、执行或发送。
+- `StrategyDecisionExecutionService` 继续要求 confirmed ActionDecision，并拒绝 rejected / 未确认 / 已执行 / 已产生 Outcome 的 Decision。
+- Outcome / Feedback / Learning / Re-analysis 下游闭环保持不变。
+- 不新增第二套 lifecycle。
+- 不自动确认、不自动执行、不自动发送消息、不修改 relationship、不伪造 Outcome。
+- 未修改 migration / database schema。
+- TEST-092 targeted tests：36 passed。
+- TEST-092 full pytest：507 passed。
+- 历史 confirmation synthesis 对“已产生 Outcome 的 Decision 不再计入 explicit confirmation”语义保持不变；相关测试仅按既有语义调整 fixture，不构成 production regression。
 
 ## 架构与安全边界
 
@@ -142,6 +185,7 @@ TEST-088 已完成真实用户工作流最小验收：
 - Recommendation 必须经过显式 candidate contract 与 RecommendationProducer。
 - Action Plan 必须 evidence-backed 且必须等待用户确认。
 - Action Decision 必须来自显式 user decision；不得伪造 confirmation。
+- Strategy Decision / Learning / Re-analysis 为 read-only derived intelligence，不得形成第二套 canonical ActionDecision lifecycle。
 - 不得自动选择、确认、执行 action，不得自动发送消息、修改 relationship 或伪造 outcome。
 - 所有数据必须 user_id 隔离。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
