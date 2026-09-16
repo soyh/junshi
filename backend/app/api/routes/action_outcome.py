@@ -49,4 +49,6 @@ def create_action_outcome(
                 payload.note,
             )
     except ValueError as exc:
+        if str(exc) == "action decision not found":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
