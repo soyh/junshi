@@ -27,6 +27,7 @@ class AnalysisActionPlanService:
         conversation_id: str,
         *,
         provider=None,
+        persist_proposals: bool = False,
     ) -> dict:
         analysis_context = self.analysis_llm_service.analysis_service.get_context(
             conn, user_id, conversation_id
@@ -53,6 +54,13 @@ class AnalysisActionPlanService:
                 recommendations,
                 recommendation_context["evidence"],
             )
+            if persist_proposals:
+                action_plan = self.action_plan_service.persist_action_plan(
+                    conn,
+                    user_id,
+                    person_id,
+                    action_plan,
+                )
         else:
             recommendations = list(action_plan_context.get("recommendations") or [])
             action_plan = list(action_plan_context.get("action_plan") or [])
