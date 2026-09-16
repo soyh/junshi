@@ -1,6 +1,7 @@
 import sqlite3
 
 from app.repositories.action_decision import ActionDecisionRepository
+from app.repositories.action_plan_proposal import ActionPlanProposalRepository
 from app.services.action_plan import ActionPlanService
 
 
@@ -9,9 +10,11 @@ class ActionDecisionService:
         self,
         action_plan_service: ActionPlanService | None = None,
         repository: ActionDecisionRepository | None = None,
+        proposal_repository: ActionPlanProposalRepository | None = None,
     ):
         self.action_plan_service = action_plan_service or ActionPlanService()
         self.repository = repository or ActionDecisionRepository()
+        self.proposal_repository = proposal_repository or ActionPlanProposalRepository()
 
     def get_context(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
         context = self.action_plan_service.get_context(conn, user_id, person_id)
@@ -37,14 +40,25 @@ class ActionDecisionService:
         note: str | None,
     ) -> dict:
         context = self.action_plan_service.get_context(conn, user_id, person_id)
+        proposal_id = None
         if recommendation_id is not None:
-            allowed_ids = {
-                item.get("recommendation_id")
-                for item in context["action_plan"]
-                if item.get("recommendation_id")
-            }
-            if recommendation_id not in allowed_ids:
+            proposal = self.proposal_repository.get_available_by_recommendation(
+                conn,
+                user_id,
+                person_id,
+                recommendation_id,
+            )
+            if proposal is None:
                 raise ValueError("recommendation is not an available evidence-backed action")
+
+            evidence_ids = {
+                item.get("source_id")
+                for item in context["evidence"]
+                if isinstance(item, dict) and item.get("source_id")
+            }
+            if not all(source_id in evidence_ids for source_id in proposal["evidence_source_ids"]):
+                raise ValueError("action plan proposal is no longer evidence-backed")
+            proposal_id = proposal["id"]
 
         if decision == "confirmed" and recommendation_id is None:
             raise ValueError("confirmed decision requires recommendation_id")
@@ -56,4 +70,5 @@ class ActionDecisionService:
             recommendation_id,
             decision,
             note,
+            proposal_id,
         )
