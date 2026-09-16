@@ -17,17 +17,22 @@ class StrategyRecommendationCandidateService:
                 continue
             content = hypothesis.get("content")
             source_ids = hypothesis.get("evidence_source_ids")
+            action = hypothesis.get("action")
             if not isinstance(content, str) or not content.strip():
                 continue
             if not isinstance(source_ids, list) or not source_ids:
                 continue
             if not all(isinstance(source_id, str) and source_id.strip() for source_id in source_ids):
                 continue
+            if action is not None and (not isinstance(action, str) or not action.strip()):
+                continue
 
             recommendation = content.strip()
             evidence_source_ids = list(dict.fromkeys(source_ids))
+            explicit_action = action.strip() if isinstance(action, str) else None
             identity_payload = {
                 "recommendation": recommendation,
+                "action": explicit_action,
                 "evidence_source_ids": evidence_source_ids,
             }
             candidate_id = "strategy-recommendation-" + hashlib.sha256(
@@ -38,6 +43,7 @@ class StrategyRecommendationCandidateService:
                     "id": candidate_id,
                     "recommendation": recommendation,
                     "evidence_source_ids": evidence_source_ids,
+                    "action": explicit_action,
                     "provenance": {
                         "source": "strategy_candidate",
                         "strategy_candidate_type": "analysis_hypothesis",
