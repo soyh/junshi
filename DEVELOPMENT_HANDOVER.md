@@ -1,8 +1,8 @@
 # AI Love Strategist Development Handover
 
-更新时间：2026-09-08
-当前阶段：TEST-091 — Action Plan → Action Decision — CONTRACT LOCKED
-当前 Branch：test-088-real-llm-user-workflow
+更新时间：2026-09-16
+当前阶段：TEST-095 — Core Engine Closure — VERIFIED PENDING TAG
+当前 Branch：test-095-core-engine-closure
 
 ## 项目目标
 
@@ -20,6 +20,8 @@ TEST-065 ~ TEST-087：VERIFIED
 TEST-088：VERIFIED
 TEST-089：VERIFIED
 TEST-090：VERIFIED
+TEST-091 ~ TEST-094：VERIFIED
+TEST-095：功能验收 VERIFIED；verification tag 尚待创建
 
 TEST-087 已锁定 Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环，未新增第二套生命周期、migration 或数据库结构。
 
@@ -131,7 +133,55 @@ TEST-088 已完成真实用户工作流最小验收：
 - `ActionPlanService`：只提升显式、evidence-backed、带 action 的 Recommendation 为 `status="proposed"` Action Plan，并要求用户确认。
 - `ActionDecisionService`：只允许 Decision 引用当前可用的 evidence-backed action plan recommendation；confirmed 必须带 recommendation_id。
 - Action Decision API 提供显式 POST Decision 入口；不存在由 Action Plan 自动确认 Decision 的路径。
-- 当前实现未显示需要 production code 修改才能满足 TEST-091 contract；下一步优先做 targeted acceptance，再决定是否需要最小修复。
+
+## TEST-092 ~ TEST-094 — VERIFIED
+
+- 延续并验证 Action Plan → Action Decision → Execution / Outcome 边界的既有生命周期。
+- 保持显式 user decision、evidence provenance、user/person isolation 与 no-auto-execution 约束。
+- TEST-094 的 real Recommendation → Action Decision bridge 为 TEST-095 的基线。
+
+## TEST-095 — VERIFIED PENDING TAG
+
+目标：补齐真实 Recommendation → Action Plan → Action Decision 的持久化生命周期缺口，并验证完整闭环能够从 Outcome / Learning 回到 fresh Analysis → Recommendation。
+
+### 本阶段变更
+
+- 新增 `backend/migrations/008_action_plan_snapshots.sql`，建立 action-plan snapshot 持久化表；未修改历史 migration 001~007。
+- 新增 `ActionPlanSnapshotRepository`，按 `user_id + person_id + recommendation_id` 保存 Recommendation、Action Plan 与 evidence snapshot。
+- `ActionPlanService` 在真实 DB connection 下读取 persisted snapshots；保留 `conn=None` 的旧测试/内存 synthesis 行为。
+- `AnalysisActionPlanService` 在产生 fresh evidence-backed Recommendation 后持久化对应 Action Plan snapshot；无 fresh Recommendation 时回退到已持久化上下文。
+- Action Plan 仍只提升显式、evidence-backed、带 action 的 Recommendation，并保持 `proposed + requires_user_confirmation`。
+- 不放宽 `ActionDecisionService` 的 evidence-backed validation；Decision 仍不能引用不可用 recommendation。
+- 未新增第二套 Strategy / Recommendation / Action Plan / Decision / Execution / Learning 生命周期。
+
+### 验收结果
+
+- TEST-095 targeted bridge：通过。
+- Outcome → Feedback → Learning → fresh Analysis → Recommendation closure：通过。
+- 相关回归套件：26 passed。
+- TEST-095 最终 targeted regression：21 passed in 1.84s。
+- 全量 pytest：509 passed in 81.58s。
+- `git status --short`：clean。
+- HEAD：`ed96f5bdc3ecd46540a06ba7d70ebe91699faed1`。
+- `git diff 8aa030c..HEAD --stat`：4 个文件，130 insertions / 20 deletions；仅涉及 snapshot repository、Action Plan service、Analysis Action Plan service、migration 008。
+
+### 锁定结论
+
+`Recommendation → Action Plan → Explicit Action Decision → Execution → Outcome → Feedback → Learning → Fresh Analysis → Recommendation`
+
+已形成可测试的单一生命周期闭环。
+
+Action Plan snapshot 是 lifecycle state recovery mechanism，不是新的 Recommendation truth；canonical evidence、StructuredAnalysis、Strategy、RecommendationProducer 与 ActionDecision validation 边界保持不变。
+
+### TEST-095 非目标
+
+- 不修改历史 migration 001~007。
+- 不改变 ActionDecision evidence-backed gate。
+- 不自动确认、不自动执行、不自动发送消息。
+- 不修改 relationship。
+- 不把 LLM output 写入 canonical truth。
+- 不引入 PostgreSQL、Redis、Elasticsearch、Vector DB。
+- 不使用或修改 8899。
 
 ## 架构与安全边界
 
