@@ -42,23 +42,40 @@ class ActionDecisionService:
         context = self.action_plan_service.get_context(conn, user_id, person_id)
         proposal_id = None
         if recommendation_id is not None:
-            proposal = self.proposal_repository.get_available_by_recommendation(
-                conn,
-                user_id,
-                person_id,
-                recommendation_id,
+            context_action_plan = context.get("action_plan") or []
+            available_action = next(
+                (
+                    item
+                    for item in context_action_plan
+                    if isinstance(item, dict)
+                    and item.get("recommendation_id") == recommendation_id
+                    and item.get("status") == "proposed"
+                    and item.get("requires_user_confirmation") is True
+                ),
+                None,
             )
-            if proposal is None:
-                raise ValueError("recommendation is not an available evidence-backed action")
+            if available_action is not None:
+                proposal_id = available_action.get("proposal_id")
+            else:
+                if conn is None:
+                    raise ValueError("recommendation is not an available evidence-backed action")
+                proposal = self.proposal_repository.get_available_by_recommendation(
+                    conn,
+                    user_id,
+                    person_id,
+                    recommendation_id,
+                )
+                if proposal is None:
+                    raise ValueError("recommendation is not an available evidence-backed action")
 
-            evidence_ids = {
-                item.get("source_id")
-                for item in context["evidence"]
-                if isinstance(item, dict) and item.get("source_id")
-            }
-            if not all(source_id in evidence_ids for source_id in proposal["evidence_source_ids"]):
-                raise ValueError("action plan proposal is no longer evidence-backed")
-            proposal_id = proposal["id"]
+                evidence_ids = {
+                    item.get("source_id")
+                    for item in context.get("evidence", [])
+                    if isinstance(item, dict) and item.get("source_id")
+                }
+                if not all(source_id in evidence_ids for source_id in proposal["evidence_source_ids"]):
+                    raise ValueError("action plan proposal is no longer evidence-backed")
+                proposal_id = proposal["id"]
 
         if decision == "confirmed" and recommendation_id is None:
             raise ValueError("confirmed decision requires recommendation_id")
