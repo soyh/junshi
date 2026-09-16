@@ -55,7 +55,20 @@ def test_proposal_isolated_by_user_and_person(client):
         ) is None
 
 
-def test_proposal_evidence_must_still_exist_before_confirmation():
+def test_proposal_evidence_must_still_exist_before_confirmation(client):
+    person = create_person(client, "evidence bridge object")
+    create_relationship(client, person["id"])
+
+    with get_connection() as conn:
+        proposal = ActionPlanProposalRepository.create(
+            conn,
+            "00000000-0000-0000-0000-000000000001",
+            person["id"],
+            "recommendation-1",
+            "保持低压力互动",
+            ["message-1"],
+        )
+
     class FakeActionPlanService:
         def get_context(self, conn, user_id, person_id):
             return {
@@ -66,21 +79,12 @@ def test_proposal_evidence_must_still_exist_before_confirmation():
             }
 
     with get_connection() as conn:
-        proposal = ActionPlanProposalRepository.create(
-            conn,
-            "user-1",
-            "person-1",
-            "recommendation-1",
-            "保持低压力互动",
-            ["message-1"],
-        )
-
         service = ActionDecisionService(action_plan_service=FakeActionPlanService())
         try:
             service.create_decision(
                 conn,
-                "user-1",
-                "person-1",
+                "00000000-0000-0000-0000-000000000001",
+                person["id"],
                 proposal["recommendation_id"],
                 "confirmed",
                 None,
