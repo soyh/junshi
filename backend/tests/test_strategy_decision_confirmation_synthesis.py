@@ -51,7 +51,6 @@ def test_confirmation_synthesis_counts_confirmed_and_rejected(client):
     first = seed_decision(person["id"], "recommendation-a", "confirmed")
     create_outcome(client, person["id"], first["id"])
     second = seed_decision(person["id"], "recommendation-b", "rejected")
-    create_outcome(client, person["id"], second["id"])
     body = get_synthesis(client, person["id"]).json()
     assert body["confirmation_summary"]["confirmed_count"] == 1
     assert body["confirmation_summary"]["rejected_count"] == 1
@@ -75,7 +74,6 @@ def test_confirmation_synthesis_tracks_latest_decision(client):
     first = seed_decision(person["id"], "recommendation-a", "confirmed")
     create_outcome(client, person["id"], first["id"])
     second = seed_decision(person["id"], "recommendation-b", "rejected")
-    create_outcome(client, person["id"], second["id"])
     body = get_synthesis(client, person["id"]).json()
     assert body["confirmation_summary"]["latest_decision_id"] == second["id"]
 
