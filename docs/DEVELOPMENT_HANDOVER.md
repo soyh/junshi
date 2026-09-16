@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-16
-当前阶段：TEST-094 — Real Recommendation → Action Plan → Action Decision Bridge — CONTRACT LOCKED
-当前 Branch：test-094-real-recommendation-action-decision-bridge
+当前阶段：TEST-094 — Real Recommendation → Action Plan → Action Decision Bridge — VERIFIED
+当前 Branch：test-094-action-plan-proposal-bridge
 
 ## 项目目标
 
@@ -23,7 +23,7 @@ TEST-090：VERIFIED
 TEST-091：CONTRACT LOCKED
 TEST-092：VERIFIED
 TEST-093：VERIFIED
-TEST-094：CONTRACT LOCKED
+TEST-094：VERIFIED
 
 TEST-087 已锁定 Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环，未新增第二套生命周期、migration 或数据库结构。
 
@@ -302,6 +302,54 @@ TEST-093 将原有“Learning 出现在 AnalysisContext”证明升级为 Learni
 - 不引入 Recommendation / StructuredAnalysis 的无约束持久化。
 - 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 - 不做真实第三方消息发送。
+
+## TEST-094 — VERIFIED
+
+目标：验证真实 `Recommendation → Action Plan → Explicit User Decision → ActionDecision` canonical 实链，而不是通过 FakeActionPlanService 注入候选。
+
+### Canonical Acceptance Chain
+
+`Real AnalysisContext → StructuredAnalysis → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → ActionPlanService → persisted proposed Action Plan → explicit user decision → ActionDecisionService → canonical ActionDecision`
+
+### 已完成验收
+
+1. 使用真实 `ActionPlanService` 与 `ActionDecisionService`，未使用 FakeActionPlanService 作为最终桥接证明。
+2. Recommendation 来自现有 StrategyRecommendationCandidate → RecommendationProducer canonical chain。
+3. Action Plan 保留 recommendation identity、action、evidence_source_ids、`status="proposed"`、`requires_user_confirmation=true`。
+4. Action Plan Proposal 通过最小 canonical bridge 持久化，供后续显式用户决策安全解析。
+5. ActionDecision 仍只能通过 `ActionDecisionService` canonical write path 创建。
+6. confirmed Decision 保留 Recommendation / Action Plan identity 与 evidence provenance。
+7. rejected Decision 可以不带 recommendation_id，且不会进入 Execution / Outcome。
+8. proposal lookup 按 user/person/recommendation 范围隔离，并在创建 Decision 前重新验证 evidence。
+9. HTTP boundary 测试证明 persisted proposal 与最终 ActionDecision 使用同一 `action_plan_proposal_id`。
+10. 不自动确认、不自动执行、不自动发送消息、不创建 Outcome。
+11. ActionDecision 不直接调用 LLM、StructuredAnalysis、Learning 或 Re-analysis。
+12. 未建立第二套 Recommendation / Action Plan / ActionDecision lifecycle。
+13. 历史 migrations 未修改；`008_action_plan_proposals.sql` 是 TEST-094 明确证明所需的最小 canonical bridge。
+14. user / person / relationship / conversation isolation 保持。
+
+### 验收结果
+
+- TEST-094 targeted bridge regression：18 passed in 2.63s。
+- TEST-094 full pytest：514 passed in 85.17s。
+- 0 failed。
+- 服务器同步基线：`dd68384fc9eb3eac7b1a0b499fec2aca1e8bd91e`。
+- working tree 在最终测试前 clean。
+- GitHub comparison 确认最后两次修复仅涉及既有测试契约兼容：
+  - `a7212e76e32b1633c36758b634413526c028925c`
+  - `dd68384fc9eb3eac7b1a0b499fec2aca1e8bd91e`
+- TEST-094 不进入 ActionExecution / Outcome；该边界由后续阶段继续负责。
+
+### 非目标
+
+- 不重新实现 TEST-093 Outcome → Feedback → Learning → Re-analysis → Recommendation。
+- 不重新实现 TEST-092 Strategy Decision convergence。
+- 不自动执行 Action。
+- 不自动发送消息。
+- 不伪造 Outcome。
+- 不引入第二套 lifecycle。
+- 不修改历史 migration。
+- 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 
 ## 架构与安全边界
 
