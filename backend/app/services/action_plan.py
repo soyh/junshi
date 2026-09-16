@@ -1,17 +1,20 @@
 import sqlite3
 
+from app.repositories.action_plan_snapshot import ActionPlanSnapshotRepository
 from app.services.strategic_reply import StrategicReplyService
 
 
 class ActionPlanService:
-    def __init__(self, strategic_reply_service: StrategicReplyService | None = None):
+    def __init__(
+        self,
+        strategic_reply_service: StrategicReplyService | None = None,
+        snapshot_repository: ActionPlanSnapshotRepository | None = None,
+    ):
         self.strategic_reply_service = strategic_reply_service or StrategicReplyService()
+        self.snapshot_repository = snapshot_repository or ActionPlanSnapshotRepository()
 
     @staticmethod
-    def build_action_plan(
-        recommendations: list,
-        evidence: list[dict],
-    ) -> list[dict]:
+    def build_action_plan(recommendations: list, evidence: list[dict]) -> list[dict]:
         """Promote only explicit, evidence-backed recommendations to proposals."""
         evidence_ids = {
             item.get("source_id")
@@ -19,23 +22,17 @@ class ActionPlanService:
             if isinstance(item, dict) and item.get("source_id")
         }
         action_plan: list[dict] = []
-
         for recommendation in recommendations:
             if not isinstance(recommendation, dict):
                 continue
-
             action = recommendation.get("action")
             source_ids = recommendation.get("evidence_source_ids")
             if not isinstance(action, str) or not action.strip():
                 continue
             if not isinstance(source_ids, list) or not source_ids:
                 continue
-            if not all(
-                isinstance(source_id, str) and source_id in evidence_ids
-                for source_id in source_ids
-            ):
+            if not all(isinstance(source_id, str) and source_id in evidence_ids for source_id in source_ids):
                 continue
-
             item = {
                 "recommendation_id": recommendation.get("id"),
                 "action": action,
@@ -48,16 +45,37 @@ class ActionPlanService:
             if recommendation.get("time_horizon") is not None:
                 item["time_horizon"] = recommendation["time_horizon"]
             action_plan.append(item)
-
         return action_plan
 
-    def get_context(
+    def persist_action_plan(
         self,
         conn: sqlite3.Connection,
         user_id: str,
         person_id: str,
-    ) -> dict:
+        recommendations: list[dict],
+        action_plan: list[dict],
+        evidence: list[dict],
+    ) -> None:
+        plans_by_id = {
+            item.get("recommendation_id"): item
+            for item in action_plan
+            if item.get("recommendation_id")
+        }
+        for recommendation in recommendations:
+            recommendation_id = recommendation.get("id")
+            if recommendation_id in plans_by_id:
+                self.snapshot_repository.upsert(
+                    conn,
+                    user_id,
+                    person_id,
+                    recommendation,
+                    plans_by_id[recommendation_id],
+                    evidence,
+                )
+
+    def get_context(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
         context = self.strategic_reply_service.get_context(conn, user_id, person_id)
+        snapshots = self.snapshot_repository.list_for_person(conn, user_id, person_id)
         return {
             "person": context["person"],
             "relationship": context["relationship"],
@@ -66,11 +84,8 @@ class ActionPlanService:
             "facts": context["facts"],
             "inferences": context["inferences"],
             "unknowns": context["unknowns"],
-            "recommendations": context["recommendations"],
-            "action_plan": self.build_action_plan(
-                context["recommendations"],
-                context["evidence"],
-            ),
+            "recommendations": [item["recommendation"] for item in snapshots],
+            "action_plan": [item["action_plan"] for item in snapshots],
             "action_constraints": {
                 "must_be_evidence_backed": True,
                 "must_preserve_unknowns": True,
