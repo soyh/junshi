@@ -1,7 +1,7 @@
 # Development Handover
 
 更新时间：2026-09-16
-当前阶段：TEST-093 — Outcome → Feedback → Learning → Re-analysis → Recommendation — CONTRACT LOCKED
+当前阶段：TEST-093 — Outcome → Feedback → Learning → Re-analysis → Recommendation — VERIFIED
 当前 Branch：test-093-outcome-learning-reanalysis-closure
 
 ## 项目目标
@@ -22,7 +22,7 @@ TEST-089：VERIFIED
 TEST-090：VERIFIED
 TEST-091：CONTRACT LOCKED
 TEST-092：VERIFIED
-TEST-093：CONTRACT LOCKED
+TEST-093：VERIFIED
 
 TEST-087 已锁定 Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环，未新增第二套生命周期、migration 或数据库结构。
 
@@ -177,7 +177,7 @@ TEST-087 已锁定 Outcome → Feedback → Learning → Re-analysis → Recomme
 - TEST-092 full pytest：507 passed。
 - 历史 confirmation synthesis 对“已产生 Outcome 的 Decision 不再计入 explicit confirmation”语义保持不变；相关测试仅按既有语义调整 fixture，不构成 production regression。
 
-## TEST-093 — CONTRACT LOCKED
+## TEST-093 — VERIFIED
 
 目标：证明上一轮 canonical Action 的 Outcome / Feedback / Learning 会进入下一轮 AnalysisContext，并且下一轮 Analysis 真正消费该 Learning，再沿既有 Strategy → Recommendation canonical lifecycle 产生新的 Recommendation。
 
@@ -187,9 +187,7 @@ TEST-092 基线的 production architecture 已存在完整可达链：
 
 `Outcome → Feedback → Learning → AnalysisContext.learning_strategy → StructuredAnalysis → StrategyRecommendationCandidate → RecommendationProducer → Recommendation`
 
-当前 GAP 是集成测试只能证明 Learning 出现在 AnalysisContext，不能证明下一轮 Analysis 真正消费 Learning 并使新的 StructuredAnalysis / Recommendation 对该 Learning 产生依赖。
-
-因此 TEST-093 先锁定集成验收契约，不修改 production architecture。
+TEST-093 将原有“Learning 出现在 AnalysisContext”证明升级为 Learning-aware 集成闭环证明：下一轮 Analysis provider 必须实际读取并消费上一轮 action feedback learning，并使新的 StructuredAnalysis / Recommendation 对该 Learning 产生可验证依赖。
 
 ### Canonical Acceptance Chain
 
@@ -213,27 +211,30 @@ TEST-092 基线的 production architecture 已存在完整可达链：
 
 `→ Fresh Recommendation`
 
-### 锁定契约
+### 已完成验收
 
-1. Outcome 必须对应实际 ActionExecution / confirmed ActionDecision；不得伪造 Outcome。
-2. Feedback 必须消费 canonical Outcome，并保留 decision / recommendation provenance。
-3. Learning 必须消费 canonical Feedback，不得绕过 Feedback 自行产生 action decision。
-4. 下一次 AnalysisContext 必须重新读取当前 canonical relationship/evidence 与 Learning inputs；不得复用旧 AnalysisContext snapshot。
-5. Analysis provider 必须实际读取并消费 `learning_strategy.learning_inputs.action_feedback`，不能只因为该字段存在就判定闭环成立。
-6. Learning-aware StructuredAnalysis 必须能够体现本轮 Learning 被消费；测试不得使用与 Learning 无关的固定返回值作为唯一证明。
-7. 新 StructuredAnalysis 必须继续保持 Fact / Inference / Unknown 分离与 evidence provenance。
-8. Strategy 必须继续通过现有 Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation 链生成 Recommendation。
-9. Learning 不得直接创建 ActionDecision、ActionExecution 或 Outcome。
-10. 新 Recommendation 必须具有当前 evidence provenance；不得静默复用旧 Recommendation / ActionDecision。
-11. 必须保持 user / person / relationship / conversation isolation。
+1. Outcome 对应实际 ActionExecution / confirmed ActionDecision，不伪造 Outcome。
+2. Feedback 消费 canonical Outcome，并保留 decision / recommendation provenance。
+3. Learning 消费 canonical Feedback，不绕过 Feedback 进入 action decision。
+4. 下一次 AnalysisContext 重新读取当前 canonical relationship/evidence 与 Learning inputs，不复用旧 AnalysisContext snapshot。
+5. Analysis provider 实际读取并消费 `learning_strategy.learning_inputs.action_feedback`。
+6. Learning-aware StructuredAnalysis 体现本轮 Learning 被消费；不是与 Learning 无关的固定返回值。
+7. 新 StructuredAnalysis 保持 Fact / Inference / Unknown 分离与 evidence provenance。
+8. Strategy 继续通过 Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation 链生成 Recommendation。
+9. Learning 不直接创建 ActionDecision、ActionExecution 或 Outcome。
+10. 新 Recommendation 具有当前 evidence provenance，不静默复用旧 Recommendation / ActionDecision。
+11. user / person / relationship / conversation isolation 保持。
 12. 不自动选择 Recommendation、不自动确认 ActionDecision、不自动执行 Action、不自动发送消息。
-13. TEST-093 不新增 migration / database schema，不修改历史 migration，不建立第二套 lifecycle。
+13. 未新增 migration / database schema，未修改历史 migration，未建立第二套 lifecycle。
 
-### 当前 TEST-093 验收测试
+### 验收结果
 
-`backend/tests/test_outcome_reanalysis_closure.py`
-
-测试已强化为 Learning-aware contract：Provider 在返回 StructuredAnalysis 前必须读取并校验上一轮 `recommendation-previous` 的 completed feedback learning，并将该 Learning identity 实际写入新的 analysis summary / hypothesis；随后验证 Recommendation 仍由 `strategy_candidate` provenance 产生，并引用当前 message evidence。
+- `backend/tests/test_outcome_reanalysis_closure.py` targeted：1 passed。
+- full pytest：507 passed in 78.42s。
+- HEAD：`408ae26e26f8713dcbd3aa36d82146e7fa252102`。
+- working tree：clean。
+- production code 未修改。
+- migration / database schema 未修改。
 
 ### 非目标
 
