@@ -5,6 +5,10 @@ from app.repositories.action_execution import ActionExecutionRepository
 from app.repositories.action_outcome import ActionOutcomeRepository
 
 
+class ActionDecisionScopeError(ValueError):
+    pass
+
+
 class ActionOutcomeService:
     def __init__(
         self,
@@ -30,6 +34,10 @@ class ActionOutcomeService:
     ) -> dict:
         decision = self.decision_repository.get(conn, user_id, person_id, decision_id)
         if decision is None:
+            if self.decision_repository.exists_for_other_scope(
+                conn, user_id, person_id, decision_id
+            ):
+                raise ActionDecisionScopeError("action decision not found")
             raise ValueError("action decision not found")
         if decision["decision"] != "confirmed":
             raise ValueError("outcome requires a confirmed action decision")
