@@ -63,6 +63,7 @@ def test_real_recommendation_reaches_action_decision_without_fake_action_plan(cl
             USER_ID,
             conversation["id"],
             provider=Provider(),
+            persist_proposals=True,
         )
 
     assert len(result["recommendations"]) == 1
@@ -73,6 +74,7 @@ def test_real_recommendation_reaches_action_decision_without_fake_action_plan(cl
 
     assert len(result["action_plan"]) == 1
     action_plan = result["action_plan"][0]
+    assert action_plan["proposal_id"]
     assert action_plan["recommendation_id"] == recommendation["id"]
     assert action_plan["action"] == recommendation["action"]
     assert action_plan["evidence_source_ids"] == [message["id"]]
@@ -90,4 +92,5 @@ def test_real_recommendation_reaches_action_decision_without_fake_action_plan(cl
         )
 
     assert decision["recommendation_id"] == recommendation["id"]
+    assert decision["action_plan_proposal_id"] == action_plan["proposal_id"]
     assert decision["decision"] == "confirmed"
