@@ -12,6 +12,7 @@ def analysis():
                 "content": "保持正常互动，不立即升级关系",
                 "confidence": 0.72,
                 "evidence_source_ids": ["interaction-1", "interaction-1"],
+                "action": "保持正常互动",
             }
         ],
         "unknowns": ["对方真实动机未知"],
@@ -24,19 +25,24 @@ def evidence():
     ]
 
 
-def test_strategy_candidate_has_minimal_recommendation_contract():
+def test_strategy_candidate_preserves_explicit_action_contract():
     candidate = StrategyRecommendationCandidateService.build_candidates(analysis())[0]
-    assert set(candidate) == {"id", "recommendation", "evidence_source_ids", "provenance"}
+    assert set(candidate) == {"id", "recommendation", "evidence_source_ids", "action", "provenance"}
     assert candidate["recommendation"] == "保持正常互动，不立即升级关系"
+    assert candidate["action"] == "保持正常互动"
     assert candidate["evidence_source_ids"] == ["interaction-1"]
     assert candidate["provenance"]["source"] == "strategy_candidate"
     assert candidate["provenance"]["strategy_candidate_type"] == "analysis_hypothesis"
 
 
-def test_strategy_candidate_identity_is_deterministic():
+def test_strategy_candidate_identity_is_deterministic_and_action_sensitive():
     first = StrategyRecommendationCandidateService.build_candidates(analysis())
     second = StrategyRecommendationCandidateService.build_candidates(analysis())
     assert first == second
+
+    changed = analysis()
+    changed["hypotheses"][0]["action"] = "降低互动频率"
+    assert first[0]["id"] != StrategyRecommendationCandidateService.build_candidates(changed)[0]["id"]
 
 
 def test_strategy_candidate_preserves_unknowns_as_provenance():
@@ -49,13 +55,22 @@ def test_strategy_candidate_preserves_unknowns_as_provenance():
 def test_strategy_candidate_rejects_hypotheses_without_evidence_ids():
     value = analysis()
     value["hypotheses"] = [
-        {"content": "立即升级关系", "confidence": 0.9},
-        {"content": "未知来源", "evidence_source_ids": ["missing"]},
+        {"content": "立即升级关系", "confidence": 0.9, "action": "立即升级关系"},
+        {"content": "未知来源", "evidence_source_ids": ["missing"], "action": "未知来源"},
     ]
     candidates = StrategyRecommendationCandidateService.build_candidates(value)
     assert len(candidates) == 1
     assert candidates[0]["recommendation"] == "未知来源"
     assert RecommendationProducer.produce(candidates, evidence()) == []
+
+
+def test_strategy_candidate_keeps_missing_action_non_promotable():
+    value = analysis()
+    value["hypotheses"][0].pop("action")
+    candidate = StrategyRecommendationCandidateService.build_candidates(value)[0]
+    assert candidate["action"] is None
+    produced = RecommendationProducer.produce([candidate], evidence())
+    assert produced[0]["action"] is None
 
 
 def test_strategy_candidate_does_not_accept_structured_analysis_as_recommendation():
