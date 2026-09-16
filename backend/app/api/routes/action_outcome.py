@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
 from app.schemas.action_outcome import ActionOutcomeCreate, ActionOutcomeResponse
-from app.services.action_outcome import ActionOutcomeService
+from app.services.action_outcome import ActionDecisionScopeError, ActionOutcomeService
 
 
 router = APIRouter(
@@ -48,7 +48,7 @@ def create_action_outcome(
                 payload.outcome,
                 payload.note,
             )
+    except ActionDecisionScopeError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
-        if str(exc) == "action decision not found":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
