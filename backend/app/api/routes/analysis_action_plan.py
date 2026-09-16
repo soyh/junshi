@@ -16,15 +16,7 @@ router = APIRouter(
 service = AnalysisActionPlanService()
 
 
-@router.get(
-    "/context",
-    response_model=AnalysisActionPlanContextResponse,
-    status_code=status.HTTP_200_OK,
-)
-def get_analysis_action_plan_context(
-    conversation_id: str,
-    user_id: str = Depends(get_current_user_id),
-):
+def _build_context(conversation_id: str, user_id: str, persist_proposals: bool):
     try:
         with get_connection() as conn:
             return service.build_context(
@@ -32,6 +24,7 @@ def get_analysis_action_plan_context(
                 user_id,
                 conversation_id,
                 provider=QwenProvider(),
+                persist_proposals=persist_proposals,
             )
     except ValueError as exc:
         raise HTTPException(
@@ -43,3 +36,27 @@ def get_analysis_action_plan_context(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="LLM analysis failed",
         ) from exc
+
+
+@router.get(
+    "/context",
+    response_model=AnalysisActionPlanContextResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_analysis_action_plan_context(
+    conversation_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    return _build_context(conversation_id, user_id, persist_proposals=False)
+
+
+@router.post(
+    "/proposals",
+    response_model=AnalysisActionPlanContextResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_analysis_action_plan_proposals(
+    conversation_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    return _build_context(conversation_id, user_id, persist_proposals=True)
