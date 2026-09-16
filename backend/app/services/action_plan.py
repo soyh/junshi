@@ -75,7 +75,13 @@ class ActionPlanService:
 
     def get_context(self, conn: sqlite3.Connection, user_id: str, person_id: str) -> dict:
         context = self.strategic_reply_service.get_context(conn, user_id, person_id)
-        snapshots = self.snapshot_repository.list_for_person(conn, user_id, person_id)
+        if conn is None:
+            recommendations = list(context.get("recommendations", []))
+            action_plan = self.build_action_plan(recommendations, context["evidence"])
+        else:
+            snapshots = self.snapshot_repository.list_for_person(conn, user_id, person_id)
+            recommendations = [item["recommendation"] for item in snapshots]
+            action_plan = [item["action_plan"] for item in snapshots]
         return {
             "person": context["person"],
             "relationship": context["relationship"],
@@ -84,8 +90,8 @@ class ActionPlanService:
             "facts": context["facts"],
             "inferences": context["inferences"],
             "unknowns": context["unknowns"],
-            "recommendations": [item["recommendation"] for item in snapshots],
-            "action_plan": [item["action_plan"] for item in snapshots],
+            "recommendations": recommendations,
+            "action_plan": action_plan,
             "action_constraints": {
                 "must_be_evidence_backed": True,
                 "must_preserve_unknowns": True,
