@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-16
-当前阶段：TEST-093 — Outcome → Feedback → Learning → Re-analysis → Recommendation — VERIFIED
-当前 Branch：test-093-outcome-learning-reanalysis-closure
+当前阶段：TEST-094 — Real Recommendation → Action Plan → Action Decision Bridge — CONTRACT LOCKED
+当前 Branch：test-094-real-recommendation-action-decision-bridge
 
 ## 项目目标
 
@@ -23,6 +23,7 @@ TEST-090：VERIFIED
 TEST-091：CONTRACT LOCKED
 TEST-092：VERIFIED
 TEST-093：VERIFIED
+TEST-094：CONTRACT LOCKED
 
 TEST-087 已锁定 Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环，未新增第二套生命周期、migration 或数据库结构。
 
@@ -231,7 +232,7 @@ TEST-093 将原有“Learning 出现在 AnalysisContext”证明升级为 Learni
 
 - `backend/tests/test_outcome_reanalysis_closure.py` targeted：1 passed。
 - full pytest：507 passed in 78.42s。
-- HEAD：`408ae26e26f8713dcbd3aa36d82146e7fa252102`。
+- HEAD：`4016cd829de04e7651c9e73de0427809ce6aef2f`。
 - working tree：clean。
 - production code 未修改。
 - migration / database schema 未修改。
@@ -244,6 +245,63 @@ TEST-093 将原有“Learning 出现在 AnalysisContext”证明升级为 Learni
 - 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
 - 不做真实第三方消息发送。
 - 不为了测试通过修改 production lifecycle。
+
+## TEST-094 — CONTRACT LOCKED
+
+目标：验证已经通过 TEST-093 的真实 Recommendation / Action Plan 是否能够进入唯一 canonical ActionDecision 写入入口，形成真正可用的 `Recommendation → Action Plan → Explicit User Decision → ActionDecision` 实链，而不是仅在测试中通过 FakeActionPlanService 注入候选。
+
+### GitHub 审计发现的当前 GAP
+
+当前 `AnalysisActionPlanService` 能够从真实 `AnalysisRecommendationService` 取得 Recommendation，并使用 `ActionPlanService.build_action_plan()` 生成 `status="proposed"`、`requires_user_confirmation=true` 的 Action Plan；但 `ActionDecisionService` 的真实 `ActionPlanService.get_context()` 仍来自 `StrategicReplyService → RecommendationService.get_context()`，该 context 当前 `recommendations=[]`，因此真实 API 的 Action Decision validation 没有消费前一阶段刚产生的 Recommendation / Action Plan。
+
+现有 `backend/tests/test_action_decision.py` 主要通过 `FakeActionPlanService` 注入 Action Plan candidate 验证 Decision service contract；这不能证明真实 Recommendation → Action Plan → ActionDecision 可达。当前代码同时保持 Recommendation / Action Plan 为 derived、non-persistent context，因此不能在没有明确 canonical bridge 的情况下假设跨请求仍可验证 recommendation identity。
+
+### Canonical Acceptance Chain
+
+`Real AnalysisContext`
+
+`→ Real StructuredAnalysis`
+
+`→ StrategyRecommendationCandidate`
+
+`→ RecommendationProducer`
+
+`→ Real Recommendation`
+
+`→ ActionPlanService.build_action_plan()`
+
+`→ proposed Action Plan`
+
+`→ Explicit User Decision`
+
+`→ ActionDecisionService`
+
+`→ canonical ActionDecision`
+
+### 锁定验收条件
+
+1. 必须使用真实 `ActionPlanService` / `ActionDecisionService` 边界，不用 FakeActionPlanService 伪造候选。
+2. Recommendation 必须来自现有 StrategyRecommendationCandidate → RecommendationProducer canonical chain。
+3. Action Plan 必须来自现有 evidence-backed Recommendation，保持 recommendation identity、action、evidence_source_ids、`status="proposed"`、`requires_user_confirmation=true`。
+4. ActionDecision 必须只能通过现有 `ActionDecisionService` canonical write path 创建。
+5. confirmed Decision 必须保留 Recommendation / Action Plan identity 与 evidence provenance；不得仅凭任意字符串 recommendation_id 放行。
+6. rejected Decision 仍可在无 recommendation_id 时记录，但不得产生 Execution / Outcome。
+7. 不得自动确认；必须存在显式 user decision input。
+8. 不得让 ActionDecision 直接调用 LLM、StructuredAnalysis provider、Learning 或 Re-analysis。
+9. 不得建立第二套 Recommendation / Action Plan / ActionDecision lifecycle。
+10. 不新增 migration / database schema；不修改历史 migration。
+11. 保持 user / person / relationship / conversation isolation。
+12. 不自动执行 Action、不自动发送消息、不创建 Outcome。
+13. 如果当前 derived Recommendation / Action Plan 无法跨真实 API boundary 被安全验证，先证明该缺口，再决定最小 canonical bridge；不得通过放宽 validation、接受客户端任意 recommendation payload 或修改测试掩盖问题。
+
+### 非目标
+
+- 不重新实现 TEST-093 Outcome → Feedback → Learning → Re-analysis → Recommendation。
+- 不重新实现 TEST-092 Strategy Decision convergence。
+- 不进入 ActionExecution / Outcome 实现；Execution 仍是下一阶段边界。
+- 不引入 Recommendation / StructuredAnalysis 的无约束持久化。
+- 不引入 PostgreSQL / Redis / Elasticsearch / Vector DB。
+- 不做真实第三方消息发送。
 
 ## 架构与安全边界
 
