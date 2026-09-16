@@ -1,11 +1,17 @@
 import sqlite3
 
+from app.repositories.action_plan_proposal import ActionPlanProposalRepository
 from app.services.strategic_reply import StrategicReplyService
 
 
 class ActionPlanService:
-    def __init__(self, strategic_reply_service: StrategicReplyService | None = None):
+    def __init__(
+        self,
+        strategic_reply_service: StrategicReplyService | None = None,
+        proposal_repository: ActionPlanProposalRepository | None = None,
+    ):
         self.strategic_reply_service = strategic_reply_service or StrategicReplyService()
+        self.proposal_repository = proposal_repository or ActionPlanProposalRepository()
 
     @staticmethod
     def build_action_plan(
@@ -50,6 +56,34 @@ class ActionPlanService:
             action_plan.append(item)
 
         return action_plan
+
+    def persist_action_plan(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+        action_plan: list[dict],
+    ) -> list[dict]:
+        """Persist an explicit proposed action plan for a later user decision."""
+        persisted: list[dict] = []
+        for item in action_plan:
+            recommendation_id = item.get("recommendation_id")
+            if not isinstance(recommendation_id, str) or not recommendation_id:
+                raise ValueError("action plan proposal requires recommendation_id")
+            proposal = self.proposal_repository.create(
+                conn,
+                user_id,
+                person_id,
+                recommendation_id,
+                item["action"],
+                item["evidence_source_ids"],
+                item.get("priority"),
+                item.get("time_horizon"),
+            )
+            persisted_item = dict(item)
+            persisted_item["proposal_id"] = proposal["id"]
+            persisted.append(persisted_item)
+        return persisted
 
     def get_context(
         self,
