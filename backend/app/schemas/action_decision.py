@@ -14,6 +14,7 @@ class ActionDecisionResponse(BaseModel):
     user_id: str
     person_id: str
     recommendation_id: str | None
+    action_plan_proposal_id: str | None
     decision: str
     note: str | None
     created_at: str
