@@ -46,6 +46,7 @@ def test_real_recommendation_reaches_action_decision_without_fake_action_plan(cl
                     "content": "保持低压力互动并观察后续反馈",
                     "confidence": 0.8,
                     "evidence_source_ids": [message["id"]],
+                    "action": "保持低压力互动并观察后续反馈",
                 }],
                 "emotional_signals": [],
                 "relationship_signals": [],
@@ -68,11 +69,12 @@ def test_real_recommendation_reaches_action_decision_without_fake_action_plan(cl
     recommendation = result["recommendations"][0]
     assert recommendation["evidence_source_ids"] == [message["id"]]
     assert recommendation["provenance"]["source"] == "strategy_candidate"
-    assert isinstance(recommendation.get("action"), str) and recommendation["action"].strip()
+    assert recommendation["action"] == "保持低压力互动并观察后续反馈"
 
     assert len(result["action_plan"]) == 1
     action_plan = result["action_plan"][0]
     assert action_plan["recommendation_id"] == recommendation["id"]
+    assert action_plan["action"] == recommendation["action"]
     assert action_plan["evidence_source_ids"] == [message["id"]]
     assert action_plan["status"] == "proposed"
     assert action_plan["requires_user_confirmation"] is True
