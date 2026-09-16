@@ -53,6 +53,14 @@ class AnalysisActionPlanService:
                 recommendations,
                 recommendation_context["evidence"],
             )
+            self.action_plan_service.persist_action_plan(
+                conn,
+                user_id,
+                person_id,
+                recommendations,
+                action_plan,
+                recommendation_context["evidence"],
+            )
         else:
             recommendations = list(action_plan_context.get("recommendations") or [])
             action_plan = list(action_plan_context.get("action_plan") or [])
