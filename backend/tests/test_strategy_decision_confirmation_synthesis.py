@@ -48,9 +48,8 @@ def get_synthesis(client, person_id):
 def test_confirmation_synthesis_counts_confirmed_and_rejected(client):
     person = create_person(client)
     create_relationship(client, person["id"])
-    first = seed_decision(person["id"], "recommendation-a", "confirmed")
-    create_outcome(client, person["id"], first["id"])
-    second = seed_decision(person["id"], "recommendation-b", "rejected")
+    seed_decision(person["id"], "recommendation-a", "confirmed")
+    seed_decision(person["id"], "recommendation-b", "rejected")
     body = get_synthesis(client, person["id"]).json()
     assert body["confirmation_summary"]["confirmed_count"] == 1
     assert body["confirmation_summary"]["rejected_count"] == 1
