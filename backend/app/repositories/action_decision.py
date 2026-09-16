@@ -30,6 +30,24 @@ class ActionDecisionRepository:
         return dict(row) if row else None
 
     @staticmethod
+    def exists_for_other_scope(
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+        decision_id: str,
+    ) -> bool:
+        row = conn.execute(
+            """
+            SELECT 1
+            FROM action_decisions
+            WHERE id = ? AND (user_id != ? OR person_id != ?)
+            LIMIT 1
+            """,
+            (decision_id, user_id, person_id),
+        ).fetchone()
+        return row is not None
+
+    @staticmethod
     def create(
         conn: sqlite3.Connection,
         user_id: str,
