@@ -8,7 +8,9 @@ class ActionDecisionRepository:
     def list_for_person(conn: sqlite3.Connection, user_id: str, person_id: str) -> list[dict]:
         rows = conn.execute(
             """
-            SELECT id, user_id, person_id, recommendation_id, decision, note, created_at
+            SELECT
+                id, user_id, person_id, recommendation_id,
+                action_plan_proposal_id, decision, note, created_at
             FROM action_decisions
             WHERE user_id = ? AND person_id = ?
             ORDER BY created_at DESC, id DESC
@@ -21,7 +23,9 @@ class ActionDecisionRepository:
     def get(conn: sqlite3.Connection, user_id: str, person_id: str, decision_id: str) -> dict | None:
         row = conn.execute(
             """
-            SELECT id, user_id, person_id, recommendation_id, decision, note, created_at
+            SELECT
+                id, user_id, person_id, recommendation_id,
+                action_plan_proposal_id, decision, note, created_at
             FROM action_decisions
             WHERE id = ? AND user_id = ? AND person_id = ?
             """,
@@ -37,12 +41,14 @@ class ActionDecisionRepository:
         recommendation_id: str | None,
         decision: str,
         note: str | None,
+        action_plan_proposal_id: str | None = None,
     ) -> dict:
         item = {
             "id": str(uuid.uuid4()),
             "user_id": user_id,
             "person_id": person_id,
             "recommendation_id": recommendation_id,
+            "action_plan_proposal_id": action_plan_proposal_id,
             "decision": decision,
             "note": note,
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -50,8 +56,11 @@ class ActionDecisionRepository:
         conn.execute(
             """
             INSERT INTO action_decisions
-                (id, user_id, person_id, recommendation_id, decision, note, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (
+                    id, user_id, person_id, recommendation_id,
+                    action_plan_proposal_id, decision, note, created_at
+                )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             tuple(item.values()),
         )
