@@ -19,12 +19,19 @@ service = AnalysisActionPlanService()
 def _build_context(conversation_id: str, user_id: str, persist_proposals: bool):
     try:
         with get_connection() as conn:
+            if persist_proposals:
+                return service.build_context(
+                    conn,
+                    user_id,
+                    conversation_id,
+                    provider=QwenProvider(),
+                    persist_proposals=True,
+                )
             return service.build_context(
                 conn,
                 user_id,
                 conversation_id,
                 provider=QwenProvider(),
-                persist_proposals=persist_proposals,
             )
     except ValueError as exc:
         raise HTTPException(
