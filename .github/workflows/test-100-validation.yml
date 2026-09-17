@@ -14,5 +14,5 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r backend/requirements.txt
-      - run: pytest -q backend/tests/test_execution_decision_gate.py
+      - run: pytest -q backend/tests/test_execution_decision_gate.py backend/tests/test_execution_scope_isolation.py
       - run: pytest -q
