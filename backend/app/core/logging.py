@@ -7,20 +7,21 @@ from logging.handlers import RotatingFileHandler
 from app.config.settings import get_settings
 
 
-_REDACTION_PATTERNS = (
-    re.compile(r"(?i)(\bBearer\s+)[^\s,;\"'}\]]+"),
-    re.compile(
-        r"(?i)([\"']?(?:[a-z0-9_-]*api[_-]?key|authorization|"
-        r"[a-z0-9_-]*encryption[_-]?key)[\"']?\s*[:=]\s*[\"']?)"
-        r"[^\s,;\"'}\]]+"
-    ),
+_AUTHORIZATION_PATTERN = re.compile(
+    r"(?i)([\"']?authorization[\"']?\s*[:=]\s*[\"']?)[^\r\n,;\"'}\]]+"
 )
+_SECRET_KEY_PATTERN = re.compile(
+    r"(?i)([\"']?(?:[a-z0-9_-]*api[_-]?key|"
+    r"[a-z0-9_-]*encryption[_-]?key)[\"']?\s*[:=]\s*[\"']?)"
+    r"[^\s,;\"'}\]]+"
+)
+_BEARER_PATTERN = re.compile(r"(?i)(\bBearer\s+)[^\s,;\"'}\]]+")
 
 
 def redact_sensitive_text(value: str) -> str:
-    redacted = value
-    redacted = _REDACTION_PATTERNS[0].sub(r"\1[REDACTED]", redacted)
-    redacted = _REDACTION_PATTERNS[1].sub(r"\1[REDACTED]", redacted)
+    redacted = _AUTHORIZATION_PATTERN.sub(r"\1[REDACTED]", value)
+    redacted = _SECRET_KEY_PATTERN.sub(r"\1[REDACTED]", redacted)
+    redacted = _BEARER_PATTERN.sub(r"\1[REDACTED]", redacted)
     return redacted
 
 
