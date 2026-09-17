@@ -40,7 +40,7 @@ def test_confirmed_decision_requires_proposed_action_plan():
     try:
         service.create_decision(object(), "user-1", "person-1", "r1", "confirmed", None)
     except ValueError as exc:
-        assert str(exc) == "recommendation is not an available proposed action"
+        assert str(exc) == "recommendation is not an available evidence-backed action"
     else:
         raise AssertionError("confirmed decision must reject non-proposed action plan")
 
@@ -64,7 +64,7 @@ def test_confirmed_decision_requires_user_confirmation_flag_on_proposal():
     try:
         service.create_decision(object(), "user-1", "person-1", "r1", "confirmed", None)
     except ValueError as exc:
-        assert str(exc) == "recommendation is not an available proposed action"
+        assert str(exc) == "recommendation is not an available evidence-backed action"
     else:
         raise AssertionError("proposal without confirmation gate must be rejected")
 
