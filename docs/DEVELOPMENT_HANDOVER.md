@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-118 — Login Throttle / Progressive Lockout — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-118 — Login Throttle / Progressive Lockout — VERIFIED
 当前 Branch：test-118-login-throttle
-TEST-117 VERIFIED 服务器代码基线：`af4995a8e5fccd8586e63e3e76191552ecb317b1`
+服务器验收代码 HEAD：`c3f542a1b034bdfb0278eaace838efcd7c868ac7`
 
 ## 项目目标
 
@@ -39,7 +39,7 @@ TEST-114 VERIFIED — Production Authentication Boundary；服务器 full 578；
 TEST-115 VERIFIED — DB-backed opaque Auth Session；migration 011；服务器 full 585；HEAD `a76c6907fa51afeee0076822601745c8ac3e4fb2`。
 TEST-116 VERIFIED — Account credentials / login → server-issued session；migration 012；服务器 full 592；HEAD `bf84a5c068813693715fa0b09ce5458d59b7356e`。
 TEST-117 VERIFIED — Multi-device session management / bootstrap retirement；服务器 targeted 7、TEST-116 7、TEST-115 7、TEST-114 7、scope isolation 4、full 599 passed in 103.79s；migration diff blank；HEAD `af4995a8e5fccd8586e63e3e76191552ecb317b1`。
-TEST-118 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — SQLite login throttle / progressive lockout；GitHub targeted 8、TEST-116 login 7、TEST-117 session management 7、TEST-115 session 7、TEST-114 production auth 7、scope isolation 4、full 607 passed；新增 migration 013，未修改历史 migration 001~012。
+TEST-118 VERIFIED — SQLite login throttle / progressive lockout；服务器 targeted 8、TEST-116 login 7、TEST-117 session management 7、TEST-115 session 7、TEST-114 production auth 7、scope isolation 4、full 607 passed in 111.95s；工作树 clean；migration diff 仅 `013_auth_login_throttle.sql`；服务器 HEAD `c3f542a1b034bdfb0278eaace838efcd7c868ac7`。
 
 ## Auth 产品化基线
 
@@ -47,8 +47,9 @@ TEST-118 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — SQLite login th
 - TEST-115：opaque session 只存 SHA-256 hash，支持 expiry/revoke，服务端解析到 `users.id`。
 - TEST-116：normalized username + scrypt password；服务器生成 user_id；注册/登录签发同一 session。
 - TEST-117：session list/current/revoke-other/rotate；`AUTH_BOOTSTRAP_ENABLED=false` 后静态 bootstrap 可退场，DB session 继续工作。
+- TEST-118：SQLite username-subject login throttle / progressive lockout，不依赖 Redis 或未验证代理 IP。
 
-## TEST-118 — Login Throttle / Progressive Lockout — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+## TEST-118 — Login Throttle / Progressive Lockout — VERIFIED
 
 目标：在不引入 Redis、不依赖未验证代理 IP 的前提下，限制用户名/密码端点的高频猜测，同时保持 existing/unknown username 的一致错误边界。
 
@@ -63,36 +64,29 @@ TEST-118 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — SQLite login th
 8. 不修改 TEST-116 password/session 实现，不建立第二套认证系统；
 9. 不修改历史 migration 001~012，不引入 PostgreSQL/Redis/ES/向量库。
 
-新增 `backend/tests/test_auth_login_throttle.py` 8 个测试：
-- existing account failure limit → 429；
-- unknown username 同一 throttle contract；
-- successful login clears failures；
-- normalized subject isolation；
-- throttle table 不保存原始 unknown username；
-- progressive lock 增长；
-- failure window expiry reset；
-- locked requests 不延长 failure counter。
-
-GitHub Actions run `35239595475`：
-- TEST-118 login throttle：8 passed；
-- TEST-116 account login：7 passed；
-- TEST-117 session management：7 passed；
-- TEST-115 auth session：7 passed；
-- TEST-114 production auth：7 passed；
+服务器验收：
+- `backend/tests/test_auth_login_throttle.py`：8 passed；
+- `backend/tests/test_auth_account_login.py`：7 passed；
+- `backend/tests/test_auth_session_management.py`：7 passed；
+- `backend/tests/test_auth_session_boundary.py`：7 passed；
+- `backend/tests/test_auth_boundary.py`：7 passed；
 - execution/action-plan scope isolation：4 passed；
-- full pytest：607 passed、1 warning in 33.02s；
-- 临时 validation workflow 已删除。
+- full pytest：607 passed in 111.95s；
+- `git status --short` blank；
+- migration diff：仅 `A backend/migrations/013_auth_login_throttle.sql`；
+- 最终文件差异与 GitHub 预期一致。
 
-当前等待服务器验收后再标记 TEST-118 VERIFIED。
+TEST-118 VERIFIED。
 
-## 下一阶段候选
+## 下一阶段
 
-TEST-118 服务器通过后优先：
-1. TEST-119 password change / credential rotation，并定义“修改密码后是否撤销其他 sessions”的明确安全契约；
-2. account recovery 边界，不在没有验证渠道前伪造邮件/短信恢复；
-3. 逐步将 `AUTH_BOOTSTRAP_ENABLED` 默认关闭并移除静态 bootstrap；
-4. release/runtime security：reverse proxy trust、HTTPS/CORS/CSRF/access log；
-5. 完整 login/session/account UI。
+TEST-119 优先：
+1. password change / credential rotation；
+2. 必须重新验证 current password，不能只凭 active session 改密码；
+3. 修改成功后撤销该用户所有旧 sessions，并签发一个新的当前 session，避免被盗旧 session 继续存活；
+4. current password 错误与 credential mismatch 使用稳定错误边界，不泄露 hash/credential 内部信息；
+5. 不伪造 account recovery；在没有验证邮件/短信渠道前只做 authenticated password change；
+6. 后续再做 recovery、bootstrap 默认关闭、release/runtime security、完整 login/session/account UI。
 
 ## 架构与持续禁止事项
 
