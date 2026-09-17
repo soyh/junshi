@@ -1,7 +1,9 @@
 name: TEST-109 validation
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - test-108-provider-error-contract
 
 jobs:
   test:
