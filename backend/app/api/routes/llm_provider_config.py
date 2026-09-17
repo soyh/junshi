@@ -6,6 +6,7 @@ from app.schemas.llm_provider_config import (
     LLMProviderConfigResponse,
     LLMProviderConfigUpdate,
 )
+from app.services.llm import LLMAnalysisError
 from app.services.llm_provider_config import (
     LLMProviderConfigError,
     LLMProviderConfigService,
@@ -49,6 +50,30 @@ def put_llm_provider_config(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
         ) from exc
+
+
+@router.post(
+    "/test",
+    status_code=status.HTTP_200_OK,
+)
+def test_llm_provider_connection(
+    user_id: str = Depends(get_current_user_id),
+):
+    try:
+        with get_connection() as conn:
+            service.test_connection(conn, user_id)
+    except LLMProviderConfigError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except LLMAnalysisError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+    return {"status": "ok"}
 
 
 @router.delete(
