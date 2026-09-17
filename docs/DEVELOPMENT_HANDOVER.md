@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-112 — Provider Log Redaction / Exception Boundary — VERIFIED
-当前 Branch：test-112-provider-log-redaction-contract
+当前阶段：TEST-113 — Provider Settings UI / Analysis Entry — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-113-provider-settings-ui
 
 ## 项目目标
 
@@ -50,6 +50,8 @@ TEST-110 VERIFIED — Provider Capability / Analysis Contract；服务器 target
 TEST-111 VERIFIED — Provider Timeout / Rate-Limit / No-Retry Contract；服务器 targeted 9 passed、既有 Provider Error Contract 3 passed、Provider Connection 3 passed、full pytest 562 passed；工作树 clean；migration diff blank；服务器 HEAD `4d750c571f64f14ece97b19f84e000c3c4950275`。
 
 TEST-112 VERIFIED — Provider Log Redaction / Exception Boundary；服务器 targeted log redaction 6 passed、provider config/materialization 2 passed、provider error/connection 6 passed、full pytest 568 passed；工作树 clean；相对 TEST-111 baseline migration diff blank；服务器 HEAD `3bb10a300cf7d09614c4e271c3415328ce7a939a`。
+
+TEST-113 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — 最小 Provider 设置 UI + Structured Analysis 入口；GitHub targeted UI contract 3 passed、既有 provider config/redaction 7 passed、full pytest 571 passed；未新增 migration。
 
 ## TEST-104 — VERIFIED
 
@@ -168,13 +170,29 @@ GitHub Actions run `35210450717`：TEST-111 targeted 9 passed、既有 Provider 
 
 GitHub Actions run `35213487409`：TEST-112 targeted 6 passed、provider config + runtime materialization 2 passed、existing provider error + connection 6 passed、full pytest 568 passed、1 warning；随后删除临时 TEST-112 validation workflow。服务器验收：targeted log redaction 6 passed、provider config/materialization 2 passed、provider error/connection 6 passed、full pytest 568 passed in 89.02s；工作树 clean；相对 TEST-111 baseline migration diff blank；最终文件差异与 GitHub 预期一致。TEST-112 VERIFIED。
 
+## TEST-113 — Provider Settings UI / Analysis Entry — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+
+目标：在当前没有独立 Web 前端工程的仓库里，建立一个最小、可直接服务的 Provider 设置页面，并只复用既有 Provider API 和 Structured Analysis API，不建立第二套 Provider 或 Analysis 业务逻辑。
+
+本阶段新增：
+1. `GET /api/v1/settings/llm/ui` 返回轻量 HTML UI，并从 OpenAPI schema 隐藏该内部页面入口；
+2. 页面支持显式输入当前 `X-User-ID`，不默认绑定 `local-user`，避免误写其他 scope；
+3. Provider 设置只调用既有 `GET/PUT/DELETE /api/v1/settings/llm` 与 `POST /api/v1/settings/llm/test`；
+4. API Key 使用 password input，不使用 localStorage/sessionStorage，读取配置时永不回填 API Key，保存完成后立即清空输入；
+5. 页面只使用 `textContent` 展示状态与错误，不使用 `innerHTML` 注入返回内容；
+6. 页面提供 Conversation ID 输入并调用既有 `GET /api/v1/conversations/{conversation_id}/analysis/structured`，明确 connection test 与正式 StructuredAnalysis validation 是不同边界；
+7. 不新增数据库 schema / migration，不改变现有 Provider/Analysis backend contract。
+
+新增 `backend/tests/test_llm_provider_settings_ui.py` 覆盖：页面可访问、复用既有 API、显式 user scope、客户端不持久化 secret、password input、Structured Analysis 入口以及 UI route 不进入 OpenAPI schema。
+
+GitHub Actions run `35226450034`：TEST-113 targeted UI contract 3 passed、existing provider config + log redaction 7 passed、full pytest 571 passed、1 warning；随后已删除临时 TEST-113 validation workflow。当前等待服务器验收后再标记 VERIFIED。
+
 ## 产品化后续审计方向
 
-TEST-113 起继续：
-1. 建立最小 Provider 设置 UI，并复用现有 GET/PUT/DELETE/POST-test API，不引入第二套 Provider 业务逻辑；
-2. 将 Provider 设置入口与 Analysis 工作流建立明确 UI 边界；
-3. 正式认证替换当前 `X-User-ID` 信任边界；
-4. 发布与运行时安全，包括 secret rotation / process environment / reverse-proxy log boundary。
+TEST-113 服务器验收后继续：
+1. 正式认证替换当前 `X-User-ID` 信任边界，并让 UI 不再手工输入 user id；
+2. 发布与运行时安全，包括 secret rotation / process environment / reverse-proxy access log boundary；
+3. 再决定是否需要独立前端工程，而不是在缺少产品导航/组件体系时提前引入 Node 构建链。
 
 连接测试成功不等于模型业务分析成功，也不等于所有 provider capability 均可用；正式 Analysis 仍必须经过 StructuredAnalysis schema validation。当前 Provider 不执行隐式自动 retry；Provider credentials 不应出现在应用 console/file log 或归一化 exception traceback 中。
 
