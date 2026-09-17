@@ -1,11 +1,18 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 
+from app.core.context import get_current_user_id, parse_bearer_token
 from app.core.database import get_connection
-from app.schemas.auth_account import AuthLoginRequest, AuthRegisterRequest
+from app.schemas.auth_account import (
+    AuthLoginRequest,
+    AuthPasswordChangeRequest,
+    AuthRegisterRequest,
+)
 from app.schemas.auth_session import AuthSessionResponse
 from app.services.auth_account import (
     AuthAccountConflict,
     AuthAccountInvalidCredentials,
+    AuthAccountInvalidCurrentPassword,
+    AuthAccountPasswordChangeForbidden,
     AuthAccountService,
 )
 from app.services.auth_login_throttle import AuthLoginThrottleService
@@ -89,5 +96,40 @@ def login(payload: AuthLoginRequest):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid credentials",
         )
+
+    return _session_response(created)
+
+
+@router.put(
+    "/password",
+    response_model=AuthSessionResponse,
+    status_code=status.HTTP_200_OK,
+)
+def change_password(
+    payload: AuthPasswordChangeRequest,
+    authorization: str | None = Header(default=None),
+    user_id: str = Depends(get_current_user_id),
+):
+    current_token = parse_bearer_token(authorization)
+
+    try:
+        with get_connection() as conn:
+            created = service.change_password(
+                conn,
+                user_id,
+                current_token,
+                payload.current_password.get_secret_value(),
+                payload.new_password.get_secret_value(),
+            )
+    except AuthAccountPasswordChangeForbidden as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from None
+    except AuthAccountInvalidCurrentPassword as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+        ) from None
 
     return _session_response(created)
