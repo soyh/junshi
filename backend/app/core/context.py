@@ -34,14 +34,16 @@ def get_current_user_id(
 ) -> str:
     """Resolve the authenticated user boundary for API requests.
 
-    Opaque auth sessions are resolved server-side to users.id. The TEST-114
-    server-configured Bearer token is a transitional bootstrap and can be
-    explicitly retired with AUTH_BOOTSTRAP_ENABLED=false. Legacy X-User-ID /
-    local-user fallback remains available only outside production while older
-    MVP contracts migrate.
+    Opaque auth sessions are resolved server-side to users.id. The legacy
+    server-configured Bearer bootstrap remains explicit opt-in only.
+    X-User-ID is never accepted as an identity source in any environment.
+    Development/test without a Bearer token continues to use LOCAL_USER_ID.
     """
     settings = get_settings()
     is_production = settings.app_env.lower() == "production"
+
+    if x_user_id:
+        raise _unauthorized("X-User-ID is not accepted")
 
     if authorization:
         token = parse_bearer_token(authorization)
@@ -62,9 +64,6 @@ def get_current_user_id(
         raise _unauthorized("invalid bearer token")
 
     if is_production:
-        if x_user_id:
-            raise _unauthorized("X-User-ID is not accepted in production")
-
         if settings.auth_bootstrap_enabled and not settings.auth_bearer_token:
             with get_connection() as conn:
                 sessions_configured = auth_session_service.has_active_sessions(conn)
@@ -75,8 +74,5 @@ def get_current_user_id(
                 )
 
         raise _unauthorized("bearer token required")
-
-    if x_user_id:
-        return x_user_id
 
     return settings.local_user_id
