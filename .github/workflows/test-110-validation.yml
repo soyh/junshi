@@ -1,0 +1,23 @@
+name: TEST-110 validation
+
+on:
+  pull_request:
+    branches:
+      - test-109-provider-url-contract
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Targeted capability contract tests
+        run: pytest -q backend/tests/test_llm_provider_capability_contract.py
+      - name: Existing provider tests
+        run: pytest -q backend/tests/test_qwen_provider.py
+      - name: Full test suite
+        run: pytest -q
