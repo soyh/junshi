@@ -1,12 +1,10 @@
 from types import SimpleNamespace
 
+from app.services import llm_provider_config
 from app.services.llm_provider_config import LLMProviderConfigService
 
 
 class FakeFernet:
-    def encrypt(self, value: bytes) -> bytes:
-        return value
-
     def decrypt(self, value: bytes) -> bytes:
         return value
 
@@ -29,10 +27,7 @@ def test_configured_provider_materializes_persisted_runtime_parameters(monkeypat
 
     monkeypatch.setattr(service.repository, "get", lambda conn, user_id: row)
     monkeypatch.setattr(service, "_fernet", lambda: FakeFernet())
-    monkeypatch.setattr(
-        "app.services.llm_provider_config.QwenProvider",
-        FakeQwenProvider,
-    )
+    monkeypatch.setattr(llm_provider_config, "QwenProvider", FakeQwenProvider)
 
     provider = service.build_provider(object(), "user-a")
 
