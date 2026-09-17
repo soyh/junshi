@@ -1,8 +1,8 @@
 # AI Love Strategist Development Handover
 
-更新时间：2026-09-16
-当前阶段：TEST-095 — Core Engine Closure — VERIFIED PENDING TAG
-当前 Branch：test-095-core-engine-closure
+更新时间：2026-09-17
+当前阶段：TEST-096 — Core Engine Safety Closure — VERIFIED PENDING TAG
+当前 Branch：test-096-core-engine-safety-closure
 
 ## 项目目标
 
@@ -22,6 +22,7 @@ TEST-089：VERIFIED
 TEST-090：VERIFIED
 TEST-091 ~ TEST-094：VERIFIED
 TEST-095：功能验收 VERIFIED；verification tag 尚待创建
+TEST-096：功能验收 VERIFIED；verification tag 尚待创建
 
 TEST-087 已锁定 Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环，未新增第二套生命周期、migration 或数据库结构。
 
@@ -180,6 +181,44 @@ Action Plan snapshot 是 lifecycle state recovery mechanism，不是新的 Recom
 - 不自动确认、不自动执行、不自动发送消息。
 - 不修改 relationship。
 - 不把 LLM output 写入 canonical truth。
+- 不引入 PostgreSQL、Redis、Elasticsearch、Vector DB。
+- 不使用或修改 8899。
+
+## TEST-096 — VERIFIED PENDING TAG
+
+目标：锁定 Core Engine 的安全闭环边界，确保 `Action Decision → Execution → Outcome` 不能绕过显式确认、不能重复执行/重复记录结果，并保持 user/person isolation。
+
+### 本阶段审计与修复
+
+- 保持 `ActionDecisionService` 的 evidence-backed recommendation validation，不放宽 Decision gate。
+- 保持 `ActionExecutionService` 的 confirmed decision 与显式 execution gate。
+- 保持 `ActionOutcomeService` 的 confirmed decision、已执行 decision 与单次 outcome gate。
+- 增加跨 user/person scope 的 Action Decision 检测：真实存在但属于其他 scope 的 UUID decision id 映射为 scope-not-found，避免跨对象读取/写入。
+- 对任意客户端直接提交的非 UUID decision id 保留既有 `409 action decision not found` 合同；不会因为字符串型无效 ID 误判为跨 scope 资源。
+- 未修改历史 migration 001~008。
+- 未修改既有测试以掩盖失败。
+
+### 验收结果
+
+- TEST-096 safety closure targeted：3 passed。
+- `test_action_outcome.py + test_core_engine_safety_closure.py`：12 passed。
+- GitHub Actions 全量 pytest：512 passed，1 warning，18.73s（修复后 commit `c43b6fd24c887bcd1952015718a187efe82712b1`）。
+- 第二次 GitHub Actions 全量 pytest：512 passed，1 warning，25.33s（修复后同一生产代码状态）。
+- 临时 GitHub Actions workflow 仅用于本阶段独立验证，验证完成后已删除，不作为产品代码保留。
+
+### 锁定结论
+
+`Confirmed Action Decision → Explicit Execution → Outcome`
+
+必须保持显式、单向、user/person scoped；不得从 rejected / missing / other-scope decision 自动进入 Execution 或 Outcome，不得重复执行，不得重复产生 Outcome。
+
+### TEST-096 非目标
+
+- 不新增第二套 Action Decision / Execution / Outcome lifecycle。
+- 不自动确认、不自动执行、不自动发送消息。
+- 不自动创建 Outcome。
+- 不修改 relationship。
+- 不修改历史 migration 001~008。
 - 不引入 PostgreSQL、Redis、Elasticsearch、Vector DB。
 - 不使用或修改 8899。
 
