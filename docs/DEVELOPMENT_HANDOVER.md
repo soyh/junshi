@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-111 — Provider Timeout / Rate-Limit / No-Retry Contract — VERIFIED
-当前 Branch：test-111-provider-retry-contract
+当前阶段：TEST-112 — Provider Log Redaction / Exception Boundary — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-112-provider-log-redaction-contract
 
 ## 项目目标
 
@@ -48,6 +48,8 @@ TEST-109 VERIFIED — Provider Base URL Contract；服务器 targeted 8 passed�
 TEST-110 VERIFIED — Provider Capability / Analysis Contract；服务器 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed；工作树 clean；migration diff blank；服务器 HEAD `2de393a29dc7419654321e558ad3dd4f69928405`。
 
 TEST-111 VERIFIED — Provider Timeout / Rate-Limit / No-Retry Contract；服务器 targeted 9 passed、既有 Provider Error Contract 3 passed、Provider Connection 3 passed、full pytest 562 passed；工作树 clean；migration diff blank；服务器 HEAD `4d750c571f64f14ece97b19f84e000c3c4950275`。
+
+TEST-112 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING；统一日志出口脱敏 Provider credentials，API Key 使用 SecretStr，Provider/internal exception 不再保留可能含敏感值的 raw cause；无 migration 变化。
 
 ## TEST-104 — VERIFIED
 
@@ -145,15 +147,35 @@ GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed
 
 GitHub Actions run `35210450717`：TEST-111 targeted 9 passed、既有 Provider Error Contract 3 passed、既有 Provider Connection 3 passed、full pytest 562 passed、1 warning；随后删除临时 TEST-111 validation workflow。服务器验收：TEST-111 targeted 9 passed、Provider Error Contract 3 passed、Provider Connection 3 passed、full pytest 562 passed in 87.67s；工作树 clean；相对 TEST-110 基线 migration diff blank；最终文件差异仅为 TEST-111 contract test 与 handover。TEST-111 VERIFIED。
 
+## TEST-112 — Provider Log Redaction / Exception Boundary — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+
+目标：在 Provider 配置、HTTP Authorization、应用日志和异常 traceback 之间建立明确的 secret boundary，避免 API Key、Bearer token、加密 key 或第三方异常内容进入 console/file log。
+
+本阶段新增：
+1. `LLMProviderConfigUpdate.api_key` 改为 Pydantic `SecretStr`，默认 repr / JSON 不暴露原始 API Key；service 只在加密持久化时显式 `get_secret_value()`；
+2. `app.core.logging.SensitiveDataFilter` 统一挂到已有或新建 root handlers，对 Authorization、Bearer token、`*_API_KEY`、`*_ENCRYPTION_KEY` 等敏感字段做 `[REDACTED]`；
+3. 日志 filter 同时处理格式化 message、exception traceback 和 stack info；
+4. `QwenProvider`、`LLMAnalysisService`、`LLMProviderConfigService` 在归一化未知/上游异常时使用 `from None`，不把可能含 API Key / Authorization / upstream body 的 raw exception cause 暴露给上层 traceback；
+5. 不改变 API 成功/失败业务状态码，不新增 endpoint，不修改数据库 schema / migration。
+
+新增 `backend/tests/test_llm_provider_log_redaction.py` 覆盖：
+- SecretStr repr / JSON masking；
+- Authorization / Bearer / API Key / encryption key 文本脱敏；
+- logger message 参数和 exception traceback 脱敏；
+- Qwen upstream exception 不保留 raw secret cause；
+- LLMAnalysisService arbitrary provider exception 不保留 raw cause；
+- provider connection wrapper 不保留 raw internal exception cause。
+
+GitHub Actions run `35213487409`：TEST-112 targeted 6 passed、provider config + runtime materialization 2 passed、existing provider error + connection 6 passed、full pytest 568 passed、1 warning；随后删除临时 TEST-112 validation workflow。服务器尚未验收，因此 TEST-112 暂不标记 VERIFIED。
+
 ## 产品化后续审计方向
 
-TEST-112 起继续审计：
-1. API Key、Authorization header、provider request / exception 的日志泄漏边界；
-2. 前端设置页与分析工作流；
-3. 正式认证替换当前 `X-User-ID` 信任边界；
-4. 发布与运行时安全。
+TEST-112 服务器验收通过后继续：
+1. 前端 Provider 设置页与 Analysis 工作流；
+2. 正式认证替换当前 `X-User-ID` 信任边界；
+3. 发布与运行时安全，包括 secret rotation / process environment / reverse-proxy log boundary。
 
-连接测试成功不等于模型业务分析成功，也不等于所有 provider capability 均可用；正式 Analysis 仍必须经过 StructuredAnalysis schema validation。当前 Provider 不执行隐式自动 retry。
+连接测试成功不等于模型业务分析成功，也不等于所有 provider capability 均可用；正式 Analysis 仍必须经过 StructuredAnalysis schema validation。当前 Provider 不执行隐式自动 retry；Provider credentials 不应出现在应用 console/file log 或归一化 exception traceback 中。
 
 ## 架构与持续禁止事项
 
