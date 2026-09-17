@@ -1,0 +1,25 @@
+name: TEST-112 validation
+
+on:
+  push:
+    branches:
+      - test-112-provider-secret-log-contract
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Targeted secret log contract tests
+        run: pytest -q backend/tests/test_llm_provider_secret_log_contract.py
+      - name: Existing provider error tests
+        run: pytest -q backend/tests/test_llm_provider_error_contract.py
+      - name: Existing provider retry tests
+        run: pytest -q backend/tests/test_llm_provider_retry_contract.py
+      - name: Full test suite
+        run: pytest -q
