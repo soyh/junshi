@@ -2,8 +2,17 @@ from app.config.settings import get_settings
 from app.core.logging import redact_sensitive_text
 
 
-def _configure_production(monkeypatch, *, token: str | None = "server-secret-token") -> None:
+def _configure_production(
+    monkeypatch,
+    *,
+    token: str | None = "server-secret-token",
+    bootstrap_enabled: bool = False,
+) -> None:
     monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv(
+        "AUTH_BOOTSTRAP_ENABLED",
+        "true" if bootstrap_enabled else "false",
+    )
     if token is None:
         monkeypatch.delenv("AUTH_BEARER_TOKEN", raising=False)
     else:
@@ -49,9 +58,9 @@ def test_production_rejects_wrong_bearer_token_without_echoing_it(client, monkey
         get_settings.cache_clear()
 
 
-def test_production_accepts_configured_bearer_token(client, monkeypatch):
+def test_production_accepts_explicitly_enabled_bootstrap_bearer_token(client, monkeypatch):
     try:
-        _configure_production(monkeypatch)
+        _configure_production(monkeypatch, bootstrap_enabled=True)
         response = client.get(
             "/api/v1/settings/llm",
             headers={"Authorization": "Bearer server-secret-token"},
@@ -62,9 +71,13 @@ def test_production_accepts_configured_bearer_token(client, monkeypatch):
         get_settings.cache_clear()
 
 
-def test_production_fails_closed_when_auth_token_not_configured(client, monkeypatch):
+def test_production_fails_closed_when_enabled_bootstrap_token_not_configured(client, monkeypatch):
     try:
-        _configure_production(monkeypatch, token=None)
+        _configure_production(
+            monkeypatch,
+            token=None,
+            bootstrap_enabled=True,
+        )
         response = client.get("/api/v1/settings/llm")
         assert response.status_code == 503
         assert response.json()["detail"] == "production authentication is not configured"
