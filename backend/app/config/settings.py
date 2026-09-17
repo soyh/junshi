@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,12 +17,20 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     local_user_id: str = "00000000-0000-0000-0000-000000000001"
+    auth_bearer_token: SecretStr | None = None
 
     dashscope_api_key: str | None = None
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     qwen_model: str = "qwen-plus"
     qwen_timeout_seconds: float = 60.0
     llm_config_encryption_key: str | None = None
+
+    @field_validator("auth_bearer_token", mode="before")
+    @classmethod
+    def blank_auth_token_is_unset(cls, value):
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     model_config = SettingsConfigDict(
         env_file=".env",
