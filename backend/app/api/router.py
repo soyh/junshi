@@ -18,6 +18,7 @@ from app.api.routes.evidence import router as evidence_router
 from app.api.routes.interactions import router as interactions_router
 from app.api.routes.learning_strategy import router as learning_strategy_router
 from app.api.routes.learning_strategy_synthesis import router as learning_strategy_synthesis_router
+from app.api.routes.llm_provider_config import router as llm_provider_config_router
 from app.api.routes.memory_learning_synthesis import router as memory_learning_synthesis_router
 from app.api.routes.memory_persistence import router as memory_persistence_router
 from app.api.routes.memory_synthesis import router as memory_synthesis_router
@@ -79,6 +80,7 @@ api_router.include_router(memory_synthesis_router)
 api_router.include_router(memory_learning_synthesis_router)
 api_router.include_router(learning_strategy_router)
 api_router.include_router(learning_strategy_synthesis_router)
+api_router.include_router(llm_provider_config_router)
 api_router.include_router(strategy_decision_router)
 api_router.include_router(strategy_decision_synthesis_router)
 api_router.include_router(strategy_decision_confirmation_router)
