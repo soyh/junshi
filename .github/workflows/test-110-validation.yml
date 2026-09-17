@@ -1,6 +1,9 @@
 name: TEST-110 validation
 
 on:
+  push:
+    branches:
+      - test-110-provider-capability-contract
   pull_request:
     branches:
       - test-109-provider-url-contract
