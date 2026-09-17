@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-120 — Auth Account / Session UI — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-120 — Auth Account / Session UI — VERIFIED
 当前 Branch：test-120-auth-account-ui
-TEST-119 VERIFIED 服务器代码 HEAD：`04b3c84e7ebdd7250db4bbcf15b7f333b93f0e77`
+服务器验收代码 HEAD：`456cd94bacb85655c53a892f23cba742af76d925`
 
 ## 项目目标
 
@@ -39,8 +39,8 @@ TEST-115 VERIFIED — DB-backed opaque Auth Session；migration 011；服务器 
 TEST-116 VERIFIED — Account credentials / login → server-issued session；migration 012；服务器 full 592；HEAD `bf84a5c068813693715fa0b09ce5458d59b7356e`。
 TEST-117 VERIFIED — Multi-device session management / bootstrap retirement；服务器 full 599；HEAD `af4995a8e5fccd8586e63e3e76191552ecb317b1`。
 TEST-118 VERIFIED — SQLite login throttle / progressive lockout；服务器 full 607；migration 013；HEAD `c3f542a1b034bdfb0278eaace838efcd7c868ac7`。
-TEST-119 VERIFIED — authenticated password change / credential rotation；服务器 targeted 8、TEST-118 throttle 8、account login 7、session management 7、auth session 7、production auth 7、scope isolation 4、full 615 passed in 113.91s；工作树 clean；migration diff blank；服务器 HEAD `04b3c84e7ebdd7250db4bbcf15b7f333b93f0e77`。
-TEST-120 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — FastAPI-served account/session UI；GitHub targeted UI 4、password change 8、login throttle 8、account login 7、session management 7、Provider UI 3、scope isolation 4、full 619 passed；无新 migration。
+TEST-119 VERIFIED — authenticated password change / credential rotation；服务器 full 615；HEAD `04b3c84e7ebdd7250db4bbcf15b7f333b93f0e77`。
+TEST-120 VERIFIED — FastAPI-served account/session UI；服务器 Auth UI 4、password change 8、login throttle 8、account login 7、session management 7、Provider UI 3、scope isolation 4、full 619 passed in 116.18s；工作树 clean；migration diff blank；服务器 HEAD `456cd94bacb85655c53a892f23cba742af76d925`。
 
 ## Auth 产品化基线
 
@@ -52,7 +52,7 @@ TEST-120 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — FastAPI-served 
 - TEST-119：password change 必须 active DB session + current password；成功后全部旧 session revoke 并签发新 session。
 - TEST-120：最小可用 Auth UI 只调用既有 VERIFIED API，不复制认证逻辑。
 
-## TEST-120 — Auth Account / Session UI — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+## TEST-120 — Auth Account / Session UI — VERIFIED
 
 目标：把 TEST-116~119 已 VERIFIED 的账号认证能力形成最小可用界面，同时保持 token、密码与 recovery 安全边界。
 
@@ -68,36 +68,52 @@ TEST-120 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — FastAPI-served 
 9. account recovery 仅明确显示 unavailable；仓库没有 verified email/SMS/OAuth/OIDC recovery channel，因此不提供 recover/reset endpoint 或伪恢复按钮；
 10. 无新 migration，未修改历史 migration 001~013。
 
-新增 `backend/tests/test_auth_account_ui.py` 4 个契约测试：
-- UI 可访问且隐藏于 OpenAPI；
-- token 仅页面内存，页面源中无持久化 storage API、无 `X-User-ID`、无 `innerHTML`、无 access-token input；
-- 页面只调用既有 VERIFIED auth/session/password API，敏感输入使用 password field；
-- recovery 明确 unavailable 且无 recover/reset/forgot-password 路径。
+GitHub Actions 第二轮 run `35244730099`：
+- TEST-120 Auth UI：4 passed；
+- TEST-119 password change：8 passed；
+- TEST-118 login throttle：8 passed；
+- account login：7 passed；
+- session management：7 passed；
+- Provider Settings UI：3 passed；
+- execution/action-plan scope isolation：4 passed；
+- full pytest：619 passed、1 warning in 146.23s；
+- 临时 workflow 已删除。
 
-GitHub Actions：
-- 第一轮 run `35244615826`：3 passed / 1 failed；失败原因是页面说明文字本身包含持久化 storage API 名称，测试按严格源代码契约判定失败；未放宽测试，而是修改说明文案，保持页面源完全不包含这些 API 标识；
-- 第二轮 run `35244730099`：success；
-  - TEST-120 Auth UI：4 passed；
-  - TEST-119 password change：8 passed；
-  - TEST-118 login throttle：8 passed；
-  - account login：7 passed；
-  - session management：7 passed；
-  - Provider Settings UI：3 passed；
-  - execution/action-plan scope isolation：4 passed；
-  - full pytest：619 passed、1 warning in 146.23s；
-- warning 为已知 Starlette TestClient / anyio BlockingPortal deprecation；
-- 临时 validation workflow 已删除。
+服务器验收：
+- `backend/tests/test_auth_account_ui.py`：4 passed；
+- `backend/tests/test_auth_password_change.py`：8 passed；
+- `backend/tests/test_auth_login_throttle.py`：8 passed；
+- `backend/tests/test_auth_account_login.py`：7 passed；
+- `backend/tests/test_auth_session_management.py`：7 passed；
+- `backend/tests/test_llm_provider_settings_ui.py`：3 passed；
+- execution/action-plan scope isolation：4 passed；
+- full pytest：619 passed in 116.18s；
+- `git status --short` blank；
+- migration diff blank；
+- final file diff 与 GitHub 预期一致。
 
-当前等待服务器验收后再标记 TEST-120 VERIFIED。
+TEST-120 VERIFIED。
 
-## 下一阶段候选
+## 下一阶段
 
-TEST-120 服务器通过后重新审计决定 TEST-121。优先检查：
-1. production bootstrap 默认关闭/静态 bootstrap 进一步退场；
-2. development/test `X-User-ID` 长期兼容路径是否可以收口；
-3. release/runtime security：HTTPS、CORS/CSRF、reverse-proxy trust、access log；
-4. 将 Provider Settings 与 Auth UI 接入统一产品导航；
-5. recovery 必须等真实 verified channel 接入后再实现。
+TEST-121：Production Bootstrap Retirement。
+
+审计结论：
+- 当前 `Settings.auth_bootstrap_enabled` 默认仍为 `True`；
+- `.env.example` 仍以 `AUTH_BOOTSTRAP_ENABLED=true` 作为默认示例；
+- production 已具备真实 DB account/session 登录能力，因此旧静态 `AUTH_BEARER_TOKEN → LOCAL_USER_ID` 不应继续默认开启；
+- TEST-121 只收紧 production bootstrap 默认值，不与 development/test `X-User-ID` 兼容路径混改。
+
+目标：
+1. `AUTH_BOOTSTRAP_ENABLED` 默认改为 false；
+2. `.env.example` 默认 false，并明确只有迁移/应急阶段才显式 opt-in；
+3. production 中仅配置 `AUTH_BEARER_TOKEN` 但未显式开启 bootstrap 时，该 token 必须 401；
+4. 显式 `AUTH_BOOTSTRAP_ENABLED=true` 时保留旧兼容能力，避免紧急迁移路径被直接删除；
+5. DB account sessions 在 bootstrap 默认关闭时仍正常工作；
+6. register/login 公共入口保持现有契约；
+7. 无 migration，不修改历史 migration 001~013。
+
+后续再独立处理 development/test `X-User-ID` 退场与 release/runtime security。
 
 ## 架构与持续禁止事项
 
