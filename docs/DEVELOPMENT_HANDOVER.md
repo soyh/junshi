@@ -1,7 +1,7 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-110 — Provider Capability / Analysis Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-110 — Provider Capability / Analysis Contract — VERIFIED
 当前 Branch：test-110-provider-capability-contract
 
 ## 项目目标
@@ -41,11 +41,11 @@ TEST-106 VERIFIED — Provider Runtime Materialization；服务器 targeted 1 pa
 
 TEST-107 VERIFIED — Provider Connection Test；服务器 targeted connection 3 passed、HTTP contract 3 passed、full pytest 539 passed；工作树 clean；历史 migration diff blank。
 
-TEST-108 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
+TEST-108 VERIFIED — Provider Error Contract；服务器 targeted 3 passed；最终 full pytest 553 passed；工作树 clean；migration diff blank。
 
-TEST-109 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
+TEST-109 VERIFIED — Provider Base URL Contract；服务器 targeted 8 passed；最终 full pytest 553 passed；工作树 clean；migration diff blank。
 
-TEST-110 当前状态 — CONTRACT LOCKED / GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
+TEST-110 VERIFIED — Provider Capability / Analysis Contract；服务器 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed；工作树 clean；migration diff blank；HEAD `2de393a29dc7419654321e558ad3dd4f69928405`。
 
 ## TEST-104 — VERIFIED
 
@@ -85,7 +85,7 @@ TEST-110 当前状态 — CONTRACT LOCKED / GITHUB SELF-TEST PASSED / SERVER VAL
 
 GitHub Actions run `35204314910`：targeted connection tests passed、full pytest passed；随后已删除临时 TEST-107 validation workflow。服务器 targeted connection 3 passed、HTTP contract 3 passed、full pytest 539 passed；工作树 clean；历史 migration diff blank。
 
-## TEST-108 — Provider Error Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+## TEST-108 — Provider Error Contract — VERIFIED
 
 目标：锁定 Provider 连接失败的稳定错误边界，避免 timeout、HTTP 429、malformed response 等上游异常直接泄漏实现细节、上游响应体或 API Key。
 
@@ -95,9 +95,9 @@ GitHub Actions run `35204314910`：targeted connection tests passed、full pytes
 3. malformed JSON → 统一连接失败错误；
 4. 错误信息不得包含测试 API Key 或敏感上游响应内容。
 
-GitHub Actions run `35204873790`：targeted provider error contract tests passed、full pytest passed；随后已删除临时 TEST-108 validation workflow。服务器尚未验收，因此 TEST-108 暂不标记 VERIFIED。
+GitHub Actions run `35204873790`：targeted provider error contract tests passed、full pytest passed；随后已删除临时 TEST-108 validation workflow。服务器验收：targeted 3 passed；在 TEST-110 最终分支 full pytest 553 passed；工作树 clean；migration diff blank。
 
-## TEST-109 — Provider Base URL Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+## TEST-109 — Provider Base URL Contract — VERIFIED
 
 目标：锁定 OpenAI-compatible provider 的 `base_url` 输入边界，避免将非法 URL、URL 内嵌凭据、query/fragment 等不应作为 API endpoint 配置的内容持久化并进入 runtime。
 
@@ -109,9 +109,9 @@ GitHub Actions run `35204873790`：targeted provider error contract tests passed
 5. 合法 URL 可以进入现有 provider materialization；
 6. 不修改数据库 schema / migration。
 
-GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed、full pytest 550 passed、1 warning；随后已删除临时 TEST-109 validation workflow。服务器尚未验收，因此 TEST-109 暂不标记 VERIFIED。
+GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed、full pytest 550 passed、1 warning；随后已删除临时 TEST-109 validation workflow。服务器验收：targeted 8 passed；在 TEST-110 最终分支 full pytest 553 passed；工作树 clean；migration diff blank。
 
-## TEST-110 — Provider Capability / Analysis Contract — CONTRACT LOCKED / GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+## TEST-110 — Provider Capability / Analysis Contract — VERIFIED
 
 目标：明确“Provider connection test 成功”只证明当前 API endpoint / credential / model 能完成轻量 chat-completions 请求，不等于该模型已经满足正式业务 Analysis capability；正式 Analysis 必须继续通过现有 JSON object 与 `StructuredAnalysis` schema validation。
 
@@ -124,11 +124,11 @@ GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed
 4. 保持现有 selected model / `response_format={"type":"json_object"}` provider 行为由既有 Qwen Provider 测试覆盖；
 5. 不修改生产 Provider 实现，不新增 endpoint，不修改数据库 schema / migration。
 
-首次 GitHub run `35205937727` 因测试对内部错误文案绑定过严失败；修正为只锁定 `LLMAnalysisError` 业务边界，没有修改生产代码。GitHub Actions run `35209692341`：TEST-110 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed、1 warning；随后删除临时 TEST-110 validation workflow。相对 TEST-109 基线的最终功能差异仅为 TEST-110 contract test；无 migration 变化。服务器尚未验收，因此 TEST-110 暂不标记 VERIFIED。
+首次 GitHub run `35205937727` 因测试对内部错误文案绑定过严失败；修正为只锁定 `LLMAnalysisError` 业务边界，没有修改生产代码。GitHub Actions run `35209692341`：TEST-110 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed、1 warning；随后删除临时 TEST-110 validation workflow。服务器验收：TEST-110 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed in 86.96s；工作树 clean；相对 TEST-109 基线 migration diff blank。TEST-110 VERIFIED。
 
 ## 产品化后续审计方向
 
-完成 TEST-108 ~ TEST-110 服务器验收后，继续审计：
+TEST-111 起继续审计：
 1. provider rate-limit / timeout / retry 契约；
 2. API Key、请求头及敏感错误信息的日志泄漏边界；
 3. 前端设置页与分析工作流；
