@@ -75,6 +75,37 @@ class QwenProvider(LLMProvider):
             raise LLMAnalysisError("Qwen returned a non-object structured result")
         return result
 
+    def test_connection(self) -> None:
+        if not self.api_key:
+            raise LLMAnalysisError("Qwen API key is not configured")
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Reply with OK to confirm this API connection test.",
+                }
+            ],
+            "max_tokens": 8,
+        }
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            response = self._post(payload, headers)
+            response.raise_for_status()
+            body = response.json()
+            choices = body["choices"]
+            if not isinstance(choices, list) or not choices:
+                raise LLMAnalysisError("Qwen connection test returned no choices")
+        except LLMAnalysisError:
+            raise
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
+            raise LLMAnalysisError("Qwen provider connection test failed") from exc
+
     def _post(self, payload: dict[str, Any], headers: dict[str, str]) -> httpx.Response:
         if self._client is not None:
             return self._client.post(
