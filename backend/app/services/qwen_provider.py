@@ -21,11 +21,7 @@ class QwenProvider(LLMProvider):
         client: httpx.Client | None = None,
     ):
         settings = get_settings()
-        self.api_key = (
-            settings.dashscope_api_key
-            if api_key is UNSET
-            else api_key
-        )
+        self.api_key = settings.dashscope_api_key if api_key is UNSET else api_key
         self.base_url = (base_url or settings.qwen_base_url).rstrip("/")
         self.model = model or settings.qwen_model
         self.timeout_seconds = (
@@ -42,14 +38,8 @@ class QwenProvider(LLMProvider):
         payload = {
             "model": self.model,
             "messages": [
-                {
-                    "role": "system",
-                    "content": self._system_prompt(),
-                },
-                {
-                    "role": "user",
-                    "content": self._user_prompt(context),
-                },
+                {"role": "system", "content": self._system_prompt()},
+                {"role": "user", "content": self._user_prompt(context)},
             ],
             "response_format": {"type": "json_object"},
         }
@@ -68,8 +58,8 @@ class QwenProvider(LLMProvider):
             result = json.loads(content)
         except LLMAnalysisError:
             raise
-        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
-            raise LLMAnalysisError("Qwen provider request failed") from exc
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError):
+            raise LLMAnalysisError("Qwen provider request failed") from None
 
         if not isinstance(result, dict):
             raise LLMAnalysisError("Qwen returned a non-object structured result")
@@ -103,8 +93,8 @@ class QwenProvider(LLMProvider):
                 raise LLMAnalysisError("Qwen connection test returned no choices")
         except LLMAnalysisError:
             raise
-        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
-            raise LLMAnalysisError("Qwen provider connection test failed") from exc
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError):
+            raise LLMAnalysisError("Qwen provider connection test failed") from None
 
     def _post(self, payload: dict[str, Any], headers: dict[str, str]) -> httpx.Response:
         if self._client is not None:
