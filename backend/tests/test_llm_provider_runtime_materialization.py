@@ -25,7 +25,12 @@ def test_configured_provider_materializes_persisted_runtime_parameters(monkeypat
         "api_key_encrypted": "encrypted-key",
     }
 
-    monkeypatch.setattr(service.repository, "get", lambda conn, user_id: row)
+    monkeypatch.setattr(
+        service.repository,
+        "get",
+        lambda conn, user_id: row,
+        raising=False,
+    )
     monkeypatch.setattr(service, "_fernet", lambda: FakeFernet())
     monkeypatch.setattr(llm_provider_config, "QwenProvider", FakeQwenProvider)
 
