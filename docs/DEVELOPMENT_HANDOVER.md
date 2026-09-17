@@ -1,8 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-113 — Provider Settings UI / Analysis Entry — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
-当前 Branch：test-113-provider-settings-ui
+当前阶段：TEST-114 — Production Authentication Boundary — VERIFIED / PAUSED
+当前 Branch：test-114-production-auth-boundary
+服务器验收代码 HEAD：`693946882ca780eafc0367dfa26a3b7f0ea06f84`
 
 ## 项目目标
 
@@ -33,7 +34,7 @@ TEST-102 VERIFIED — DB-level Outcome idempotency；新增 migration 009 `uq_ac
 
 TEST-103 VERIFIED — `sqlite3.IntegrityError → HTTP 409 Conflict`；服务器 targeted 1 passed、full 529 passed；migration diff blank。
 
-TEST-104 VERIFIED — user-selectable LLM Provider / API configuration；服务器 targeted 1 passed、full 530 passed；工作树 clean；HEAD `0ebe095`；历史 migration 001~009 未修改。
+TEST-104 VERIFIED — user-selectable LLM Provider / API configuration；服务器 targeted 1 passed、full 530 passed；工作树 clean；历史 migration 001~009 未修改。
 
 TEST-105 VERIFIED — Provider Runtime Routing；服务器 targeted 2 passed、full 532 passed；工作树 clean；历史 migration diff blank。
 
@@ -47,154 +48,81 @@ TEST-109 VERIFIED — Provider Base URL Contract；服务器 targeted 8 passed�
 
 TEST-110 VERIFIED — Provider Capability / Analysis Contract；服务器 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed；工作树 clean；migration diff blank；服务器 HEAD `2de393a29dc7419654321e558ad3dd4f69928405`。
 
-TEST-111 VERIFIED — Provider Timeout / Rate-Limit / No-Retry Contract；服务器 targeted 9 passed、既有 Provider Error Contract 3 passed、Provider Connection 3 passed、full pytest 562 passed；工作树 clean；migration diff blank；服务器 HEAD `4d750c571f64f14ece97b19f84e000c3c4950275`。
+TEST-111 VERIFIED — Provider Timeout / Rate-Limit / No-Retry Contract；服务器 targeted 9 passed、Provider Error Contract 3 passed、Provider Connection 3 passed、full pytest 562 passed；工作树 clean；migration diff blank；服务器 HEAD `4d750c571f64f14ece97b19f84e000c3c4950275`。
 
-TEST-112 VERIFIED — Provider Log Redaction / Exception Boundary；服务器 targeted log redaction 6 passed、provider config/materialization 2 passed、provider error/connection 6 passed、full pytest 568 passed；工作树 clean；相对 TEST-111 baseline migration diff blank；服务器 HEAD `3bb10a300cf7d09614c4e271c3415328ce7a939a`。
+TEST-112 VERIFIED — Provider Log Redaction / Exception Boundary；服务器 targeted 6 passed、provider config/materialization 2 passed、provider error/connection 6 passed、full pytest 568 passed；工作树 clean；migration diff blank；服务器 HEAD `3bb10a300cf7d09614c4e271c3415328ce7a939a`。
 
-TEST-113 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — 最小 Provider 设置 UI + Structured Analysis 入口；GitHub targeted UI contract 3 passed、既有 provider config/redaction 7 passed、full pytest 571 passed；未新增 migration。
+TEST-113 VERIFIED — Provider Settings UI / Analysis Entry；服务器 targeted UI contract 3 passed、provider config/redaction 7 passed、full pytest 571 passed in 89.15s；工作树 clean；相对 TEST-112 migration diff blank；服务器 HEAD `b59b7625ffd8a391835545852ce981871da32580`。
 
-## TEST-104 — VERIFIED
+TEST-114 VERIFIED — Production Authentication Boundary；服务器 auth boundary 7 passed、Provider UI auth regression 3 passed、Provider security regression 7 passed、full pytest 578 passed in 89.48s；工作树 clean；相对 TEST-113 migration diff blank；服务器验收代码 HEAD `693946882ca780eafc0367dfa26a3b7f0ea06f84`。
 
-目标：让用户能够按 user scope 保存自己的 OpenAI-compatible API Key、Base URL、Model、Timeout，并让现有 Analysis / Strategy / Recommendation / Strategic Reply / Action Plan analysis routes 使用该配置；没有用户配置时保持原有 Qwen 默认行为。
+## TEST-104 ~ TEST-112 — Provider 产品化与安全边界
 
-已建立：user-scoped provider config、Fernet API key encryption、GET/PUT/DELETE `/api/v1/settings/llm`、`openai_compatible` provider、`LLM_CONFIG_ENCRYPTION_KEY`、requirements 中 `cryptography==46.0.5`，以及对现有分析入口的配置读取。
+TEST-104 建立 user-scoped OpenAI-compatible Provider 配置：API Key、Base URL、Model、Timeout；API Key 通过 Fernet 加密持久化，GET 响应只返回 `api_key_configured`，无用户配置时保持 Qwen fallback。
 
-## TEST-105 — Provider Runtime Routing — VERIFIED
+TEST-105/106 锁定 persisted configuration 会真实进入所有 Analysis 路由及 Provider constructor 参数，包括解密后的 API key、base_url、model、timeout_seconds。
 
-目标：验证 TEST-104 保存的 provider configuration 不只是“设置 API”，而是实际进入各 AI 分析入口；同时验证无配置时保持原有 Qwen fallback。
+TEST-107 增加独立 `POST /api/v1/settings/llm/test` connection test；connection success 仅证明 endpoint / credential / model 可完成轻量请求，不代表正式 Analysis capability。
 
-覆盖入口：Structured Analysis、Strategy、Recommendation、Strategic Reply、Action Plan Analysis。服务器 targeted 2 passed、full pytest 532 passed。
+TEST-108/109/110 锁定错误归一化、合法 Provider URL、connection 与 StructuredAnalysis capability 的边界；正式 Analysis 仍必须通过 JSON object 与 `StructuredAnalysis` schema validation。
 
-## TEST-106 — Provider Runtime Materialization — VERIFIED
+TEST-111 明确当前 Provider 不执行隐式自动 retry：timeout / 429 第一次失败即归一化为 `LLMAnalysisError`，避免隐藏重复计费和不可控延迟。
 
-目标：锁定 user-scoped persisted provider configuration 在 runtime 中实际 materialize 为 Provider 实例参数，而不是只验证“拿到了某个 Provider 对象”。
+TEST-112 建立 secret/log boundary：Provider API Key 使用 `SecretStr`；root logging handler 统一脱敏 Authorization、Bearer token、API key、encryption key；Provider/service 归一化上游异常时截断 raw exception cause，避免 secret / upstream body 进入 traceback。
 
-验证 persisted API key 解密、base_url、model、timeout_seconds 均进入现有 QwenProvider adapter；不建立第二套 provider 实现。服务器 targeted 1 passed、full pytest 533 passed；历史 migration diff blank。
+## TEST-113 — Provider Settings UI / Analysis Entry — VERIFIED
 
-## TEST-107 — Provider Connection Test — VERIFIED
+目标：在当前没有独立 Web 前端工程的仓库里建立最小、可直接服务的 Provider 设置页面，并只复用既有 Provider API 和 Structured Analysis API。
 
-目标：建立独立于正式 Analysis 的 Provider 连接测试能力，使用户可以验证当前 user-scoped provider configuration 是否能够实际访问其 OpenAI-compatible `/chat/completions` endpoint。
+已建立：
+1. `GET /api/v1/settings/llm/ui` 轻量 HTML UI，并从 OpenAPI schema 隐藏；
+2. Provider 设置只调用既有 `GET/PUT/DELETE /api/v1/settings/llm` 与 `POST /api/v1/settings/llm/test`；
+3. API Key 使用 password input，不使用 localStorage/sessionStorage，不从服务端回填，保存后立即清空；
+4. 页面只用 `textContent` 展示返回值，不使用 `innerHTML` 注入；
+5. 页面提供 Conversation ID 输入并调用既有 Structured Analysis API；
+6. 不新增数据库 schema / migration，不建立第二套 Provider / Analysis 逻辑。
 
-新增：
-- `LLMProvider.test_connection()` provider contract；
-- `QwenProvider.test_connection()` 轻量连接请求，不要求返回完整 StructuredAnalysis；
-- `LLMProviderConfigService.test_connection()`，通过当前 user scope materialize provider 后执行连接测试；
-- `POST /api/v1/settings/llm/test`；
-- configuration/materialization error → HTTP 503；upstream/provider connection failure → HTTP 502；成功返回 `{"status": "ok"}`。
+GitHub Actions run `35226450034`：targeted 3 passed、provider config/redaction 7 passed、full 571 passed；临时 workflow 已删除。服务器最终验收完全通过，TEST-113 VERIFIED。
 
-新增测试覆盖：
-1. connection request 使用 materialized API key、model、base URL，并发送受限 `max_tokens`；
-2. upstream HTTP failure 映射为 `LLMAnalysisError`；
-3. malformed/empty choices 被拒绝；
-4. HTTP endpoint 成功、configuration error、upstream failure 的状态码契约；
-5. 不修改数据库 schema / migration。
+## TEST-114 — Production Authentication Boundary — VERIFIED
 
-GitHub Actions run `35204314910`：targeted connection tests passed、full pytest passed；随后已删除临时 TEST-107 validation workflow。服务器 targeted connection 3 passed、HTTP contract 3 passed、full pytest 539 passed；工作树 clean；历史 migration diff blank。
+目标：消除生产环境直接信任客户端 `X-User-ID` 的身份伪造边界，同时保留 development/test 的兼容迁移窗口。
 
-## TEST-108 — Provider Error Contract — VERIFIED
+当前认证契约：
+1. `APP_ENV=production` 时禁止客户端 `X-User-ID` 身份声明；
+2. production 请求必须使用 `Authorization: Bearer <token>`；
+3. Bearer token 与服务端 `AUTH_BEARER_TOKEN` 使用常量时间比较；
+4. 合法 token 映射到服务端配置的 `LOCAL_USER_ID`，客户端不提供 user_id；
+5. 缺少/错误 Bearer token → HTTP 401；production 使用 `X-User-ID` → HTTP 401；
+6. production 未配置 `AUTH_BEARER_TOKEN` → HTTP 503，fail closed；
+7. development/test 暂保留旧 `X-User-ID` / local-user fallback，以避免一次性破坏既有回归契约；
+8. TEST-113 Provider UI 已切换到 Bearer token，不再手工输入 user id；
+9. `AUTH_BEARER_TOKEN` 已纳入日志敏感字段脱敏；
+10. 未新增 migration，未修改历史 migration。
 
-目标：锁定 Provider 连接失败的稳定错误边界，避免 timeout、HTTP 429、malformed response 等上游异常直接泄漏实现细节、上游响应体或 API Key。
+GitHub Actions run `35229312839`：auth boundary 7 passed、Provider UI 3 passed、Provider security 7 passed、full pytest 578 passed、1 warning；临时 workflow 已删除。
 
-新增测试覆盖：
-1. timeout → 统一 `LLMAnalysisError`；
-2. HTTP 429 → 统一连接失败错误，不返回 upstream response body；
-3. malformed JSON → 统一连接失败错误；
-4. 错误信息不得包含测试 API Key 或敏感上游响应内容。
+服务器验收：
+- `backend/tests/test_auth_boundary.py`：7 passed；
+- `backend/tests/test_llm_provider_settings_ui.py`：3 passed；
+- Provider security regression：7 passed；
+- full pytest：578 passed in 89.48s；
+- `git status --short` blank；
+- 相对 TEST-113 baseline `backend/migrations` diff blank；
+- 最终业务文件差异与 GitHub 预期一致。
 
-GitHub Actions run `35204873790`：targeted provider error contract tests passed、full pytest passed；随后已删除临时 TEST-108 validation workflow。服务器验收：targeted 3 passed；在 TEST-110 最终分支 full pytest 553 passed；工作树 clean；migration diff blank。
+TEST-114 VERIFIED。
 
-## TEST-109 — Provider Base URL Contract — VERIFIED
+## 当前暂停点 / 下一阶段
 
-目标：锁定 OpenAI-compatible provider 的 `base_url` 输入边界，避免将非法 URL、URL 内嵌凭据、query/fragment 等不应作为 API endpoint 配置的内容持久化并进入 runtime。
+按用户要求，项目当前暂停在 TEST-114 VERIFIED，不启动 TEST-115。
 
-新增测试覆盖：
-1. HTTP / HTTPS URL 必须包含 host；
-2. URL 内嵌 username/password 被拒绝；
-3. query / fragment 被拒绝；
-4. 保存配置时规范化 trailing slash；
-5. 合法 URL 可以进入现有 provider materialization；
-6. 不修改数据库 schema / migration。
-
-GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed、full pytest 550 passed、1 warning；随后已删除临时 TEST-109 validation workflow。服务器验收：targeted 8 passed；在 TEST-110 最终分支 full pytest 553 passed；工作树 clean；migration diff blank。
-
-## TEST-110 — Provider Capability / Analysis Contract — VERIFIED
-
-目标：明确“Provider connection test 成功”只证明当前 API endpoint / credential / model 能完成轻量 chat-completions 请求，不等于该模型已经满足正式业务 Analysis capability；正式 Analysis 必须继续通过现有 JSON object 与 `StructuredAnalysis` schema validation。
-
-本阶段采用 contract-lock 而不是新增公共 capabilities API，避免在没有产品需求时引入第二套 capability registry 或静态宣称模型能力。
-
-新增测试覆盖：
-1. connection test 成功后，合法 StructuredAnalysis 仍按现有 Analysis pipeline 成功；
-2. connection test 返回普通文本 `OK` 不得被正式 Analysis 当成成功；
-3. JSON array 等非 object structured result 必须被拒绝；
-4. 保持现有 selected model / `response_format={"type":"json_object"}` provider 行为由既有 Qwen Provider 测试覆盖；
-5. 不修改生产 Provider 实现，不新增 endpoint，不修改数据库 schema / migration。
-
-首次 GitHub run `35205937727` 因测试对内部错误文案绑定过严失败；修正为只锁定 `LLMAnalysisError` 业务边界，没有修改生产代码。GitHub Actions run `35209692341`：TEST-110 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed、1 warning；随后删除临时 TEST-110 validation workflow。服务器验收：TEST-110 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed in 86.96s；工作树 clean；相对 TEST-109 基线 migration diff blank。TEST-110 VERIFIED。
-
-## TEST-111 — Provider Timeout / Rate-Limit / No-Retry Contract — VERIFIED
-
-目标：锁定当前 Provider 的超时、429 rate-limit 与重试边界。当前策略是不在 Provider 内部隐式自动重试：一次 Analysis / connection request 对应一次 upstream HTTP request；timeout 或 429 在第一次失败后立即归一化为 `LLMAnalysisError`。这样避免隐藏的重复计费、重复请求和不可控延迟；未来若产品需要 retry，应通过显式、可配置、可观测策略单独实现。
-
-本阶段采用 contract-lock，不修改生产 Provider 实现。
-
-新增测试覆盖：
-1. Analysis HTTP request 使用用户配置的 `timeout_seconds`；
-2. Analysis ReadTimeout 只发起一次请求，不隐式 retry；
-3. Analysis HTTP 429 只发起一次请求，不隐式 retry；
-4. Connection Test 使用相同 configured timeout，并且 timeout 不隐式 retry；
-5. Connection Test HTTP 429 不隐式 retry；
-6. Provider timeout 配置必须 `> 0` 且 `<= 300`，300 秒边界允许；
-7. 不新增 endpoint、不修改数据库 schema / migration。
-
-GitHub Actions run `35210450717`：TEST-111 targeted 9 passed、既有 Provider Error Contract 3 passed、既有 Provider Connection 3 passed、full pytest 562 passed、1 warning；随后删除临时 TEST-111 validation workflow。服务器验收：TEST-111 targeted 9 passed、Provider Error Contract 3 passed、Provider Connection 3 passed、full pytest 562 passed in 87.67s；工作树 clean；相对 TEST-110 基线 migration diff blank；最终文件差异仅为 TEST-111 contract test 与 handover。TEST-111 VERIFIED。
-
-## TEST-112 — Provider Log Redaction / Exception Boundary — VERIFIED
-
-目标：在 Provider 配置、HTTP Authorization、应用日志和异常 traceback 之间建立明确的 secret boundary，避免 API Key、Bearer token、加密 key 或第三方异常内容进入 console/file log。
-
-本阶段新增：
-1. `LLMProviderConfigUpdate.api_key` 改为 Pydantic `SecretStr`，默认 repr / JSON 不暴露原始 API Key；service 只在加密持久化时显式 `get_secret_value()`；
-2. `app.core.logging.SensitiveDataFilter` 统一挂到已有或新建 root handlers，对 Authorization、Bearer token、`*_API_KEY`、`*_ENCRYPTION_KEY` 等敏感字段做 `[REDACTED]`；
-3. 日志 filter 同时处理格式化 message、exception traceback 和 stack info；
-4. `QwenProvider`、`LLMAnalysisService`、`LLMProviderConfigService` 在归一化未知/上游异常时使用 `from None`，不把可能含 API Key / Authorization / upstream body 的 raw exception cause 暴露给上层 traceback；
-5. 不改变 API 成功/失败业务状态码，不新增 endpoint，不修改数据库 schema / migration。
-
-新增 `backend/tests/test_llm_provider_log_redaction.py` 覆盖：
-- SecretStr repr / JSON masking；
-- Authorization / Bearer / API Key / encryption key 文本脱敏；
-- logger message 参数和 exception traceback 脱敏；
-- Qwen upstream exception 不保留 raw secret cause；
-- LLMAnalysisService arbitrary provider exception 不保留 raw cause；
-- provider connection wrapper 不保留 raw internal exception cause。
-
-GitHub Actions run `35213487409`：TEST-112 targeted 6 passed、provider config + runtime materialization 2 passed、existing provider error + connection 6 passed、full pytest 568 passed、1 warning；随后删除临时 TEST-112 validation workflow。服务器验收：targeted log redaction 6 passed、provider config/materialization 2 passed、provider error/connection 6 passed、full pytest 568 passed in 89.02s；工作树 clean；相对 TEST-111 baseline migration diff blank；最终文件差异与 GitHub 预期一致。TEST-112 VERIFIED。
-
-## TEST-113 — Provider Settings UI / Analysis Entry — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
-
-目标：在当前没有独立 Web 前端工程的仓库里，建立一个最小、可直接服务的 Provider 设置页面，并只复用既有 Provider API 和 Structured Analysis API，不建立第二套 Provider 或 Analysis 业务逻辑。
-
-本阶段新增：
-1. `GET /api/v1/settings/llm/ui` 返回轻量 HTML UI，并从 OpenAPI schema 隐藏该内部页面入口；
-2. 页面支持显式输入当前 `X-User-ID`，不默认绑定 `local-user`，避免误写其他 scope；
-3. Provider 设置只调用既有 `GET/PUT/DELETE /api/v1/settings/llm` 与 `POST /api/v1/settings/llm/test`；
-4. API Key 使用 password input，不使用 localStorage/sessionStorage，读取配置时永不回填 API Key，保存完成后立即清空输入；
-5. 页面只使用 `textContent` 展示状态与错误，不使用 `innerHTML` 注入返回内容；
-6. 页面提供 Conversation ID 输入并调用既有 `GET /api/v1/conversations/{conversation_id}/analysis/structured`，明确 connection test 与正式 StructuredAnalysis validation 是不同边界；
-7. 不新增数据库 schema / migration，不改变现有 Provider/Analysis backend contract。
-
-新增 `backend/tests/test_llm_provider_settings_ui.py` 覆盖：页面可访问、复用既有 API、显式 user scope、客户端不持久化 secret、password input、Structured Analysis 入口以及 UI route 不进入 OpenAPI schema。
-
-GitHub Actions run `35226450034`：TEST-113 targeted UI contract 3 passed、existing provider config + log redaction 7 passed、full pytest 571 passed、1 warning；随后已删除临时 TEST-113 validation workflow。当前等待服务器验收后再标记 VERIFIED。
-
-## 产品化后续审计方向
-
-TEST-113 服务器验收后继续：
-1. 正式认证替换当前 `X-User-ID` 信任边界，并让 UI 不再手工输入 user id；
-2. 发布与运行时安全，包括 secret rotation / process environment / reverse-proxy access log boundary；
-3. 再决定是否需要独立前端工程，而不是在缺少产品导航/组件体系时提前引入 Node 构建链。
-
-连接测试成功不等于模型业务分析成功，也不等于所有 provider capability 均可用；正式 Analysis 仍必须经过 StructuredAnalysis schema validation。当前 Provider 不执行隐式自动 retry；Provider credentials 不应出现在应用 console/file log 或归一化 exception traceback 中。
+恢复后优先方向：
+1. 从当前单用户、服务端静态 Bearer token 边界升级到真正的多用户 authenticated identity：session/token → server-resolved `user_id`；
+2. 逐步移除 development/test 对任意 `X-User-ID` 的兼容依赖，而不是让客户端继续决定身份；
+3. 用户登录/注册/session 生命周期、token revoke/rotation、密码或外部身份提供方策略；
+4. 继续发布与运行时安全：secret rotation、process environment、reverse-proxy access log、HTTPS/CORS/CSRF 等；
+5. 再推进完整产品 UI，而不是提前建立与当前后端契约重复的第二套业务逻辑。
 
 ## 架构与持续禁止事项
 
@@ -207,3 +135,7 @@ TEST-113 服务器验收后继续：
 - 所有数据必须 user_id 隔离；Person / Relationship / Conversation 不得跨 scope 混用。
 - 不修改历史 migration；不建立第二套 lifecycle。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
+- connection test 成功不等于正式 Analysis capability 成功；正式 Analysis 必须继续通过 StructuredAnalysis validation。
+- 当前 Provider 不执行隐式自动 retry。
+- Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113/114 verification tag 已创建。
