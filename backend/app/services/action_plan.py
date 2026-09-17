@@ -79,7 +79,26 @@ class ActionPlanService:
             recommendations = list(context.get("recommendations", []))
             action_plan = self.build_action_plan(recommendations, context["evidence"])
         else:
-            snapshots = self.snapshot_repository.list_for_person(conn, user_id, person_id)
+            current_evidence_ids = {
+                item.get("source_id")
+                for item in context.get("evidence", [])
+                if isinstance(item, dict) and item.get("source_id")
+            }
+            snapshots = []
+            for item in self.snapshot_repository.list_for_person(conn, user_id, person_id):
+                recommendation = item["recommendation"]
+                action_plan_item = item["action_plan"]
+                recommendation_evidence = recommendation.get("evidence_source_ids")
+                action_plan_evidence = action_plan_item.get("evidence_source_ids")
+                if not isinstance(recommendation_evidence, list) or not recommendation_evidence:
+                    continue
+                if not isinstance(action_plan_evidence, list) or not action_plan_evidence:
+                    continue
+                if not all(source_id in current_evidence_ids for source_id in recommendation_evidence):
+                    continue
+                if not all(source_id in current_evidence_ids for source_id in action_plan_evidence):
+                    continue
+                snapshots.append(item)
             recommendations = [item["recommendation"] for item in snapshots]
             action_plan = [item["action_plan"] for item in snapshots]
         return {
