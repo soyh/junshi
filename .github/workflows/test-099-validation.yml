@@ -1,0 +1,21 @@
+name: TEST-099 validation
+
+on:
+  push:
+    branches:
+      - test-099-action-plan-persistence-gate
+  pull_request:
+    branches:
+      - test-098-action-plan-snapshot-isolation
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r backend/requirements.txt
+      - run: pytest -q backend/tests/test_action_plan_persistence_gate.py
+      - run: pytest -q
