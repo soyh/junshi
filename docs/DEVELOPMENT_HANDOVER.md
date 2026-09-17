@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-124 — Production Surface Hardening — GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED
-当前 Branch：test-124-production-surface-hardening
+当前阶段：TEST-125 — Secure Uvicorn Launcher Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-125-secure-uvicorn-launcher
 TEST-123 VERIFIED 服务器代码 HEAD：`77eddc8f84547cf5acae89142a463b7e64d72d78`
 
 ## 项目目标
@@ -45,6 +45,7 @@ TEST-121 VERIFIED — production bootstrap default retirement；服务器 full 6
 TEST-122 VERIFIED — legacy `X-User-ID` retired；服务器累计验收通过；GitHub full 630 passed。
 TEST-123 VERIFIED — HTTP security response boundary；服务器累计验收通过；full 636 passed；服务器 HEAD `77eddc8f84547cf5acae89142a463b7e64d72d78`。
 TEST-124 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — production FastAPI debug/docs surface hardening；full 640 passed。
+TEST-125 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — secure Uvicorn launcher；full 647 passed。
 
 ## Auth / Runtime 产品化基线
 
@@ -59,33 +60,13 @@ TEST-124 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — production Fas
 - TEST-122：`X-User-ID` 在 production/development/test 均拒绝，不允许客户端通过 header 选择 `user_id`；development/test 无 Bearer 时仅固定 `LOCAL_USER_ID` fallback。
 - TEST-123：全局基础安全响应头；auth/settings 响应 `Cache-Control: no-store`；默认不开放 permissive CORS；Bearer token 仍由响应 body 返回，不切换 Cookie。
 - TEST-124：production 强制 `debug=False`，并关闭 `/docs`、`/redoc`、`/openapi.json`；development/test 保留文档与可选 debug。
+- TEST-125：仓库内统一 `python -m app.server` launcher；production 仅允许 loopback bind，单 worker、无 reload、无 proxy header trust、无默认 Server header。
 
-## TEST-122 — Legacy X-User-ID Retirement — VERIFIED
+## TEST-122 / TEST-123 — VERIFIED
 
-目标：彻底结束 `X-User-ID` 作为身份来源的长期兼容路径。
+TEST-122：彻底结束 `X-User-ID` 作为身份来源；历史隔离测试改由 pytest 适配器转换成真实 DB user + opaque Bearer session；服务器累计验收 all pass。
 
-实现与验证：
-1. `get_current_user_id()` 在任何环境收到 `X-User-ID` 都返回 401；
-2. valid DB session 与 `X-User-ID` 同时出现时也拒绝请求，避免 ambiguous identity；
-3. development/test 无 Bearer、无旧 header 时仍固定使用 `LOCAL_USER_ID` fallback；
-4. 原 full suite 有 47 个历史隔离测试用旧 header 模拟多用户。未恢复生产逻辑，而是在 pytest `client` fixture 内将非 auth-contract 测试中的旧 header 转换为真实 DB user + opaque session，再发送 `Authorization: Bearer <session>`；
-5. 所有 `test_auth_*` 契约测试绕过适配器，继续直接验证应用拒绝 `X-User-ID`；
-6. 无新 migration，历史 migration 001~013 未修改。
-
-服务器与 TEST-123 累计验收：符合预期、all pass；TEST-122 VERIFIED。
-
-## TEST-123 — HTTP Security Boundary — VERIFIED
-
-目标：在不假设生产域名、HTTPS termination 或 reverse proxy 拓扑的前提下，先建立与部署环境无关的 HTTP 响应安全底线。
-
-实现：
-1. 正常应用响应统一设置 `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`；
-2. `/api/v1/auth*` 与 `/api/v1/settings*` 额外 `Cache-Control: no-store`；
-3. 默认不开放 permissive CORS；
-4. Bearer token 不切换 Cookie；
-5. 暂不启用 HSTS / strict CSP / TrustedHost / proxy trust，等待真实部署拓扑。
-
-GitHub run `35252416990`：full 636 passed；服务器累计验收 all pass；TEST-123 VERIFIED。
+TEST-123：统一 `nosniff` / `DENY` / `no-referrer` 安全响应头；auth/settings `Cache-Control: no-store`；默认无 permissive CORS；Bearer token 不切换 Cookie；服务器累计验收 all pass。
 
 ## TEST-124 — Production Surface Hardening — GITHUB SELF-TEST PASSED
 
@@ -93,37 +74,51 @@ GitHub run `35252416990`：full 636 passed；服务器累计验收 all pass；TE
 
 实现与验证：
 1. `backend/app/main.py` 新增 `_fastapi_surface_options(settings)`；
-2. `APP_ENV=production` 时，无论 `APP_DEBUG` 是否误设为 true，FastAPI 都强制 `debug=False`；
-3. production 的 `docs_url`、`redoc_url`、`openapi_url` 均设为 `None`，因此 `/docs`、`/redoc`、`/openapi.json` 返回 404；
-4. development/test 继续暴露 docs/openapi，并按 `APP_DEBUG` 控制 debug；
-5. 新增 `backend/tests/test_production_surface_hardening.py` 4 个契约测试；
+2. `APP_ENV=production` 时，无论 `APP_DEBUG` 是否误设为 true，FastAPI 强制 `debug=False`；
+3. production 的 `/docs`、`/redoc`、`/openapi.json` 均关闭；
+4. development/test 继续保留 docs/openapi，并按 `APP_DEBUG` 控制 debug；
+5. `backend/tests/test_production_surface_hardening.py`：4 passed；
 6. 无新 migration，历史 migration 001~013 未修改。
 
-GitHub Actions run `35253423403`：success；
-- TEST-124：4 passed；
+GitHub Actions run `35253423403`：TEST-124 4、TEST-123 6、TEST-122 4、production auth 8、Auth UI 4、Provider UI 3、scope isolation 4、full 640 passed、1 warning in 33.43s；临时 workflow 已删除。
+
+为加速推进，TEST-124 与 TEST-125 一次性服务器验收。
+
+## TEST-125 — Secure Uvicorn Launcher Contract — GITHUB SELF-TEST PASSED
+
+目标：把服务器启动安全参数从“人工命令习惯”收进仓库内可测试契约，避免未来部署时无意开启公网监听、reload 或未经定义的 forwarded/proxy trust。
+
+实现：
+1. 新增 `backend/app/server.py`，项目根目录可通过兼容 `app` package 使用 `python -m app.server`；
+2. `_uvicorn_options(settings)` 使用 `HOST` / `PORT` / `LOG_LEVEL`；
+3. production 只接受 loopback host：`127.0.0.1`、`::1`、`localhost`；`0.0.0.0` 等 public/wildcard bind 直接 `RuntimeError`；
+4. development 可显式使用非 loopback host；
+5. 固定 `workers=1`，保持当前 SQLite MVP 单进程运行边界；
+6. 固定 `reload=False`；
+7. 固定 `proxy_headers=False` 与 `forwarded_allow_ips=""`，当前不信任 forwarded client/scheme；
+8. 固定 `server_header=False`；
+9. `main()` 使用 import string `app.main:app` 调用 `uvicorn.run()`；
+10. 新增 `backend/tests/test_secure_uvicorn_launcher.py` 7 个测试；
+11. 无新 migration，历史 migration 001~013 未修改；
+12. 本阶段没有修改或重启当前服务器进程，也没有触碰 8899。
+
+GitHub Actions run `35253778818`：success；
+- TEST-125 launcher：7 passed；
+- TEST-124 regression：4 passed；
 - TEST-123 regression：6 passed；
 - TEST-122 regression：4 passed；
 - production auth：8 passed；
 - Auth UI：4 passed；
 - Provider UI：3 passed；
 - scope isolation：4 passed；
-- full pytest：640 passed、1 warning in 33.43s；
+- full pytest：647 passed、1 warning in 32.26s；
 - 临时 validation workflow 已删除。
 
-为加速推进，TEST-124 服务器验收与 TEST-125 合并到下一个累计验收节点；当前不标记 SERVER VERIFIED。
+当前等待服务器一次性验收 TEST-124 + TEST-125。
 
-## 下一阶段
+## 下一阶段候选
 
-TEST-125 — Secure Uvicorn Launcher Contract：
-1. 在仓库内建立统一、可测试的 Uvicorn 启动入口；
-2. 默认使用 settings 的 `HOST=127.0.0.1` / `PORT=18080`；
-3. 明确 `workers=1`，保持当前 SQLite MVP 单进程写入边界；
-4. 明确关闭 proxy header trust，避免未配置可信反代边界前接受 forwarded client/scheme 信息；
-5. 不启用 reload；
-6. 不修改当前服务器进程或 8899；
-7. 无 migration。
-
-完成 TEST-125 GitHub full 后，再形成 TEST-124 + TEST-125 累计服务器验收节点。
+服务器通过后继续强力推进 TEST-126。当前优先候选：SQLite online backup / integrity / restore safety contract；只在测试临时库上验证，不直接操作生产数据库。
 
 ## 架构与持续禁止事项
 
@@ -137,4 +132,4 @@ TEST-125 — Secure Uvicorn Launcher Contract：
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~124 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~125 verification tag 已创建。
