@@ -23,7 +23,7 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
   <fieldset>
     <legend>Provider</legend>
     <label for="user-id">User ID</label>
-    <input id="user-id" value="local-user" autocomplete="off">
+    <input id="user-id" placeholder="Enter current X-User-ID" autocomplete="off">
 
     <label for="provider">Provider</label>
     <select id="provider">
