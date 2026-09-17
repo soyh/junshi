@@ -18,13 +18,17 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
 </head>
 <body>
   <h1>LLM Provider Settings</h1>
-  <p class="note">当前仍使用 X-User-ID 作为临时用户边界。API Key 不会从服务端读取回页面；修改配置时必须重新输入。</p>
+  <p class="note">生产认证使用 Authorization: Bearer。X-User-ID 仅保留为未配置认证时的 development/test legacy compatibility，本页面不会发送或允许选择 user_id。API Key 不会从服务端读取回页面。</p>
+
+  <fieldset>
+    <legend>Authentication</legend>
+    <label for="access-token">Access token</label>
+    <input id="access-token" type="password" autocomplete="off" placeholder="Bearer token when authentication is enabled">
+    <p class="note">Token 仅保存在当前页面内存/输入框中，不写入 localStorage 或 sessionStorage。生产访问应通过 HTTPS。</p>
+  </fieldset>
 
   <fieldset>
     <legend>Provider</legend>
-    <label for="user-id">User ID</label>
-    <input id="user-id" placeholder="Enter current X-User-ID" autocomplete="off">
-
     <label for="provider">Provider</label>
     <select id="provider">
       <option value="openai_compatible">OpenAI-compatible</option>
@@ -70,15 +74,10 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
   const status = byId('status');
   const analysisResult = byId('analysis-result');
 
-  function userId() {
-    const value = byId('user-id').value.trim();
-    if (!value) throw new Error('User ID is required');
-    return value;
-  }
-
   async function api(path, options = {}) {
     const headers = new Headers(options.headers || {});
-    headers.set('X-User-ID', userId());
+    const token = byId('access-token').value.trim();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
     if (options.body) headers.set('Content-Type', 'application/json');
     const response = await fetch(path, { ...options, headers });
     if (response.status === 204) return null;
@@ -105,7 +104,7 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
       byId('base-url').value = '';
       byId('model').value = '';
       byId('timeout').value = '60';
-      renderStatus('No provider config saved for this user.');
+      renderStatus('No provider config saved for the authenticated user.');
       return;
     }
     byId('provider').value = config.provider;
