@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 
@@ -10,6 +12,15 @@ def make_connection_client(status_code=200, body=None):
         assert request.url.path == "/v1/chat/completions"
         assert request.headers["authorization"] == "Bearer test-key"
         assert request.headers["content-type"] == "application/json"
+        payload = json.loads(request.content)
+        assert payload["model"] == "example-model"
+        assert payload["max_tokens"] == 8
+        assert payload["messages"] == [
+            {
+                "role": "user",
+                "content": "Reply with OK to confirm this API connection test.",
+            }
+        ]
         return httpx.Response(
             status_code,
             json=body if body is not None else {"choices": [{"message": {"content": "OK"}}]},
@@ -34,6 +45,7 @@ def test_qwen_provider_connection_test_translates_http_failure():
     provider = QwenProvider(
         api_key="test-key",
         base_url="https://example.test/v1",
+        model="example-model",
         client=make_connection_client(status_code=401, body={"error": "unauthorized"}),
     )
 
@@ -45,6 +57,7 @@ def test_qwen_provider_connection_test_rejects_empty_choices():
     provider = QwenProvider(
         api_key="test-key",
         base_url="https://example.test/v1",
+        model="example-model",
         client=make_connection_client(body={"choices": []}),
     )
 
