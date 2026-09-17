@@ -1,10 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-121 — Production Bootstrap Retirement — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-121 — Production Bootstrap Retirement — VERIFIED / PAUSED
 当前 Branch：test-121-production-bootstrap-retirement
-TEST-120 VERIFIED 服务器代码 HEAD：`456cd94bacb85655c53a892f23cba742af76d925`
-TEST-120 VERIFIED handover commit：`eaafcd69570a191ec6584345bdcc7bce1cb8c2b2`
+服务器验收代码 HEAD：`43b514a5dfa454b85424b3abe5a96ffb93da0c24`
 
 ## 项目目标
 
@@ -41,8 +40,8 @@ TEST-116 VERIFIED — Account credentials / login → server-issued session；mi
 TEST-117 VERIFIED — Multi-device session management / bootstrap retirement；服务器 full 599；HEAD `af4995a8e5fccd8586e63e3e76191552ecb317b1`。
 TEST-118 VERIFIED — SQLite login throttle / progressive lockout；服务器 full 607；migration 013；HEAD `c3f542a1b034bdfb0278eaace838efcd7c868ac7`。
 TEST-119 VERIFIED — authenticated password change / credential rotation；服务器 full 615；HEAD `04b3c84e7ebdd7250db4bbcf15b7f333b93f0e77`。
-TEST-120 VERIFIED — FastAPI-served account/session UI；服务器 Auth UI 4、password change 8、login throttle 8、account login 7、session management 7、Provider UI 3、scope isolation 4、full 619 passed in 116.18s；工作树 clean；migration diff blank；服务器 HEAD `456cd94bacb85655c53a892f23cba742af76d925`。
-TEST-121 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — production bootstrap default retirement；GitHub TEST-121 6、production auth 7、auth-session boundary 7、session management 7、account login 7、password change 8、Auth UI 4、scope isolation 4、full 625 passed；无新 migration。
+TEST-120 VERIFIED — FastAPI-served account/session UI；服务器 full 619；HEAD `456cd94bacb85655c53a892f23cba742af76d925`。
+TEST-121 VERIFIED — production bootstrap default retirement；服务器 TEST-121 6、production auth 7、auth-session boundary 7、session management 7、account login 7、password change 8、Auth UI 4、scope isolation 4、full 625 passed in 114.67s；工作树 clean；migration diff blank；服务器 HEAD `43b514a5dfa454b85424b3abe5a96ffb93da0c24`。
 
 ## Auth 产品化基线
 
@@ -53,57 +52,48 @@ TEST-121 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — production boot
 - TEST-118：SQLite login throttle / progressive lockout。
 - TEST-119：password change 必须 active DB session + current password；成功后全部旧 session revoke 并签发新 session。
 - TEST-120：最小可用 Auth UI 只调用既有 VERIFIED API，不复制认证逻辑。
-- TEST-121：静态 `AUTH_BEARER_TOKEN → LOCAL_USER_ID` bootstrap 默认关闭；仅显式 opt-in 时保留迁移兼容。
+- TEST-121：静态 `AUTH_BEARER_TOKEN → LOCAL_USER_ID` bootstrap 默认关闭；只有显式 `AUTH_BOOTSTRAP_ENABLED=true` 才保留迁移/应急兼容。
 
-## TEST-121 — Production Bootstrap Retirement — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+## TEST-121 — Production Bootstrap Retirement — VERIFIED
 
-目标：在真实 DB account/session 已建立后，让旧静态 bootstrap 从“默认开启”变成“显式 opt-in”，减少生产环境误配置后继续信任固定 `LOCAL_USER_ID` token 的风险。
+目标：真实 DB account/session 已建立后，让旧静态 bootstrap 从默认开启改为显式 opt-in，降低生产环境继续信任固定 `LOCAL_USER_ID` token 的风险。
 
-已完成：
-1. `Settings.auth_bootstrap_enabled` 默认值由 `True` 改为 `False`；
-2. `.env.example` 改为 `AUTH_BOOTSTRAP_ENABLED=false`，注释明确只允许显式 migration / emergency compatibility window 使用；
-3. production 中配置了 `AUTH_BEARER_TOKEN` 但 bootstrap disabled 时，该静态 token 返回 `401 invalid bearer token`；
-4. `AUTH_BOOTSTRAP_ENABLED=true` + 配置静态 token 时，TEST-114 兼容路径仍可显式使用；
-5. enabled bootstrap 但没有配置 token、且没有 active session 时，原有 fail-closed `503 production authentication is not configured` 语义保留；
-6. DB-backed account sessions 在 bootstrap disabled 时仍可正常访问 protected API；
-7. register/login 公共入口在 bootstrap disabled production 下保持正常；
-8. production 无 bootstrap、无 bearer 时统一 `401 bearer token required`；
-9. TEST-114 / TEST-115 旧回归测试改为显式声明何时需要 transitional bootstrap，不再隐式依赖默认开启；
-10. development/test `X-User-ID` 兼容路径本阶段未修改；
-11. 无新 migration，未修改历史 migration 001~013。
+已验证：
+1. `Settings.auth_bootstrap_enabled` 默认值为 `False`；
+2. `.env.example` 默认 `AUTH_BOOTSTRAP_ENABLED=false`；
+3. production 仅配置 `AUTH_BEARER_TOKEN`、但未显式启用 bootstrap 时，该静态 token 返回 `401 invalid bearer token`；
+4. 显式 `AUTH_BOOTSTRAP_ENABLED=true` 后旧兼容 token 仍可使用；
+5. DB-backed account sessions 在 bootstrap disabled 时正常；
+6. register/login 公共入口正常；
+7. production 无 bootstrap、无 bearer 时要求 bearer token；
+8. development/test `X-User-ID` 兼容路径未在本阶段修改；
+9. 无新 migration，未修改历史 migration 001~013。
 
-新增 `backend/tests/test_auth_bootstrap_retirement.py` 6 个测试，覆盖：
-- Settings 默认 bootstrap disabled；
-- `.env.example` 默认 bootstrap disabled；
-- production 静态 token 默认拒绝且不回显；
-- 显式 opt-in 后静态 bootstrap 仍可使用；
-- bootstrap disabled 时 register/login + DB session 正常；
-- production 无 bootstrap/session 时要求 bearer token。
+GitHub Actions run `35248850831`：full 625 passed、1 warning。
 
-更新既有测试：
-- `backend/tests/test_auth_boundary.py`：旧 static bootstrap 成功/缺失 token 场景改为显式 `bootstrap_enabled=True`；
-- `backend/tests/test_auth_session_boundary.py`：仅需要 bootstrap exchange 的测试显式 opt-in，其余 DB session 测试在 bootstrap disabled 下运行。
-
-GitHub Actions run `35248850831`：
-- TEST-121 bootstrap retirement：6 passed；
-- production auth regression：7 passed；
-- auth session boundary regression：7 passed；
-- session management regression：7 passed；
-- account login regression：7 passed；
-- password change regression：8 passed；
-- Auth Account UI regression：4 passed；
+服务器验收：
+- `backend/tests/test_auth_bootstrap_retirement.py`：6 passed；
+- `backend/tests/test_auth_boundary.py`：7 passed；
+- `backend/tests/test_auth_session_boundary.py`：7 passed；
+- `backend/tests/test_auth_session_management.py`：7 passed；
+- `backend/tests/test_auth_account_login.py`：7 passed；
+- `backend/tests/test_auth_password_change.py`：8 passed；
+- `backend/tests/test_auth_account_ui.py`：4 passed；
 - execution/action-plan scope isolation：4 passed；
-- full pytest：625 passed、1 warning in 33.07s；
-- warning 为已知 Starlette TestClient / anyio BlockingPortal deprecation；
-- 临时 validation workflow 已删除。
+- full pytest：625 passed in 114.67s；
+- `git status --short` blank；
+- migration diff blank；
+- `.env` 未显式设置 `AUTH_BOOTSTRAP_ENABLED`，因此当前运行配置采用代码默认 `false`。
 
-当前等待服务器验收后再标记 TEST-121 VERIFIED。
+TEST-121 VERIFIED。
 
-## 下一阶段候选
+## 当前暂停点
 
-TEST-121 服务器通过后重新审计决定 TEST-122。优先候选：
+按用户要求临时暂停，不启动 TEST-122。
+
+恢复后应先重新审计当前 GitHub HEAD，再决定 TEST-122。优先候选：
 1. development/test `X-User-ID` 长期兼容路径收口；
-2. runtime HTTP security boundary：CORS / host / proxy trust / security headers；
+2. runtime HTTP security boundary：CORS / Host / proxy trust / security headers；
 3. Provider Settings UI 与 Auth UI 统一入口；
 4. HTTPS / reverse proxy / access log / deployment release checklist；
 5. account recovery 仍必须等待真实 verified channel。
