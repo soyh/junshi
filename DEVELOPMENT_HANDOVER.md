@@ -1,8 +1,8 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-096 — Core Engine Safety Closure — VERIFIED PENDING TAG
-当前 Branch：test-096-core-engine-safety-closure
+当前阶段：TEST-097 — Evidence-Backed Proposal Freshness — VERIFIED PENDING TAG
+当前 Branch：test-097-evidence-backed-proposal-freshness
 
 ## 项目目标
 
@@ -23,6 +23,7 @@ TEST-090：VERIFIED
 TEST-091 ~ TEST-094：VERIFIED
 TEST-095：功能验收 VERIFIED；verification tag 尚待创建
 TEST-096：功能验收 VERIFIED；verification tag 尚待创建
+TEST-097：功能验收 VERIFIED；verification tag 尚待创建
 
 TEST-087 已锁定 Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环，未新增第二套生命周期、migration 或数据库结构。
 
@@ -219,6 +220,43 @@ Action Plan snapshot 是 lifecycle state recovery mechanism，不是新的 Recom
 - 不自动创建 Outcome。
 - 不修改 relationship。
 - 不修改历史 migration 001~008。
+- 不引入 PostgreSQL、Redis、Elasticsearch、Vector DB。
+- 不使用或修改 8899。
+
+## TEST-097 — VERIFIED PENDING TAG
+
+目标：锁定 persisted Action Plan snapshot 的 evidence freshness 边界，防止 canonical evidence 已失效后，旧 snapshot 仍被当作可用 evidence-backed action 进入 Action Decision。
+
+### 本阶段审计与修复
+
+- 审计确认 `action_plan_snapshots` 是 lifecycle state recovery mechanism，而不是新的 canonical Recommendation truth。
+- 发现具体生命周期风险：snapshot 持久化后，关联 canonical message 可以被删除；如果 ActionPlanService 直接恢复 snapshot，旧 recommendation/action plan 仍可能出现在 Decision context 中。
+- 修改 `ActionPlanService.get_context()`：真实 DB connection 下恢复 snapshot 时，必须同时验证 Recommendation 与 Action Plan 的全部 `evidence_source_ids` 仍存在于当前 canonical evidence；任一来源失效，该 snapshot 不进入可用 recommendations / action_plan。
+- 不删除 snapshot 数据，不修改历史 migration 001~008；失效 snapshot 仅从当前可用 action proposal context 中排除。
+- `ActionDecisionService` 的 evidence-backed validation 未放宽；Decision 仍只能引用当前可用 proposal。
+- 新增 `test_evidence_backed_proposal_freshness.py`：验证 message 删除后 persisted action plan 不再出现在 Decision context，且确认该 recommendation 被拒绝。
+- 未自动确认、执行、发送消息或修改 relationship。
+
+### 验收结果
+
+- GitHub Actions 全量 pytest：513 passed，1 warning，21.58s。
+- GitHub Actions job：success。
+- 临时 TEST-097 validation workflow 已删除，不作为产品代码保留。
+- 未修改历史 migration；TEST-097 仅修改 Action Plan freshness gate 与对应测试。
+
+### 锁定结论
+
+`Persisted Action Plan Snapshot → Current Canonical Evidence Validation → Explicit Action Decision`
+
+Snapshot 只能作为恢复机制；一旦其 evidence provenance 不再存在于当前 canonical evidence，就不能继续作为可用 action proposal 进入 Decision。
+
+### TEST-097 非目标
+
+- 不建立新的 Action Plan / Recommendation / Decision 生命周期。
+- 不修改历史 migration 001~008。
+- 不自动确认、不自动执行、不自动发送消息。
+- 不修改 relationship。
+- 不把 snapshot evidence 重新定义为 canonical truth。
 - 不引入 PostgreSQL、Redis、Elasticsearch、Vector DB。
 - 不使用或修改 8899。
 
