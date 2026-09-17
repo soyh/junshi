@@ -1,4 +1,5 @@
 import sqlite3
+import uuid
 
 from app.repositories.action_decision import ActionDecisionRepository
 from app.repositories.action_execution import ActionExecutionRepository
@@ -34,6 +35,14 @@ class ActionOutcomeService:
     ) -> dict:
         decision = self.decision_repository.get(conn, user_id, person_id, decision_id)
         if decision is None:
+            # Persisted action decisions are UUIDs. Keep the legacy missing-ID
+            # contract for arbitrary client-supplied identifiers while still
+            # returning a scope error for a real decision belonging elsewhere.
+            try:
+                uuid.UUID(decision_id)
+            except (ValueError, AttributeError, TypeError):
+                raise ValueError("action decision not found") from None
+
             if self.decision_repository.exists_for_other_scope(
                 conn, user_id, person_id, decision_id
             ):
