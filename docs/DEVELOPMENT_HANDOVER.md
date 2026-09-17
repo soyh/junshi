@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-114 — Production Authentication Boundary — VERIFIED / PAUSED
-当前 Branch：test-114-production-auth-boundary
-服务器验收代码 HEAD：`693946882ca780eafc0367dfa26a3b7f0ea06f84`
+当前阶段：TEST-115 — Auth Session / Server-resolved User Boundary — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-115-auth-session-boundary
+TEST-114 VERIFIED 基线：`28bceb7f9b52eb6f6170398c103945077a1364c2`
 
 ## 项目目标
 
@@ -55,6 +55,8 @@ TEST-112 VERIFIED — Provider Log Redaction / Exception Boundary；服务器 ta
 TEST-113 VERIFIED — Provider Settings UI / Analysis Entry；服务器 targeted UI contract 3 passed、provider config/redaction 7 passed、full pytest 571 passed in 89.15s；工作树 clean；相对 TEST-112 migration diff blank；服务器 HEAD `b59b7625ffd8a391835545852ce981871da32580`。
 
 TEST-114 VERIFIED — Production Authentication Boundary；服务器 auth boundary 7 passed、Provider UI auth regression 3 passed、Provider security regression 7 passed、full pytest 578 passed in 89.48s；工作树 clean；相对 TEST-113 migration diff blank；服务器验收代码 HEAD `693946882ca780eafc0367dfa26a3b7f0ea06f84`。
+
+TEST-115 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — 新增 DB-backed opaque auth session，将 bearer token 在服务端解析到 `users.id`；GitHub targeted session 7 passed、TEST-114 auth regression 7 passed、scope isolation 4 passed、full pytest 585 passed；新增 migration 011，未修改历史 migration 001~010。
 
 ## TEST-104 ~ TEST-112 — Provider 产品化与安全边界
 
@@ -113,16 +115,42 @@ GitHub Actions run `35229312839`：auth boundary 7 passed、Provider UI 3 passed
 
 TEST-114 VERIFIED。
 
-## 当前暂停点 / 下一阶段
+## TEST-115 — Auth Session / Server-resolved User Boundary — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
 
-按用户要求，项目当前暂停在 TEST-114 VERIFIED，不启动 TEST-115。
+目标：在不破坏 TEST-114 已 VERIFIED 生产认证边界的前提下，把身份解析从“单个静态 token → LOCAL_USER_ID”升级为真正可支持多用户的“opaque session token → server-resolved `users.id`”。本阶段只建立 session persistence / resolution / revoke 边界，不提前实现用户名密码注册登录。
 
-恢复后优先方向：
-1. 从当前单用户、服务端静态 Bearer token 边界升级到真正的多用户 authenticated identity：session/token → server-resolved `user_id`；
-2. 逐步移除 development/test 对任意 `X-User-ID` 的兼容依赖，而不是让客户端继续决定身份；
-3. 用户登录/注册/session 生命周期、token revoke/rotation、密码或外部身份提供方策略；
+本阶段新增：
+1. migration 011 `auth_sessions`：`id`、`user_id`、`token_hash`、`expires_at`、`revoked_at`、`created_at`；`user_id` 外键关联 `users(id)`，并为 user / expiry 建索引；
+2. `AuthSessionService` 使用高熵 `secrets.token_urlsafe(32)` 生成 opaque token，数据库只保存 SHA-256 token hash，不保存原始 bearer；
+3. session 具备 expiry / revoke；过期或 revoked token 不得解析为 user；
+4. `get_current_user_id()` 对 Bearer token 优先查询 DB session 并解析到对应 `users.id`，然后才兼容 TEST-114 的静态 `AUTH_BEARER_TOKEN → LOCAL_USER_ID` bootstrap；
+5. production 仍拒绝客户端 `X-User-ID`；客户端始终不能通过 session API 指定目标 `user_id`；
+6. `POST /api/v1/auth/sessions` 只允许已认证用户为“自己”创建新 opaque session；
+7. `DELETE /api/v1/auth/session` 只吊销当前真实 DB session；静态 bootstrap token 不是可吊销 session；
+8. 两个不同 user 的 session token 可以在同一 API 上解析为不同 user scope，并继续复用现有 Person / Relationship / Conversation 等 user isolation；
+9. 不修改历史 migration 001~010，不新增 PostgreSQL/Redis/ES/向量库，不建立第二套身份依赖。
+
+新增 `backend/tests/test_auth_session_boundary.py` 覆盖：bootstrap → opaque session、raw token 不落库、两个 session → 两个 user scope、expired session rejection、revoked session rejection、HTTP revoke，以及静态 bootstrap 不可伪装为 DB session。
+
+GitHub Actions run `35232166643`：
+- TEST-115 targeted session boundary：7 passed；
+- TEST-114 production auth regression：7 passed；
+- existing execution/action-plan scope isolation：4 passed；
+- full pytest：585 passed、1 warning；
+- 临时 TEST-115 validation workflow 已删除。
+
+当前等待服务器验收后再标记 TEST-115 VERIFIED。
+
+## 当前推进点 / 下一阶段
+
+当前停在 TEST-115 GitHub self-test passed / server validation pending。
+
+TEST-115 服务器验收通过后优先方向：
+1. TEST-116 建立真正的账号凭据与 session issuance：注册/登录或外部身份提供方 → server-issued session，而不是让已有 bootstrap token 继续承担用户登录功能；
+2. 明确密码哈希/外部 IdP 策略、登录失败边界、session rotation 与多设备 session 管理；
+3. 逐步移除 development/test 对任意 `X-User-ID` 的兼容依赖；
 4. 继续发布与运行时安全：secret rotation、process environment、reverse-proxy access log、HTTPS/CORS/CSRF 等；
-5. 再推进完整产品 UI，而不是提前建立与当前后端契约重复的第二套业务逻辑。
+5. 再推进完整产品 UI，不建立与当前后端契约重复的第二套业务逻辑。
 
 ## 架构与持续禁止事项
 
@@ -138,4 +166,4 @@ TEST-114 VERIFIED。
 - connection test 成功不等于正式 Analysis capability 成功；正式 Analysis 必须继续通过 StructuredAnalysis validation。
 - 当前 Provider 不执行隐式自动 retry。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113/114 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113/114/115 verification tag 已创建。
