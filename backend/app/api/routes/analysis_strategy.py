@@ -9,6 +9,7 @@ from app.services.llm_provider_config import (
     LLMProviderConfigError,
     LLMProviderConfigService,
 )
+from app.services.qwen_provider import QwenProvider
 
 
 router = APIRouter(
@@ -18,6 +19,12 @@ router = APIRouter(
 
 service = AnalysisStrategyService()
 provider_config_service = LLMProviderConfigService()
+
+
+def _build_provider(conn, user_id: str):
+    if provider_config_service.get(conn, user_id) is None:
+        return QwenProvider()
+    return provider_config_service.build_provider(conn, user_id)
 
 
 @router.get(
@@ -35,7 +42,7 @@ def get_analysis_strategy_context(
                 conn,
                 user_id,
                 conversation_id,
-                provider=provider_config_service.build_provider(conn, user_id),
+                provider=_build_provider(conn, user_id),
             )
     except ValueError as exc:
         raise HTTPException(
