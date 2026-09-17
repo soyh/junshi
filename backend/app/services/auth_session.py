@@ -202,6 +202,22 @@ class AuthSessionService:
         )
         return cursor.rowcount == 1
 
+    def revoke_all_for_user(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+    ) -> int:
+        cursor = conn.execute(
+            """
+            UPDATE auth_sessions
+            SET revoked_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+              AND revoked_at IS NULL
+            """,
+            (user_id,),
+        )
+        return cursor.rowcount
+
     def revoke_other_sessions(
         self,
         conn: sqlite3.Connection,
