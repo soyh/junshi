@@ -85,7 +85,7 @@ def test_production_fails_closed_when_enabled_bootstrap_token_not_configured(cli
         get_settings.cache_clear()
 
 
-def test_development_keeps_legacy_user_header_for_migration(client, monkeypatch):
+def test_development_rejects_legacy_user_header(client, monkeypatch):
     try:
         monkeypatch.setenv("APP_ENV", "development")
         monkeypatch.delenv("AUTH_BEARER_TOKEN", raising=False)
@@ -94,6 +94,19 @@ def test_development_keeps_legacy_user_header_for_migration(client, monkeypatch)
             "/api/v1/settings/llm",
             headers={"X-User-ID": "legacy-test-user"},
         )
+        assert response.status_code == 401
+        assert response.headers["www-authenticate"] == "Bearer"
+        assert response.json()["detail"] == "X-User-ID is not accepted"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_development_without_bearer_uses_local_user_fallback(client, monkeypatch):
+    try:
+        monkeypatch.setenv("APP_ENV", "development")
+        monkeypatch.delenv("AUTH_BEARER_TOKEN", raising=False)
+        get_settings.cache_clear()
+        response = client.get("/api/v1/settings/llm")
         assert response.status_code == 200
         assert response.json() is None
     finally:
