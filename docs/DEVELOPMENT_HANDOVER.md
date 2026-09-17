@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-108 — Provider Error Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
-当前 Branch：test-108-provider-error-contract
+当前阶段：TEST-109 — Provider Base URL Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-109-provider-url-contract
 
 ## 项目目标
 
@@ -42,6 +42,8 @@ TEST-106 VERIFIED — Provider Runtime Materialization；服务器 targeted 1 pa
 TEST-107 VERIFIED — Provider Connection Test；服务器 targeted connection 3 passed、HTTP contract 3 passed、full pytest 539 passed；工作树 clean；历史 migration diff blank。
 
 TEST-108 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
+
+TEST-109 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
 
 ## TEST-104 — VERIFIED
 
@@ -93,9 +95,23 @@ GitHub Actions run `35204314910`：targeted connection tests passed、full pytes
 
 GitHub Actions run `35204873790`：targeted provider error contract tests passed、full pytest passed；随后已删除临时 TEST-108 validation workflow。服务器尚未验收，因此 TEST-108 暂不标记 VERIFIED。
 
+## TEST-109 — Provider Base URL Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+
+目标：锁定 OpenAI-compatible provider 的 `base_url` 输入边界，避免将非法 URL、URL 内嵌凭据、query/fragment 等不应作为 API endpoint 配置的内容持久化并进入 runtime。
+
+新增测试覆盖：
+1. HTTP / HTTPS URL 必须包含 host；
+2. URL 内嵌 username/password 被拒绝；
+3. query / fragment 被拒绝；
+4. 保存配置时规范化 trailing slash；
+5. 合法 URL 可以进入现有 provider materialization；
+6. 不修改数据库 schema / migration。
+
+GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed、full pytest 550 passed、1 warning；随后已删除临时 TEST-109 validation workflow。服务器尚未验收，因此 TEST-109 暂不标记 VERIFIED。
+
 ## 产品化后续审计方向
 
-TEST-108 服务器验收通过后，继续审计：
+TEST-109 服务器验收通过后，继续审计：
 1. provider/model capability；
 2. provider rate-limit / timeout / retry 契约；
 3. API Key、请求头及敏感错误信息的日志泄漏边界；
