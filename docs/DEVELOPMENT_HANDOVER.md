@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-118 — Login Throttle / Progressive Lockout — VERIFIED
-当前 Branch：test-118-login-throttle
-服务器验收代码 HEAD：`c3f542a1b034bdfb0278eaace838efcd7c868ac7`
+当前阶段：TEST-119 — Password Change / Credential Rotation — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-119-password-change
+TEST-118 VERIFIED 服务器代码基线：`c3f542a1b034bdfb0278eaace838efcd7c868ac7`
 
 ## 项目目标
 
@@ -38,55 +38,67 @@ TEST-113 VERIFIED — Provider Settings UI；服务器 full 571；HEAD `b59b7625
 TEST-114 VERIFIED — Production Authentication Boundary；服务器 full 578；HEAD `693946882ca780eafc0367dfa26a3b7f0ea06f84`。
 TEST-115 VERIFIED — DB-backed opaque Auth Session；migration 011；服务器 full 585；HEAD `a76c6907fa51afeee0076822601745c8ac3e4fb2`。
 TEST-116 VERIFIED — Account credentials / login → server-issued session；migration 012；服务器 full 592；HEAD `bf84a5c068813693715fa0b09ce5458d59b7356e`。
-TEST-117 VERIFIED — Multi-device session management / bootstrap retirement；服务器 targeted 7、TEST-116 7、TEST-115 7、TEST-114 7、scope isolation 4、full 599 passed in 103.79s；migration diff blank；HEAD `af4995a8e5fccd8586e63e3e76191552ecb317b1`。
-TEST-118 VERIFIED — SQLite login throttle / progressive lockout；服务器 targeted 8、TEST-116 login 7、TEST-117 session management 7、TEST-115 session 7、TEST-114 production auth 7、scope isolation 4、full 607 passed in 111.95s；工作树 clean；migration diff 仅 `013_auth_login_throttle.sql`；服务器 HEAD `c3f542a1b034bdfb0278eaace838efcd7c868ac7`。
+TEST-117 VERIFIED — Multi-device session management / bootstrap retirement；服务器 full 599；HEAD `af4995a8e5fccd8586e63e3e76191552ecb317b1`。
+TEST-118 VERIFIED — SQLite login throttle / progressive lockout；服务器 targeted 8、account login 7、session management 7、auth session 7、production auth 7、scope isolation 4、full 607 passed in 111.95s；工作树 clean；migration diff 仅 `013_auth_login_throttle.sql`；服务器 HEAD `c3f542a1b034bdfb0278eaace838efcd7c868ac7`。
+TEST-119 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — authenticated password change / credential rotation；GitHub targeted 8、TEST-118 throttle 8、account login 7、session management 7、auth session 7、production auth 7、scope isolation 4、full 615 passed；无新 migration，未修改历史 migration 001~013。
 
 ## Auth 产品化基线
 
 - TEST-114：production 禁止 `X-User-ID`；静态 `AUTH_BEARER_TOKEN → LOCAL_USER_ID` 仅作迁移 bootstrap。
 - TEST-115：opaque session 只存 SHA-256 hash，支持 expiry/revoke，服务端解析到 `users.id`。
 - TEST-116：normalized username + scrypt password；服务器生成 user_id；注册/登录签发同一 session。
-- TEST-117：session list/current/revoke-other/rotate；`AUTH_BOOTSTRAP_ENABLED=false` 后静态 bootstrap 可退场，DB session 继续工作。
+- TEST-117：session list/current/revoke-other/rotate；静态 bootstrap 有显式 disable 路径。
 - TEST-118：SQLite username-subject login throttle / progressive lockout，不依赖 Redis 或未验证代理 IP。
+- TEST-119：改密必须同时持有真实 DB session 并重新验证 current password；成功后撤销同用户全部旧 session，再签发新的唯一继续 session。
 
-## TEST-118 — Login Throttle / Progressive Lockout — VERIFIED
+## TEST-119 — Password Change / Credential Rotation — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
 
-目标：在不引入 Redis、不依赖未验证代理 IP 的前提下，限制用户名/密码端点的高频猜测，同时保持 existing/unknown username 的一致错误边界。
+目标：建立 authenticated password change，不把“已有 session”当作足够的改密凭据；改密后立即切断所有旧设备 session，避免旧 session 在 credential rotation 后继续存活。
 
 已建立：
-1. migration 013 `auth_login_throttle`：只持久化 `subject_hash / failed_attempts / window_started_at / locked_until / updated_at`；subject 为 normalized username 的 SHA-256，不存原始未知用户名；
-2. 默认 15 分钟失败窗口；前 5 次失败继续返回既有 `401 invalid credentials`；第 5 次失败建立 30 秒锁定；
-3. 锁定结束后若同一窗口继续失败，锁定按 30s → 60s → 120s → 240s... 递增，最大 15 分钟；
-4. 锁定期间直接返回统一 `429 too many login attempts` 与 `Retry-After`；锁定期间请求不增加 failed_attempts，不允许高频请求自行无限延长锁定；
-5. existing username 与 unknown username 使用同一 subject 状态机；unknown username 仍执行 TEST-116 dummy scrypt verification 后记录失败；
-6. 成功登录会删除该 normalized subject 的 throttle 状态；
-7. throttle 只按服务端规范化 username subject 工作，不读取/信任 `X-Forwarded-For` 等代理 header；
-8. 不修改 TEST-116 password/session 实现，不建立第二套认证系统；
-9. 不修改历史 migration 001~012，不引入 PostgreSQL/Redis/ES/向量库。
+1. `PUT /api/v1/auth/password`，请求只接受 `current_password / new_password`，两者均为 `SecretStr`；客户端不能提交 `user_id`；
+2. 只允许真实 active DB auth session 改密；TEST-114 静态 bootstrap token 即使可认证，也不能调用 password change；
+3. 服务端再次校验 current password；错误时统一 `401 invalid current password`，不回显输入密码；
+4. new password 继续使用 TEST-116 `scrypt_v1` 参数和随机 salt，不增加第二套 password hash 实现；
+5. password hash 更新、旧 session 全量 revoke、新 session 创建都发生在同一 SQLite transaction；任一步失败均回滚；
+6. 改密成功后同用户全部既有 session（包括发起改密的当前 session 和其他设备 session）立即失效；服务端返回新的 opaque session；
+7. 新 password 可重新登录，旧 password 不再可用；
+8. session revocation 严格按 `user_id`，其他用户 session 不受影响；
+9. `AuthSessionService.revoke_all_for_user()` 只作用于指定 user scope；
+10. 不新增 migration，不修改历史 migration 001~013；不实现没有验证渠道的 account recovery。
 
-服务器验收：
-- `backend/tests/test_auth_login_throttle.py`：8 passed；
-- `backend/tests/test_auth_account_login.py`：7 passed；
-- `backend/tests/test_auth_session_management.py`：7 passed；
-- `backend/tests/test_auth_session_boundary.py`：7 passed；
-- `backend/tests/test_auth_boundary.py`：7 passed；
+新增 `backend/tests/test_auth_password_change.py` 8 个测试，覆盖：
+- 未认证不能改密；
+- credential + current session rotation；
+- 同用户所有旧 sessions 全部撤销；
+- current password 错误原子回滚且原 session 保持有效；
+- 其他用户 session 不受影响；
+- 数据库只保存新 scrypt hash，不保存原始密码；
+- payload 不能指定 user_id；
+- static bootstrap token 不能改密。
+
+GitHub Actions run `35243049295`：
+- TEST-119 password change：8 passed；
+- TEST-118 login throttle：8 passed；
+- TEST-116 account login：7 passed；
+- TEST-117 session management：7 passed；
+- TEST-115 auth session：7 passed；
+- TEST-114 production auth：7 passed；
 - execution/action-plan scope isolation：4 passed；
-- full pytest：607 passed in 111.95s；
-- `git status --short` blank；
-- migration diff：仅 `A backend/migrations/013_auth_login_throttle.sql`；
-- 最终文件差异与 GitHub 预期一致。
+- full pytest：615 passed、1 warning in 29.25s；
+- 临时 validation workflow 已删除。
 
-TEST-118 VERIFIED。
+当前等待服务器验收后再标记 TEST-119 VERIFIED。
 
-## 下一阶段
+## 下一阶段候选
 
-TEST-119 优先：
-1. password change / credential rotation；
-2. 必须重新验证 current password，不能只凭 active session 改密码；
-3. 修改成功后撤销该用户所有旧 sessions，并签发一个新的当前 session，避免被盗旧 session 继续存活；
-4. current password 错误与 credential mismatch 使用稳定错误边界，不泄露 hash/credential 内部信息；
-5. 不伪造 account recovery；在没有验证邮件/短信渠道前只做 authenticated password change；
-6. 后续再做 recovery、bootstrap 默认关闭、release/runtime security、完整 login/session/account UI。
+TEST-119 服务器通过后优先：
+1. account recovery capability boundary：在没有验证邮件/短信渠道前，明确禁止伪造“忘记密码自动恢复”；
+2. 评估建立 recovery challenge/token 的 server-side contract，但只有真实验证渠道接入后才能签发可用 recovery credential；
+3. 将 `AUTH_BOOTSTRAP_ENABLED` 的生产默认退场路径进一步收紧；
+4. 移除 development/test 任意 `X-User-ID` 的长期兼容依赖；
+5. release/runtime security：HTTPS/CORS/CSRF/reverse-proxy trust/access log；
+6. 完整 login/session/account UI。
 
 ## 架构与持续禁止事项
 
@@ -100,4 +112,4 @@ TEST-119 优先：
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~118 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~119 verification tag 已创建。
