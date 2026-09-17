@@ -20,7 +20,7 @@ AUTH_ACCOUNT_HTML = r'''<!doctype html>
 </head>
 <body>
   <h1>Account & Session</h1>
-  <p class="note">Session access token 仅保存在当前页面 JavaScript 内存中，不写入 localStorage、sessionStorage 或页面 DOM。关闭或刷新页面后需要重新登录。</p>
+  <p class="note">Session access token 仅保存在当前页面 JavaScript 内存中，不写入浏览器持久化存储或页面 DOM。关闭或刷新页面后需要重新登录。</p>
 
   <fieldset>
     <legend>Register</legend>
