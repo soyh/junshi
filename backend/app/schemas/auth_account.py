@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 
 class AuthRegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     username: str = Field(
         min_length=3,
         max_length=64,
@@ -11,6 +13,8 @@ class AuthRegisterRequest(BaseModel):
 
 
 class AuthLoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     username: str = Field(
         min_length=3,
         max_length=64,
