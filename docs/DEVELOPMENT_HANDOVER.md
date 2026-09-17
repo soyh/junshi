@@ -1,7 +1,7 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-106 — Provider Runtime Materialization — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-106 — Provider Runtime Materialization — VERIFIED
 当前 Branch：test-106-provider-http-contract
 
 ## 项目目标
@@ -33,11 +33,11 @@ TEST-102 VERIFIED — DB-level Outcome idempotency；新增 migration 009 `uq_ac
 
 TEST-103 VERIFIED — `sqlite3.IntegrityError → HTTP 409 Conflict`；服务器 targeted 1 passed、full 529 passed；migration diff blank。
 
-TEST-104 VERIFIED — user-selectable LLM Provider / API configuration；服务器 targeted 1 passed、full 530 passed；工作树 clean；历史 migration 001~009 未修改。
+TEST-104 VERIFIED — user-selectable LLM Provider / API configuration；服务器 targeted 1 passed、full 530 passed；工作树 clean；HEAD `0ebe095`；历史 migration 001~009 未修改。
 
 TEST-105 VERIFIED — Provider Runtime Routing；服务器 targeted 2 passed、full 532 passed；工作树 clean；历史 migration diff blank。
 
-TEST-106 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
+TEST-106 VERIFIED — Provider Runtime Materialization；服务器 targeted 1 passed、full 533 passed；工作树 clean；历史 migration diff blank。
 
 ## TEST-104 — VERIFIED
 
@@ -60,7 +60,7 @@ TEST-106 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
 
 GitHub Actions run `35202685438`：targeted 2 passed、full pytest 532 passed；临时 validation workflow 已删除。服务器随后完成同等 targeted/full 验收，结果一致，migration diff blank。
 
-## TEST-106 — Provider Runtime Materialization
+## TEST-106 — Provider Runtime Materialization — VERIFIED
 
 目标：锁定 user-scoped persisted provider configuration 在 runtime 中实际 materialize 为 Provider 实例参数，而不是只验证“拿到了某个 Provider 对象”。
 
@@ -69,17 +69,18 @@ GitHub Actions run `35202685438`：targeted 2 passed、full pytest 532 passed；
 2. persisted `base_url`、`model`、`timeout_seconds` 均传入 provider；
 3. provider 类型仍为现有 `QwenProvider` adapter，不建立第二套 provider 实现。
 
-GitHub Actions run `35203595737`：
-- 初始测试发现 repository stub 未提供 `get` 属性，修正测试 double 后重新执行；
-- targeted materialization + existing Qwen provider tests：passed；
-- full pytest：passed；
-- 临时 TEST-106 validation workflow 已删除。
-
-当前尚未进行服务器验收，因此 TEST-106 暂不标记 VERIFIED。
+GitHub Actions run `35203595737`：targeted materialization + existing Qwen provider tests、full pytest 均 success；临时 validation workflow 已删除。服务器验收：targeted 1 passed、full pytest 533 passed、工作树 clean、历史 migration diff blank。
 
 ## 产品化后续审计方向
 
-TEST-106 服务器验收通过后，继续审计真实第三方 provider HTTP 调用、provider connection test、provider/model capability、前端设置页，以及正式认证；不应仅凭单元测试假定第三方模型调用已经完成产品化闭环。
+TEST-106 服务器验收通过后，继续审计：
+1. provider connection test / 实际第三方 HTTP 调用的产品化边界；
+2. provider/model capability；
+3. 前端设置页与分析工作流；
+4. 正式认证替换当前 `X-User-ID` 信任边界；
+5. 发布与运行时安全。
+
+不应仅凭 MockTransport 单元测试假定第三方模型调用已经完成产品化闭环。
 
 ## 架构与持续禁止事项
 
