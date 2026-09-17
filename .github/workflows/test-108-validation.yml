@@ -1,7 +1,9 @@
 name: TEST-108 validation
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - test-107-provider-connection-test
 
 jobs:
   test:
