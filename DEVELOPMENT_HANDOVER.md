@@ -1,16 +1,17 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-097 — Evidence-Backed Proposal Freshness — VERIFIED PENDING TAG
-当前 Branch：test-097-evidence-backed-proposal-freshness
+当前阶段：TEST-101 — Execution Scope Isolation — VERIFIED PENDING SERVER ACCEPTANCE
+当前 Branch：test-101-execution-scope-isolation
+当前 HEAD：99a29fee242e3219aff839131e5606b8495dc673
 
 ## 项目目标
 
 本项目是长期关系管理 + AI 恋爱决策辅助系统，不是单纯聊天机器人或回复生成器。
 
-核心链路：
+核心生命周期：
 
-`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis`
+`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis → Strategy → Recommendation`
 
 ## 已完成阶段
 
@@ -24,262 +25,140 @@ TEST-091 ~ TEST-094：VERIFIED
 TEST-095：功能验收 VERIFIED；verification tag 尚待创建
 TEST-096：功能验收 VERIFIED；verification tag 尚待创建
 TEST-097：功能验收 VERIFIED；verification tag 尚待创建
+TEST-098：服务器验收 VERIFIED；verification tag 尚待创建
+TEST-099：服务器验收 VERIFIED；verification tag 尚待创建
+TEST-100：GitHub Actions 回归通过，待服务器验收
+TEST-101：GitHub Actions 回归通过，待服务器验收
 
-TEST-087 已锁定 Outcome → Feedback → Learning → Re-analysis → Recommendation 闭环，未新增第二套生命周期、migration 或数据库结构。
+## TEST-095 — Core Engine Persistence Closure
 
-## TEST-088 — VERIFIED
+目标：补齐真实 Recommendation → Action Plan → Action Decision 的持久化恢复缺口，并保持 Outcome → Feedback → Learning → fresh Analysis → Recommendation 单一生命周期。
 
-TEST-088 已完成真实用户工作流最小验收：
+关键实现：
+- 新增 migration 008 `action_plan_snapshots`；未修改历史 migration 001~007。
+- 新增 `ActionPlanSnapshotRepository`，严格按 `user_id + person_id + recommendation_id` 隔离。
+- `ActionPlanService` 在真实 DB connection 下恢复 persisted snapshot，并校验当前 canonical evidence。
+- `AnalysisActionPlanService` 对 fresh evidence-backed Recommendation 产生 Action Plan 后持久化 snapshot。
+- Action Plan 仍为 `proposed + requires_user_confirmation=True`，不得自动确认或执行。
 
-- 真实 canonical user / person / relationship / conversation / messages 进入 AnalysisContext。
-- Real Qwen / DashScope StructuredAnalysis 成功返回并完成 schema validation。
-- StructuredAnalysis 保留 Fact / Inference / Unknown、hypothesis / signal 与 evidence provenance。
-- Action Plan Context 正确读取真实 relationship state 与 evidence。
-- 无 Recommendation 时 `recommendations=[]`、`action_plan=[]` 为当前架构预期，不得为了验收强行生成 action。
-- user isolation、read-only、source-backed、unknown preservation、no-auto-execution 等约束保持。
-- `/persons` FK 500 已定性为未注册 `X-User-ID=test-088-real-user` 导致 SQLite 正常拒绝，不属于 FK、migration、数据库损坏或 Person 业务逻辑缺陷。
-- StructuredAnalysis 历史间歇性 502 不再阻塞 TEST-088；当前真实 StructuredAnalysis 已成功通过。
-- 未修改 production code、tests、migration 或数据库 schema。
+验收：targeted 与全量 pytest 均通过；TEST-095 已锁定单一生命周期闭环。
 
-## TEST-089 — VERIFIED
+## TEST-096 — Core Engine Safety Closure
 
-目标：验证现有桥接边界：
+锁定：`Confirmed Action Decision → Explicit Execution → Outcome`。
 
-`Real AnalysisContext → Real StructuredAnalysis → StrategyDecisionContext → explicit StrategyRecommendationCandidate → RecommendationProducer → Recommendation`
-
-验收结论：
-
-- Real Qwen StructuredAnalysis 成功进入现有 AnalysisRecommendationService。
-- StrategyRecommendationCandidate 保持显式、deterministic、evidence-backed 边界。
-- candidate 具有稳定 identity、recommendation、evidence_source_ids、provenance。
-- evidence_source_ids 必须存在于 canonical evidence；无证据 candidate 被拒绝。
-- Recommendation 只由 RecommendationProducer 产生，并保留 candidate identity、evidence provenance。
-- unknowns 保持 derived constraint/provenance，不被转换为 fact、success evidence 或 recommendation quality。
-- 不自动选择、不自动确认、不自动执行、不自动发送消息、不修改 relationship。
-- 重复读取保持 deterministic，无 decision / execution / outcome side effect。
-- 未新增 StructuredAnalysis persistence 或第二套 Strategy / Recommendation 生命周期。
-
-## TEST-090 — VERIFIED
-
-目标：验证最小必要桥接：
-
-`Real Recommendation → Evidence Validation → Action Plan Proposal`
-
-### 锁定契约
-
-- Action Plan 只消费显式 Recommendation，不直接消费 StructuredAnalysis / hypothesis。
-- Recommendation 必须有稳定 id、非空 action、非空 evidence_source_ids。
-- 所有 evidence_source_ids 必须存在于当前 canonical evidence。
-- 缺少 action、缺少 evidence、invalid evidence、blank action 的 Recommendation 均不得进入 Action Plan。
-- Action Plan 输出只能是 `status="proposed"`。
-- `requires_user_confirmation=true` 必须保持。
-- 不自动确认、不自动执行、不自动发送消息。
-- 不修改 relationship。
-- 不创建 Outcome，不触发 Feedback / Learning。
-- 保持 user/person/conversation isolation。
-- TEST-090 不负责重新验证 Action Decision / Execution / Outcome 生命周期。
-
-### 已完成验收
-
-- Real evidence-backed Recommendation 成功进入 Action Plan。
-- Action Plan 正确保留 recommendation identity、action、evidence_source_ids、priority、time_horizon。
-- negative gates 已验证：missing action / missing evidence / invalid evidence / blank action 全部 BLOCKED。
-- DB side-effect check 通过；测试 probe 前后不存在 Recommendation / Action Plan 等新的 canonical persistence side effect。
-- 全量 pytest 已通过 509 tests（TEST-088 后服务器验收基线）。
-- working tree 保持 clean。
-- 未修改 production code、tests、migration 或数据库 schema。
-
-## TEST-091 — CONTRACT LOCKED
-
-目标：验证现有 `Action Plan → Action Decision` 人工决策边界，不扩大到 Execution。
-
-### Canonical Boundary
-
-`Action Plan (proposed + requires_user_confirmation)`
-
-`→ Explicit User Decision`
-
-`→ Action Decision`
-
-`→ [Execution 为下一阶段边界]`
-
-### 锁定契约
-
-1. 只有 `status="proposed"` 的 Action Plan 才能进入 Decision。
-2. `requires_user_confirmation=True` 必须保持，不能被系统隐式移除。
-3. 系统不得自动把 proposed 转换成 confirmed。
-4. 必须存在显式 user decision input。
-5. Decision 必须绑定原始 Recommendation / Action Plan identity。
-6. Decision 必须保持 evidence provenance，不得丢失来源约束。
-7. rejected / cancelled Decision 不得进入 Execution。
-8. 未 confirmed 的 Decision 不得进入 Execution。
-9. 系统不得伪造 user confirmation。
-10. Decision 不得自行创建 Outcome。
-11. Decision 不得自行触发 Feedback / Learning。
-12. 不得建立第二套 Action Decision lifecycle。
-13. user/person/relationship/conversation isolation 必须保持。
-14. 不得自动发送消息。
-15. 不得通过 Decision 自动修改 relationship。
-
-### TEST-091 非目标
-
-- 不重新实现 TEST-086 已锁定的 Action Decision → Execution 边界。
-- 不重新实现 TEST-087 Outcome → Feedback → Learning → Re-analysis 闭环。
-- 不增加第二套 Action Plan / Decision / Execution 生命周期。
-- 不新增 migration / database schema。
-- 不要求真实第三方消息发送。
-- 不允许为了制造 demo 而绕过用户确认。
-
-### 当前 GitHub 实现基线
-
-- `ActionPlanService`：只提升显式、evidence-backed、带 action 的 Recommendation 为 `status="proposed"` Action Plan，并要求用户确认。
-- `ActionDecisionService`：只允许 Decision 引用当前可用的 evidence-backed action plan recommendation；confirmed 必须带 recommendation_id。
-- Action Decision API 提供显式 POST Decision 入口；不存在由 Action Plan 自动确认 Decision 的路径。
-
-## TEST-092 ~ TEST-094 — VERIFIED
-
-- 延续并验证 Action Plan → Action Decision → Execution / Outcome 边界的既有生命周期。
-- 保持显式 user decision、evidence provenance、user/person isolation 与 no-auto-execution 约束。
-- TEST-094 的 real Recommendation → Action Decision bridge 为 TEST-095 的基线。
-
-## TEST-095 — VERIFIED PENDING TAG
-
-目标：补齐真实 Recommendation → Action Plan → Action Decision 的持久化生命周期缺口，并验证完整闭环能够从 Outcome / Learning 回到 fresh Analysis → Recommendation。
-
-### 本阶段变更
-
-- 新增 `backend/migrations/008_action_plan_snapshots.sql`，建立 action-plan snapshot 持久化表；未修改历史 migration 001~007。
-- 新增 `ActionPlanSnapshotRepository`，按 `user_id + person_id + recommendation_id` 保存 Recommendation、Action Plan 与 evidence snapshot。
-- `ActionPlanService` 在真实 DB connection 下读取 persisted snapshots；保留 `conn=None` 的旧测试/内存 synthesis 行为。
-- `AnalysisActionPlanService` 在产生 fresh evidence-backed Recommendation 后持久化对应 Action Plan snapshot；无 fresh Recommendation 时回退到已持久化上下文。
-- Action Plan 仍只提升显式、evidence-backed、带 action 的 Recommendation，并保持 `proposed + requires_user_confirmation`。
-- 不放宽 `ActionDecisionService` 的 evidence-backed validation；Decision 仍不能引用不可用 recommendation。
-- 未新增第二套 Strategy / Recommendation / Action Plan / Decision / Execution / Learning 生命周期。
-
-### 验收结果
-
-- TEST-095 targeted bridge：通过。
-- Outcome → Feedback → Learning → fresh Analysis → Recommendation closure：通过。
-- 相关回归套件：26 passed。
-- TEST-095 最终 targeted regression：21 passed in 1.84s。
-- 全量 pytest：509 passed in 81.58s。
-- `git status --short`：clean。
-- HEAD：`ed96f5bdc3ecd46540a06ba7d70ebe91699faed1`。
-- `git diff 8aa030c..HEAD --stat`：4 个文件，130 insertions / 20 deletions；仅涉及 snapshot repository、Action Plan service、Analysis Action Plan service、migration 008。
-
-### 锁定结论
-
-`Recommendation → Action Plan → Explicit Action Decision → Execution → Outcome → Feedback → Learning → Fresh Analysis → Recommendation`
-
-已形成可测试的单一生命周期闭环。
-
-Action Plan snapshot 是 lifecycle state recovery mechanism，不是新的 Recommendation truth；canonical evidence、StructuredAnalysis、Strategy、RecommendationProducer 与 ActionDecision validation 边界保持不变。
-
-### TEST-095 非目标
-
-- 不修改历史 migration 001~007。
-- 不改变 ActionDecision evidence-backed gate。
-- 不自动确认、不自动执行、不自动发送消息。
-- 不修改 relationship。
-- 不把 LLM output 写入 canonical truth。
-- 不引入 PostgreSQL、Redis、Elasticsearch、Vector DB。
-- 不使用或修改 8899。
-
-## TEST-096 — VERIFIED PENDING TAG
-
-目标：锁定 Core Engine 的安全闭环边界，确保 `Action Decision → Execution → Outcome` 不能绕过显式确认、不能重复执行/重复记录结果，并保持 user/person isolation。
-
-### 本阶段审计与修复
-
-- 保持 `ActionDecisionService` 的 evidence-backed recommendation validation，不放宽 Decision gate。
-- 保持 `ActionExecutionService` 的 confirmed decision 与显式 execution gate。
-- 保持 `ActionOutcomeService` 的 confirmed decision、已执行 decision 与单次 outcome gate。
-- 增加跨 user/person scope 的 Action Decision 检测：真实存在但属于其他 scope 的 UUID decision id 映射为 scope-not-found，避免跨对象读取/写入。
-- 对任意客户端直接提交的非 UUID decision id 保留既有 `409 action decision not found` 合同；不会因为字符串型无效 ID 误判为跨 scope 资源。
+安全边界：
+- Execution 必须引用当前 user/person scope 下的 confirmed Decision。
+- rejected / missing / other-scope Decision 不得执行。
+- Outcome 必须对应 confirmed Decision 且必须已有 execution。
+- 同一 Decision 不得重复 execution / outcome。
+- 保持 user/person isolation。
+- 对真实跨 scope UUID 与任意客户端字符串 ID 保持既有 HTTP 错误合同。
 - 未修改历史 migration 001~008。
-- 未修改既有测试以掩盖失败。
 
-### 验收结果
+GitHub Actions 全量回归在修复后连续两次通过。
 
-- TEST-096 safety closure targeted：3 passed。
-- `test_action_outcome.py + test_core_engine_safety_closure.py`：12 passed。
-- GitHub Actions 全量 pytest：512 passed，1 warning，18.73s（修复后 commit `c43b6fd24c887bcd1952015718a187efe82712b1`）。
-- 第二次 GitHub Actions 全量 pytest：512 passed，1 warning，25.33s（修复后同一生产代码状态）。
-- 临时 GitHub Actions workflow 仅用于本阶段独立验证，验证完成后已删除，不作为产品代码保留。
+## TEST-097 — Evidence-Backed Proposal Freshness
 
-### 锁定结论
+锁定：`Persisted Action Plan Snapshot → Current Canonical Evidence Validation → Explicit Action Decision`。
 
-`Confirmed Action Decision → Explicit Execution → Outcome`
+- snapshot 不是新的 Recommendation truth，只是 lifecycle state recovery mechanism。
+- snapshot 恢复时必须验证 Recommendation 与 Action Plan 的全部 `evidence_source_ids` 仍存在于当前 canonical evidence。
+- canonical evidence 已失效时，旧 snapshot 从当前可用 proposal context 排除，但不删除历史 snapshot。
+- ActionDecision evidence-backed validation 不放宽。
+- 未修改历史 migration 001~008。
 
-必须保持显式、单向、user/person scoped；不得从 rejected / missing / other-scope decision 自动进入 Execution 或 Outcome，不得重复执行，不得重复产生 Outcome。
+GitHub Actions 全量 pytest：513 passed，1 warning。
 
-### TEST-096 非目标
+## TEST-098 — Action Plan Snapshot Isolation
 
-- 不新增第二套 Action Decision / Execution / Outcome lifecycle。
-- 不自动确认、不自动执行、不自动发送消息。
-- 不自动创建 Outcome。
-- 不修改 relationship。
-- 不修改历史 migration 001~008。
-- 不引入 PostgreSQL、Redis、Elasticsearch、Vector DB。
-- 不使用或修改 8899。
+锁定 snapshot 的 user/person isolation：
+- 相同 recommendation id 在不同 user scope 下可以保存不同 snapshot。
+- 查询必须同时匹配 `user_id + person_id`。
+- 不得返回其他 user 或其他 person 的 snapshot。
 
-## TEST-097 — VERIFIED PENDING TAG
+无 production code / migration 修改。服务器 targeted 与全量 pytest 已通过。
 
-目标：锁定 persisted Action Plan snapshot 的 evidence freshness 边界，防止 canonical evidence 已失效后，旧 snapshot 仍被当作可用 evidence-backed action 进入 Action Decision。
+## TEST-099 — Action Plan Persistence Gate
 
-### 本阶段审计与修复
+锁定：只有真正对应 Action Plan item 的 Recommendation 才能进入 `action_plan_snapshots`。
 
-- 审计确认 `action_plan_snapshots` 是 lifecycle state recovery mechanism，而不是新的 canonical Recommendation truth。
-- 发现具体生命周期风险：snapshot 持久化后，关联 canonical message 可以被删除；如果 ActionPlanService 直接恢复 snapshot，旧 recommendation/action plan 仍可能出现在 Decision context 中。
-- 修改 `ActionPlanService.get_context()`：真实 DB connection 下恢复 snapshot 时，必须同时验证 Recommendation 与 Action Plan 的全部 `evidence_source_ids` 仍存在于当前 canonical evidence；任一来源失效，该 snapshot 不进入可用 recommendations / action_plan。
-- 不删除 snapshot 数据，不修改历史 migration 001~008；失效 snapshot 仅从当前可用 action proposal context 中排除。
-- `ActionDecisionService` 的 evidence-backed validation 未放宽；Decision 仍只能引用当前可用 proposal。
-- 新增 `test_evidence_backed_proposal_freshness.py`：验证 message 删除后 persisted action plan 不再出现在 Decision context，且确认该 recommendation 被拒绝。
-- 未自动确认、执行、发送消息或修改 relationship。
+- orphan Action Plan item 不得被持久化。
+- Recommendation / Action Plan / evidence snapshot 的 `evidence_source_ids` 必须保持一致。
+- 不修改历史 migration。
 
-### 验收结果
+服务器 targeted 与全量 pytest 已通过。
 
-- GitHub Actions 全量 pytest：513 passed，1 warning，21.58s。
-- GitHub Actions job：success。
-- 临时 TEST-097 validation workflow 已删除，不作为产品代码保留。
-- 未修改历史 migration；TEST-097 仅修改 Action Plan freshness gate 与对应测试。
+## TEST-100 — Action Decision Proposal Gate + Execution Decision Gate
 
-### 锁定结论
+锁定两道显式生命周期边界。
 
-`Persisted Action Plan Snapshot → Current Canonical Evidence Validation → Explicit Action Decision`
+第一道：只有 Action Plan item 同时满足：
+- `status == "proposed"`
+- `requires_user_confirmation is True`
+- 存在 `recommendation_id`
 
-Snapshot 只能作为恢复机制；一旦其 evidence provenance 不再存在于当前 canonical evidence，就不能继续作为可用 action proposal 进入 Decision。
+才能进入 Action Decision。
 
-### TEST-097 非目标
+第二道：只有 `confirmed` Action Decision 才能进入 Execution；rejected Decision、重复 execution，以及已有 Outcome 的 Decision 均被阻断。
 
-- 不建立新的 Action Plan / Recommendation / Decision 生命周期。
-- 不修改历史 migration 001~008。
-- 不自动确认、不自动执行、不自动发送消息。
-- 不修改 relationship。
-- 不把 snapshot evidence 重新定义为 canonical truth。
-- 不引入 PostgreSQL、Redis、Elasticsearch、Vector DB。
-- 不使用或修改 8899。
+`ActionDecisionCreate` 继续只允许显式 `confirmed | rejected`，系统不得伪造用户确认。
 
-## 架构与安全边界
+GitHub Actions targeted + full pytest 均通过；当前分支待服务器验收。
 
-- AnalysisContext 必须 deterministic、source-backed、read-only。
-- LLM 不访问 Repository / SQLite，不修改 canonical data，不执行 action，不发送消息。
-- StructuredAnalysis 是 derived interpretation，不是 canonical truth。
-- Fact / Inference / Unknown 必须严格区分；inference、hypothesis、material signal 必须保留 provenance。
-- Recommendation 必须经过显式 candidate contract 与 RecommendationProducer。
-- Action Plan 必须 evidence-backed 且必须等待用户确认。
-- Action Decision 必须来自显式 user decision；不得伪造 confirmation。
-- 不得自动选择、确认、执行 action，不得自动发送消息、修改 relationship 或伪造 outcome。
-- 所有数据必须 user_id 隔离。
-- MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
-- 不得修改历史 migration、重写 migrations.py、修改 conversations/messages 业务逻辑或通过修改测试掩盖错误。
+## TEST-101 — Execution Scope Isolation
 
-## 持续禁止事项
+目标：锁定 Action Execution 对 Action Decision 的 user/person scope 隔离，不允许同一 decision id 在其他 person scope 下被执行。
 
-- 不得让 RecommendationProducer 直接消费 StructuredAnalysis。
-- 不得把 inference 自动写入 canonical evidence 或 memory。
-- 不得把 unknown 自动转换为 fact、success 或 recommendation quality。
-- 不得自动确认 decision、执行 action、发送消息、修改 relationship 或伪造 outcome。
-- 不得绕过 user / person / conversation isolation。
-- 不得建立第二套 Strategy / Decision / Action Plan / Execution / Learning 生命周期。
-- GitHub 能确认的信息不得先要求服务器端查询。
+新增测试：
+- `test_execution_uses_exact_user_and_person_scope_for_decision`
+- `test_execution_does_not_cross_person_scope`
+
+测试使用与 production service 相同的 scoped repository contract，验证 service 必须以 `(user_id, person_id, decision_id)` 获取 Decision，并在 scope 不匹配时不得创建 execution。
+
+GitHub Actions：
+- targeted `backend/tests/test_execution_scope_isolation.py`：通过
+- full `pytest -q`：通过
+- 临时 TEST-101 validation workflow 已删除，不作为产品代码保留。
+
+当前状态：VERIFIED PENDING SERVER ACCEPTANCE。
+
+## 核心安全边界
+
+1. AnalysisContext 必须 deterministic、source-backed、read-only。
+2. LLM 不直接访问 Repository / SQLite，不修改 canonical data，不执行 action，不发送消息。
+3. StructuredAnalysis 是 derived interpretation，不是 canonical truth。
+4. Fact / Inference / Unknown 必须严格区分；Unknown 不得被伪造为事实或成功证据。
+5. Recommendation 必须 evidence-backed，并保留 evidence provenance。
+6. Action Plan 只能由显式 Recommendation 提案产生，状态为 proposed，并要求用户确认。
+7. Action Decision 必须来自显式用户决策；不得自动 confirmed。
+8. Execution 必须来自当前 scope 下的 confirmed Action Decision。
+9. Outcome 必须来自已执行的 confirmed Action Decision。
+10. Feedback / Learning / Re-analysis 不得自动确认、执行或产生 Outcome。
+11. persisted snapshot 只能作为状态恢复机制，不能替代 canonical evidence 或 Recommendation truth。
+12. user/person/relationship/conversation isolation 必须保持在所有读写路径。
+13. 不得自动发送消息，不得自动修改 relationship。
+14. 不得建立第二套 Recommendation / Action Plan / Decision / Execution / Outcome / Learning lifecycle。
+15. MVP 不引入 PostgreSQL、Redis、Elasticsearch、Vector DB。
+16. 不修改历史 migration 001~008；后续 schema 变更必须使用新的 migration 编号。
+17. 不使用或修改端口 8899。
+
+## 当前下一审计点
+
+TEST-101 服务器验收通过后，下一阶段优先审计 Action Outcome 的并发幂等边界：当前 `ActionOutcomeService` 使用 read-before-write 防重复，但历史 migration 005 没有 `decision_id` UNIQUE 约束。若确认存在真实并发窗口，应通过新的 migration（不得修改 005）建立数据库级约束，并以独立测试锁定该契约。
+
+同时继续审计：
+- Recommendation / Action Plan 不得绕过 Decision 直接进入 Execution。
+- Execution 不得绕过 Outcome 生命周期。
+- Learning → AnalysisContext 的反馈传播必须真实、可追踪、无跨 scope 污染。
+- Feedback / Learning 不得推断未经 evidence 支持的 success 或 relationship impact。
+
+## 验收规则
+
+每个 TEST 完成后必须：
+- GitHub 代码与测试通过；
+- 必要时进行服务器 targeted + full pytest；
+- 检查 `git status --short`；
+- 检查历史 migration 未被修改；
+- 更新本 handover；
+- verification tag 如当前 GitHub connector 无法创建，必须明确记录为 PENDING TAG，不得虚报。
