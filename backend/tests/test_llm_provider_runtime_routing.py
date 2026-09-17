@@ -25,6 +25,7 @@ MODULES = [
 def test_configured_provider_is_used_by_all_llm_analysis_routes(monkeypatch):
     fake_provider = FakeProvider()
     config = SimpleNamespace(provider="openai_compatible")
+    conn = object()
 
     for module in MODULES:
         monkeypatch.setattr(module.provider_config_service, "get", lambda conn, user_id: config)
@@ -34,8 +35,7 @@ def test_configured_provider_is_used_by_all_llm_analysis_routes(monkeypatch):
             lambda conn, user_id: fake_provider,
         )
 
-        with object() as conn:
-            provider = module._build_provider(conn, "user-a")
+        provider = module._build_provider(conn, "user-a")
 
         assert provider is fake_provider
 
