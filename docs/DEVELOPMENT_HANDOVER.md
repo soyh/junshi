@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-104 — User-selectable LLM Provider / API Configuration — VERIFIED
-当前 Branch：test-104-provider-api-contract
+当前阶段：TEST-105 — Provider Runtime Routing — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-105-provider-runtime-routing
 
 ## 项目目标
 
@@ -35,69 +35,40 @@ TEST-103 VERIFIED — `sqlite3.IntegrityError → HTTP 409 Conflict`；服务器
 
 TEST-104 VERIFIED — user-selectable LLM Provider / API configuration；服务器 targeted 1 passed、full 530 passed；工作树 clean；HEAD `0ebe095`；历史 migration 001~009 未修改。
 
+TEST-105 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
+
 ## TEST-104 — VERIFIED
 
 目标：让用户能够按 user scope 保存自己的 OpenAI-compatible API Key、Base URL、Model、Timeout，并让现有 Analysis / Strategy / Recommendation / Strategic Reply / Action Plan analysis routes 使用该配置；没有用户配置时保持原有 Qwen 默认行为。
 
-### 已实现
+已建立：user-scoped provider config、Fernet API key encryption、GET/PUT/DELETE `/api/v1/settings/llm`、`openai_compatible` provider、`LLM_CONFIG_ENCRYPTION_KEY`、requirements 中 `cryptography==46.0.5`，以及对现有分析入口的配置读取。
 
-- 新增 migration 010：`user_llm_provider_configs`，`user_id` 为唯一 scope。
-- 新增 `LLMProviderConfigRepository`，所有读写均按 user_id 隔离。
-- 新增 `LLMProviderConfigService`，使用 Fernet 加密 API key；response 永不返回 plaintext key。
-- 新增 `LLMProviderConfigUpdate` / `LLMProviderConfigResponse`。
-- 新增 API：
-  - `GET /api/v1/settings/llm`
-  - `PUT /api/v1/settings/llm`
-  - `DELETE /api/v1/settings/llm`
-- 新增 server secret：`LLM_CONFIG_ENCRYPTION_KEY`。没有该 secret 时禁止保存用户 API key。
-- 当前 provider 类型锁定为 `openai_compatible`；用户可以指定 Base URL + Model + API Key。
-- Structured Analysis / Strategy / Recommendation / Strategic Reply / Action Plan analysis routes 优先读取 user config；无配置时继续使用 `QwenProvider()` 默认路径。
-- 保留原有模块级 `QwenProvider` injection seam，避免破坏既有 route tests。
-- `.env.example` 已记录加密 key 配置方式。
-- `cryptography==46.0.5` 已加入 backend requirements。
+## TEST-105 — Provider Runtime Routing
 
-### 安全边界
+目标：验证 TEST-104 保存的 provider configuration 不只是“设置 API”，而是实际进入各 AI 分析入口；同时验证无配置时保持原有 Qwen fallback。
 
-1. API key 不返回给客户端。
-2. API key 不以 plaintext 写入 SQLite，仅保存 Fernet ciphertext。
-3. 加密 master key 只来自服务器环境变量，不由用户 API 提供。
-4. provider config 严格按 user_id 隔离。
-5. 当前 MVP 仍使用 `X-User-ID` context；正式认证不是 TEST-104 的目标。
-6. TEST-104 不自动调用第三方 provider 做 connection test，不自动切换模型、不自动扣费、不自动选择 provider。
+覆盖入口：
+- Structured Analysis
+- Strategy
+- Recommendation
+- Strategic Reply
+- Action Plan Analysis
 
-### GitHub 自测
+新增 `backend/tests/test_llm_provider_runtime_routing.py`，验证：
+1. configured provider 由 `provider_config_service.build_provider()` 返回并被全部上述入口使用；
+2. 未配置时各入口继续实例化 `QwenProvider()`。
 
-第一次 full pytest 暴露 8 个既有 route tests 依赖模块级 `QwenProvider` monkeypatch；未修改测试掩盖问题。
+GitHub Actions 自测 run `35202685438`：
+- targeted：2 passed，1 warning；
+- full pytest：532 passed，1 warning；
+- workflow 已完成 success；
+- 临时 TEST-105 validation workflow 已删除。
 
-修复为兼容注入 seam 后，GitHub Actions run `35192147144`：
-- targeted `backend/tests/test_llm_provider_config.py`：1 passed
-- full pytest：530 passed，1 warning
-- 临时 TEST-104 workflow 已删除。
+当前尚未进行服务器验收，因此 TEST-105 暂不标记 VERIFIED。
 
-### 服务器验收
+## 产品化后续审计方向
 
-2026-09-17：服务器 `test-104-provider-api-contract` 验收完成。
-
-- `cryptography==46.0.5` 安装后导入正常。
-- `pytest -q backend/tests/test_llm_provider_config.py` → 1 passed。
-- `pytest -q` → 530 passed in 87.05s。
-- `git status --short` → clean。
-- HEAD → `0ebe095`。
-- `git diff HEAD^ -- backend/migrations` → blank；历史 migration 001~009 未修改。
-
-HTTP GET / PUT / GET / DELETE 与真实第三方模型调用属于后续产品化验收，不作为本次 TEST-104 VERIFIED 的必要条件。
-
-## 产品化下一阶段
-
-TEST-104 VERIFIED 后，再由项目决策进入独立 productization 阶段：
-
-1. provider connection-test API；
-2. provider/model 列表与能力声明；
-3. 前端用户设置页与模型选择；
-4. 前端 Person / Relationship / Conversation / Analysis / Recommendation / Action Plan / Decision / Outcome 工作流页面；
-5. 正式认证与真实用户身份替换 `X-User-ID`。
-
-前端当前不应被假设为已完成；TEST-104 只负责把 user-selectable model/API 的后端契约建立并接入现有 AI analysis chain。
+服务器验收 TEST-105 通过后，再继续审计真实第三方 provider HTTP 调用、provider connection test、provider/model capability、前端设置页，以及正式认证；不应仅凭单元测试假定第三方模型调用已经完成产品化闭环。
 
 ## 架构与持续禁止事项
 
@@ -110,4 +81,3 @@ TEST-104 VERIFIED 后，再由项目决策进入独立 productization 阶段：
 - 所有数据必须 user_id 隔离；Person / Relationship / Conversation 不得跨 scope 混用。
 - 不修改历史 migration；不建立第二套 lifecycle。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
-- GitHub 能确认的信息不得先要求服务器端查询。
