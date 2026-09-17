@@ -27,6 +27,14 @@ class AuthAccountInvalidCredentials(AuthAccountError):
     pass
 
 
+class AuthAccountPasswordChangeForbidden(AuthAccountError):
+    pass
+
+
+class AuthAccountInvalidCurrentPassword(AuthAccountError):
+    pass
+
+
 def normalize_username(username: str) -> str:
     return username.strip().lower()
 
@@ -153,3 +161,47 @@ class AuthAccountService:
             raise AuthAccountInvalidCredentials("invalid credentials")
 
         return self.session_service.create(conn, str(row["user_id"]))
+
+    def change_password(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        current_token: str,
+        current_password: str,
+        new_password: str,
+    ) -> CreatedAuthSession:
+        current_session = self.session_service.get_active_session(conn, current_token)
+        if current_session is None or current_session.user_id != user_id:
+            raise AuthAccountPasswordChangeForbidden(
+                "password change requires an active account session"
+            )
+
+        row = conn.execute(
+            """
+            SELECT password_hash
+            FROM user_credentials
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+        if row is None:
+            raise AuthAccountPasswordChangeForbidden(
+                "password change requires account credentials"
+            )
+
+        if not verify_password(current_password, str(row["password_hash"])):
+            raise AuthAccountInvalidCurrentPassword("invalid current password")
+
+        new_password_hash = hash_password(new_password)
+        conn.execute(
+            """
+            UPDATE user_credentials
+            SET password_hash = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+            """,
+            (new_password_hash, user_id),
+        )
+
+        self.session_service.revoke_all_for_user(conn, user_id)
+        return self.session_service.create(conn, user_id)
