@@ -1,0 +1,35 @@
+name: TEST-125 validation
+
+on:
+  push:
+    branches:
+      - test-125-secure-uvicorn-launcher
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: TEST-125 secure Uvicorn launcher
+        run: pytest -q backend/tests/test_secure_uvicorn_launcher.py
+      - name: TEST-124 production surface regression
+        run: pytest -q backend/tests/test_production_surface_hardening.py
+      - name: TEST-123 HTTP security regression
+        run: pytest -q backend/tests/test_http_security_boundary.py
+      - name: TEST-122 legacy header retirement regression
+        run: pytest -q backend/tests/test_auth_legacy_header_retirement.py
+      - name: Production auth regression
+        run: pytest -q backend/tests/test_auth_boundary.py
+      - name: Auth UI regression
+        run: pytest -q backend/tests/test_auth_account_ui.py
+      - name: Provider UI regression
+        run: pytest -q backend/tests/test_llm_provider_settings_ui.py
+      - name: Scope isolation regression
+        run: pytest -q backend/tests/test_execution_scope_isolation.py backend/tests/test_action_plan_snapshot_isolation.py
+      - name: Full test suite
+        run: pytest -q
