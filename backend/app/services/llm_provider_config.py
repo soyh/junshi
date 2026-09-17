@@ -28,10 +28,10 @@ class LLMProviderConfigService:
             )
         try:
             return Fernet(key)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError):
             raise LLMProviderConfigError(
                 "LLM provider config encryption key is invalid"
-            ) from exc
+            ) from None
 
     def get(
         self,
@@ -55,9 +55,8 @@ class LLMProviderConfigService:
         user_id: str,
         config: LLMProviderConfigUpdate,
     ) -> LLMProviderConfigResponse:
-        encrypted = self._fernet().encrypt(config.api_key.encode("utf-8")).decode(
-            "ascii"
-        )
+        api_key = config.api_key.get_secret_value()
+        encrypted = self._fernet().encrypt(api_key.encode("utf-8")).decode("ascii")
         self.repository.upsert(
             conn,
             user_id,
@@ -88,10 +87,10 @@ class LLMProviderConfigService:
             api_key = self._fernet().decrypt(
                 row["api_key_encrypted"].encode("ascii")
             ).decode("utf-8")
-        except (InvalidToken, UnicodeDecodeError, ValueError) as exc:
+        except (InvalidToken, UnicodeDecodeError, ValueError):
             raise LLMProviderConfigError(
                 "stored LLM provider API key cannot be decrypted"
-            ) from exc
+            ) from None
 
         return QwenProvider(
             api_key=api_key,
@@ -106,5 +105,5 @@ class LLMProviderConfigService:
             provider.test_connection()
         except LLMAnalysisError:
             raise
-        except Exception as exc:
-            raise LLMAnalysisError("LLM provider connection test failed") from exc
+        except Exception:
+            raise LLMAnalysisError("LLM provider connection test failed") from None
