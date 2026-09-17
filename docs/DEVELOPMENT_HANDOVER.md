@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-107 — Provider Connection Test — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
-当前 Branch：test-107-provider-connection-test
+当前阶段：TEST-108 — Provider Error Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-108-provider-error-contract
 
 ## 项目目标
 
@@ -39,7 +39,9 @@ TEST-105 VERIFIED — Provider Runtime Routing；服务器 targeted 2 passed、f
 
 TEST-106 VERIFIED — Provider Runtime Materialization；服务器 targeted 1 passed、full 533 passed；工作树 clean；历史 migration diff blank。
 
-TEST-107 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
+TEST-107 VERIFIED — Provider Connection Test；服务器 targeted connection 3 passed、HTTP contract 3 passed、full pytest 539 passed；工作树 clean；历史 migration diff blank。
+
+TEST-108 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
 
 ## TEST-104 — VERIFIED
 
@@ -59,7 +61,7 @@ TEST-107 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
 
 验证 persisted API key 解密、base_url、model、timeout_seconds 均进入现有 QwenProvider adapter；不建立第二套 provider 实现。服务器 targeted 1 passed、full pytest 533 passed；历史 migration diff blank。
 
-## TEST-107 — Provider Connection Test
+## TEST-107 — Provider Connection Test — VERIFIED
 
 目标：建立独立于正式 Analysis 的 Provider 连接测试能力，使用户可以验证当前 user-scoped provider configuration 是否能够实际访问其 OpenAI-compatible `/chat/completions` endpoint。
 
@@ -68,7 +70,7 @@ TEST-107 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
 - `QwenProvider.test_connection()` 轻量连接请求，不要求返回完整 StructuredAnalysis；
 - `LLMProviderConfigService.test_connection()`，通过当前 user scope materialize provider 后执行连接测试；
 - `POST /api/v1/settings/llm/test`；
-- configuration/materialization error → HTTP 503；upstream/provider connection failure → HTTP 502；成功返回 `{\"status\": \"ok\"}`。
+- configuration/materialization error → HTTP 503；upstream/provider connection failure → HTTP 502；成功返回 `{"status": "ok"}`。
 
 新增测试覆盖：
 1. connection request 使用 materialized API key、model、base URL，并发送受限 `max_tokens`；
@@ -77,14 +79,26 @@ TEST-107 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
 4. HTTP endpoint 成功、configuration error、upstream failure 的状态码契约；
 5. 不修改数据库 schema / migration。
 
-GitHub Actions run `35204314910`：targeted connection tests passed、full pytest passed；随后已删除临时 TEST-107 validation workflow。服务器尚未验收，因此 TEST-107 暂不标记 VERIFIED。
+GitHub Actions run `35204314910`：targeted connection tests passed、full pytest passed；随后已删除临时 TEST-107 validation workflow。服务器 targeted connection 3 passed、HTTP contract 3 passed、full pytest 539 passed；工作树 clean；历史 migration diff blank。
+
+## TEST-108 — Provider Error Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+
+目标：锁定 Provider 连接失败的稳定错误边界，避免 timeout、HTTP 429、malformed response 等上游异常直接泄漏实现细节、上游响应体或 API Key。
+
+新增测试覆盖：
+1. timeout → 统一 `LLMAnalysisError`；
+2. HTTP 429 → 统一连接失败错误，不返回 upstream response body；
+3. malformed JSON → 统一连接失败错误；
+4. 错误信息不得包含测试 API Key 或敏感上游响应内容。
+
+GitHub Actions run `35204873790`：targeted provider error contract tests passed、full pytest passed；随后已删除临时 TEST-108 validation workflow。服务器尚未验收，因此 TEST-108 暂不标记 VERIFIED。
 
 ## 产品化后续审计方向
 
-TEST-107 服务器验收通过后，继续审计：
+TEST-108 服务器验收通过后，继续审计：
 1. provider/model capability；
-2. API Key 与敏感错误信息的日志泄漏边界；
-3. provider rate-limit / timeout / retry 契约；
+2. provider rate-limit / timeout / retry 契约；
+3. API Key、请求头及敏感错误信息的日志泄漏边界；
 4. 前端设置页与分析工作流；
 5. 正式认证替换当前 `X-User-ID` 信任边界；
 6. 发布与运行时安全。
