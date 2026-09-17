@@ -1,0 +1,25 @@
+name: TEST-115 validation
+
+on:
+  push:
+    branches:
+      - test-115-auth-session-boundary
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Targeted auth session boundary tests
+        run: pytest -q backend/tests/test_auth_session_boundary.py
+      - name: Existing production auth boundary regression
+        run: pytest -q backend/tests/test_auth_boundary.py
+      - name: Existing scope isolation regression
+        run: pytest -q backend/tests/test_execution_scope_isolation.py backend/tests/test_action_plan_snapshot_isolation.py
+      - name: Full test suite
+        run: pytest -q
