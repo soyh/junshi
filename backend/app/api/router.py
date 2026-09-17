@@ -13,6 +13,7 @@ from app.api.routes.analysis_recommendation import router as analysis_recommenda
 from app.api.routes.analysis_strategy import router as analysis_strategy_router
 from app.api.routes.analysis_strategic_reply import router as analysis_strategic_reply_router
 from app.api.routes.analysis_structured import router as analysis_structured_router
+from app.api.routes.auth_session import router as auth_session_router
 from app.api.routes.conversations import router as conversations_router
 from app.api.routes.evidence import router as evidence_router
 from app.api.routes.interactions import router as interactions_router
@@ -63,6 +64,7 @@ api_router.include_router(analysis_recommendation_router)
 api_router.include_router(analysis_strategic_reply_router)
 api_router.include_router(analysis_action_plan_router)
 
+api_router.include_router(auth_session_router)
 api_router.include_router(persons_router)
 api_router.include_router(person_profiles_router)
 api_router.include_router(relationships_router)
