@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     qwen_model: str = "qwen-plus"
     qwen_timeout_seconds: float = 60.0
+    llm_config_encryption_key: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
