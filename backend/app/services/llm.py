@@ -28,13 +28,13 @@ class LLMAnalysisService:
             result = self.provider.analyze(context)
         except LLMAnalysisError:
             raise
-        except Exception as exc:
-            raise LLMAnalysisError("LLM provider failed") from exc
+        except Exception:
+            raise LLMAnalysisError("LLM provider failed") from None
 
         if not isinstance(result, dict):
             raise LLMAnalysisError("LLM provider returned a non-object result")
 
         try:
             return StructuredAnalysis.model_validate(result)
-        except Exception as exc:
-            raise LLMAnalysisError("LLM provider returned invalid structured analysis") from exc
+        except Exception:
+            raise LLMAnalysisError("LLM provider returned invalid structured analysis") from None
