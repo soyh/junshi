@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-117 — Multi-device Session Management / Bootstrap Retirement — VERIFIED
-当前 Branch：test-117-session-management
-服务器验收代码 HEAD：`af4995a8e5fccd8586e63e3e76191552ecb317b1`
+当前阶段：TEST-118 — Login Throttle / Progressive Lockout — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-118-login-throttle
+TEST-117 VERIFIED 服务器代码基线：`af4995a8e5fccd8586e63e3e76191552ecb317b1`
 
 ## 项目目标
 
@@ -16,85 +16,83 @@
 
 TEST-008 ~ TEST-090：按既有交接记录 VERIFIED；TEST-091 CONTRACT LOCKED；TEST-092 VERIFIED；TEST-093 VERIFIED；TEST-094 CONTRACT LOCKED。
 
-TEST-095 VERIFIED — Recommendation / Action Plan 跨请求 persistence bridge；migration 008 `action_plan_snapshots`。
-TEST-096 VERIFIED — confirmed Decision → explicit Execution → Outcome safety；scope / duplicate / conflict gates。
-TEST-097 VERIFIED — evidence-backed proposal freshness；stale snapshot 排除但不删除。
-TEST-098 VERIFIED — Action Plan snapshot user/person isolation。
+TEST-095 VERIFIED — Recommendation / Action Plan persistence bridge；migration 008。
+TEST-096 VERIFIED — Decision → Execution → Outcome safety。
+TEST-097 VERIFIED — evidence-backed proposal freshness。
+TEST-098 VERIFIED — Action Plan snapshot isolation。
 TEST-099 VERIFIED — Action Plan persistence gate。
-TEST-100 VERIFIED — proposal gate + execution gate。
-TEST-101 VERIFIED — Execution 精确 user/person/decision scope isolation；full 526 passed。
-TEST-102 VERIFIED — DB-level Outcome idempotency；migration 009；full 528 passed。
-TEST-103 VERIFIED — Outcome DB duplicate → HTTP 409；full 529 passed。
-TEST-104 VERIFIED — user-scoped LLM Provider configuration；migration 010；full 530 passed。
-TEST-105 VERIFIED — Provider Runtime Routing；full 532 passed。
-TEST-106 VERIFIED — Provider Runtime Materialization；full 533 passed。
-TEST-107 VERIFIED — Provider Connection Test；full 539 passed。
+TEST-100 VERIFIED — proposal / execution gate。
+TEST-101 VERIFIED — Execution scope isolation；full 526。
+TEST-102 VERIFIED — Outcome DB idempotency；migration 009；full 528。
+TEST-103 VERIFIED — duplicate Outcome → HTTP 409；full 529。
+TEST-104 VERIFIED — user-scoped LLM Provider config；migration 010；full 530。
+TEST-105 VERIFIED — Provider Runtime Routing；full 532。
+TEST-106 VERIFIED — Provider Runtime Materialization；full 533。
+TEST-107 VERIFIED — Provider Connection Test；full 539。
 TEST-108 VERIFIED — Provider Error Contract。
-TEST-109 VERIFIED — Provider Base URL Contract。
-TEST-110 VERIFIED — Provider Capability / StructuredAnalysis Contract；full 553 passed。
-TEST-111 VERIFIED — Provider Timeout / 429 / No-Retry Contract；full 562 passed。
-TEST-112 VERIFIED — Provider Log Redaction / Exception Boundary；full 568 passed。
-TEST-113 VERIFIED — Provider Settings UI / Structured Analysis Entry；服务器 full 571 passed；服务器 HEAD `b59b7625ffd8a391835545852ce981871da32580`。
-TEST-114 VERIFIED — Production Authentication Boundary；服务器 full 578 passed；服务器 HEAD `693946882ca780eafc0367dfa26a3b7f0ea06f84`。
-TEST-115 VERIFIED — DB-backed opaque Auth Session / Server-resolved User Boundary；服务器 full 585 passed；服务器 HEAD `a76c6907fa51afeee0076822601745c8ac3e4fb2`。
-TEST-116 VERIFIED — 本地账号凭据注册/登录 → server-issued TEST-115 session；服务器 account/login 7、session regression 7、production auth regression 7、scope isolation 4、full 592 passed in 102.24s；工作树 clean；相对 TEST-115 仅新增 migration 012；服务器 HEAD `bf84a5c068813693715fa0b09ce5458d59b7356e`。
-TEST-117 VERIFIED — 多设备 session list/current/revoke/rotate + 静态 bootstrap 显式退场开关；服务器 targeted 7、TEST-116 7、TEST-115 7、TEST-114 7、scope isolation 4、full 599 passed in 103.79s；工作树 clean；相对 TEST-116 migration diff blank；服务器 HEAD `af4995a8e5fccd8586e63e3e76191552ecb317b1`。
+TEST-109 VERIFIED — Provider URL Contract。
+TEST-110 VERIFIED — Provider Capability / StructuredAnalysis；full 553。
+TEST-111 VERIFIED — Provider Timeout / 429 / No-Retry；full 562。
+TEST-112 VERIFIED — Provider Log Redaction；full 568。
+TEST-113 VERIFIED — Provider Settings UI；服务器 full 571；HEAD `b59b7625ffd8a391835545852ce981871da32580`。
+TEST-114 VERIFIED — Production Authentication Boundary；服务器 full 578；HEAD `693946882ca780eafc0367dfa26a3b7f0ea06f84`。
+TEST-115 VERIFIED — DB-backed opaque Auth Session；migration 011；服务器 full 585；HEAD `a76c6907fa51afeee0076822601745c8ac3e4fb2`。
+TEST-116 VERIFIED — Account credentials / login → server-issued session；migration 012；服务器 full 592；HEAD `bf84a5c068813693715fa0b09ce5458d59b7356e`。
+TEST-117 VERIFIED — Multi-device session management / bootstrap retirement；服务器 targeted 7、TEST-116 7、TEST-115 7、TEST-114 7、scope isolation 4、full 599 passed in 103.79s；migration diff blank；HEAD `af4995a8e5fccd8586e63e3e76191552ecb317b1`。
+TEST-118 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — SQLite login throttle / progressive lockout；GitHub targeted 8、TEST-116 login 7、TEST-117 session management 7、TEST-115 session 7、TEST-114 production auth 7、scope isolation 4、full 607 passed；新增 migration 013，未修改历史 migration 001~012。
 
-## TEST-104 ~ TEST-112 — Provider 产品化与安全边界
+## Auth 产品化基线
 
-- user-scoped OpenAI-compatible Provider 配置：API Key / Base URL / Model / Timeout。
-- API Key 通过 Fernet 加密持久化；GET 不返回原始 key。
-- persisted provider configuration 会真实进入所有 Analysis 路由和 Provider constructor。
-- 独立 connection test 与正式 StructuredAnalysis capability 分离。
-- Provider URL、timeout、429、no-retry、error normalization 均有契约测试。
-- `SecretStr` + centralized logging redaction 保护 API Key / Authorization / Bearer / encryption key。
-- Provider/service 归一化未知异常时截断 raw exception cause，避免 secret 泄漏。
+- TEST-114：production 禁止 `X-User-ID`；静态 `AUTH_BEARER_TOKEN → LOCAL_USER_ID` 仅作迁移 bootstrap。
+- TEST-115：opaque session 只存 SHA-256 hash，支持 expiry/revoke，服务端解析到 `users.id`。
+- TEST-116：normalized username + scrypt password；服务器生成 user_id；注册/登录签发同一 session。
+- TEST-117：session list/current/revoke-other/rotate；`AUTH_BOOTSTRAP_ENABLED=false` 后静态 bootstrap 可退场，DB session 继续工作。
 
-## TEST-113 ~ TEST-116 — Auth 产品化基线
+## TEST-118 — Login Throttle / Progressive Lockout — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
 
-TEST-113：FastAPI-served Provider Settings UI，Bearer token 调用既有 Provider/Analysis API，不持久化 API Key 到浏览器 storage。
-
-TEST-114：production 禁止客户端 `X-User-ID`；静态 `AUTH_BEARER_TOKEN → LOCAL_USER_ID` 作为迁移 bootstrap；错误 token → 401，未配置且无 active session → 503 fail closed。
-
-TEST-115：migration 011 `auth_sessions`；opaque token 只存 SHA-256 hash；支持 expiry/revoke；Bearer session 服务端解析到 `users.id`。
-
-TEST-116：migration 012 `user_credentials`；注册/登录使用 normalized username + `hashlib.scrypt` password hash；服务器生成 user_id；成功后签发 TEST-115 session；错误账号/密码统一 `401 invalid credentials`。
-
-## TEST-117 — Multi-device Session Management / Bootstrap Retirement — VERIFIED
-
-目标：让同一账号可安全管理多个 server-issued session，并为 TEST-114 静态 bootstrap token 建立显式退场路径；不新增第二套 token 实现，不新增数据库 schema。
+目标：在不引入 Redis、不依赖未验证代理 IP 的前提下，限制用户名/密码端点的高频猜测，同时保持 existing/unknown username 的一致错误边界。
 
 已建立：
-1. `GET /api/v1/auth/sessions`：返回当前用户所有未过期、未吊销 session，仅暴露 `id / expires_at / created_at / current`，不返回 access token 或 token hash；
-2. `DELETE /api/v1/auth/sessions/{session_id}`：只能按当前 authenticated `user_id` 撤销自己的 session；跨用户 session id 返回 404，不泄露归属；
-3. `DELETE /api/v1/auth/sessions/others`：必须由真实 DB session 调用，一次撤销同用户除当前 session 外的其他 active sessions；
-4. `POST /api/v1/auth/session/rotate`：必须由真实 DB session 调用；原 session 立即 revoke，返回新的 TEST-115 opaque session；旧 token 随即失效；
-5. 静态 bootstrap token 不能伪装为可 rotation 的 DB session；
-6. 新增 `AUTH_BOOTSTRAP_ENABLED`，默认 `true` 保持 TEST-114 兼容；设置为 `false` 后静态 `AUTH_BEARER_TOKEN` 不再被身份解析接受，但 TEST-116 account-issued DB session 继续正常工作；
-7. `.env.example` 明确 bootstrap credential 为迁移期配置；
-8. 未新增 migration，未修改历史 migration 001~012。
+1. migration 013 `auth_login_throttle`：只持久化 `subject_hash / failed_attempts / window_started_at / locked_until / updated_at`；subject 为 normalized username 的 SHA-256，不存原始未知用户名；
+2. 默认 15 分钟失败窗口；前 5 次失败继续返回既有 `401 invalid credentials`；第 5 次失败建立 30 秒锁定；
+3. 锁定结束后若同一窗口继续失败，锁定按 30s → 60s → 120s → 240s... 递增，最大 15 分钟；
+4. 锁定期间直接返回统一 `429 too many login attempts` 与 `Retry-After`；锁定期间请求不增加 failed_attempts，不允许高频请求自行无限延长锁定；
+5. existing username 与 unknown username 使用同一 subject 状态机；unknown username 仍执行 TEST-116 dummy scrypt verification 后记录失败；
+6. 成功登录会删除该 normalized subject 的 throttle 状态；
+7. throttle 只按服务端规范化 username subject 工作，不读取/信任 `X-Forwarded-For` 等代理 header；
+8. 不修改 TEST-116 password/session 实现，不建立第二套认证系统；
+9. 不修改历史 migration 001~012，不引入 PostgreSQL/Redis/ES/向量库。
 
-服务器验收：
-- `backend/tests/test_auth_session_management.py`：7 passed；
-- `backend/tests/test_auth_account_login.py`：7 passed；
-- `backend/tests/test_auth_session_boundary.py`：7 passed；
-- `backend/tests/test_auth_boundary.py`：7 passed；
+新增 `backend/tests/test_auth_login_throttle.py` 8 个测试：
+- existing account failure limit → 429；
+- unknown username 同一 throttle contract；
+- successful login clears failures；
+- normalized subject isolation；
+- throttle table 不保存原始 unknown username；
+- progressive lock 增长；
+- failure window expiry reset；
+- locked requests 不延长 failure counter。
+
+GitHub Actions run `35239595475`：
+- TEST-118 login throttle：8 passed；
+- TEST-116 account login：7 passed；
+- TEST-117 session management：7 passed；
+- TEST-115 auth session：7 passed；
+- TEST-114 production auth：7 passed；
 - execution/action-plan scope isolation：4 passed；
-- full pytest：599 passed in 103.79s；
-- `git status --short` blank；
-- 相对 TEST-116 migration diff blank；
-- 最终文件差异与 GitHub 预期一致。
+- full pytest：607 passed、1 warning in 33.02s；
+- 临时 validation workflow 已删除。
 
-TEST-117 VERIFIED。
+当前等待服务器验收后再标记 TEST-118 VERIFIED。
 
-## 下一阶段
+## 下一阶段候选
 
-TEST-118 优先：
-1. 登录失败节流 / progressive lockout，使用 SQLite，不引入 Redis；
-2. existing/unknown username 保持同一错误语义，避免账号枚举；
-3. 成功登录后清理该主体失败计数；
-4. 锁定状态只基于 server-side normalized subject，不信任 `X-Forwarded-For` 等代理头；
-5. 后续再做 password change / credential rotation / account recovery、bootstrap 默认关闭、release/runtime security、完整 login/session UI。
+TEST-118 服务器通过后优先：
+1. TEST-119 password change / credential rotation，并定义“修改密码后是否撤销其他 sessions”的明确安全契约；
+2. account recovery 边界，不在没有验证渠道前伪造邮件/短信恢复；
+3. 逐步将 `AUTH_BOOTSTRAP_ENABLED` 默认关闭并移除静态 bootstrap；
+4. release/runtime security：reverse proxy trust、HTTPS/CORS/CSRF/access log；
+5. 完整 login/session/account UI。
 
 ## 架构与持续禁止事项
 
@@ -107,7 +105,5 @@ TEST-118 优先：
 - 所有数据必须 user_id 隔离；Person / Relationship / Conversation 不得跨 scope 混用。
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
-- connection test 成功不等于正式 Analysis capability 成功；正式 Analysis 必须继续通过 StructuredAnalysis validation。
-- 当前 Provider 不执行隐式自动 retry。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~117 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~118 verification tag 已创建。
