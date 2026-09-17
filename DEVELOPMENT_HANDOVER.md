@@ -1,9 +1,8 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-101 — Execution Scope Isolation — VERIFIED PENDING SERVER ACCEPTANCE
-当前 Branch：test-101-execution-scope-isolation
-当前 HEAD：8d6c91934b709dd58010cfc9fb3b77c38cdcec5a
+当前阶段：TEST-102 — Action Outcome Idempotency — VERIFIED PENDING SERVER ACCEPTANCE
+当前 Branch：test-102-action-outcome-idempotency
 
 ## 项目目标
 
@@ -28,7 +27,8 @@ TEST-097：功能验收 VERIFIED；verification tag 尚待创建
 TEST-098：服务器验收 VERIFIED；verification tag 尚待创建
 TEST-099：服务器验收 VERIFIED；verification tag 尚待创建
 TEST-100：GitHub Actions 回归通过，待服务器验收
-TEST-101：GitHub Actions 回归通过，待服务器验收
+TEST-101：服务器验收 VERIFIED；verification tag 尚待创建
+TEST-102：GitHub Actions 回归通过，待服务器验收
 
 ## TEST-095 — Core Engine Persistence Closure
 
@@ -117,9 +117,37 @@ GitHub Actions targeted + full pytest 均通过；当前分支待服务器验收
 测试使用与 production service 相同的 scoped repository contract，验证 service 必须以 `(user_id, person_id, decision_id)` 获取 Decision，并在 scope 不匹配时不得创建 execution。
 
 GitHub Actions：
-- targeted `backend/tests/test_execution_scope_isolation.py`：通过
-- full `pytest -q`：通过
+- targeted `backend/tests/test_execution_scope_isolation.py`：2 passed
+- full `pytest -q`：526 passed
 - 临时 TEST-101 validation workflow 已删除，不作为产品代码保留。
+
+服务器验收：
+- targeted：2 passed
+- full：526 passed
+- working tree clean
+- `git diff HEAD^ -- backend/migrations` 无输出
+
+当前状态：VERIFIED；verification tag 尚待创建。
+
+## TEST-102 — Action Outcome Idempotency
+
+目标：将 Action Outcome 的“单次结果”约束从 service 层 read-before-write 提升到数据库层，消除并发请求同时通过检查后重复写入的窗口。
+
+生产变更：
+- 新增 migration 009 `action_outcome_idempotency`。
+- 不修改历史 migration 005。
+- 对 `action_outcomes.decision_id` 建立唯一索引 `uq_action_outcomes_decision`。
+- 保持 ActionOutcomeService 现有 confirmed Decision + executed Decision + read-before-write 业务校验。
+
+新增测试：
+- 同一 `decision_id` 的第二个 outcome 必须被 SQLite UNIQUE 约束拒绝。
+- 即使 user/person scope 不同，同一 `decision_id` 也不得产生第二个 outcome。
+
+GitHub Actions：
+- targeted `backend/tests/test_action_outcome_idempotency.py`：通过
+- full `pytest -q`：通过
+- run `35189708708`：success
+- 临时 TEST-102 validation workflow 已删除，不作为产品代码保留。
 
 当前状态：VERIFIED PENDING SERVER ACCEPTANCE。
 
@@ -145,9 +173,9 @@ GitHub Actions：
 
 ## 当前下一审计点
 
-TEST-101 服务器验收通过后，下一阶段优先审计 Action Outcome 的并发幂等边界：当前 `ActionOutcomeService` 使用 read-before-write 防重复，但历史 migration 005 没有 `decision_id` UNIQUE 约束。若确认存在真实并发窗口，应通过新的 migration（不得修改 005）建立数据库级约束，并以独立测试锁定该契约。
+TEST-102 服务器验收通过后，继续审计 Action Outcome API 在数据库 UNIQUE 冲突下的 HTTP 错误合同，以及并发失败是否会被正确映射为业务冲突而非 500。
 
-同时继续审计：
+随后继续审计：
 - Recommendation / Action Plan 不得绕过 Decision 直接进入 Execution。
 - Execution 不得绕过 Outcome 生命周期。
 - Learning → AnalysisContext 的反馈传播必须真实、可追踪、无跨 scope 污染。
