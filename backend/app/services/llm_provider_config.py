@@ -8,7 +8,7 @@ from app.schemas.llm_provider_config import (
     LLMProviderConfigResponse,
     LLMProviderConfigUpdate,
 )
-from app.services.llm import LLMProvider
+from app.services.llm import LLMAnalysisError, LLMProvider
 from app.services.qwen_provider import QwenProvider
 
 
@@ -99,3 +99,12 @@ class LLMProviderConfigService:
             model=row["model"],
             timeout_seconds=float(row["timeout_seconds"]),
         )
+
+    def test_connection(self, conn: sqlite3.Connection, user_id: str) -> None:
+        provider = self.build_provider(conn, user_id)
+        try:
+            provider.test_connection()
+        except LLMAnalysisError:
+            raise
+        except Exception as exc:
+            raise LLMAnalysisError("LLM provider connection test failed") from exc
