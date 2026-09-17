@@ -1,0 +1,33 @@
+name: TEST-119 validation
+
+on:
+  push:
+    branches:
+      - test-119-password-change
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Targeted password change tests
+        run: pytest -q backend/tests/test_auth_password_change.py
+      - name: Login throttle regression
+        run: pytest -q backend/tests/test_auth_login_throttle.py
+      - name: Account login regression
+        run: pytest -q backend/tests/test_auth_account_login.py
+      - name: Session management regression
+        run: pytest -q backend/tests/test_auth_session_management.py
+      - name: Auth session regression
+        run: pytest -q backend/tests/test_auth_session_boundary.py
+      - name: Production auth regression
+        run: pytest -q backend/tests/test_auth_boundary.py
+      - name: Scope isolation regression
+        run: pytest -q backend/tests/test_execution_scope_isolation.py backend/tests/test_action_plan_snapshot_isolation.py
+      - name: Full test suite
+        run: pytest -q
