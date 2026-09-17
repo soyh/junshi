@@ -1,0 +1,25 @@
+name: TEST-114 validation
+
+on:
+  push:
+    branches:
+      - test-114-authenticated-user-boundary
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Targeted authenticated user boundary tests
+        run: pytest -q backend/tests/test_authenticated_user_boundary.py
+      - name: Existing provider settings UI tests
+        run: pytest -q backend/tests/test_llm_provider_settings_ui.py
+      - name: Existing user-scope provider tests
+        run: pytest -q backend/tests/test_llm_provider_config.py backend/tests/test_llm_provider_runtime_routing.py
+      - name: Full test suite
+        run: pytest -q
