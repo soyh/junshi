@@ -24,7 +24,7 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
     <legend>Authentication</legend>
     <label for="access-token">Access token</label>
     <input id="access-token" type="password" autocomplete="off" placeholder="Bearer token when authentication is enabled">
-    <p class="note">Token 仅保存在当前页面内存/输入框中，不写入 localStorage 或 sessionStorage。生产访问应通过 HTTPS。</p>
+    <p class="note">Token 仅保存在当前页面内存/输入框中，不写入浏览器持久化存储。生产访问应通过 HTTPS。</p>
   </fieldset>
 
   <fieldset>
