@@ -98,10 +98,6 @@ def test_provider_settings_ui_uses_bearer_and_never_sends_user_id(client):
     assert "headers.set('Authorization', `Bearer ${token}`)" in body
     assert 'id="user-id"' not in body
     assert "headers.set('X-User-ID'" not in body
-    assert "localStorage" in body  # explanatory text only
-    assert "sessionStorage" in body  # explanatory text only
+    assert "localStorage" not in body
+    assert "sessionStorage" not in body
     assert ".innerHTML" not in body
-
-    script = body.split("<script>", 1)[1].split("</script>", 1)[0]
-    assert "localStorage." not in script
-    assert "sessionStorage." not in script
