@@ -1,0 +1,23 @@
+name: TEST-113 validation
+
+on:
+  push:
+    branches:
+      - test-113-provider-settings-ui
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Targeted provider settings UI tests
+        run: pytest -q backend/tests/test_llm_provider_settings_ui.py
+      - name: Existing provider config and redaction tests
+        run: pytest -q backend/tests/test_llm_provider_config.py backend/tests/test_llm_provider_log_redaction.py
+      - name: Full test suite
+        run: pytest -q
