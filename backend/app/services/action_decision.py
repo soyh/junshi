@@ -38,12 +38,16 @@ class ActionDecisionService:
     ) -> dict:
         context = self.action_plan_service.get_context(conn, user_id, person_id)
         if recommendation_id is not None:
-            allowed_ids = {
+            available = {
                 item.get("recommendation_id")
                 for item in context["action_plan"]
-                if item.get("recommendation_id")
+                if (
+                    item.get("recommendation_id")
+                    and item.get("status") == "proposed"
+                    and item.get("requires_user_confirmation") is True
+                )
             }
-            if recommendation_id not in allowed_ids:
+            if recommendation_id not in available:
                 raise ValueError("recommendation is not an available evidence-backed action")
 
         if decision == "confirmed" and recommendation_id is None:
