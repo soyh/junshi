@@ -1,7 +1,7 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-104 — User-selectable LLM Provider / API Configuration — GITHUB SELF-TEST PASSED, SERVER VALIDATION PENDING
+当前阶段：TEST-104 — User-selectable LLM Provider / API Configuration — VERIFIED
 当前 Branch：test-104-provider-api-contract
 
 ## 项目目标
@@ -33,7 +33,9 @@ TEST-102 VERIFIED — DB-level Outcome idempotency；新增 migration 009 `uq_ac
 
 TEST-103 VERIFIED — `sqlite3.IntegrityError → HTTP 409 Conflict`；服务器 targeted 1 passed、full 529 passed；migration diff blank。
 
-## TEST-104 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+TEST-104 VERIFIED — user-selectable LLM Provider / API configuration；服务器 targeted 1 passed、full 530 passed；工作树 clean；HEAD `0ebe095`；历史 migration 001~009 未修改。
+
+## TEST-104 — VERIFIED
 
 目标：让用户能够按 user scope 保存自己的 OpenAI-compatible API Key、Base URL、Model、Timeout，并让现有 Analysis / Strategy / Recommendation / Strategic Reply / Action Plan analysis routes 使用该配置；没有用户配置时保持原有 Qwen 默认行为。
 
@@ -72,21 +74,22 @@ TEST-103 VERIFIED — `sqlite3.IntegrityError → HTTP 409 Conflict`；服务器
 - full pytest：530 passed，1 warning
 - 临时 TEST-104 workflow 已删除。
 
-### 服务器验收节点
+### 服务器验收
 
-服务器切换到 `test-104-provider-api-contract` 后执行：
+2026-09-17：服务器 `test-104-provider-api-contract` 验收完成。
 
-1. `git status --short` 应为空。
-2. migration 010 应正常应用。
-3. `pytest -q backend/tests/test_llm_provider_config.py` → 1 passed。
-4. `pytest -q` → 预期 530 passed。
-5. 不修改历史 migration 001~009。
-6. 设置 `LLM_CONFIG_ENCRYPTION_KEY` 后进行 HTTP GET / PUT / GET / DELETE 验收，并确认 API response 不包含原始 key。
-7. 不需要真实第三方模型调用。
+- `cryptography==46.0.5` 安装后导入正常。
+- `pytest -q backend/tests/test_llm_provider_config.py` → 1 passed。
+- `pytest -q` → 530 passed in 87.05s。
+- `git status --short` → clean。
+- HEAD → `0ebe095`。
+- `git diff HEAD^ -- backend/migrations` → blank；历史 migration 001~009 未修改。
+
+HTTP GET / PUT / GET / DELETE 与真实第三方模型调用属于后续产品化验收，不作为本次 TEST-104 VERIFIED 的必要条件。
 
 ## 产品化下一阶段
 
-TEST-104 server VERIFIED 后，再进入独立 productization 阶段：
+TEST-104 VERIFIED 后，再由项目决策进入独立 productization 阶段：
 
 1. provider connection-test API；
 2. provider/model 列表与能力声明；
