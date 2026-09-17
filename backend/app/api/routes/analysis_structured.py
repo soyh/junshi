@@ -5,7 +5,10 @@ from app.core.database import get_connection
 from app.schemas.structured_analysis import StructuredAnalysis
 from app.services.analysis_llm import AnalysisLLMService
 from app.services.llm import LLMAnalysisError
-from app.services.qwen_provider import QwenProvider
+from app.services.llm_provider_config import (
+    LLMProviderConfigError,
+    LLMProviderConfigService,
+)
 
 
 router = APIRouter(
@@ -14,6 +17,7 @@ router = APIRouter(
 )
 
 service = AnalysisLLMService()
+provider_config_service = LLMProviderConfigService()
 
 
 @router.get(
@@ -27,15 +31,21 @@ def get_structured_analysis(
 ):
     try:
         with get_connection() as conn:
+            provider = provider_config_service.build_provider(conn, user_id)
             return service.analyze(
                 conn,
                 user_id,
                 conversation_id,
-                provider=QwenProvider(),
+                provider=provider,
             )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except LLMProviderConfigError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
         ) from exc
     except LLMAnalysisError as exc:
