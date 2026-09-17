@@ -129,7 +129,7 @@ def test_registration_rejects_short_password_before_persistence(client):
     assert credential_count == 0
 
 
-def test_account_credentials_never_allow_client_selected_user_id(client):
+def test_account_credentials_reject_client_selected_user_id(client):
     response = client.post(
         REGISTER_URL,
         json={
@@ -138,18 +138,10 @@ def test_account_credentials_never_allow_client_selected_user_id(client):
             "user_id": "attacker-selected-user",
         },
     )
-    assert response.status_code == 201
 
+    assert response.status_code == 422
     with get_connection() as conn:
-        row = conn.execute(
-            """
-            SELECT users.id AS user_id
-            FROM user_credentials
-            JOIN users ON users.id = user_credentials.user_id
-            WHERE username = ?
-            """,
-            ("server-owned-id",),
-        ).fetchone()
-
-    assert row is not None
-    assert row["user_id"] != "attacker-selected-user"
+        credential_count = conn.execute(
+            "SELECT COUNT(*) AS count FROM user_credentials",
+        ).fetchone()["count"]
+    assert credential_count == 0
