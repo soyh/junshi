@@ -80,3 +80,28 @@ def test_persist_action_plan_does_not_persist_orphan_action_plan_items():
     )
 
     assert repository.calls == []
+
+
+def test_persist_action_plan_preserves_exact_evidence_provenance_for_persisted_proposal():
+    repository = RecordingSnapshotRepository()
+    service = ActionPlanService(snapshot_repository=repository)
+    recommendations = [
+        {
+            "id": "r-valid",
+            "action": "提出轻量邀请",
+            "evidence_source_ids": ["e1", "e2"],
+        }
+    ]
+    evidence = [
+        {"source_id": "e1", "source_type": "message"},
+        {"source_id": "e2", "source_type": "interaction"},
+    ]
+    action_plan = service.build_action_plan(recommendations, evidence)
+
+    service.persist_action_plan(
+        object(), "user-1", "person-1", recommendations, action_plan, evidence
+    )
+
+    assert repository.calls[0]["recommendation"]["evidence_source_ids"] == ["e1", "e2"]
+    assert repository.calls[0]["action_plan"]["evidence_source_ids"] == ["e1", "e2"]
+    assert repository.calls[0]["evidence"] == evidence
