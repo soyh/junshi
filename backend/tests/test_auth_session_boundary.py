@@ -6,8 +6,17 @@ from app.core.database import get_connection
 from app.services.auth_session import AuthSessionService
 
 
-def _configure_production(monkeypatch, *, bootstrap_token: str | None = None) -> None:
+def _configure_production(
+    monkeypatch,
+    *,
+    bootstrap_token: str | None = None,
+    bootstrap_enabled: bool = False,
+) -> None:
     monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv(
+        "AUTH_BOOTSTRAP_ENABLED",
+        "true" if bootstrap_enabled else "false",
+    )
     if bootstrap_token is None:
         monkeypatch.delenv("AUTH_BEARER_TOKEN", raising=False)
     else:
@@ -21,7 +30,11 @@ def _bearer(token: str) -> dict[str, str]:
 
 def test_authenticated_user_can_exchange_bootstrap_for_opaque_session(client, monkeypatch):
     try:
-        _configure_production(monkeypatch, bootstrap_token="bootstrap-secret")
+        _configure_production(
+            monkeypatch,
+            bootstrap_token="bootstrap-secret",
+            bootstrap_enabled=True,
+        )
 
         response = client.post(
             "/api/v1/auth/sessions",
@@ -44,7 +57,11 @@ def test_authenticated_user_can_exchange_bootstrap_for_opaque_session(client, mo
 
 def test_auth_session_stores_only_token_hash(client, monkeypatch):
     try:
-        _configure_production(monkeypatch, bootstrap_token="bootstrap-secret")
+        _configure_production(
+            monkeypatch,
+            bootstrap_token="bootstrap-secret",
+            bootstrap_enabled=True,
+        )
         response = client.post(
             "/api/v1/auth/sessions",
             headers=_bearer("bootstrap-secret"),
@@ -152,7 +169,11 @@ def test_revoked_session_is_rejected(client, monkeypatch):
 
 def test_current_session_can_be_revoked_through_api(client, monkeypatch):
     try:
-        _configure_production(monkeypatch, bootstrap_token="bootstrap-secret")
+        _configure_production(
+            monkeypatch,
+            bootstrap_token="bootstrap-secret",
+            bootstrap_enabled=True,
+        )
         created = client.post(
             "/api/v1/auth/sessions",
             headers=_bearer("bootstrap-secret"),
@@ -176,7 +197,11 @@ def test_current_session_can_be_revoked_through_api(client, monkeypatch):
 
 def test_static_bootstrap_token_is_not_revocable_as_session(client, monkeypatch):
     try:
-        _configure_production(monkeypatch, bootstrap_token="bootstrap-secret")
+        _configure_production(
+            monkeypatch,
+            bootstrap_token="bootstrap-secret",
+            bootstrap_enabled=True,
+        )
         response = client.delete(
             "/api/v1/auth/session",
             headers=_bearer("bootstrap-secret"),
