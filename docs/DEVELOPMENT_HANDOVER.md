@@ -1,7 +1,7 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-111 — Provider Timeout / Rate-Limit / No-Retry Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-111 — Provider Timeout / Rate-Limit / No-Retry Contract — VERIFIED
 当前 Branch：test-111-provider-retry-contract
 
 ## 项目目标
@@ -47,7 +47,7 @@ TEST-109 VERIFIED — Provider Base URL Contract；服务器 targeted 8 passed�
 
 TEST-110 VERIFIED — Provider Capability / Analysis Contract；服务器 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed；工作树 clean；migration diff blank；服务器 HEAD `2de393a29dc7419654321e558ad3dd4f69928405`。
 
-TEST-111 当前状态 — CONTRACT LOCKED / GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
+TEST-111 VERIFIED — Provider Timeout / Rate-Limit / No-Retry Contract；服务器 targeted 9 passed、既有 Provider Error Contract 3 passed、Provider Connection 3 passed、full pytest 562 passed；工作树 clean；migration diff blank；服务器 HEAD `4d750c571f64f14ece97b19f84e000c3c4950275`。
 
 ## TEST-104 — VERIFIED
 
@@ -128,7 +128,7 @@ GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed
 
 首次 GitHub run `35205937727` 因测试对内部错误文案绑定过严失败；修正为只锁定 `LLMAnalysisError` 业务边界，没有修改生产代码。GitHub Actions run `35209692341`：TEST-110 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed、1 warning；随后删除临时 TEST-110 validation workflow。服务器验收：TEST-110 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed in 86.96s；工作树 clean；相对 TEST-109 基线 migration diff blank。TEST-110 VERIFIED。
 
-## TEST-111 — Provider Timeout / Rate-Limit / No-Retry Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+## TEST-111 — Provider Timeout / Rate-Limit / No-Retry Contract — VERIFIED
 
 目标：锁定当前 Provider 的超时、429 rate-limit 与重试边界。当前策略是不在 Provider 内部隐式自动重试：一次 Analysis / connection request 对应一次 upstream HTTP request；timeout 或 429 在第一次失败后立即归一化为 `LLMAnalysisError`。这样避免隐藏的重复计费、重复请求和不可控延迟；未来若产品需要 retry，应通过显式、可配置、可观测策略单独实现。
 
@@ -143,11 +143,11 @@ GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed
 6. Provider timeout 配置必须 `> 0` 且 `<= 300`，300 秒边界允许；
 7. 不新增 endpoint、不修改数据库 schema / migration。
 
-GitHub Actions run `35210450717`：TEST-111 targeted 9 passed、既有 Provider Error Contract 3 passed、既有 Provider Connection 3 passed、full pytest 562 passed、1 warning；随后删除临时 TEST-111 validation workflow。服务器尚未验收，因此 TEST-111 暂不标记 VERIFIED。
+GitHub Actions run `35210450717`：TEST-111 targeted 9 passed、既有 Provider Error Contract 3 passed、既有 Provider Connection 3 passed、full pytest 562 passed、1 warning；随后删除临时 TEST-111 validation workflow。服务器验收：TEST-111 targeted 9 passed、Provider Error Contract 3 passed、Provider Connection 3 passed、full pytest 562 passed in 87.67s；工作树 clean；相对 TEST-110 基线 migration diff blank；最终文件差异仅为 TEST-111 contract test 与 handover。TEST-111 VERIFIED。
 
 ## 产品化后续审计方向
 
-TEST-111 服务器验收通过后继续审计：
+TEST-112 起继续审计：
 1. API Key、Authorization header、provider request / exception 的日志泄漏边界；
 2. 前端设置页与分析工作流；
 3. 正式认证替换当前 `X-User-ID` 信任边界；
