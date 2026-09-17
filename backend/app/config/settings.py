@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     local_user_id: str = "00000000-0000-0000-0000-000000000001"
+    auth_bearer_token: str | None = None
 
     dashscope_api_key: str | None = None
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
