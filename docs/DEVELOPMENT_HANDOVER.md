@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-110 — Provider Capability / Analysis Contract — VERIFIED
-当前 Branch：test-110-provider-capability-contract
+当前阶段：TEST-111 — Provider Timeout / Rate-Limit / No-Retry Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-111-provider-retry-contract
 
 ## 项目目标
 
@@ -45,7 +45,9 @@ TEST-108 VERIFIED — Provider Error Contract；服务器 targeted 3 passed；�
 
 TEST-109 VERIFIED — Provider Base URL Contract；服务器 targeted 8 passed；最终 full pytest 553 passed；工作树 clean；migration diff blank。
 
-TEST-110 VERIFIED — Provider Capability / Analysis Contract；服务器 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed；工作树 clean；migration diff blank；HEAD `2de393a29dc7419654321e558ad3dd4f69928405`。
+TEST-110 VERIFIED — Provider Capability / Analysis Contract；服务器 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed；工作树 clean；migration diff blank；服务器 HEAD `2de393a29dc7419654321e558ad3dd4f69928405`。
+
+TEST-111 当前状态 — CONTRACT LOCKED / GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
 
 ## TEST-104 — VERIFIED
 
@@ -126,16 +128,32 @@ GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed
 
 首次 GitHub run `35205937727` 因测试对内部错误文案绑定过严失败；修正为只锁定 `LLMAnalysisError` 业务边界，没有修改生产代码。GitHub Actions run `35209692341`：TEST-110 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed、1 warning；随后删除临时 TEST-110 validation workflow。服务器验收：TEST-110 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed in 86.96s；工作树 clean；相对 TEST-109 基线 migration diff blank。TEST-110 VERIFIED。
 
+## TEST-111 — Provider Timeout / Rate-Limit / No-Retry Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+
+目标：锁定当前 Provider 的超时、429 rate-limit 与重试边界。当前策略是不在 Provider 内部隐式自动重试：一次 Analysis / connection request 对应一次 upstream HTTP request；timeout 或 429 在第一次失败后立即归一化为 `LLMAnalysisError`。这样避免隐藏的重复计费、重复请求和不可控延迟；未来若产品需要 retry，应通过显式、可配置、可观测策略单独实现。
+
+本阶段采用 contract-lock，不修改生产 Provider 实现。
+
+新增测试覆盖：
+1. Analysis HTTP request 使用用户配置的 `timeout_seconds`；
+2. Analysis ReadTimeout 只发起一次请求，不隐式 retry；
+3. Analysis HTTP 429 只发起一次请求，不隐式 retry；
+4. Connection Test 使用相同 configured timeout，并且 timeout 不隐式 retry；
+5. Connection Test HTTP 429 不隐式 retry；
+6. Provider timeout 配置必须 `> 0` 且 `<= 300`，300 秒边界允许；
+7. 不新增 endpoint、不修改数据库 schema / migration。
+
+GitHub Actions run `35210450717`：TEST-111 targeted 9 passed、既有 Provider Error Contract 3 passed、既有 Provider Connection 3 passed、full pytest 562 passed、1 warning；随后删除临时 TEST-111 validation workflow。服务器尚未验收，因此 TEST-111 暂不标记 VERIFIED。
+
 ## 产品化后续审计方向
 
-TEST-111 起继续审计：
-1. provider rate-limit / timeout / retry 契约；
-2. API Key、请求头及敏感错误信息的日志泄漏边界；
-3. 前端设置页与分析工作流；
-4. 正式认证替换当前 `X-User-ID` 信任边界；
-5. 发布与运行时安全。
+TEST-111 服务器验收通过后继续审计：
+1. API Key、Authorization header、provider request / exception 的日志泄漏边界；
+2. 前端设置页与分析工作流；
+3. 正式认证替换当前 `X-User-ID` 信任边界；
+4. 发布与运行时安全。
 
-连接测试成功不等于模型业务分析成功，也不等于所有 provider capability 均可用；正式 Analysis 仍必须经过 StructuredAnalysis schema validation。
+连接测试成功不等于模型业务分析成功，也不等于所有 provider capability 均可用；正式 Analysis 仍必须经过 StructuredAnalysis schema validation。当前 Provider 不执行隐式自动 retry。
 
 ## 架构与持续禁止事项
 
