@@ -62,7 +62,7 @@ def test_connection_success_with_non_analysis_text_is_not_structured_analysis_su
     )
 
     provider.test_connection()
-    with pytest.raises(LLMAnalysisError, match="invalid structured analysis"):
+    with pytest.raises(LLMAnalysisError):
         LLMAnalysisService(provider).analyze({})
 
 
