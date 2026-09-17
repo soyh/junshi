@@ -43,7 +43,12 @@ def get_current_user_id(
     is_production = settings.app_env.lower() == "production"
 
     if x_user_id:
-        raise _unauthorized("X-User-ID is not accepted")
+        detail = (
+            "X-User-ID is not accepted in production"
+            if is_production
+            else "X-User-ID is not accepted"
+        )
+        raise _unauthorized(detail)
 
     if authorization:
         token = parse_bearer_token(authorization)
