@@ -9,6 +9,9 @@ class LLMProvider(Protocol):
     def analyze(self, context: dict[str, Any]) -> dict[str, Any]:
         ...
 
+    def test_connection(self) -> None:
+        ...
+
 
 class LLMAnalysisError(RuntimeError):
     pass
