@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-121 — Production Bootstrap Retirement — VERIFIED / PAUSED
-当前 Branch：test-121-production-bootstrap-retirement
-服务器验收代码 HEAD：`43b514a5dfa454b85424b3abe5a96ffb93da0c24`
+当前阶段：TEST-122 — Legacy X-User-ID Retirement — GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED
+当前 Branch：test-122-legacy-user-header-retirement
+TEST-121 VERIFIED 服务器代码 HEAD：`43b514a5dfa454b85424b3abe5a96ffb93da0c24`
 
 ## 项目目标
 
@@ -41,7 +41,8 @@ TEST-117 VERIFIED — Multi-device session management / bootstrap retirement；�
 TEST-118 VERIFIED — SQLite login throttle / progressive lockout；服务器 full 607；migration 013；HEAD `c3f542a1b034bdfb0278eaace838efcd7c868ac7`。
 TEST-119 VERIFIED — authenticated password change / credential rotation；服务器 full 615；HEAD `04b3c84e7ebdd7250db4bbcf15b7f333b93f0e77`。
 TEST-120 VERIFIED — FastAPI-served account/session UI；服务器 full 619；HEAD `456cd94bacb85655c53a892f23cba742af76d925`。
-TEST-121 VERIFIED — production bootstrap default retirement；服务器 TEST-121 6、production auth 7、auth-session boundary 7、session management 7、account login 7、password change 8、Auth UI 4、scope isolation 4、full 625 passed in 114.67s；工作树 clean；migration diff blank；服务器 HEAD `43b514a5dfa454b85424b3abe5a96ffb93da0c24`。
+TEST-121 VERIFIED — production bootstrap default retirement；服务器 full 625；HEAD `43b514a5dfa454b85424b3abe5a96ffb93da0c24`。
+TEST-122 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — `X-User-ID` 不再是任何环境的身份来源；full 630 passed。
 
 ## Auth 产品化基线
 
@@ -53,50 +54,48 @@ TEST-121 VERIFIED — production bootstrap default retirement；服务器 TEST-1
 - TEST-119：password change 必须 active DB session + current password；成功后全部旧 session revoke 并签发新 session。
 - TEST-120：最小可用 Auth UI 只调用既有 VERIFIED API，不复制认证逻辑。
 - TEST-121：静态 `AUTH_BEARER_TOKEN → LOCAL_USER_ID` bootstrap 默认关闭；只有显式 `AUTH_BOOTSTRAP_ENABLED=true` 才保留迁移/应急兼容。
+- TEST-122：`X-User-ID` 在 production/development/test 均拒绝，不再允许客户端通过 header 选择 `user_id`；development/test 无 Bearer 时仍固定使用 `LOCAL_USER_ID` fallback。
 
-## TEST-121 — Production Bootstrap Retirement — VERIFIED
+## TEST-122 — Legacy X-User-ID Retirement — GITHUB SELF-TEST PASSED
 
-目标：真实 DB account/session 已建立后，让旧静态 bootstrap 从默认开启改为显式 opt-in，降低生产环境继续信任固定 `LOCAL_USER_ID` token 的风险。
+目标：彻底结束 `X-User-ID` 作为身份来源的长期兼容路径，防止任何环境因配置差异重新允许客户端直接选择用户身份。
 
-已验证：
-1. `Settings.auth_bootstrap_enabled` 默认值为 `False`；
-2. `.env.example` 默认 `AUTH_BOOTSTRAP_ENABLED=false`；
-3. production 仅配置 `AUTH_BEARER_TOKEN`、但未显式启用 bootstrap 时，该静态 token 返回 `401 invalid bearer token`；
-4. 显式 `AUTH_BOOTSTRAP_ENABLED=true` 后旧兼容 token 仍可使用；
-5. DB-backed account sessions 在 bootstrap disabled 时正常；
-6. register/login 公共入口正常；
-7. production 无 bootstrap、无 bearer 时要求 bearer token；
-8. development/test `X-User-ID` 兼容路径未在本阶段修改；
-9. 无新 migration，未修改历史 migration 001~013。
+实现与验证：
+1. `get_current_user_id()` 在任何环境只要收到 `X-User-ID` 都返回 401；
+2. production 继续返回 `X-User-ID is not accepted in production`；development/test 返回 `X-User-ID is not accepted`；
+3. valid DB session 与 `X-User-ID` 同时出现时也拒绝请求，不允许 ambiguous identity；
+4. development/test 无 Bearer、无旧 header 时仍使用固定 `LOCAL_USER_ID` fallback，避免测试基础设施与生产认证耦合；
+5. 原 full suite 有 47 个历史隔离测试用旧 header 模拟多用户。未恢复旧生产逻辑，而是在 pytest `client` fixture 内将非 auth-contract 测试中的旧 header 转换为真实 DB user + opaque session，再发送 `Authorization: Bearer <session>`；
+6. 所有 `test_auth_*` 契约测试绕过该适配器，因此仍直接验证应用本身拒绝 `X-User-ID`；
+7. 无新 migration，未修改历史 migration 001~013。
 
-GitHub Actions run `35248850831`：full 625 passed、1 warning。
+GitHub Actions：
+- 第一轮 run `35249866711`：targeted 全绿，full suite 因 47 个历史隔离测试依赖旧 header 失败；
+- 第二轮 run `35250994364`：success；
+  - TEST-122：4 passed；
+  - production auth：8 passed；
+  - bootstrap retirement：6 passed；
+  - auth session：7 passed；
+  - session management：7 passed；
+  - account login：7 passed；
+  - password change：8 passed；
+  - Auth UI：4 passed；
+  - scope isolation：4 passed；
+  - full pytest：630 passed、1 warning in 94.97s；
+- 临时 validation workflow 已删除。
 
-服务器验收：
-- `backend/tests/test_auth_bootstrap_retirement.py`：6 passed；
-- `backend/tests/test_auth_boundary.py`：7 passed；
-- `backend/tests/test_auth_session_boundary.py`：7 passed；
-- `backend/tests/test_auth_session_management.py`：7 passed；
-- `backend/tests/test_auth_account_login.py`：7 passed；
-- `backend/tests/test_auth_password_change.py`：8 passed；
-- `backend/tests/test_auth_account_ui.py`：4 passed；
-- execution/action-plan scope isolation：4 passed；
-- full pytest：625 passed in 114.67s；
-- `git status --short` blank；
-- migration diff blank；
-- `.env` 未显式设置 `AUTH_BOOTSTRAP_ENABLED`，因此当前运行配置采用代码默认 `false`。
+为加速推进，TEST-122 服务器验收与 TEST-123 合并到下一个累计验收节点；当前不标记 SERVER VERIFIED。
 
-TEST-121 VERIFIED。
+## 下一阶段
 
-## 当前暂停点
-
-按用户要求临时暂停，不启动 TEST-122。
-
-恢复后应先重新审计当前 GitHub HEAD，再决定 TEST-122。优先候选：
-1. development/test `X-User-ID` 长期兼容路径收口；
-2. runtime HTTP security boundary：CORS / Host / proxy trust / security headers；
-3. Provider Settings UI 与 Auth UI 统一入口；
-4. HTTPS / reverse proxy / access log / deployment release checklist；
-5. account recovery 仍必须等待真实 verified channel。
+TEST-123 — HTTP Security Boundary：
+1. 全局安全响应头：`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`；
+2. `/api/v1/auth*` 与 `/api/v1/settings*` 返回 `Cache-Control: no-store`；
+3. 不启用 permissive CORS；
+4. Bearer auth 不改为 Cookie；
+5. 不信任 `X-Forwarded-*`；
+6. 暂不启用 HSTS / strict CSP / TrustedHost，因为当前没有锁定 HTTPS termination、生产域名和 inline UI CSP 迁移方案；
+7. 无 schema/migration 变化。
 
 ## 架构与持续禁止事项
 
@@ -110,4 +109,4 @@ TEST-121 VERIFIED。
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~121 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~122 verification tag 已创建。
