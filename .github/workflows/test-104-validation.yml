@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - test-104-provider-api-contract
+  pull_request:
+    branches:
+      - test-103-action-outcome-http-conflict
 
 jobs:
   test:
