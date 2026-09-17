@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-106 — Provider Runtime Materialization — VERIFIED
-当前 Branch：test-106-provider-http-contract
+当前阶段：TEST-107 — Provider Connection Test — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-107-provider-connection-test
 
 ## 项目目标
 
@@ -39,6 +39,8 @@ TEST-105 VERIFIED — Provider Runtime Routing；服务器 targeted 2 passed、f
 
 TEST-106 VERIFIED — Provider Runtime Materialization；服务器 targeted 1 passed、full 533 passed；工作树 clean；历史 migration diff blank。
 
+TEST-107 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
+
 ## TEST-104 — VERIFIED
 
 目标：让用户能够按 user scope 保存自己的 OpenAI-compatible API Key、Base URL、Model、Timeout，并让现有 Analysis / Strategy / Recommendation / Strategic Reply / Action Plan analysis routes 使用该配置；没有用户配置时保持原有 Qwen 默认行为。
@@ -49,38 +51,45 @@ TEST-106 VERIFIED — Provider Runtime Materialization；服务器 targeted 1 pa
 
 目标：验证 TEST-104 保存的 provider configuration 不只是“设置 API”，而是实际进入各 AI 分析入口；同时验证无配置时保持原有 Qwen fallback。
 
-覆盖入口：
-- Structured Analysis
-- Strategy
-- Recommendation
-- Strategic Reply
-- Action Plan Analysis
-
-新增 `backend/tests/test_llm_provider_runtime_routing.py`，验证 configured provider 与 Qwen fallback 均覆盖全部上述入口。
-
-GitHub Actions run `35202685438`：targeted 2 passed、full pytest 532 passed；临时 validation workflow 已删除。服务器随后完成同等 targeted/full 验收，结果一致，migration diff blank。
+覆盖入口：Structured Analysis、Strategy、Recommendation、Strategic Reply、Action Plan Analysis。服务器 targeted 2 passed、full pytest 532 passed。
 
 ## TEST-106 — Provider Runtime Materialization — VERIFIED
 
 目标：锁定 user-scoped persisted provider configuration 在 runtime 中实际 materialize 为 Provider 实例参数，而不是只验证“拿到了某个 Provider 对象”。
 
-新增 `backend/tests/test_llm_provider_runtime_materialization.py`，验证：
-1. persisted `api_key_encrypted` 经解密后传入 provider；
-2. persisted `base_url`、`model`、`timeout_seconds` 均传入 provider；
-3. provider 类型仍为现有 `QwenProvider` adapter，不建立第二套 provider 实现。
+验证 persisted API key 解密、base_url、model、timeout_seconds 均进入现有 QwenProvider adapter；不建立第二套 provider 实现。服务器 targeted 1 passed、full pytest 533 passed；历史 migration diff blank。
 
-GitHub Actions run `35203595737`：targeted materialization + existing Qwen provider tests、full pytest 均 success；临时 validation workflow 已删除。服务器验收：targeted 1 passed、full pytest 533 passed、工作树 clean、历史 migration diff blank。
+## TEST-107 — Provider Connection Test
+
+目标：建立独立于正式 Analysis 的 Provider 连接测试能力，使用户可以验证当前 user-scoped provider configuration 是否能够实际访问其 OpenAI-compatible `/chat/completions` endpoint。
+
+新增：
+- `LLMProvider.test_connection()` provider contract；
+- `QwenProvider.test_connection()` 轻量连接请求，不要求返回完整 StructuredAnalysis；
+- `LLMProviderConfigService.test_connection()`，通过当前 user scope materialize provider 后执行连接测试；
+- `POST /api/v1/settings/llm/test`；
+- configuration/materialization error → HTTP 503；upstream/provider connection failure → HTTP 502；成功返回 `{\"status\": \"ok\"}`。
+
+新增测试覆盖：
+1. connection request 使用 materialized API key、model、base URL，并发送受限 `max_tokens`；
+2. upstream HTTP failure 映射为 `LLMAnalysisError`；
+3. malformed/empty choices 被拒绝；
+4. HTTP endpoint 成功、configuration error、upstream failure 的状态码契约；
+5. 不修改数据库 schema / migration。
+
+GitHub Actions run `35204314910`：targeted connection tests passed、full pytest passed；随后已删除临时 TEST-107 validation workflow。服务器尚未验收，因此 TEST-107 暂不标记 VERIFIED。
 
 ## 产品化后续审计方向
 
-TEST-106 服务器验收通过后，继续审计：
-1. provider connection test / 实际第三方 HTTP 调用的产品化边界；
-2. provider/model capability；
-3. 前端设置页与分析工作流；
-4. 正式认证替换当前 `X-User-ID` 信任边界；
-5. 发布与运行时安全。
+TEST-107 服务器验收通过后，继续审计：
+1. provider/model capability；
+2. API Key 与敏感错误信息的日志泄漏边界；
+3. provider rate-limit / timeout / retry 契约；
+4. 前端设置页与分析工作流；
+5. 正式认证替换当前 `X-User-ID` 信任边界；
+6. 发布与运行时安全。
 
-不应仅凭 MockTransport 单元测试假定第三方模型调用已经完成产品化闭环。
+连接测试成功不等于模型业务分析成功，也不等于所有 provider capability 均可用；正式 Analysis 仍必须经过 StructuredAnalysis schema validation。
 
 ## 架构与持续禁止事项
 
