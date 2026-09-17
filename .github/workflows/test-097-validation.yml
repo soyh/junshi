@@ -1,0 +1,17 @@
+name: TEST-097 validation
+
+on:
+  push:
+    branches:
+      - test-097-evidence-backed-proposal-freshness
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r backend/requirements.txt
+      - run: cd backend && pytest -q
