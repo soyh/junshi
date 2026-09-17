@@ -1,7 +1,7 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-112 — Provider Log Redaction / Exception Boundary — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-112 — Provider Log Redaction / Exception Boundary — VERIFIED
 当前 Branch：test-112-provider-log-redaction-contract
 
 ## 项目目标
@@ -49,7 +49,7 @@ TEST-110 VERIFIED — Provider Capability / Analysis Contract；服务器 target
 
 TEST-111 VERIFIED — Provider Timeout / Rate-Limit / No-Retry Contract；服务器 targeted 9 passed、既有 Provider Error Contract 3 passed、Provider Connection 3 passed、full pytest 562 passed；工作树 clean；migration diff blank；服务器 HEAD `4d750c571f64f14ece97b19f84e000c3c4950275`。
 
-TEST-112 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING；统一日志出口脱敏 Provider credentials，API Key 使用 SecretStr，Provider/internal exception 不再保留可能含敏感值的 raw cause；无 migration 变化。
+TEST-112 VERIFIED — Provider Log Redaction / Exception Boundary；服务器 targeted log redaction 6 passed、provider config/materialization 2 passed、provider error/connection 6 passed、full pytest 568 passed；工作树 clean；相对 TEST-111 baseline migration diff blank；服务器 HEAD `3bb10a300cf7d09614c4e271c3415328ce7a939a`。
 
 ## TEST-104 — VERIFIED
 
@@ -147,7 +147,7 @@ GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed
 
 GitHub Actions run `35210450717`：TEST-111 targeted 9 passed、既有 Provider Error Contract 3 passed、既有 Provider Connection 3 passed、full pytest 562 passed、1 warning；随后删除临时 TEST-111 validation workflow。服务器验收：TEST-111 targeted 9 passed、Provider Error Contract 3 passed、Provider Connection 3 passed、full pytest 562 passed in 87.67s；工作树 clean；相对 TEST-110 基线 migration diff blank；最终文件差异仅为 TEST-111 contract test 与 handover。TEST-111 VERIFIED。
 
-## TEST-112 — Provider Log Redaction / Exception Boundary — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+## TEST-112 — Provider Log Redaction / Exception Boundary — VERIFIED
 
 目标：在 Provider 配置、HTTP Authorization、应用日志和异常 traceback 之间建立明确的 secret boundary，避免 API Key、Bearer token、加密 key 或第三方异常内容进入 console/file log。
 
@@ -166,14 +166,15 @@ GitHub Actions run `35210450717`：TEST-111 targeted 9 passed、既有 Provider 
 - LLMAnalysisService arbitrary provider exception 不保留 raw cause；
 - provider connection wrapper 不保留 raw internal exception cause。
 
-GitHub Actions run `35213487409`：TEST-112 targeted 6 passed、provider config + runtime materialization 2 passed、existing provider error + connection 6 passed、full pytest 568 passed、1 warning；随后删除临时 TEST-112 validation workflow。服务器尚未验收，因此 TEST-112 暂不标记 VERIFIED。
+GitHub Actions run `35213487409`：TEST-112 targeted 6 passed、provider config + runtime materialization 2 passed、existing provider error + connection 6 passed、full pytest 568 passed、1 warning；随后删除临时 TEST-112 validation workflow。服务器验收：targeted log redaction 6 passed、provider config/materialization 2 passed、provider error/connection 6 passed、full pytest 568 passed in 89.02s；工作树 clean；相对 TEST-111 baseline migration diff blank；最终文件差异与 GitHub 预期一致。TEST-112 VERIFIED。
 
 ## 产品化后续审计方向
 
-TEST-112 服务器验收通过后继续：
-1. 前端 Provider 设置页与 Analysis 工作流；
-2. 正式认证替换当前 `X-User-ID` 信任边界；
-3. 发布与运行时安全，包括 secret rotation / process environment / reverse-proxy log boundary。
+TEST-113 起继续：
+1. 建立最小 Provider 设置 UI，并复用现有 GET/PUT/DELETE/POST-test API，不引入第二套 Provider 业务逻辑；
+2. 将 Provider 设置入口与 Analysis 工作流建立明确 UI 边界；
+3. 正式认证替换当前 `X-User-ID` 信任边界；
+4. 发布与运行时安全，包括 secret rotation / process environment / reverse-proxy log boundary。
 
 连接测试成功不等于模型业务分析成功，也不等于所有 provider capability 均可用；正式 Analysis 仍必须经过 StructuredAnalysis schema validation。当前 Provider 不执行隐式自动 retry；Provider credentials 不应出现在应用 console/file log 或归一化 exception traceback 中。
 
