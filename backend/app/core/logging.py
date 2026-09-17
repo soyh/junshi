@@ -1,8 +1,34 @@
 import logging
 import os
+import re
 from logging.handlers import RotatingFileHandler
 
 from app.config.settings import get_settings
+
+
+_REDACTION_PATTERNS = (
+    re.compile(
+        r"(?i)(authorization[\"']?\s*[:=]\s*[\"']?\s*bearer\s+)[^\s\"',;}]+"
+    ),
+    re.compile(
+        r"(?i)(api[_-]?key(?:_encrypted)?[\"']?\s*[:=]\s*[\"']?\s*)[^\s\"',;}]+"
+    ),
+    re.compile(r"(?i)(\bbearer\s+)[^\s\"',;}]+"),
+)
+
+
+def redact_sensitive_text(value: object) -> str:
+    text = str(value)
+    for pattern in _REDACTION_PATTERNS:
+        text = pattern.sub(r"\1[REDACTED]", text)
+    return text
+
+
+class RedactingFormatter(logging.Formatter):
+    """Redact provider credentials from the complete rendered log record."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        return redact_sensitive_text(super().format(record))
 
 
 def setup_logging() -> None:
@@ -16,7 +42,7 @@ def setup_logging() -> None:
     if root_logger.handlers:
         return
 
-    formatter = logging.Formatter(
+    formatter = RedactingFormatter(
         "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
     )
 
