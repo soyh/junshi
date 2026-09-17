@@ -12,7 +12,8 @@ _AUTHORIZATION_PATTERN = re.compile(
 )
 _SECRET_KEY_PATTERN = re.compile(
     r"(?i)([\"']?(?:[a-z0-9_-]*api[_-]?key|"
-    r"[a-z0-9_-]*encryption[_-]?key)[\"']?\s*[:=]\s*[\"']?)"
+    r"[a-z0-9_-]*encryption[_-]?key|auth[_-]?bearer[_-]?token)"
+    r"[\"']?\s*[:=]\s*[\"']?)"
     r"[^\s,;\"'}\]]+"
 )
 _BEARER_PATTERN = re.compile(r"(?i)(\bBearer\s+)[^\s,;\"'}\]]+")
@@ -26,7 +27,7 @@ def redact_sensitive_text(value: str) -> str:
 
 
 class SensitiveDataFilter(logging.Filter):
-    """Redacts provider credentials from log messages and exception tracebacks."""
+    """Redacts provider and authentication credentials from application logs."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.msg = redact_sensitive_text(record.getMessage())
