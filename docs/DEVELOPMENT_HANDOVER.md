@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-17
-当前阶段：TEST-109 — Provider Base URL Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
-当前 Branch：test-109-provider-url-contract
+当前阶段：TEST-110 — Provider Capability / Analysis Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-110-provider-capability-contract
 
 ## 项目目标
 
@@ -44,6 +44,8 @@ TEST-107 VERIFIED — Provider Connection Test；服务器 targeted connection 3
 TEST-108 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
 
 TEST-109 当前状态 — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
+
+TEST-110 当前状态 — CONTRACT LOCKED / GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING。
 
 ## TEST-104 — VERIFIED
 
@@ -109,15 +111,29 @@ GitHub Actions run `35204873790`：targeted provider error contract tests passed
 
 GitHub Actions run `35205313729`：targeted provider URL contract tests 8 passed、full pytest 550 passed、1 warning；随后已删除临时 TEST-109 validation workflow。服务器尚未验收，因此 TEST-109 暂不标记 VERIFIED。
 
+## TEST-110 — Provider Capability / Analysis Contract — CONTRACT LOCKED / GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+
+目标：明确“Provider connection test 成功”只证明当前 API endpoint / credential / model 能完成轻量 chat-completions 请求，不等于该模型已经满足正式业务 Analysis capability；正式 Analysis 必须继续通过现有 JSON object 与 `StructuredAnalysis` schema validation。
+
+本阶段采用 contract-lock 而不是新增公共 capabilities API，避免在没有产品需求时引入第二套 capability registry 或静态宣称模型能力。
+
+新增测试覆盖：
+1. connection test 成功后，合法 StructuredAnalysis 仍按现有 Analysis pipeline 成功；
+2. connection test 返回普通文本 `OK` 不得被正式 Analysis 当成成功；
+3. JSON array 等非 object structured result 必须被拒绝；
+4. 保持现有 selected model / `response_format={"type":"json_object"}` provider 行为由既有 Qwen Provider 测试覆盖；
+5. 不修改生产 Provider 实现，不新增 endpoint，不修改数据库 schema / migration。
+
+首次 GitHub run `35205937727` 因测试对内部错误文案绑定过严失败；修正为只锁定 `LLMAnalysisError` 业务边界，没有修改生产代码。GitHub Actions run `35209692341`：TEST-110 targeted 3 passed、既有 Qwen Provider 5 passed、full pytest 553 passed、1 warning；随后删除临时 TEST-110 validation workflow。相对 TEST-109 基线的最终功能差异仅为 TEST-110 contract test；无 migration 变化。服务器尚未验收，因此 TEST-110 暂不标记 VERIFIED。
+
 ## 产品化后续审计方向
 
-TEST-109 服务器验收通过后，继续审计：
-1. provider/model capability；
-2. provider rate-limit / timeout / retry 契约；
-3. API Key、请求头及敏感错误信息的日志泄漏边界；
-4. 前端设置页与分析工作流；
-5. 正式认证替换当前 `X-User-ID` 信任边界；
-6. 发布与运行时安全。
+完成 TEST-108 ~ TEST-110 服务器验收后，继续审计：
+1. provider rate-limit / timeout / retry 契约；
+2. API Key、请求头及敏感错误信息的日志泄漏边界；
+3. 前端设置页与分析工作流；
+4. 正式认证替换当前 `X-User-ID` 信任边界；
+5. 发布与运行时安全。
 
 连接测试成功不等于模型业务分析成功，也不等于所有 provider capability 均可用；正式 Analysis 仍必须经过 StructuredAnalysis schema validation。
 
