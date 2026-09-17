@@ -1,7 +1,7 @@
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator
 
 
 ProviderName = Literal["openai_compatible"]
@@ -11,7 +11,7 @@ class LLMProviderConfigUpdate(BaseModel):
     provider: ProviderName = "openai_compatible"
     base_url: str = Field(min_length=1, max_length=500)
     model: str = Field(min_length=1, max_length=200)
-    api_key: str = Field(min_length=1, max_length=1000)
+    api_key: SecretStr = Field(min_length=1, max_length=1000)
     timeout_seconds: float = Field(default=60.0, gt=0, le=300)
 
     @field_validator("base_url")
