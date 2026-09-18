@@ -1,0 +1,26 @@
+name: TEST-135 server parity validation
+
+on:
+  push:
+    branches:
+      - test-135-authenticated-product-shell
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Bootstrap retirement from backend cwd
+        working-directory: backend
+        run: pytest -q tests/test_auth_bootstrap_retirement.py
+      - name: TEST-134 and TEST-135 targeted from backend cwd
+        working-directory: backend
+        run: pytest -q tests/test_release_runbook_contract.py tests/test_authenticated_product_shell.py
+      - name: Full test suite from backend cwd
+        working-directory: backend
+        run: pytest -q
