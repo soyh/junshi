@@ -1,7 +1,7 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-131 — HTTP Liveness / Runtime Readiness Boundary — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-131 — HTTP Liveness / Runtime Readiness Boundary — GITHUB SELF-TEST PASSED / SERVER RE-VALIDATION PENDING
 当前 Branch：test-131-http-runtime-health
 TEST-130 VERIFIED 服务器代码 HEAD：`876cfd727943931606d4d7213f6ad6432d7cb250`
 TEST-130 验收闭环文档基线：`58ba08d802a0ca213b5e9045c46648a98ca152dd`
@@ -21,7 +21,7 @@ TEST-127 VERIFIED — offline verified restore safety；服务器 full 663；HEA
 TEST-128 VERIFIED — managed backup manifest/checksum/retention；服务器 targeted 9 passed，累计 full 691。
 TEST-129 VERIFIED — read-only operations readiness；服务器 targeted 9 passed，累计 full 691。
 TEST-130 VERIFIED — release preflight；服务器 targeted 10 passed，累计 full 691；HEAD `876cfd727943931606d4d7213f6ad6432d7cb250`。
-TEST-131 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — HTTP liveness / runtime readiness；GitHub full 700。
+TEST-131 GITHUB SELF-TEST PASSED / SERVER RE-VALIDATION PENDING — HTTP liveness / runtime readiness；兼容性修复后 GitHub full 700。
 
 ## Runtime / Operations 产品化基线
 
@@ -58,34 +58,38 @@ TEST-130 服务器最终验收：
 1. 保留现有 `/health` body 与 TEST-123 cache contract，不改变兼容行为；
 2. 新增 `/health/live`：固定 200，完全不访问数据库；
 3. 新增 `/health/ready`：只读检查 SQLite 文件可访问性与 migration 精确一致性；ready=200，not-ready=503；
-4. SQLite probe 使用 `mode=ro` + `SELECT name FROM sqlite_schema LIMIT 1`，既不创建缺失 DB，也能拒绝非 SQLite/corrupt 文件；
+4. SQLite probe 使用 `mode=ro` + `SELECT name FROM sqlite_master LIMIT 1`；`sqlite_master` 兼容较旧 SQLite，同时会真实读取数据库 header/schema，因此既不创建缺失 DB，也能拒绝非 SQLite/corrupt 文件；
 5. `backend/app/core/readiness.py` 仅增加只读 public migration-state helper，TEST-129 原有 database integrity + managed backup freshness 行为不变；
 6. runtime readiness 不运行 migration、不执行 `PRAGMA integrity_check`、不扫描 backup manifest、不计算 backup SHA-256；
 7. `/health/ready` 只输出 database ok/error、migration expected/applied count 与归一化错误；不输出绝对路径、migration 版本列表、backup 信息或 secrets；
 8. 新 `/health/live` 与 `/health/ready` 使用 `Cache-Control: no-store`；旧 `/health` 按 TEST-123 保持非强制 no-store；
 9. 无 schema migration。
 
-CI 发现并修复了两个真实边界问题，没有修改旧 VERIFIED 测试：
-- 第一轮 run `35332656349`：`SELECT 1` 不读取 SQLite 文件页，损坏文件被误判可访问；改为读取 `sqlite_schema`；
-- 第二轮 run `35332731512`：targeted 全过，但 full 暴露 TEST-123 旧 `/health` cache contract 冲突；保留旧 `/health` 行为，只对新 probe no-store；
-- 最终 run `35333000258`：success。
+GitHub CI 发现并修复的边界问题，没有修改旧 VERIFIED 测试：
+- run `35332656349`：最初使用 `SELECT 1`，不会读取 SQLite 文件页，损坏文件被误判可访问；改为真实读取 schema；
+- run `35332731512`：targeted 全过，但 full 暴露 TEST-123 旧 `/health` cache contract 冲突；保留旧 `/health` 行为，只对新 probe no-store；
+- run `35333000258`：上述版本在 GitHub success，full 700；
+- 首次服务器验收发现服务器 SQLite 对 `sqlite_schema` 不兼容：TEST-131 3 failed / 6 passed，其他 TEST-123/124/129/130/auth/scope 全通过，full 697 passed / 3 failed；
+- 随后将 probe 从 `sqlite_schema` 改为长期兼容的 `sqlite_master`，语义不变；
+- 兼容性修复 GitHub run `35333640165`：success。
 
-最终 GitHub 结果：
+兼容性修复后的 GitHub 结果：
 - TEST-131 runtime health：9 passed；
+- TEST-123 HTTP security：6 passed；
 - TEST-130 preflight：10 passed；
 - TEST-129 readiness：9 passed；
 - TEST-124 production surface：4 passed；
 - production auth：8 passed；
 - scope isolation：4 passed；
-- full pytest：700 passed、1 warning in 34.93s；
+- full pytest：700 passed、1 warning in 29.47s；
 - warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation，与本阶段无关；
 - 临时 workflow 已删除。
 
-当前等待服务器验收 TEST-131。服务器验收只运行 pytest / git diff / git status，不启动或重启 uvicorn，不执行 backup/restore/readiness/preflight CLI，不修改 `.env`，不触碰 8899。
+当前等待服务器对 SQLite 兼容性修复做最小复验。复验只运行 TEST-131 + full + git diff/status，不启动或重启 uvicorn，不执行 backup/restore/readiness/preflight CLI，不修改 `.env`，不触碰 8899。
 
 ## 下一阶段候选
 
-TEST-131 服务器通过后重新审计决定 TEST-132。优先考虑部署后的 probe/runbook 契约或 process supervision 边界，但不提前假设 Nginx/systemd/域名方案。
+TEST-131 服务器复验通过后重新审计决定 TEST-132。优先考虑部署后的 probe/runbook 契约或 process supervision 边界，但不提前假设 Nginx/systemd/域名方案。
 
 ## 架构与持续禁止事项
 
