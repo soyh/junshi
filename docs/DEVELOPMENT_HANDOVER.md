@@ -1,8 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-137 — Conversation Content Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-137 — Conversation Content Workspace — VERIFIED
 当前 Branch：test-137-conversation-content-workspace
+TEST-137 VERIFIED 服务器代码 HEAD：`da5a3b355dbdb6345809cfe0e2c28cd880e9e849`
 TEST-136 VERIFIED 服务器代码 HEAD：`07d2cf6fe47f1f2ec7a0672dfb9a9120385d1066`
 TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f460f`
 TEST-133 VERIFIED 服务器代码 HEAD：`74a9c5a976be094d9dd2d51e764ab457965f83ec`
@@ -18,11 +19,11 @@ TEST-133 VERIFIED 服务器代码 HEAD：`74a9c5a976be094d9dd2d51e764ab457965f83
 
 ## 阶段状态
 
-- TEST-008 ~ TEST-136：按既有交接记录 VERIFIED。
+- TEST-008 ~ TEST-137：按既有交接记录 VERIFIED。
 - TEST-134 VERIFIED：platform-neutral release runbook / rollback safety contract。
 - TEST-135 VERIFIED：authenticated single-page product shell。
 - TEST-136 VERIFIED：authenticated Person / Relationship / Conversation Workspace。
-- TEST-137 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING：Conversation Content Workspace，Messages + Text Import 产品化接入。
+- TEST-137 VERIFIED：Conversation Content Workspace，Messages + Text Import 产品化接入。
 
 ## Runtime / Operations 产品化基线
 
@@ -83,7 +84,7 @@ GitHub Actions run `35364179911`：TEST-136 7、TEST-135 6、canonical core 9、
 
 服务器最终验收由用户于 2026-09-18 确认符合预期：branch `test-136-authenticated-core-workspace`，HEAD `07d2cf6fe47f1f2ec7a0672dfb9a9120385d1066`，targeted 29 passed，full 747 passed，`git diff --check` 与 `git status --short` 无输出。TEST-136 正式 VERIFIED。
 
-## TEST-137 — Conversation Content Workspace — GITHUB SELF-TEST PASSED
+## TEST-137 — Conversation Content Workspace — VERIFIED
 
 目标：把已创建 Conversation 从“容器”推进为“可录入真实互动证据的工作区”，只复用 existing Messages / Text Import API。
 
@@ -116,11 +117,21 @@ GitHub Actions run `35365645959`：success；从与服务器一致的 `backend/`
 - warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
 - 临时 workflow 已删除，清理提交 `ef3f55a98de5277365b72f106dd121eb6d41b876`。
 
-当前等待服务器最终验收 TEST-137。未声称 TEST-137 VERIFIED。
+服务器最终验收于 2026-09-18 完成：
+- branch：`test-137-conversation-content-workspace`；
+- HEAD：`da5a3b355dbdb6345809cfe0e2c28cd880e9e849`；
+- targeted：81 passed in 19.28s；
+- full pytest：754 passed in 135.09s；
+- `git diff --check` 无输出；
+- `git status --short` 无输出。
 
-## 下一阶段候选
+TEST-137 正式锁定 VERIFIED。
 
-TEST-137 服务器通过后，下一最小产品化增量应优先审计 Timeline / interaction evidence 的现有 API，决定 TEST-138 是否把 Conversation 之外的关系事件/时间线也接入统一 Workspace，再进入更上层 Strategy / Recommendation / Action Plan UI。不得绕过 canonical evidence pipeline。
+## 下一阶段
+
+TEST-138 — Relationship Evidence / Timeline Workspace。
+
+目标：复用现有 Interaction 与 Person Timeline canonical API，把 Conversation 之外的 `message / call / meeting / date / gift / other` 真实关系事件接入统一 `/app`，并让用户看到 Person 级统一时间线。前端不得复制 Relationship↔Person consistency；继续由现有 InteractionService 与 TimelineService 负责 scope/consistency/source-backed aggregation。完成后再进入更上层 Strategy / Recommendation / Action Plan 产品化。
 
 ## 架构与持续禁止事项
 
