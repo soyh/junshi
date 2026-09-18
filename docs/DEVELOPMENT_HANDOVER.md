@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-129 — Operations Readiness Check — GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED
-当前 Branch：test-129-operations-readiness
+当前阶段：TEST-130 — Release Preflight — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-130-release-preflight
 TEST-127 VERIFIED 服务器代码 HEAD：`023fb2391d47d692db8b3b1002c5fbb2637be7d3`
 
 ## 项目目标
@@ -17,8 +17,9 @@ TEST-127 VERIFIED 服务器代码 HEAD：`023fb2391d47d692db8b3b1002c5fbb2637be7
 TEST-008 ~ TEST-125：按既有交接记录 VERIFIED。
 TEST-126 VERIFIED — SQLite online backup + integrity verification；服务器 full 663。
 TEST-127 VERIFIED — offline verified restore safety；服务器 full 663；HEAD `023fb2391d47d692db8b3b1002c5fbb2637be7d3`。
-TEST-128 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — managed backup manifest/checksum/retention；full 672。
-TEST-129 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — read-only operations readiness；full 681。
+TEST-128 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — managed backup manifest/checksum/retention；GitHub full 672。
+TEST-129 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — read-only operations readiness；GitHub full 681。
+TEST-130 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — release preflight；GitHub full 691。
 
 ## Runtime / Operations 产品化基线
 
@@ -30,6 +31,7 @@ TEST-129 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — read-only oper
 - TEST-127：offline-confirmed restore + pre/post integrity verification + atomic replace + stale WAL/SHM cleanup。
 - TEST-128：managed backup manifest + SHA-256 + strict verification + safe retention。
 - TEST-129：read-only database/migration/backup readiness report + machine-readable exit status。
+- TEST-130：release preflight 汇总 production config、secure launcher、operations readiness；部署前 fail closed。
 
 ## TEST-126 / TEST-127 — VERIFIED
 
@@ -50,19 +52,46 @@ TEST-129 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — read-only oper
 
 1. 新增 `backend/app/core/readiness.py` 与 `backend/app/readiness.py`；
 2. 数据库只读执行 TEST-126 integrity verification；
-3. migration 版本从 `backend/migrations/*.sql` 获取，并与 DB `schema_migrations` 精确集合比较；缺失、未知、重复版本均 fail closed；
+3. migration 版本从 `backend/migrations/*.sql` 获取，并与 DB `schema_migrations` 精确比较；缺失、未知、重复版本均 fail closed；
 4. backup 只从通过 TEST-128 manifest/checksum/integrity 验证的 managed backups 中选择最近一个；
 5. 无有效 backup、backup stale、timestamp 在未来均 fail；
 6. 默认最大 backup age 24h，可显式配置；
-7. JSON 输出只含 basename、migration 版本/计数、backup age/status，不打印绝对路径、Authorization、API key 或 password；
+7. JSON 输出只含 basename、migration 版本/计数、backup age/status，不打印绝对路径或 secret；
 8. CLI `python -m app.readiness --json` 以 exit code 0/1 表示 ready/not-ready；
-9. GitHub run `35315030038`：TEST-129 9、TEST-128 9、TEST-127 8、TEST-126 8、production auth 8、scope 4、full 681 passed、1 warning in 36.07s；临时 workflow 已删除。
+9. GitHub run `35315030038`：TEST-129 9、TEST-128 9、TEST-127 8、TEST-126 8、production auth 8、scope 4、full 681 passed、1 warning in 36.07s。
 
-为加速推进，TEST-128/129 服务器验收与 TEST-130 合并。
+## TEST-130 — Release Preflight — GITHUB SELF-TEST PASSED
 
-## 下一阶段
+1. 新增 `backend/app/core/preflight.py` 与 `backend/app/preflight.py`；
+2. release preflight 要求 `APP_ENV=production`；
+3. 要求 `APP_DEBUG=false`，即使 TEST-124 有运行时兜底，也把错误部署配置直接判为 not-ready；
+4. 要求 `AUTH_BOOTSTRAP_ENABLED=false`；
+5. 要求 `LLM_CONFIG_ENCRYPTION_KEY` 已配置，但输出只暴露 boolean，不打印密钥；
+6. 明确拒绝 `PORT=8899`，把长期禁止端口写入发布门槛；
+7. 校验 log level；
+8. 复用 TEST-125 `_uvicorn_options()`，要求 production loopback、workers=1、reload=false、proxy_headers=false、forwarded_allow_ips=""、server_header=false；public bind fail closed；
+9. 复用 TEST-129 operations readiness，不复制数据库/migration/backup 判断；
+10. CLI `python -m app.preflight --json` 不启动服务，以 exit code 0/1 表示 release ready/not-ready；
+11. JSON 不输出 encryption key、auth token、DashScope key 或绝对测试路径；
+12. 无 schema migration，CI 只使用临时 SQLite 与临时备份。
 
-TEST-130 — Release Preflight：把 production environment、安全 launcher 和 TEST-129 readiness 聚合为一个部署前检查；要求 production、bootstrap 默认关闭、loopback launcher、DB/migration/backup ready；输出机器可读 JSON 且不泄露 secret。只在 CI 临时数据验证，不启动服务、不读生产数据库。
+GitHub Actions run `35315361027`：success；
+- TEST-130 release preflight：10 passed；
+- TEST-129 readiness：9 passed；
+- TEST-128 manifest/retention：9 passed；
+- TEST-127 restore：8 passed；
+- TEST-126 backup：8 passed；
+- launcher：7 passed；
+- production auth：8 passed；
+- scope isolation：4 passed；
+- full pytest：691 passed、1 warning in 214.09s；
+- 临时 validation workflow 已删除。
+
+当前等待服务器一次性验收 TEST-128 + TEST-129 + TEST-130。服务器验收阶段只运行 pytest / git diff / git status，不运行 backup、restore、readiness、preflight 或 server CLI，不修改 `.env`，不触碰 8899。
+
+## 下一阶段候选
+
+服务器通过后重新审计决定 TEST-131；优先考虑 deployment/release contract、liveness/readiness HTTP 分离或运维 runbook，不提前硬编码域名、Nginx/systemd 等尚未确认的部署假设。
 
 ## 架构与持续禁止事项
 
@@ -76,4 +105,4 @@ TEST-130 — Release Preflight：把 production environment、安全 launcher �
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~129 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~130 verification tag 已创建。
