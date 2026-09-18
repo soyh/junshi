@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-137 — Conversation Content Workspace — VERIFIED
-当前 Branch：test-137-conversation-content-workspace
+当前阶段：TEST-138 — Relationship Evidence / Timeline Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-138-relationship-evidence-timeline-workspace
 TEST-137 VERIFIED 服务器代码 HEAD：`da5a3b355dbdb6345809cfe0e2c28cd880e9e849`
 TEST-136 VERIFIED 服务器代码 HEAD：`07d2cf6fe47f1f2ec7a0672dfb9a9120385d1066`
 TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f460f`
@@ -24,6 +24,7 @@ TEST-133 VERIFIED 服务器代码 HEAD：`74a9c5a976be094d9dd2d51e764ab457965f83
 - TEST-135 VERIFIED：authenticated single-page product shell。
 - TEST-136 VERIFIED：authenticated Person / Relationship / Conversation Workspace。
 - TEST-137 VERIFIED：Conversation Content Workspace，Messages + Text Import 产品化接入。
+- TEST-138 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING：Relationship Evidence / Timeline Workspace。
 
 ## Runtime / Operations 产品化基线
 
@@ -52,86 +53,67 @@ GitHub Actions run `35355369005`：full 734 passed、1 warning。服务器最终
 
 ## TEST-135 — Authenticated Product Shell — VERIFIED
 
-统一 `/app` 产品入口已经完成：
-1. register/login/logout/session management；
-2. LLM Provider 管理；
-3. Structured Analysis；
-4. opaque session token 只存在当前页面 `currentAccessToken` 内存；
-5. 不使用 localStorage/sessionStorage/URL/DOM token input/X-User-ID；
-6. Provider API key 不回显；
-7. Structured Analysis 继续复用 `/api/v1/conversations/{id}/analysis/structured`；
-8. 原 Auth/Provider UI 保留；无 schema migration。
+统一 `/app` 产品入口已经完成：register/login/logout/session、LLM Provider、Structured Analysis；opaque session token 仅存在页面内存；无 localStorage/sessionStorage/X-User-ID/DOM token input；Provider key 不回显；无 migration。
 
-GitHub Actions run `35356010017`：full 740 passed。cwd-dependent `.env.example` 测试缺陷由 `416dc6c3f5d1769161fb688eb4a8c7f12920e16b` 修正；server-parity run `35362679263` full 740 passed。服务器最终复跑 HEAD `a2792c0207b1d43e6ad488c6deefec9e679f460f`：full 740 passed，仓库干净，TEST-135 VERIFIED。
+服务器最终复跑 HEAD `a2792c0207b1d43e6ad488c6deefec9e679f460f`：full 740 passed，仓库干净，TEST-135 VERIFIED。
 
 ## TEST-136 — Authenticated Core Workspace — VERIFIED
 
-目标：把真正核心业务 Workspace 接入统一 `/app`，覆盖 `Person → Relationship → Conversation`；只复用既有 canonical API 和 bearer session，不增加第二套业务逻辑，不提前实现 Recommendation / Action Plan / Execution / Outcome UI。
+统一 `/app` 已接入 Person → Relationship → Conversation；cross-consistency 继续由 backend canonical service 校验；选择 Conversation 同步 Structured Analysis；所有操作复用 bearer `api()`；无新业务路由、无 migration。
 
-实现：
-1. Person Workspace：加载、创建、选择 Person；
-2. Relationship Workspace：基于当前 Person，复用 `/api/v1/relationships`；
-3. Conversation Workspace：基于当前 Person、Relationship 可选，复用现有 conversations API；
-4. Conversation status 只暴露 `active / archived`；
-5. 选择 Conversation 后自动同步到 Structured Analysis；
-6. cross-consistency 继续由 backend canonical service 校验；
-7. 所有操作继续通过统一 `api()` 注入 bearer token；
-8. server data 不通过不安全 HTML 拼接渲染；
-9. logout 清空 workspace selection；
-10. 无新业务路由、无 schema migration、无后续 lifecycle UI 提前实现。
-
-GitHub Actions run `35364179911`：TEST-136 7、TEST-135 6、canonical core 9、bearer scope 7、full 747 passed。
-
-服务器最终验收由用户于 2026-09-18 确认符合预期：branch `test-136-authenticated-core-workspace`，HEAD `07d2cf6fe47f1f2ec7a0672dfb9a9120385d1066`，targeted 29 passed，full 747 passed，`git diff --check` 与 `git status --short` 无输出。TEST-136 正式 VERIFIED。
+GitHub Actions run `35364179911`：full 747 passed。服务器最终验收 HEAD `07d2cf6fe47f1f2ec7a0672dfb9a9120385d1066`：targeted 29、full 747，仓库干净。TEST-136 VERIFIED。
 
 ## TEST-137 — Conversation Content Workspace — VERIFIED
 
-目标：把已创建 Conversation 从“容器”推进为“可录入真实互动证据的工作区”，只复用 existing Messages / Text Import API。
-
-关键 contract 审计：
-- Messages：`POST /api/v1/messages` 向现有 Conversation 写单条消息；`GET /api/v1/conversations/{conversation_id}/messages` 读取并由后端按 `sent_at, created_at` 排序；sender_type 为 `user / person / system / assistant`。
-- Text Import：`POST /api/v1/text-imports` 的既有语义是“为 Person 创建新 Conversation 并批量写入消息”，不是向当前 Conversation 追加。TEST-137 明确保留这一语义，导入成功后 UI 自动选中新 Conversation。
+目标：把 Conversation 从容器推进为真实聊天证据工作区，只复用 Messages / Text Import canonical API。
 
 实现：
-1. 新增 `backend/app/ui/conversation_content_workspace.py`，以独立 fragment 提供 Conversation Content UI 与脚本；
-2. `backend/app/ui/routes.py` 在保持 TEST-135/136 `product_shell.py` 主体不复制的前提下，把 fragment 注入统一 `/app`，脚本仍运行在原单页 IIFE 内，因此直接复用同一个 in-memory bearer token、`api()`、selected Person/Conversation state；
-3. Messages UI 支持读取当前 Conversation 消息；
-4. 支持手工写入单条消息，sender_type 使用既有四种 canonical 值，sent_at 可选 ISO-8601；
-5. 所有消息渲染使用 DOM `textContent/createElement/replaceChildren`，不引入不安全 HTML 渲染；
-6. Text Import UI 明示 `timestamp | sender_type | content` 格式；导入按既有 contract 创建新 Conversation，成功后自动切换 conversation selection 并加载导入后的消息；
-7. 不把 import 伪装成 append，不修改 TextImportService / MessageService / repository 语义；
-8. logout/person/conversation 变更会清空或刷新内容工作区状态，避免展示旧 Conversation 数据；
-9. 无 schema migration、无新业务 API、无 Recommendation / Action Plan / Execution / Outcome 提前实现。
+1. Messages 读取与单条写入当前 Conversation；sender_type 沿用 `user / person / system / assistant`；
+2. Text Import 保持既有“创建新 Conversation + 批量写消息”语义，不伪装成 append；
+3. import 后自动选择新 Conversation；
+4. 安全 DOM 渲染；复用同一 in-memory bearer token；
+5. 无 migration、无新业务 API。
+
+GitHub Actions run `35365645959`：full 754 passed。服务器最终验收 HEAD `da5a3b355dbdb6345809cfe0e2c28cd880e9e849`：targeted 81、full 754，`git diff --check` 与 `git status --short` 无输出。TEST-137 VERIFIED。
+
+## TEST-138 — Relationship Evidence / Timeline Workspace — GITHUB SELF-TEST PASSED
+
+目标：把 Conversation 之外的真实关系事件与 Person 级统一 evidence timeline 接入 `/app`，只复用现有 Interaction / Timeline canonical API。
+
+关键 contract 审计：
+- Interaction create/list 已由 `InteractionService` 校验 user scope、Person ownership、Relationship↔Person consistency；合法 type 固定为 `message / call / meeting / date / gift / other`。
+- Person Timeline 是 read-only 聚合视图，现有 `TimelineService` 聚合 `conversation + message + interaction`，按 canonical occurred_at 顺序提供 pagination/source metadata；不创建第二套事件数据。
+
+实现：
+1. 新增 `backend/app/ui/relationship_evidence_workspace.py` fragment；
+2. `backend/app/ui/routes.py` 将 TEST-137 Conversation Content 与 TEST-138 Relationship Evidence fragment 共同注入统一 `/app`，继续运行在原单页 bearer/session IIFE 内；
+3. Interaction UI 支持为当前 Person 创建事件，当前 Relationship 可选；前端不复制 relationship-person consistency；
+4. 支持读取当前 Person 的 Interaction 列表；
+5. Person Timeline UI 读取 `/api/v1/persons/{person_id}/timeline?limit=50&offset=0`，只读展示 Conversation / Message / Interaction 聚合结果；
+6. Interaction 创建成功后刷新 Interaction + Timeline；
+7. 所有 server data 使用 `textContent/createElement/replaceChildren` 安全渲染；
+8. logout/person change 通过既有 resetWorkspace wrapper 清理 evidence 状态；
+9. 无 schema migration、无新业务 API、无 Strategy/Recommendation/Action Plan 提前实现。
 
 实现提交：
-- `d59d4966dda405a5f755905a5be91c307977d970` — Conversation Content Workspace fragment；
-- `8ca77b952bc1d9cf295a716e2c5cddec912b8098` — fragment 注入统一 product shell；
-- `b891bb7a5b3f348676e63099a4915cec1f7835d1` — TEST-137 UI contract + real bearer message/import isolation tests。
+- `4887875423ba3fef0c46ec4ab089302a95bbccb3` — Relationship Evidence / Timeline fragment；
+- `791d2f4d6bce5fe613de50a025fbb058437de75e` — 注入统一 product shell；
+- `8517b8891b7b41679b4505833a8b2d95e8e795ba` — TEST-138 UI contract + real bearer scope/timeline tests。
 
-GitHub Actions run `35365645959`：success；从与服务器一致的 `backend/` 工作目录执行：
-- TEST-137：7 passed、1 warning；
-- TEST-135 + TEST-136 product workspace regression：13 passed、1 warning；
-- Messages + Text Import canonical regression：54 passed、1 warning；
-- account bearer scope regression：7 passed、1 warning；
-- full pytest：754 passed、1 warning in 53.65s；
+GitHub Actions run `35367816536`：success；从 `backend/` 工作目录执行：
+- TEST-138：7 passed、1 warning in 9.48s；
+- TEST-135~137 Product Workspace regression：20 passed、1 warning；
+- Interaction + Timeline canonical regression：14 passed、1 warning；
+- account bearer scope：7 passed、1 warning；
+- full pytest：761 passed、1 warning in 159.18s；
 - warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
-- 临时 workflow 已删除，清理提交 `ef3f55a98de5277365b72f106dd121eb6d41b876`。
+- 临时 workflow 已删除，清理提交 `9feae612d568c6b81eaaa8eb59b8192c7fca7684`。
 
-服务器最终验收于 2026-09-18 完成：
-- branch：`test-137-conversation-content-workspace`；
-- HEAD：`da5a3b355dbdb6345809cfe0e2c28cd880e9e849`；
-- targeted：81 passed in 19.28s；
-- full pytest：754 passed in 135.09s；
-- `git diff --check` 无输出；
-- `git status --short` 无输出。
+当前等待服务器最终验收 TEST-138。未声称 TEST-138 VERIFIED。
 
-TEST-137 正式锁定 VERIFIED。
+## 下一阶段候选
 
-## 下一阶段
-
-TEST-138 — Relationship Evidence / Timeline Workspace。
-
-目标：复用现有 Interaction 与 Person Timeline canonical API，把 Conversation 之外的 `message / call / meeting / date / gift / other` 真实关系事件接入统一 `/app`，并让用户看到 Person 级统一时间线。前端不得复制 Relationship↔Person consistency；继续由现有 InteractionService 与 TimelineService 负责 scope/consistency/source-backed aggregation。完成后再进入更上层 Strategy / Recommendation / Action Plan 产品化。
+TEST-138 服务器通过后，优先审计现有 StructuredAnalysis → Strategy → Recommendation 的 API/service contract，确定 TEST-139 最小产品化增量。目标是从“证据输入完整化”进入“AI 决策输出产品化”，但 Recommendation 必须继续经过 StrategyRecommendationCandidate → RecommendationProducer，不允许 UI 绕过 canonical lifecycle。
 
 ## 架构与持续禁止事项
 
@@ -145,4 +127,4 @@ TEST-138 — Relationship Evidence / Timeline Workspace。
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~137 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~138 verification tag 已创建。
