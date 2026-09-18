@@ -1,0 +1,31 @@
+name: TEST-131 validation
+
+on:
+  push:
+    branches:
+      - test-131-http-runtime-health
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: TEST-131 runtime health
+        run: pytest -q backend/tests/test_runtime_health.py
+      - name: TEST-130 preflight regression
+        run: pytest -q backend/tests/test_release_preflight.py
+      - name: TEST-129 readiness regression
+        run: pytest -q backend/tests/test_operations_readiness.py
+      - name: TEST-124 production surface regression
+        run: pytest -q backend/tests/test_production_surface_hardening.py
+      - name: Production auth regression
+        run: pytest -q backend/tests/test_auth_boundary.py
+      - name: Scope isolation regression
+        run: pytest -q backend/tests/test_execution_scope_isolation.py backend/tests/test_action_plan_snapshot_isolation.py
+      - name: Full test suite
+        run: pytest -q
