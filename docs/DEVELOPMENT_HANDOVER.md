@@ -1,10 +1,10 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-133 — Supervisor-Neutral Runtime Contract — VERIFIED
-当前 Branch：test-133-supervisor-runtime-contract
+当前阶段：TEST-134 — Release Runbook Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-134-release-runbook-contract
 TEST-133 VERIFIED 服务器代码 HEAD：`74a9c5a976be094d9dd2d51e764ab457965f83ec`
-TEST-131 VERIFIED 服务器代码 HEAD：`d58d20c495bc20f14bbc5bbdb3657fb19bf0b657`
+TEST-133 验收闭环文档基线：`6066e6b108592df427f265291c7af968c681a3d2`
 
 ## 项目目标
 
@@ -15,15 +15,8 @@ TEST-131 VERIFIED 服务器代码 HEAD：`d58d20c495bc20f14bbc5bbdb3657fb19bf0b6
 
 ## 阶段状态
 
-TEST-008 ~ TEST-125：按既有交接记录 VERIFIED。
-TEST-126 VERIFIED — SQLite online backup + integrity verification；服务器 full 663。
-TEST-127 VERIFIED — offline verified restore safety；服务器 full 663。
-TEST-128 VERIFIED — managed backup manifest/checksum/retention；服务器累计 full 691。
-TEST-129 VERIFIED — read-only operations readiness；服务器累计 full 691。
-TEST-130 VERIFIED — release preflight；服务器累计 full 691；HEAD `876cfd727943931606d4d7213f6ad6432d7cb250`。
-TEST-131 VERIFIED — HTTP liveness / runtime readiness；服务器 TEST-131 9 passed、full 700 passed；HEAD `d58d20c495bc20f14bbc5bbdb3657fb19bf0b657`。
-TEST-132 VERIFIED — loopback-only local runtime probe CLI；服务器验收 all pass。
-TEST-133 VERIFIED — supervisor-neutral runtime lifecycle contract；服务器验收 all pass；HEAD `74a9c5a976be094d9dd2d51e764ab457965f83ec`。
+TEST-008 ~ TEST-133：按既有交接记录 VERIFIED。
+TEST-134 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — platform-neutral release runbook / rollback safety contract；GitHub full 734。
 
 ## Runtime / Operations 产品化基线
 
@@ -37,63 +30,57 @@ TEST-133 VERIFIED — supervisor-neutral runtime lifecycle contract；服务器�
 - TEST-129：read-only database/migration/backup readiness report + machine-readable exit status。
 - TEST-130：release preflight 汇总 production config、secure launcher、operations readiness；部署前 fail closed。
 - TEST-131：HTTP liveness 与 runtime readiness 分离；高频 probe 不执行 backup checksum/integrity。
-- TEST-132：本机 loopback-only runtime probe CLI，供任意 supervisor/编排器调用。
-- TEST-133：平台无关 supervisor lifecycle contract，统一启动前 gate、启动、probe、退出与失败重启语义。
+- TEST-132：本机 loopback-only runtime probe CLI。
+- TEST-133：平台无关 supervisor lifecycle contract。
+- TEST-134：平台无关 release runbook，明确 backup/preflight/stop/switch/start/probe/rollback 顺序和数据库回滚安全门槛。
 
-## TEST-131 — VERIFIED
-
-- `/health` 保持原兼容契约；
-- `/health/live` 固定 200，不访问数据库；
-- `/health/ready` 只读检查 SQLite 可访问性与 migration 精确一致性，ready=200 / not-ready=503；
-- SQLite 使用 `mode=ro` + `sqlite_master`，兼容服务器 SQLite 3.26.0；
-- 不运行 migration、不做 backup checksum/integrity；
-- GitHub 兼容性修复 run `35333640165` full 700；
-- 服务器最终复验：TEST-131 9 passed in 0.98s，full 700 passed in 118.87s，working tree clean，migration diff 空。
-
-## TEST-132 — Local Runtime Probe CLI — VERIFIED
-
-目标：提供不依赖 curl、systemd、Nginx、Docker 或具体云厂商的本机运行探针。
-
-实现：
-1. `backend/app/core/runtime_probe.py` + CLI `python -m app.probe live|ready [--json]`；
-2. 只允许 loopback host，非 loopback 在发请求前拒绝；
-3. 明确拒绝 port 8899；
-4. HTTP client `trust_env=False`、`follow_redirects=False`，默认超时 2 秒；
-5. live/ready 严格验证 TEST-131 响应契约；ready 503 归一化；
-6. 不回显响应正文、网络异常细节、host/port 或 secret；
-7. CLI 以 exit code 0/1 表示健康/失败；
-8. 无 schema migration，不启动/停止现有服务。
-
-GitHub Actions run `35335559052`：TEST-132 11、TEST-131 9、TEST-130 10、TEST-125 7、TEST-123 6、production auth 8、scope 4、full 711 passed、1 warning in 34.91s；临时 workflow 已删除。
-
-服务器最终验收：用户确认 all pass，结果符合预期；未报告任何 migration、工作树或回归异常。
-
-## TEST-133 — Supervisor-Neutral Runtime Contract — VERIFIED
-
-目标：在不选定 systemd/Nginx/Docker/云厂商的情况下，给任意进程管理器提供同一套安全生命周期契约。
-
-实现：
-1. 新增 `backend/app/core/supervision.py`；
-2. 新增 CLI `python -m app.supervision --json`；
-3. contract schema version=1；
-4. startup gate 固定为 `python -m app.preflight --json`，必须 exit 0；
-5. process 固定为 `python -m app.server`；
-6. 复用 TEST-125 `_uvicorn_options()`，要求 production、loopback、workers=1、reload=false、proxy_headers=false、forwarded_allow_ips=""、server_header=false；
-7. 明确拒绝 port 8899；
-8. liveness/readiness 直接复用 TEST-132 `python -m app.probe live|ready --json`；
-9. shutdown contract：SIGTERM，建议 30 秒 graceful window，之后才 SIGKILL escalation；
-10. restart contract：on-failure，建议 5 秒 delay，clean exit 不自动重启；
-11. 所有命令均为 argument vector，不通过 shell；
-12. 输出不包含 auth token、DashScope key、LLM encryption key 或 database path；
-13. 无 schema migration，不启动/停止任何进程。
-
-GitHub Actions run `35335884679`：TEST-133 11、TEST-132 11、TEST-131 9、TEST-130 10、TEST-125 7、production auth 8、scope 4、full 722 passed、1 warning in 32.82s；临时 workflow 已删除。
+## TEST-132 / TEST-133 — VERIFIED
 
 服务器最终验收：用户确认 all pass，结果符合预期；TEST-132/133 正式锁定 VERIFIED。
 
-## 下一阶段
+TEST-132：`python -m app.probe live|ready --json`；loopback-only、拒绝 8899、`trust_env=False`、不跟随 redirect、短超时、错误去敏。
 
-TEST-134 — 重新审计并建立 deployment runbook / release checklist automation；不提前假设 systemd、Nginx、域名或 TLS termination 方案。优先目标：把 TEST-126~133 的既有安全能力组合成可验证的部署步骤与回滚前置条件，而不是新增另一套运行逻辑。
+TEST-133：`python -m app.supervision --json`；startup gate=`app.preflight`，process=`app.server`，live/ready probe，SIGTERM 30s graceful window，on-failure restart，不绑定具体 systemd/Nginx/Docker/云厂商。
+
+## TEST-134 — Release Runbook Contract — GITHUB SELF-TEST PASSED
+
+目标：把 TEST-126~133 的既有能力组合成可验证的发布/回滚顺序，而不是新增第二套运行逻辑。
+
+实现：
+1. 新增 `backend/app/core/deployment.py`；
+2. 新增只读 contract CLI `python -m app.deployment --json`；CLI 只输出计划，不执行 backup/stop/start/restore；
+3. 固定发布顺序：`online_backup → release_preflight → stop_current_process → switch_release → start_candidate_process → verify_liveness → verify_readiness`；
+4. online backup 固定复用 `python -m app.backup`，必须在 release switch 前成功；
+5. release preflight 固定复用 `python -m app.preflight --json`，必须在停止当前进程前成功；
+6. release switch 明确为 external platform action，不自动操作 Git/systemd/Nginx/Docker；必须保留运行配置、数据库和 backups；
+7. stop/start/probe 直接复用 TEST-133/132 契约：SIGTERM→grace→SIGKILL、`python -m app.server`、live→ready；
+8. 普通 code rollback 与 database rollback 严格分离；发布失败不会自动 restore 数据库；
+9. 只有明确判断 schema/data 必须回滚时，才允许人工使用 `python -m app.restore --backup <verified-backup-path> --offline-confirmed`；要求应用完全离线、backup 已验证；
+10. 所有命令保持 argument vector，不通过 shell；不嵌入 auth token、DashScope key、LLM encryption key 或 database path；
+11. production-only、loopback-only、拒绝 port 8899；
+12. 无 schema migration，不启动/停止任何真实进程。
+
+第一轮 CI `35355252345`：11 passed / 1 failed。失败是新测试把安全标志 `reserved_port_8899_forbidden=true` 误判成“使用了 8899”；生产实现无错误。测试修正为只禁止实际 `"port": 8899`，同时要求安全标志存在。
+
+第二轮 GitHub Actions run `35355369005`：success；
+- TEST-134：12 passed；
+- TEST-133：11 passed；
+- TEST-132：11 passed；
+- TEST-131：9 passed；
+- TEST-130：10 passed；
+- TEST-127 restore：8 passed；
+- TEST-126 backup：8 passed；
+- production auth：8 passed；
+- scope isolation：4 passed；
+- full pytest：734 passed、1 warning in 30.29s；
+- warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
+- 临时 workflow 已删除。
+
+当前等待服务器验收 TEST-134。服务器验收只需 pytest / git diff / git status，不执行 `app.deployment`、backup/restore/preflight/server/probe，不修改 `.env`，不触碰 8899。
+
+## 下一阶段候选
+
+TEST-134 服务器通过后重新审计 TEST-135。当前优先从“运维契约细分”切回“普通用户可用产品壳”：审计已有 Auth UI、Provider Settings UI 与业务 API，优先建立统一安全导航/应用入口，而不是继续拆更细的 deployment contract。
 
 ## 架构与持续禁止事项
 
@@ -107,4 +94,4 @@ TEST-134 — 重新审计并建立 deployment runbook / release checklist automa
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~133 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~134 verification tag 已创建。
