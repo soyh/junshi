@@ -10,6 +10,10 @@ from app.ui.relationship_evidence_workspace import (
     RELATIONSHIP_EVIDENCE_HTML,
     RELATIONSHIP_EVIDENCE_SCRIPT,
 )
+from app.ui.strategy_recommendation_workspace import (
+    STRATEGY_RECOMMENDATION_HTML,
+    STRATEGY_RECOMMENDATION_SCRIPT,
+)
 
 
 router = APIRouter(tags=["ui"])
@@ -27,6 +31,7 @@ def build_product_shell_html() -> str:
     workspace_html = (
         f"{CONVERSATION_CONTENT_HTML}\n"
         f"{RELATIONSHIP_EVIDENCE_HTML}\n"
+        f"{STRATEGY_RECOMMENDATION_HTML}\n"
         f"{provider_marker}"
     )
     html = PRODUCT_SHELL_HTML.replace(
@@ -37,6 +42,7 @@ def build_product_shell_html() -> str:
     workspace_script = (
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
+        f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
