@@ -32,7 +32,11 @@ def _database_available(database_path: Path) -> bool:
 
     try:
         with sqlite3.connect(_readonly_uri(database_path), uri=True, timeout=2.0) as conn:
-            conn.execute("SELECT name FROM sqlite_schema LIMIT 1").fetchone()
+            # sqlite_master is the long-standing schema table name and is
+            # compatible with older SQLite builds used on some production
+            # distributions. Reading it forces SQLite to parse the database
+            # header/schema, unlike SELECT 1, so corrupt files still fail.
+            conn.execute("SELECT name FROM sqlite_master LIMIT 1").fetchone()
     except sqlite3.DatabaseError:
         return False
     return True
