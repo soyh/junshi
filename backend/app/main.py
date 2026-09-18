@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.config.settings import Settings, get_settings
@@ -9,6 +10,7 @@ from app.core.bootstrap import ensure_local_user
 from app.core.database import initialize_database
 from app.core.logging import setup_logging
 from app.core.migrations import run_migrations
+from app.core.runtime_health import check_runtime_readiness
 
 setup_logging()
 
@@ -57,7 +59,11 @@ async def apply_http_security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "no-referrer"
 
     path = request.url.path
-    if path.startswith("/api/v1/auth") or path.startswith("/api/v1/settings"):
+    if (
+        path.startswith("/api/v1/auth")
+        or path.startswith("/api/v1/settings")
+        or path.startswith("/health")
+    ):
         response.headers["Cache-Control"] = "no-store"
 
     return response
@@ -70,6 +76,29 @@ def health():
         "service": settings.app_name,
         "version": "0.1.0",
     }
+
+
+@app.get("/health/live")
+def health_live():
+    return {
+        "status": "ok",
+        "check": "liveness",
+    }
+
+
+@app.get("/health/ready")
+def health_ready():
+    current_settings = get_settings()
+    report = check_runtime_readiness(current_settings.database_path)
+    payload = {
+        "status": "ready" if report.ready else "not_ready",
+        "database": report.database,
+        "migrations": report.migrations,
+    }
+    return JSONResponse(
+        status_code=200 if report.ready else 503,
+        content=payload,
+    )
 
 
 app.include_router(api_router)
