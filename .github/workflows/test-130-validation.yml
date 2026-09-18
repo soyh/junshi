@@ -1,0 +1,35 @@
+name: TEST-130 validation
+
+on:
+  push:
+    branches:
+      - test-130-release-preflight
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: TEST-130 release preflight
+        run: pytest -q backend/tests/test_release_preflight.py
+      - name: TEST-129 readiness regression
+        run: pytest -q backend/tests/test_operations_readiness.py
+      - name: TEST-128 manifest retention regression
+        run: pytest -q backend/tests/test_backup_manifest_retention.py
+      - name: TEST-127 restore regression
+        run: pytest -q backend/tests/test_sqlite_offline_restore.py
+      - name: TEST-126 backup regression
+        run: pytest -q backend/tests/test_sqlite_online_backup.py
+      - name: Launcher regression
+        run: pytest -q backend/tests/test_secure_uvicorn_launcher.py
+      - name: Production auth regression
+        run: pytest -q backend/tests/test_auth_boundary.py
+      - name: Scope isolation regression
+        run: pytest -q backend/tests/test_execution_scope_isolation.py backend/tests/test_action_plan_snapshot_isolation.py
+      - name: Full test suite
+        run: pytest -q
