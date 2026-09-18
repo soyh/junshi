@@ -1,8 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-19
-当前阶段：TEST-140 — Action Plan Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-140 — Action Plan Workspace — VERIFIED
 当前 Branch：test-140-action-plan-workspace
+TEST-140 VERIFIED 服务器代码 HEAD：`323eea1dab49c8e3cc96d95a936875781072a187`
 TEST-139 VERIFIED 服务器代码 HEAD：`6a9eb85104d5fd7dc35bd09bb89d35f2efba52c6`
 TEST-138 VERIFIED 服务器代码 HEAD：`483d1f01d24de5c3ec53e96c62b26c46fac44713`
 TEST-137 VERIFIED 服务器代码 HEAD：`da5a3b355dbdb6345809cfe0e2c28cd880e9e849`
@@ -20,14 +21,14 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 
 ## 阶段状态
 
-- TEST-008 ~ TEST-139：按既有交接记录 VERIFIED。
+- TEST-008 ~ TEST-140：按既有交接记录 VERIFIED。
 - TEST-134 VERIFIED：platform-neutral release runbook / rollback safety contract。
 - TEST-135 VERIFIED：authenticated single-page product shell。
 - TEST-136 VERIFIED：authenticated Person / Relationship / Conversation Workspace。
 - TEST-137 VERIFIED：Conversation Content Workspace，Messages + Text Import 产品化接入。
 - TEST-138 VERIFIED：Relationship Evidence / Timeline Workspace。
 - TEST-139 VERIFIED：Strategy & Recommendation Workspace。
-- TEST-140：GitHub self-test passed；服务器最终验收待执行。
+- TEST-140 VERIFIED：Action Plan Workspace。
 
 ## Runtime / Operations 产品化基线
 
@@ -60,7 +61,7 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 
 GitHub Actions run `35369269897`：full 768 passed。服务器最终验收 branch `test-139-strategy-recommendation-workspace`、HEAD `6a9eb85104d5fd7dc35bd09bb89d35f2efba52c6`：targeted 72 passed、full 768 passed，`git diff --check` 与 `git status --short` 无输出。TEST-139 VERIFIED。
 
-## TEST-140 — Action Plan Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+## TEST-140 — Action Plan Workspace — VERIFIED
 
 ### Contract 审计
 
@@ -113,13 +114,21 @@ Action Plan item 继续保持：`status=proposed`、`requires_user_confirmation=
 - warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
 - 临时 workflow 已删除，清理提交 `de8e868a6ee517e688d97882ea7de7ca2b6056bf`。
 
-服务器最终验收尚未执行，因此 TEST-140 尚未标记 VERIFIED。
+服务器最终验收于 2026-09-19 完成：
+- branch：`test-140-action-plan-workspace`；
+- HEAD：`323eea1dab49c8e3cc96d95a936875781072a187`；
+- targeted：99 passed in 17.04s；
+- full pytest：776 passed in 134.61s；
+- `git diff --check` 无输出；
+- `git status --short` 无输出。
 
-## 下一阶段候选
+TEST-140 正式锁定 VERIFIED。
+
+## 下一阶段
 
 TEST-141 — Action Decision Workspace。
 
-仅在 TEST-140 服务器 VERIFIED 后进入。预期只复用现有 Person-level Action Decision context/create API，让用户对当前 `proposed` 且 evidence-backed Action Plan 做明确 `confirmed / rejected` 决定；不得因为 Confirm 自动执行，Execution 继续保持后续独立阶段。
+目标：只复用现有 Person-level Action Decision context/create API，让用户对当前 `proposed` 且 evidence-backed Action Plan 做明确 `confirmed / rejected` 决定。Confirm 只创建 canonical Action Decision，不得自动触发 Execution；Execution 继续保持后续独立阶段。
 
 ## 架构与持续禁止事项
 
