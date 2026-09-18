@@ -5,6 +5,10 @@ from app.ui.action_decision_workspace import (
     ACTION_DECISION_HTML,
     ACTION_DECISION_SCRIPT,
 )
+from app.ui.action_execution_workspace import (
+    ACTION_EXECUTION_HTML,
+    ACTION_EXECUTION_SCRIPT,
+)
 from app.ui.action_plan_workspace import ACTION_PLAN_HTML, ACTION_PLAN_SCRIPT
 from app.ui.conversation_content_workspace import (
     CONVERSATION_CONTENT_HTML,
@@ -39,6 +43,7 @@ def build_product_shell_html() -> str:
         f"{STRATEGY_RECOMMENDATION_HTML}\n"
         f"{ACTION_PLAN_HTML}\n"
         f"{ACTION_DECISION_HTML}\n"
+        f"{ACTION_EXECUTION_HTML}\n"
         f"{provider_marker}"
     )
     html = PRODUCT_SHELL_HTML.replace(
@@ -49,6 +54,7 @@ def build_product_shell_html() -> str:
     workspace_script = (
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
+        f"{ACTION_EXECUTION_SCRIPT}\n\n"
         f"{ACTION_DECISION_SCRIPT}\n\n"
         f"{ACTION_PLAN_SCRIPT}\n\n"
         f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
