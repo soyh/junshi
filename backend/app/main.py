@@ -62,7 +62,7 @@ async def apply_http_security_headers(request: Request, call_next):
     if (
         path.startswith("/api/v1/auth")
         or path.startswith("/api/v1/settings")
-        or path.startswith("/health")
+        or path in {"/health/live", "/health/ready"}
     ):
         response.headers["Cache-Control"] = "no-store"
 
