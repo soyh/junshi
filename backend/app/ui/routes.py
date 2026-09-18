@@ -6,6 +6,10 @@ from app.ui.conversation_content_workspace import (
     CONVERSATION_CONTENT_SCRIPT,
 )
 from app.ui.product_shell import PRODUCT_SHELL_HTML
+from app.ui.relationship_evidence_workspace import (
+    RELATIONSHIP_EVIDENCE_HTML,
+    RELATIONSHIP_EVIDENCE_SCRIPT,
+)
 
 
 router = APIRouter(tags=["ui"])
@@ -20,14 +24,24 @@ def build_product_shell_html() -> str:
     if script_marker not in PRODUCT_SHELL_HTML:
         raise RuntimeError("Product shell script insertion marker not found")
 
+    workspace_html = (
+        f"{CONVERSATION_CONTENT_HTML}\n"
+        f"{RELATIONSHIP_EVIDENCE_HTML}\n"
+        f"{provider_marker}"
+    )
     html = PRODUCT_SHELL_HTML.replace(
         provider_marker,
-        f"{CONVERSATION_CONTENT_HTML}\n{provider_marker}",
+        workspace_html,
         1,
+    )
+    workspace_script = (
+        f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
+        f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
+        f"{script_marker}"
     )
     return html.replace(
         script_marker,
-        f"{CONVERSATION_CONTENT_SCRIPT}\n\n{script_marker}",
+        workspace_script,
         1,
     )
 
