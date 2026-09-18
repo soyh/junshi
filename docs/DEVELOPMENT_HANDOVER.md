@@ -1,8 +1,9 @@
 # Development Handover
 
-更新时间：2026-09-18
-当前阶段：TEST-138 — Relationship Evidence / Timeline Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+更新时间：2026-09-19
+当前阶段：TEST-138 — Relationship Evidence / Timeline Workspace — VERIFIED
 当前 Branch：test-138-relationship-evidence-timeline-workspace
+TEST-138 VERIFIED 服务器代码 HEAD：`483d1f01d24de5c3ec53e96c62b26c46fac44713`
 TEST-137 VERIFIED 服务器代码 HEAD：`da5a3b355dbdb6345809cfe0e2c28cd880e9e849`
 TEST-136 VERIFIED 服务器代码 HEAD：`07d2cf6fe47f1f2ec7a0672dfb9a9120385d1066`
 TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f460f`
@@ -19,12 +20,12 @@ TEST-133 VERIFIED 服务器代码 HEAD：`74a9c5a976be094d9dd2d51e764ab457965f83
 
 ## 阶段状态
 
-- TEST-008 ~ TEST-137：按既有交接记录 VERIFIED。
+- TEST-008 ~ TEST-138：按既有交接记录 VERIFIED。
 - TEST-134 VERIFIED：platform-neutral release runbook / rollback safety contract。
 - TEST-135 VERIFIED：authenticated single-page product shell。
 - TEST-136 VERIFIED：authenticated Person / Relationship / Conversation Workspace。
 - TEST-137 VERIFIED：Conversation Content Workspace，Messages + Text Import 产品化接入。
-- TEST-138 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING：Relationship Evidence / Timeline Workspace。
+- TEST-138 VERIFIED：Relationship Evidence / Timeline Workspace。
 
 ## Runtime / Operations 产品化基线
 
@@ -76,7 +77,7 @@ GitHub Actions run `35364179911`：full 747 passed。服务器最终验收 HEAD 
 
 GitHub Actions run `35365645959`：full 754 passed。服务器最终验收 HEAD `da5a3b355dbdb6345809cfe0e2c28cd880e9e849`：targeted 81、full 754，`git diff --check` 与 `git status --short` 无输出。TEST-137 VERIFIED。
 
-## TEST-138 — Relationship Evidence / Timeline Workspace — GITHUB SELF-TEST PASSED
+## TEST-138 — Relationship Evidence / Timeline Workspace — VERIFIED
 
 目标：把 Conversation 之外的真实关系事件与 Person 级统一 evidence timeline 接入 `/app`，只复用现有 Interaction / Timeline canonical API。
 
@@ -109,11 +110,21 @@ GitHub Actions run `35367816536`：success；从 `backend/` 工作目录执行�
 - warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
 - 临时 workflow 已删除，清理提交 `9feae612d568c6b81eaaa8eb59b8192c7fca7684`。
 
-当前等待服务器最终验收 TEST-138。未声称 TEST-138 VERIFIED。
+服务器最终验收于 2026-09-19 完成：
+- branch：`test-138-relationship-evidence-timeline-workspace`；
+- HEAD：`483d1f01d24de5c3ec53e96c62b26c46fac44713`；
+- targeted：48 passed in 11.76s；
+- full pytest：761 passed in 130.51s；
+- `git diff --check` 无输出；
+- `git status --short` 无输出。
 
-## 下一阶段候选
+TEST-138 正式锁定 VERIFIED。
 
-TEST-138 服务器通过后，优先审计现有 StructuredAnalysis → Strategy → Recommendation 的 API/service contract，确定 TEST-139 最小产品化增量。目标是从“证据输入完整化”进入“AI 决策输出产品化”，但 Recommendation 必须继续经过 StrategyRecommendationCandidate → RecommendationProducer，不允许 UI 绕过 canonical lifecycle。
+## 下一阶段
+
+TEST-139 — Strategy & Recommendation Workspace。
+
+目标：从“证据输入完整化”进入“AI 决策输出产品化”。复用现有 `/api/v1/conversations/{conversation_id}/strategy/context` 与 `/api/v1/conversations/{conversation_id}/recommendation/context`，把当前 Conversation 的 StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation 结果接入统一 `/app`。UI 只展示 read-only context，不自行生成、排序、选择或执行 recommendation；不得绕过 canonical lifecycle，不提前实现 Action Plan / Decision / Execution / Outcome。
 
 ## 架构与持续禁止事项
 
