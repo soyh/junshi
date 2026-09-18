@@ -7,6 +7,7 @@ PROTECTED_URL = "/api/v1/settings/llm"
 REGISTER_URL = "/api/v1/auth/register"
 LOGIN_URL = "/api/v1/auth/login"
 PASSWORD = "correct-horse-battery-staple"
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -36,7 +37,7 @@ def test_bootstrap_setting_defaults_disabled():
 
 
 def test_env_example_disables_bootstrap_by_default():
-    env_example = Path(".env.example").read_text(encoding="utf-8")
+    env_example = (REPOSITORY_ROOT / ".env.example").read_text(encoding="utf-8")
     assert "AUTH_BOOTSTRAP_ENABLED=false" in env_example
     assert "AUTH_BOOTSTRAP_ENABLED=true" not in env_example
 
