@@ -1,0 +1,31 @@
+name: TEST-126 validation
+
+on:
+  push:
+    branches:
+      - test-126-sqlite-online-backup
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: TEST-126 SQLite online backup
+        run: pytest -q backend/tests/test_sqlite_online_backup.py
+      - name: TEST-125 launcher regression
+        run: pytest -q backend/tests/test_secure_uvicorn_launcher.py
+      - name: TEST-124 production surface regression
+        run: pytest -q backend/tests/test_production_surface_hardening.py
+      - name: TEST-123 HTTP security regression
+        run: pytest -q backend/tests/test_http_security_boundary.py
+      - name: Production auth regression
+        run: pytest -q backend/tests/test_auth_boundary.py
+      - name: Scope isolation regression
+        run: pytest -q backend/tests/test_execution_scope_isolation.py backend/tests/test_action_plan_snapshot_isolation.py
+      - name: Full test suite
+        run: pytest -q
