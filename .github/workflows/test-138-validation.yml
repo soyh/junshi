@@ -1,0 +1,32 @@
+name: TEST-138 validation
+
+on:
+  push:
+    branches:
+      - test-138-relationship-evidence-timeline-workspace
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: TEST-138 relationship evidence workspace
+        working-directory: backend
+        run: pytest -q tests/test_authenticated_relationship_evidence_workspace.py
+      - name: Product workspace regression
+        working-directory: backend
+        run: pytest -q tests/test_authenticated_product_shell.py tests/test_authenticated_core_workspace.py tests/test_authenticated_conversation_content_workspace.py
+      - name: Canonical interaction and timeline regression
+        working-directory: backend
+        run: pytest -q tests/test_interactions.py tests/test_timeline.py
+      - name: Account bearer scope regression
+        working-directory: backend
+        run: pytest -q tests/test_auth_account_login.py
+      - name: Full test suite from server-equivalent cwd
+        working-directory: backend
+        run: pytest -q
