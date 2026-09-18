@@ -44,8 +44,8 @@ def build_product_shell_html() -> str:
     workspace_script = (
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
-        f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
         f"{ACTION_PLAN_SCRIPT}\n\n"
+        f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
