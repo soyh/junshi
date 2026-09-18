@@ -1,8 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-133 — Supervisor-Neutral Runtime Contract — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-133 — Supervisor-Neutral Runtime Contract — VERIFIED
 当前 Branch：test-133-supervisor-runtime-contract
+TEST-133 VERIFIED 服务器代码 HEAD：`74a9c5a976be094d9dd2d51e764ab457965f83ec`
 TEST-131 VERIFIED 服务器代码 HEAD：`d58d20c495bc20f14bbc5bbdb3657fb19bf0b657`
 
 ## 项目目标
@@ -21,8 +22,8 @@ TEST-128 VERIFIED — managed backup manifest/checksum/retention；服务器累�
 TEST-129 VERIFIED — read-only operations readiness；服务器累计 full 691。
 TEST-130 VERIFIED — release preflight；服务器累计 full 691；HEAD `876cfd727943931606d4d7213f6ad6432d7cb250`。
 TEST-131 VERIFIED — HTTP liveness / runtime readiness；服务器 TEST-131 9 passed、full 700 passed；HEAD `d58d20c495bc20f14bbc5bbdb3657fb19bf0b657`。
-TEST-132 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — loopback-only local runtime probe CLI；GitHub full 711。
-TEST-133 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — supervisor-neutral runtime lifecycle contract；GitHub full 722。
+TEST-132 VERIFIED — loopback-only local runtime probe CLI；服务器验收 all pass。
+TEST-133 VERIFIED — supervisor-neutral runtime lifecycle contract；服务器验收 all pass；HEAD `74a9c5a976be094d9dd2d51e764ab457965f83ec`。
 
 ## Runtime / Operations 产品化基线
 
@@ -49,7 +50,7 @@ TEST-133 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — supervisor-neut
 - GitHub 兼容性修复 run `35333640165` full 700；
 - 服务器最终复验：TEST-131 9 passed in 0.98s，full 700 passed in 118.87s，working tree clean，migration diff 空。
 
-## TEST-132 — Local Runtime Probe CLI — GITHUB SELF-TEST PASSED
+## TEST-132 — Local Runtime Probe CLI — VERIFIED
 
 目标：提供不依赖 curl、systemd、Nginx、Docker 或具体云厂商的本机运行探针。
 
@@ -65,7 +66,9 @@ TEST-133 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — supervisor-neut
 
 GitHub Actions run `35335559052`：TEST-132 11、TEST-131 9、TEST-130 10、TEST-125 7、TEST-123 6、production auth 8、scope 4、full 711 passed、1 warning in 34.91s；临时 workflow 已删除。
 
-## TEST-133 — Supervisor-Neutral Runtime Contract — GITHUB SELF-TEST PASSED
+服务器最终验收：用户确认 all pass，结果符合预期；未报告任何 migration、工作树或回归异常。
+
+## TEST-133 — Supervisor-Neutral Runtime Contract — VERIFIED
 
 目标：在不选定 systemd/Nginx/Docker/云厂商的情况下，给任意进程管理器提供同一套安全生命周期契约。
 
@@ -84,31 +87,13 @@ GitHub Actions run `35335559052`：TEST-132 11、TEST-131 9、TEST-130 10、TEST
 12. 输出不包含 auth token、DashScope key、LLM encryption key 或 database path；
 13. 无 schema migration，不启动/停止任何进程。
 
-GitHub Actions run `35335884679`：success；
-- TEST-133：11 passed；
-- TEST-132：11 passed；
-- TEST-131：9 passed；
-- TEST-130：10 passed；
-- TEST-125：7 passed；
-- production auth：8 passed；
-- scope isolation：4 passed；
-- full pytest：722 passed、1 warning in 32.82s；
-- warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
-- 临时 workflow 已删除。
+GitHub Actions run `35335884679`：TEST-133 11、TEST-132 11、TEST-131 9、TEST-130 10、TEST-125 7、production auth 8、scope 4、full 722 passed、1 warning in 32.82s；临时 workflow 已删除。
 
-## 当前服务器验收节点
+服务器最终验收：用户确认 all pass，结果符合预期；TEST-132/133 正式锁定 VERIFIED。
 
-一次性验收 TEST-132 + TEST-133：
-- 只运行 pytest / git diff / git status；
-- 不执行 `python -m app.probe` 对真实服务发请求；
-- 不执行 `python -m app.supervision`；
-- 不运行 preflight/server，不启动/停止/restart uvicorn；
-- 不修改 `.env`，不触碰 8899；
-- 无 migration 预期。
+## 下一阶段
 
-## 下一阶段候选
-
-TEST-134 在 TEST-132/133 服务器通过后重新审计。优先候选：正式 deployment runbook artifact / release checklist automation，但不提前假设 systemd、Nginx、域名或 TLS termination 方案。
+TEST-134 — 重新审计并建立 deployment runbook / release checklist automation；不提前假设 systemd、Nginx、域名或 TLS termination 方案。优先目标：把 TEST-126~133 的既有安全能力组合成可验证的部署步骤与回滚前置条件，而不是新增另一套运行逻辑。
 
 ## 架构与持续禁止事项
 
