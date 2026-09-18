@@ -1,8 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-09-19
-当前阶段：TEST-143 — Outcome Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-143 — Outcome Workspace — VERIFIED
 当前 Branch：`test-143-outcome-workspace`
+TEST-143 VERIFIED 服务器代码/文档 HEAD：`02cc3c4805f199e9ce9c521f82b0c93672a95ef2`
 TEST-142 VERIFIED 服务器代码 HEAD：`06b2fd49aedc6a5d31bfd9d56025db755cd6b10b`
 TEST-142 最终文档整理 HEAD：`dd5f2b34561fe6a865e1b871a3ee23a1081027c5`
 TEST-142 post-verification 基线：`1532c569f4607e2256e5a72e104b4c1827cf0849`
@@ -27,7 +28,7 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 
 ## 阶段状态
 
-- TEST-008 ~ TEST-142：按既有交接记录 VERIFIED。
+- TEST-008 ~ TEST-143：按既有交接记录 VERIFIED。
 - TEST-134 VERIFIED：platform-neutral release runbook / rollback safety contract。
 - TEST-135 VERIFIED：authenticated single-page product shell。
 - TEST-136 VERIFIED：authenticated Person / Relationship / Conversation Workspace。
@@ -37,7 +38,7 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 - TEST-140 VERIFIED：Action Plan Workspace。
 - TEST-141 VERIFIED：Action Decision Workspace。
 - TEST-142 VERIFIED：Action Execution Workspace。
-- TEST-143：GitHub self-test passed，等待服务器最终验收，尚未标记 VERIFIED。
+- TEST-143 VERIFIED：Outcome Workspace。
 
 ## Runtime / Operations 产品化基线
 
@@ -96,69 +97,68 @@ UI 只把 `decision=confirmed && execution_status=execution_ready` 作为候选�
 
 GitHub Actions run `35375105715`：combined targeted 116 / full 792。服务器实际测试代码 HEAD `06b2fd49aedc6a5d31bfd9d56025db755cd6b10b`：targeted 116、full 792。运行时日志 `ui-preview.log` / `uvicorn.log` 已保留并移出 repository；随后 fast-forward 纯文档整理到 `dd5f2b34561fe6a865e1b871a3ee23a1081027c5`，最终 repository clean。正式验证记录提交为 `1532c569f4607e2256e5a72e104b4c1827cf0849`。TEST-142 VERIFIED。
 
-## TEST-143 — Outcome Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+## TEST-143 — Outcome Workspace — VERIFIED
 
-### Canonical contract 审计
+### Canonical contract
 
-现有 Outcome schema / route / service / repository 已完整复用，没有新增第二套业务逻辑：
+现有 Outcome schema / route / service / repository 被直接复用：
 - `GET /api/v1/persons/{person_id}/action-plan/outcomes`：读取当前 user/person scope 的 Outcome history；
 - `POST /api/v1/persons/{person_id}/action-plan/outcomes/{decision_id}`：显式记录 Outcome；
 - payload 只有 `outcome` 与可选 `note`；
 - `outcome` 只允许 `completed | skipped | failed`；
-- Action Decision 必须存在于当前 user/person scope；
-- decision 必须为 `confirmed`；
-- 对应 Action Execution 必须已经存在；
+- Action Decision 必须属于当前 user/person、必须 `confirmed`、必须已有对应 Action Execution；
 - 同一 decision 只能有一个 Outcome；重复记录返回 conflict；
 - foreign user/person scope 不可读取或创建；
-- repository 只写 `action_outcomes`；不会自动创建 Feedback、Learning、Re-analysis，不发送消息，不修改 Relationship。
+- repository 只写 `action_outcomes`，不会自动创建 Feedback、Learning、Re-analysis，不发送消息，不修改 Relationship。
 
-Outcome UI 使用 TEST-142 的 execution context 识别候选：只有 `decision=confirmed && execution_status=executed` 才可进入 Outcome 选择；`outcome_recorded` 不再可选。服务端 POST 时仍重新执行 canonical 校验，客户端筛选不是 authority。
+Outcome UI 通过 TEST-142 execution context 识别候选：只有 `decision=confirmed && execution_status=executed` 才可记录 Outcome；`outcome_recorded` 不再可选。服务端 POST 仍执行 canonical 校验，客户端筛选不是 authority。
 
 ### 实现
 
 1. 新增 `backend/app/ui/action_outcome_workspace.py`；
 2. `/app` HTML 顺序保持 Action Plan → Action Decision → Action Execution → Outcome；
-3. 用户必须显式点击 `Load outcome context`，才读取 execution context 与 Outcome history；
+3. 用户必须显式点击 `Load outcome context` 才读取 execution context 与 Outcome history；
 4. 登录、Person 切换、Action Execution 完成均不会自动创建或加载 Outcome；
 5. 用户显式选择 executed confirmed decision，再选择 `completed / skipped / failed`，填写可选 note；
 6. 只有单独点击 `Record selected outcome` 才 POST canonical Outcome API；
 7. POST 后只刷新 execution context 与 Outcome history；不会自动触发 Feedback / Learning / Re-analysis；
-8. 明确提示没有启动 Feedback、Learning、Re-analysis、message send 或 Relationship change；
-9. 继续复用 page-memory bearer token、安全 DOM `textContent/createElement/replaceChildren`；无 localStorage/sessionStorage/innerHTML/X-User-ID；
-10. TEST-143 script 放在 TEST-142 script 之前，保持 TEST-139~142 fragment isolation；
+8. 不发送消息、不修改 Relationship；
+9. 继续使用 page-memory bearer token、安全 DOM，无 localStorage/sessionStorage/innerHTML/X-User-ID；
+10. TEST-143 script 放在 TEST-142 script 之前以保持旧 fragment isolation；
 11. 无新业务 API、无 schema migration、未提前实现 Feedback Workspace。
 
-### 实现提交
+### 实现提交与 GitHub Actions
 
 - `ff895e661edcabb9c22d4d094f00cb369d50ceed` — Outcome workspace fragment；
-- `312dbb347219a999cdfa1b12ca4079d2819b5e76` — 注入统一 product shell，并保持旧 fragment isolation；
+- `312dbb347219a999cdfa1b12ca4079d2819b5e76` — 注入统一 product shell；
 - `9dac4c186130be2795fab4151ea7f8dbb66b6f5a` — 8 项 authenticated Outcome workspace tests；
-- `f1e30fc9a7a812236953e44b1f2889f434bf9180` — 初版临时 TEST-143 validation workflow；
-- `6acd06851ed471d08a8e3038aa9bfddc3b92dbea` — 修正临时 workflow 中 Feedback/Learning 测试文件名；
-- `c1b97af6322388f3470f12841ae09f5caf74a85f` — 成功后删除临时 workflow。
+- `f1e30fc9a7a812236953e44b1f2889f434bf9180` — 初版临时 validation workflow；
+- `6acd06851ed471d08a8e3038aa9bfddc3b92dbea` — 修正临时 workflow 测试文件名；
+- `c1b97af6322388f3470f12841ae09f5caf74a85f` — 成功后删除临时 workflow；
+- `02cc3c4805f199e9ce9c521f82b0c93672a95ef2` — 服务器验收前唯一交接文档基线。
 
-### GitHub Actions 验证
+首轮 GitHub Actions run `35376348396` 仅因临时 workflow 引用了不存在的测试文件名失败；业务代码没有修改。修正后 run `35376407255` / job `105702003793` 整体 success：focused 8、Product Workspace regression 58、Outcome + Execution gates 22、Feedback/Learning/Re-analysis separation 17、auth 7、combined targeted 112、full 800。
 
-首轮 run `35376348396` 失败原因仅为临时 workflow 引用了不存在的测试文件名 `test_action_plan_feedback.py` / `test_action_plan_learning_synthesis.py`。没有修改业务代码、没有删除或弱化测试；仅将 workflow 修正为仓库真实存在的 `test_action_feedback.py` 与 `test_action_feedback_learning_synthesis.py`，并保留 `test_outcome_reanalysis_closure.py`。
+### 服务器最终验收
 
-修正后 run `35376407255`，job `105702003793`，测试 HEAD `6acd06851ed471d08a8e3038aa9bfddc3b92dbea`，整体 success：
-- TEST-143 focused：8 passed、1 warning in 0.41s；
-- TEST-135~142 Product Workspace regression：58 passed、1 warning in 4.22s；
-- Outcome canonical + Execution safety gates：22 passed、1 warning in 0.67s；
-- Feedback / Learning / Re-analysis separation regression：17 passed、1 warning in 1.08s；
-- account bearer scope：7 passed、1 warning in 0.76s；
-- combined targeted：112 passed、1 warning in 6.76s；
-- full pytest：800 passed、1 warning in 35.69s。
+2026-09-19 最终验收通过：
+- branch：`test-143-outcome-workspace`；
+- HEAD：`02cc3c4805f199e9ce9c521f82b0c93672a95ef2`；
+- 初始 `git status --short` 无输出；
+- targeted：112 passed in 25.49s；
+- full：800 passed in 140.96s；
+- `git diff --check` 无输出；
+- 最终 `git status --short` 无输出；
+- `DEVELOPMENT_HANDOVER.md` 存在；
+- `docs/DEVELOPMENT_HANDOVER.md` 不存在。
 
-唯一 pytest warning 仍为 Starlette TestClient 对 `anyio.abc.BlockingPortal` alias 的 deprecation；GitHub runner 另提示 actions/checkout@v4 与 setup-python@v5 的 Node20 target 被强制 Node24，均非测试失败。临时 workflow 已删除。
+TEST-143 VERIFIED。
 
-服务器最终验收尚未执行，因此 TEST-143 当前不能标记 VERIFIED。
-
-## 下一阶段候选
+## 下一阶段
 
 TEST-144 — Feedback Workspace。
 
-只能在 TEST-143 服务器最终验收通过并标记 VERIFIED 后开始。必须先审计现有 Feedback schema、route、service、repository 与 learning/re-analysis 边界。预期只接入现有 canonical Feedback read/write 能力；Outcome 不得自动生成 Feedback，Feedback 不得自动触发 Learning / Re-analysis，除非现有 canonical API 的明确 contract 要求且经过阶段审计确认。
+允许从 TEST-143 post-verification 文档提交进入 TEST-144。必须先审计现有 Feedback schema、route、service、repository 与 Learning / Re-analysis 边界，然后只接入现有 canonical Feedback 能力。Outcome 不得自动生成 Feedback；Feedback 不得自动触发 Learning / Re-analysis，除非现有 canonical contract 明确要求并在本阶段审计后被保留。不得发送消息、不得修改 Relationship、不得跨 user/person scope。
 
 ## 架构与持续禁止事项
 
