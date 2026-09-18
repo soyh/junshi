@@ -1,10 +1,11 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-09-19
-当前阶段：TEST-142 — Action Execution Workspace — VERIFIED
-当前 Branch：test-142-action-execution-workspace
+当前阶段：TEST-143 — Outcome Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：`test-143-outcome-workspace`
 TEST-142 VERIFIED 服务器代码 HEAD：`06b2fd49aedc6a5d31bfd9d56025db755cd6b10b`
-TEST-142 最终文档基线 HEAD：`dd5f2b34561fe6a865e1b871a3ee23a1081027c5`
+TEST-142 最终文档整理 HEAD：`dd5f2b34561fe6a865e1b871a3ee23a1081027c5`
+TEST-142 post-verification 基线：`1532c569f4607e2256e5a72e104b4c1827cf0849`
 TEST-141 VERIFIED 服务器代码 HEAD：`49275dab6f83620159fc2fba6ef4fda30a0088ad`
 TEST-140 VERIFIED 服务器代码 HEAD：`323eea1dab49c8e3cc96d95a936875781072a187`
 TEST-139 VERIFIED 服务器代码 HEAD：`6a9eb85104d5fd7dc35bd09bb89d35f2efba52c6`
@@ -13,7 +14,7 @@ TEST-137 VERIFIED 服务器代码 HEAD：`da5a3b355dbdb6345809cfe0e2c28cd880e9e8
 TEST-136 VERIFIED 服务器代码 HEAD：`07d2cf6fe47f1f2ec7a0672dfb9a9120385d1066`
 TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f460f`
 
-本文件是唯一 canonical handover。`docs/DEVELOPMENT_HANDOVER.md` 已在 TEST-142 最终整理中删除，不再维护镜像副本。
+本文件是唯一 canonical handover。`docs/DEVELOPMENT_HANDOVER.md` 已删除，不再维护镜像副本。
 
 ## 项目目标
 
@@ -36,6 +37,7 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 - TEST-140 VERIFIED：Action Plan Workspace。
 - TEST-141 VERIFIED：Action Decision Workspace。
 - TEST-142 VERIFIED：Action Execution Workspace。
+- TEST-143：GitHub self-test passed，等待服务器最终验收，尚未标记 VERIFIED。
 
 ## Runtime / Operations 产品化基线
 
@@ -62,77 +64,101 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 
 ## TEST-139 — Strategy & Recommendation Workspace — VERIFIED
 
-目标：把 Strategy / Recommendation canonical context 接入统一 `/app`，不新建第二套策略或建议逻辑。
+Strategy / Recommendation canonical context 已接入统一 `/app`。Conversation 切换不自动调用 LLM；用户显式加载；Recommendation 保留 evidence provenance、`must_not_auto_select` 与 `must_not_auto_execute`；该阶段不创建 Action Plan / Decision / Execution。
 
-关键约束：Conversation 切换不自动调用 LLM；用户显式点击加载；Recommendation 保留 evidence provenance、`must_not_auto_select` 与 `must_not_auto_execute`；无 Action Plan / Decision / Execution。
-
-GitHub Actions run `35369269897`：full 768 passed。服务器最终验收 branch `test-139-strategy-recommendation-workspace`、HEAD `6a9eb85104d5fd7dc35bd09bb89d35f2efba52c6`：targeted 72 passed、full 768 passed，`git diff --check` 与 `git status --short` 无输出。TEST-139 VERIFIED。
+GitHub Actions run `35369269897`：full 768 passed。服务器最终验收 branch `test-139-strategy-recommendation-workspace`、HEAD `6a9eb85104d5fd7dc35bd09bb89d35f2efba52c6`：targeted 72 passed、full 768 passed，repository clean。TEST-139 VERIFIED。
 
 ## TEST-140 — Action Plan Workspace — VERIFIED
 
-现有系统区分 Conversation-level Action Plan generation/persistence 与 Person-level persisted Action Plan read。TEST-140 只在用户显式点击 `Generate & save action plan` 时调用可能触发 LLM/provider 并写入 `action_plan_snapshots` 的 Conversation-level orchestration；`Refresh saved plans` 只读 Person-level persisted context。Action Plan item 保持 `status=proposed`、`requires_user_confirmation=true`，不创建 Action Decision、不执行。
+Conversation-level Action Plan generation/persistence 与 Person-level persisted Action Plan read 保持分离。只有显式 `Generate & save action plan` 才会触发可能调用 LLM/provider 的 orchestration；Action Plan item 保持 `status=proposed`、`requires_user_confirmation=true`，不创建 Action Decision、不执行。
 
-GitHub Actions run `35370519984` success：targeted 99 passed，full 776 passed。服务器最终验收于 2026-09-19 完成：branch `test-140-action-plan-workspace`，HEAD `323eea1dab49c8e3cc96d95a936875781072a187`，targeted 99 passed in 17.04s，full 776 passed in 134.61s，`git diff --check` 与 `git status --short` 无输出。TEST-140 VERIFIED。
+GitHub Actions run `35370519984`：targeted 99 / full 776。服务器 HEAD `323eea1dab49c8e3cc96d95a936875781072a187`：targeted 99、full 776，repository clean。TEST-140 VERIFIED。
 
 ## TEST-141 — Action Decision Workspace — VERIFIED
 
-现有 canonical Action Decision API 为 `GET /api/v1/persons/{person_id}/action-plan/decisions/context` 与 `POST /api/v1/persons/{person_id}/action-plan/decisions`。decision 只允许 `confirmed | rejected`；confirmed 必须引用当前仍为 `proposed` 且 `requires_user_confirmation=true` 的 recommendation。Action Decision create 只写 decision，不会调用 Execution service。
+Canonical API：
+- `GET /api/v1/persons/{person_id}/action-plan/decisions/context`
+- `POST /api/v1/persons/{person_id}/action-plan/decisions`
 
-TEST-141 UI 只在显式 `Load decision context` 后展示 proposal，并由用户显式 Confirm/Reject；Confirm 只记录用户决定，明确不会启动 execution。继续使用 page-memory bearer、安全 DOM，并保持 Person/logout reset，不自动加载或提交。
+Decision 只允许 `confirmed | rejected`；confirmed 必须引用当前仍为 `proposed` 且 `requires_user_confirmation=true` 的 recommendation。Action Decision create 只记录显式用户决定，不会调用 Execution service。UI 不会在 Person 切换时自动加载/提交，Confirm 明确不会启动 execution。
 
-GitHub Actions 修复后 run `35371684170`：combined targeted 80 passed，full 784 passed。服务器最终验收于 2026-09-19 完成：branch `test-141-action-decision-workspace`，HEAD `49275dab6f83620159fc2fba6ef4fda30a0088ad`，targeted 80 passed in 15.74s，full 784 passed in 138.02s，`git diff --check` 与 `git status --short` 无输出。TEST-141 VERIFIED。
+GitHub Actions run `35371684170`：combined targeted 80 / full 784。服务器 HEAD `49275dab6f83620159fc2fba6ef4fda30a0088ad`：targeted 80、full 784，repository clean。TEST-141 VERIFIED。
 
 ## TEST-142 — Action Execution Workspace — VERIFIED
 
-### Contract 审计
+Canonical API：
+- `GET /api/v1/persons/{person_id}/action-plan/execution-context`
+- `POST /api/v1/persons/{person_id}/action-plan/executions/{decision_id}`
 
-现有 canonical Action Execution API：
-- `GET /api/v1/persons/{person_id}/action-plan/execution-context`：读取当前 Person 的 Action Decision execution status 与 execution constraints；
-- `POST /api/v1/persons/{person_id}/action-plan/executions/{decision_id}`：记录单独、显式的 Action Execution；payload 仅包含可选 `executed_at` 与 `note`；
-- context 对 decision 状态分类为 `execution_ready | executed | outcome_recorded | not_executable`；
-- 只有 `decision=confirmed` 且未 execution、未 Outcome 的 decision 才是 `execution_ready`；
-- 服务端 POST 时再次强制 confirmed、user/person/decision scope、no existing Outcome、no duplicate Execution；客户端筛选不是 authority；
-- rejected decision 不可执行，重复 execution 返回 conflict，Outcome 已存在时不可再次执行；
-- execution repository 只写 `action_executions`，不会发送消息、创建 Outcome 或修改 Relationship；
-- constraints 明确包含 `must_require_confirmed_decision=true`、`must_require_explicit_execution=true`、`must_not_execute_rejected_decision=true`、`must_not_execute_from_confirmation_automatically=true`、`must_not_send=true`、`must_not_create_outcome_automatically=true`。
+只有 confirmed、未 execution、未 Outcome 的 decision 才是 `execution_ready`。Execution 必须通过独立显式动作记录；confirmed decision 本身不执行。服务端再次校验 confirmed、scope、no existing Outcome 与 no duplicate Execution。Execution 不发送消息、不创建 Outcome、不修改 Relationship。
+
+UI 只把 `decision=confirmed && execution_status=execution_ready` 作为候选，并通过独立 `Record selected execution` POST。登录、Person 切换、Action Decision Confirm 均不会自动执行。
+
+GitHub Actions run `35375105715`：combined targeted 116 / full 792。服务器实际测试代码 HEAD `06b2fd49aedc6a5d31bfd9d56025db755cd6b10b`：targeted 116、full 792。运行时日志 `ui-preview.log` / `uvicorn.log` 已保留并移出 repository；随后 fast-forward 纯文档整理到 `dd5f2b34561fe6a865e1b871a3ee23a1081027c5`，最终 repository clean。正式验证记录提交为 `1532c569f4607e2256e5a72e104b4c1827cf0849`。TEST-142 VERIFIED。
+
+## TEST-143 — Outcome Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+
+### Canonical contract 审计
+
+现有 Outcome schema / route / service / repository 已完整复用，没有新增第二套业务逻辑：
+- `GET /api/v1/persons/{person_id}/action-plan/outcomes`：读取当前 user/person scope 的 Outcome history；
+- `POST /api/v1/persons/{person_id}/action-plan/outcomes/{decision_id}`：显式记录 Outcome；
+- payload 只有 `outcome` 与可选 `note`；
+- `outcome` 只允许 `completed | skipped | failed`；
+- Action Decision 必须存在于当前 user/person scope；
+- decision 必须为 `confirmed`；
+- 对应 Action Execution 必须已经存在；
+- 同一 decision 只能有一个 Outcome；重复记录返回 conflict；
+- foreign user/person scope 不可读取或创建；
+- repository 只写 `action_outcomes`；不会自动创建 Feedback、Learning、Re-analysis，不发送消息，不修改 Relationship。
+
+Outcome UI 使用 TEST-142 的 execution context 识别候选：只有 `decision=confirmed && execution_status=executed` 才可进入 Outcome 选择；`outcome_recorded` 不再可选。服务端 POST 时仍重新执行 canonical 校验，客户端筛选不是 authority。
 
 ### 实现
 
-1. 新增 `backend/app/ui/action_execution_workspace.py`；
-2. `/app` 在 Action Decision 后新增 Action Execution 区域；
-3. 只有用户显式点击 `Load execution context` 才 GET canonical execution context；登录、Person 切换、Action Decision Confirm 都不会自动加载或执行；
-4. UI 仅把 `decision=confirmed && execution_status=execution_ready` 的记录作为可选择候选；
-5. 用户可填写可选 `executed_at` 与 `note`，然后单独点击 `Record selected execution`；
-6. POST 成功后只重新加载 execution context，并明确提示 `No message was sent and no Outcome was created`；
-7. Person 切换/logout 只 reset Execution workspace；
-8. 继续复用 page-memory bearer token 和安全 DOM `textContent/createElement/replaceChildren`，不使用 localStorage/sessionStorage/innerHTML/X-User-ID；
-9. TEST-142 script 放在 TEST-141 Action Decision script 之前，HTML 仍按 Action Plan → Action Decision → Action Execution 排列，从而保持 TEST-139/140/141 fragment isolation；
-10. 无新业务 API、无 schema migration、未实现 Outcome UI。
+1. 新增 `backend/app/ui/action_outcome_workspace.py`；
+2. `/app` HTML 顺序保持 Action Plan → Action Decision → Action Execution → Outcome；
+3. 用户必须显式点击 `Load outcome context`，才读取 execution context 与 Outcome history；
+4. 登录、Person 切换、Action Execution 完成均不会自动创建或加载 Outcome；
+5. 用户显式选择 executed confirmed decision，再选择 `completed / skipped / failed`，填写可选 note；
+6. 只有单独点击 `Record selected outcome` 才 POST canonical Outcome API；
+7. POST 后只刷新 execution context 与 Outcome history；不会自动触发 Feedback / Learning / Re-analysis；
+8. 明确提示没有启动 Feedback、Learning、Re-analysis、message send 或 Relationship change；
+9. 继续复用 page-memory bearer token、安全 DOM `textContent/createElement/replaceChildren`；无 localStorage/sessionStorage/innerHTML/X-User-ID；
+10. TEST-143 script 放在 TEST-142 script 之前，保持 TEST-139~142 fragment isolation；
+11. 无新业务 API、无 schema migration、未提前实现 Feedback Workspace。
+
+### 实现提交
+
+- `ff895e661edcabb9c22d4d094f00cb369d50ceed` — Outcome workspace fragment；
+- `312dbb347219a999cdfa1b12ca4079d2819b5e76` — 注入统一 product shell，并保持旧 fragment isolation；
+- `9dac4c186130be2795fab4151ea7f8dbb66b6f5a` — 8 项 authenticated Outcome workspace tests；
+- `f1e30fc9a7a812236953e44b1f2889f434bf9180` — 初版临时 TEST-143 validation workflow；
+- `6acd06851ed471d08a8e3038aa9bfddc3b92dbea` — 修正临时 workflow 中 Feedback/Learning 测试文件名；
+- `c1b97af6322388f3470f12841ae09f5caf74a85f` — 成功后删除临时 workflow。
 
 ### GitHub Actions 验证
 
-临时 GitHub Actions run `35375105715`，job `105697834658`，测试 HEAD `c34e76babd2bc549bb1885520d49804d6beedae9`，整体 success：focused 8 passed；TEST-135~141 Product Workspace regression 50 passed；Execution canonical + synthesis + bridge + gate + scope 26 passed；Action Decision regression 13 passed；Outcome separation regression 12 passed；account bearer scope 7 passed；combined targeted 116 passed；full pytest 792 passed。临时 workflow 已删除。
+首轮 run `35376348396` 失败原因仅为临时 workflow 引用了不存在的测试文件名 `test_action_plan_feedback.py` / `test_action_plan_learning_synthesis.py`。没有修改业务代码、没有删除或弱化测试；仅将 workflow 修正为仓库真实存在的 `test_action_feedback.py` 与 `test_action_feedback_learning_synthesis.py`，并保留 `test_outcome_reanalysis_closure.py`。
 
-### 服务器最终验收
+修正后 run `35376407255`，job `105702003793`，测试 HEAD `6acd06851ed471d08a8e3038aa9bfddc3b92dbea`，整体 success：
+- TEST-143 focused：8 passed、1 warning in 0.41s；
+- TEST-135~142 Product Workspace regression：58 passed、1 warning in 4.22s；
+- Outcome canonical + Execution safety gates：22 passed、1 warning in 0.67s；
+- Feedback / Learning / Re-analysis separation regression：17 passed、1 warning in 1.08s；
+- account bearer scope：7 passed、1 warning in 0.76s；
+- combined targeted：112 passed、1 warning in 6.76s；
+- full pytest：800 passed、1 warning in 35.69s。
 
-2026-09-19 最终验收通过：
-- branch：`test-142-action-execution-workspace`；
-- 服务器已实际测试代码 HEAD：`06b2fd49aedc6a5d31bfd9d56025db755cd6b10b`；
-- targeted：116 passed in 24.13s；
-- full：792 passed in 137.37s；
-- `git diff --check` 无输出；
-- 初次 `git status --short` 仅有运行时生成的 `ui-preview.log` 与 `uvicorn.log`，已保留并移出 repository 到 `/opt/ai-love-strategist-runtime-logs/`；
-- 随后 fast-forward 到纯文档整理 HEAD `dd5f2b34561fe6a865e1b871a3ee23a1081027c5`；从测试代码 HEAD 到该 HEAD 只有 handover 文档整合/删除重复镜像，无业务或测试代码变化；
-- 最终 `git diff --check` 无输出，`git status --short` 无输出；
-- 根目录 `DEVELOPMENT_HANDOVER.md` 存在，重复 `docs/DEVELOPMENT_HANDOVER.md` 已删除。
+唯一 pytest warning 仍为 Starlette TestClient 对 `anyio.abc.BlockingPortal` alias 的 deprecation；GitHub runner 另提示 actions/checkout@v4 与 setup-python@v5 的 Node20 target 被强制 Node24，均非测试失败。临时 workflow 已删除。
 
-TEST-142 VERIFIED。
+服务器最终验收尚未执行，因此 TEST-143 当前不能标记 VERIFIED。
 
-## 下一阶段
+## 下一阶段候选
 
-TEST-143 — Outcome Workspace。
+TEST-144 — Feedback Workspace。
 
-允许从 TEST-142 post-verification 文档基线进入 TEST-143。范围必须先审计现有 Outcome schema、route、service、repository 与测试后锁定。预期只把现有 canonical Outcome create/read contract 接入统一 `/app`：只能基于已执行的 Action Decision 由用户显式记录 Outcome；不得由 Execution 自动生成，不得跳过 Execution，不得自动生成 Feedback/Learning/Re-analysis，不得修改 Relationship 或发送消息。
+只能在 TEST-143 服务器最终验收通过并标记 VERIFIED 后开始。必须先审计现有 Feedback schema、route、service、repository 与 learning/re-analysis 边界。预期只接入现有 canonical Feedback read/write 能力；Outcome 不得自动生成 Feedback，Feedback 不得自动触发 Learning / Re-analysis，除非现有 canonical API 的明确 contract 要求且经过阶段审计确认。
 
 ## 架构与持续禁止事项
 
@@ -140,12 +166,12 @@ TEST-143 — Outcome Workspace。
 - StructuredAnalysis 是 derived interpretation，不是 canonical truth。
 - Recommendation 必须经过 StrategyRecommendationCandidate → RecommendationProducer。
 - Action Plan 必须 evidence-backed 且等待用户确认。
-- Action Decision 必须来自显式 user decision；不得自动确认、执行、发送消息、修改 relationship 或伪造 Outcome。
+- Action Decision 必须来自显式 user decision；不得自动确认、执行、发送消息、修改 Relationship 或伪造 Outcome。
 - Action Execution 必须来自独立显式 execution 动作；confirmed decision 本身不得触发执行。
 - Outcome 必须基于已存在的 Action Execution，并由用户显式记录；Execution 本身不得自动生成 Outcome。
-- Outcome → Feedback → Learning → Re-analysis 必须继续沿唯一 canonical lifecycle。
+- Outcome → Feedback → Learning → Re-analysis 必须继续沿唯一 canonical lifecycle，各阶段边界必须保持显式、可审计。
 - 所有数据必须 user_id 隔离；Person / Relationship / Conversation 不得跨 scope 混用。
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~142 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~143 verification tag 已创建。
