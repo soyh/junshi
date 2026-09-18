@@ -1,9 +1,10 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-130 — Release Preflight — VERIFIED
-当前 Branch：test-130-release-preflight
-服务器验收代码 HEAD：`876cfd727943931606d4d7213f6ad6432d7cb250`
+当前阶段：TEST-131 — HTTP Liveness / Runtime Readiness Boundary — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-131-http-runtime-health
+TEST-130 VERIFIED 服务器代码 HEAD：`876cfd727943931606d4d7213f6ad6432d7cb250`
+TEST-130 验收闭环文档基线：`58ba08d802a0ca213b5e9045c46648a98ca152dd`
 
 ## 项目目标
 
@@ -20,11 +21,12 @@ TEST-127 VERIFIED — offline verified restore safety；服务器 full 663；HEA
 TEST-128 VERIFIED — managed backup manifest/checksum/retention；服务器 targeted 9 passed，累计 full 691。
 TEST-129 VERIFIED — read-only operations readiness；服务器 targeted 9 passed，累计 full 691。
 TEST-130 VERIFIED — release preflight；服务器 targeted 10 passed，累计 full 691；HEAD `876cfd727943931606d4d7213f6ad6432d7cb250`。
+TEST-131 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — HTTP liveness / runtime readiness；GitHub full 700。
 
 ## Runtime / Operations 产品化基线
 
 - TEST-122：彻底退役 `X-User-ID` 身份来源。
-- TEST-123：基础 HTTP 安全响应头、auth/settings no-store、无 permissive CORS。
+- TEST-123：基础 HTTP 安全响应头、auth/settings no-store、旧 `/health` 保持非强制 no-store、无 permissive CORS。
 - TEST-124：production 强制 `debug=False`，关闭 docs/redoc/openapi。
 - TEST-125：统一 `python -m app.server`；production loopback-only、single-worker、no reload、no proxy trust、no Server header。
 - TEST-126：WAL-safe SQLite online backup + integrity verification + atomic publish。
@@ -32,54 +34,11 @@ TEST-130 VERIFIED — release preflight；服务器 targeted 10 passed，累计 
 - TEST-128：managed backup manifest + SHA-256 + strict verification + safe retention。
 - TEST-129：read-only database/migration/backup readiness report + machine-readable exit status。
 - TEST-130：release preflight 汇总 production config、secure launcher、operations readiness；部署前 fail closed。
+- TEST-131：HTTP liveness 与 runtime readiness 分离；高频 probe 不执行 backup checksum/integrity。
 
-## TEST-126 / TEST-127 — VERIFIED
+## TEST-126 ~ TEST-130 — VERIFIED
 
-服务器累计验收：restore 8、backup 8、launcher 7、surface 4、production auth 8、scope 4、full 663 passed in 123.02s；工作树 clean；migration diff 空；最终文件 diff 精确匹配。
-
-## TEST-128 — Backup Manifest / Checksum / Retention — VERIFIED
-
-1. `backend/app/core/backup_manifest.py`：manifest schema version=1，记录 UTC created_at、backup basename、size、SHA-256、integrity=ok；
-2. manifest 使用 sibling temp + fsync + atomic replace；
-3. managed backup 在 manifest 发布失败时回滚新 backup；
-4. verify 严格校验 schema、basename/path traversal、size、SHA-256、SQLite integrity；
-5. retention 只认有效 manifest，不删除手工 SQLite、损坏 manifest 或 checksum 不匹配 backup；
-6. dry-run 默认；apply 时先删 manifest 再删 backup；
-7. CLI 新增 `--verify-manifest`、`--retention-dir`、`--keep`、`--apply-retention`；
-8. GitHub run `35314760780`：TEST-128 9、TEST-127 8、TEST-126 8、production auth 8、scope 4、full 672 passed；
-9. 服务器：TEST-128 9 passed，累计 full 691 passed。
-
-## TEST-129 — Operations Readiness — VERIFIED
-
-1. `backend/app/core/readiness.py` 与 `backend/app/readiness.py`；
-2. 数据库只读执行 TEST-126 integrity verification；
-3. migration 版本从 `backend/migrations/*.sql` 获取，并与 DB `schema_migrations` 精确比较；缺失、未知、重复版本均 fail closed；
-4. backup 只从通过 TEST-128 manifest/checksum/integrity 验证的 managed backups 中选择最近一个；
-5. 无有效 backup、backup stale、timestamp 在未来均 fail；
-6. 默认最大 backup age 24h，可显式配置；
-7. JSON 输出只含 basename、migration 版本/计数、backup age/status，不打印绝对路径或 secret；
-8. CLI `python -m app.readiness --json` 以 exit code 0/1 表示 ready/not-ready；
-9. GitHub run `35315030038`：TEST-129 9、TEST-128 9、TEST-127 8、TEST-126 8、production auth 8、scope 4、full 681 passed；
-10. 服务器：TEST-129 9 passed，累计 full 691 passed。
-
-## TEST-130 — Release Preflight — VERIFIED
-
-1. `backend/app/core/preflight.py` 与 `backend/app/preflight.py`；
-2. release preflight 要求 `APP_ENV=production`；
-3. 要求 `APP_DEBUG=false`；
-4. 要求 `AUTH_BOOTSTRAP_ENABLED=false`；
-5. 要求 `LLM_CONFIG_ENCRYPTION_KEY` 已配置，但输出只暴露 boolean；
-6. 明确拒绝 `PORT=8899`；
-7. 校验 log level；
-8. 复用 TEST-125 `_uvicorn_options()`，要求 production loopback、workers=1、reload=false、proxy_headers=false、forwarded_allow_ips=""、server_header=false；public bind fail closed；
-9. 复用 TEST-129 operations readiness；
-10. CLI `python -m app.preflight --json` 不启动服务，以 exit code 0/1 表示 release ready/not-ready；
-11. JSON 不输出 encryption key、auth token、DashScope key 或绝对路径；
-12. 无 schema migration。
-
-GitHub Actions run `35315361027`：success；TEST-130 10、TEST-129 9、TEST-128 9、TEST-127 8、TEST-126 8、launcher 7、production auth 8、scope 4、full 691 passed。
-
-服务器最终验收：
+TEST-130 服务器最终验收：
 - TEST-130：10 passed in 0.34s；
 - TEST-129：9 passed in 0.30s；
 - TEST-128：9 passed in 0.39s；
@@ -91,16 +50,42 @@ GitHub Actions run `35315361027`：success；TEST-130 10、TEST-129 9、TEST-128
 - full pytest：691 passed in 121.76s；
 - branch / HEAD 精确匹配；工作树 clean；migration diff 空；TEST-127→130 文件 diff 精确匹配。
 
-## 下一阶段
+## TEST-131 — HTTP Liveness / Runtime Readiness Boundary — GITHUB SELF-TEST PASSED
 
-TEST-131 — HTTP Liveness / Runtime Readiness Boundary：
-1. 保留现有 `/health` 兼容契约；
-2. 新增轻量 `/health/live`，不得访问数据库；
-3. 新增只读 `/health/ready`，仅检查运行时所需的数据库可访问性与 migration 一致性；
-4. 不在高频 HTTP readiness 中执行 TEST-129 的 backup checksum/integrity 扫描，backup freshness 继续由 operations readiness / release preflight 负责；
-5. not-ready 返回 HTTP 503，错误归一化，不输出数据库绝对路径或 secret；
-6. health 响应 `Cache-Control: no-store`；
-7. 无 schema migration；CI/服务器仍只使用测试临时库，不触碰 8899。
+目标：区分“进程活着”与“当前能够安全接业务请求”，同时不把 TEST-129/130 的重型运维检查塞进高频 HTTP probe。
+
+实现：
+1. 保留现有 `/health` body 与 TEST-123 cache contract，不改变兼容行为；
+2. 新增 `/health/live`：固定 200，完全不访问数据库；
+3. 新增 `/health/ready`：只读检查 SQLite 文件可访问性与 migration 精确一致性；ready=200，not-ready=503；
+4. SQLite probe 使用 `mode=ro` + `SELECT name FROM sqlite_schema LIMIT 1`，既不创建缺失 DB，也能拒绝非 SQLite/corrupt 文件；
+5. `backend/app/core/readiness.py` 仅增加只读 public migration-state helper，TEST-129 原有 database integrity + managed backup freshness 行为不变；
+6. runtime readiness 不运行 migration、不执行 `PRAGMA integrity_check`、不扫描 backup manifest、不计算 backup SHA-256；
+7. `/health/ready` 只输出 database ok/error、migration expected/applied count 与归一化错误；不输出绝对路径、migration 版本列表、backup 信息或 secrets；
+8. 新 `/health/live` 与 `/health/ready` 使用 `Cache-Control: no-store`；旧 `/health` 按 TEST-123 保持非强制 no-store；
+9. 无 schema migration。
+
+CI 发现并修复了两个真实边界问题，没有修改旧 VERIFIED 测试：
+- 第一轮 run `35332656349`：`SELECT 1` 不读取 SQLite 文件页，损坏文件被误判可访问；改为读取 `sqlite_schema`；
+- 第二轮 run `35332731512`：targeted 全过，但 full 暴露 TEST-123 旧 `/health` cache contract 冲突；保留旧 `/health` 行为，只对新 probe no-store；
+- 最终 run `35333000258`：success。
+
+最终 GitHub 结果：
+- TEST-131 runtime health：9 passed；
+- TEST-130 preflight：10 passed；
+- TEST-129 readiness：9 passed；
+- TEST-124 production surface：4 passed；
+- production auth：8 passed；
+- scope isolation：4 passed；
+- full pytest：700 passed、1 warning in 34.93s；
+- warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation，与本阶段无关；
+- 临时 workflow 已删除。
+
+当前等待服务器验收 TEST-131。服务器验收只运行 pytest / git diff / git status，不启动或重启 uvicorn，不执行 backup/restore/readiness/preflight CLI，不修改 `.env`，不触碰 8899。
+
+## 下一阶段候选
+
+TEST-131 服务器通过后重新审计决定 TEST-132。优先考虑部署后的 probe/runbook 契约或 process supervision 边界，但不提前假设 Nginx/systemd/域名方案。
 
 ## 架构与持续禁止事项
 
@@ -114,4 +99,4 @@ TEST-131 — HTTP Liveness / Runtime Readiness Boundary：
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~130 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~131 verification tag 已创建。
