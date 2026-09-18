@@ -150,7 +150,9 @@ def test_feedback_fragment_uses_read_only_canonical_endpoints_without_learning_c
     assert "method: 'PATCH'" not in script
     assert "method: 'DELETE'" not in script
     assert "learning-synthesis" not in script
-    assert "re-analysis" not in script.lower()
+    assert "/re-analysis" not in script.lower()
+    assert "loadreanalysis" not in script.lower()
+    assert "runreanalysis" not in script.lower()
 
 
 def test_feedback_requires_explicit_load_and_outcome_does_not_auto_load_feedback(client):
