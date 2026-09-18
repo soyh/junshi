@@ -1,0 +1,41 @@
+name: TEST-142 validation
+
+on:
+  push:
+    branches:
+      - test-142-action-execution-workspace
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: TEST-142 Action Execution workspace
+        working-directory: backend
+        run: pytest -q tests/test_authenticated_action_execution_workspace.py
+      - name: Product workspace regression through TEST-141
+        working-directory: backend
+        run: pytest -q tests/test_authenticated_product_shell.py tests/test_authenticated_core_workspace.py tests/test_authenticated_conversation_content_workspace.py tests/test_authenticated_relationship_evidence_workspace.py tests/test_authenticated_strategy_recommendation_workspace.py tests/test_authenticated_action_plan_workspace.py tests/test_authenticated_action_decision_workspace.py
+      - name: Execution canonical and safety gates
+        working-directory: backend
+        run: pytest -q tests/test_strategy_decision_execution.py tests/test_strategy_decision_execution_synthesis.py tests/test_action_execution_bridge.py tests/test_execution_decision_gate.py tests/test_execution_scope_isolation.py
+      - name: Action Decision regression
+        working-directory: backend
+        run: pytest -q tests/test_action_decision.py tests/test_action_decision_proposal_gate.py
+      - name: Outcome separation regression
+        working-directory: backend
+        run: pytest -q tests/test_action_outcome.py tests/test_action_outcome_http_conflict.py tests/test_action_outcome_idempotency.py
+      - name: Account bearer scope regression
+        working-directory: backend
+        run: pytest -q tests/test_auth_account_login.py
+      - name: Combined TEST-142 targeted validation
+        working-directory: backend
+        run: pytest -q tests/test_authenticated_action_execution_workspace.py tests/test_authenticated_product_shell.py tests/test_authenticated_core_workspace.py tests/test_authenticated_conversation_content_workspace.py tests/test_authenticated_relationship_evidence_workspace.py tests/test_authenticated_strategy_recommendation_workspace.py tests/test_authenticated_action_plan_workspace.py tests/test_authenticated_action_decision_workspace.py tests/test_strategy_decision_execution.py tests/test_strategy_decision_execution_synthesis.py tests/test_action_execution_bridge.py tests/test_execution_decision_gate.py tests/test_execution_scope_isolation.py tests/test_action_decision.py tests/test_action_decision_proposal_gate.py tests/test_action_outcome.py tests/test_action_outcome_http_conflict.py tests/test_action_outcome_idempotency.py tests/test_auth_account_login.py
+      - name: Full test suite from server-equivalent cwd
+        working-directory: backend
+        run: pytest -q
