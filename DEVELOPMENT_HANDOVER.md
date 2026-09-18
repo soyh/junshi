@@ -1,192 +1,112 @@
 # AI Love Strategist Development Handover
 
-更新时间：2026-09-17
-当前阶段：TEST-102 — Action Outcome Idempotency — VERIFIED PENDING SERVER ACCEPTANCE
-当前 Branch：test-102-action-outcome-idempotency
+更新时间：2026-09-18
+当前阶段：TEST-135 — Authenticated Product Shell — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-135-authenticated-product-shell
+TEST-133 VERIFIED 服务器代码 HEAD：`74a9c5a976be094d9dd2d51e764ab457965f83ec`
+TEST-133 验收闭环文档基线：`6066e6b108592df427f265291c7af968c681a3d2`
 
 ## 项目目标
 
-本项目是长期关系管理 + AI 恋爱决策辅助系统，不是单纯聊天机器人或回复生成器。
+长期关系管理 + AI 恋爱决策辅助系统，不是单纯聊天机器人。
 
-核心生命周期：
+核心链路：
+`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis`
 
-`Canonical Data → Canonical Evidence / AnalysisContext → StructuredAnalysis → Strategy → StrategyRecommendationCandidate → RecommendationProducer → Recommendation → Action Plan → Action Decision → User Confirmation → Action Execution → Outcome → Feedback → Learning → Re-analysis → Strategy → Recommendation`
+## 阶段状态
 
-## 已完成阶段
+TEST-008 ~ TEST-133：按既有交接记录 VERIFIED。
+TEST-134 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — platform-neutral release runbook / rollback safety contract；GitHub full 734。
+TEST-135 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — authenticated single-page product shell；GitHub full 740。
 
-TEST-008 ~ TEST-044：VERIFIED
-TEST-045 ~ TEST-064：VERIFIED
-TEST-065 ~ TEST-087：VERIFIED
-TEST-088：VERIFIED
-TEST-089：VERIFIED
-TEST-090：VERIFIED
-TEST-091 ~ TEST-094：VERIFIED
-TEST-095：功能验收 VERIFIED；verification tag 尚待创建
-TEST-096：功能验收 VERIFIED；verification tag 尚待创建
-TEST-097：功能验收 VERIFIED；verification tag 尚待创建
-TEST-098：服务器验收 VERIFIED；verification tag 尚待创建
-TEST-099：服务器验收 VERIFIED；verification tag 尚待创建
-TEST-100：GitHub Actions 回归通过，待服务器验收
-TEST-101：服务器验收 VERIFIED；verification tag 尚待创建
-TEST-102：GitHub Actions 回归通过，待服务器验收
+## Runtime / Operations 产品化基线
 
-## TEST-095 — Core Engine Persistence Closure
+- TEST-122：彻底退役 `X-User-ID` 身份来源。
+- TEST-123：基础 HTTP 安全响应头、auth/settings no-store、旧 `/health` cache contract 保持兼容、无 permissive CORS。
+- TEST-124：production 强制 `debug=False`，关闭 docs/redoc/openapi。
+- TEST-125：统一 `python -m app.server`；production loopback-only、single-worker、no reload、no proxy trust、no Server header。
+- TEST-126：WAL-safe SQLite online backup + integrity verification + atomic publish。
+- TEST-127：offline-confirmed restore + pre/post integrity verification + atomic replace + stale WAL/SHM cleanup。
+- TEST-128：managed backup manifest + SHA-256 + strict verification + safe retention。
+- TEST-129：read-only database/migration/backup readiness report + machine-readable exit status。
+- TEST-130：release preflight 汇总 production config、secure launcher、operations readiness；部署前 fail closed。
+- TEST-131：HTTP liveness 与 runtime readiness 分离；高频 probe 不执行 backup checksum/integrity。
+- TEST-132：本机 loopback-only runtime probe CLI。
+- TEST-133：平台无关 supervisor lifecycle contract。
+- TEST-134：平台无关 release runbook，明确 backup/preflight/stop/switch/start/probe/rollback 顺序和数据库回滚安全门槛。
 
-目标：补齐真实 Recommendation → Action Plan → Action Decision 的持久化恢复缺口，并保持 Outcome → Feedback → Learning → fresh Analysis → Recommendation 单一生命周期。
+## TEST-132 / TEST-133 — VERIFIED
 
-关键实现：
-- 新增 migration 008 `action_plan_snapshots`；未修改历史 migration 001~007。
-- 新增 `ActionPlanSnapshotRepository`，严格按 `user_id + person_id + recommendation_id` 隔离。
-- `ActionPlanService` 在真实 DB connection 下恢复 persisted snapshot，并校验当前 canonical evidence。
-- `AnalysisActionPlanService` 对 fresh evidence-backed Recommendation 产生 Action Plan 后持久化 snapshot。
-- Action Plan 仍为 `proposed + requires_user_confirmation=True`，不得自动确认或执行。
+服务器最终验收：用户确认 all pass，结果符合预期；TEST-132/133 正式锁定 VERIFIED。
 
-验收：targeted 与全量 pytest 均通过；TEST-095 已锁定单一生命周期闭环。
+TEST-132：`python -m app.probe live|ready --json`；loopback-only、拒绝 8899、`trust_env=False`、不跟随 redirect、短超时、错误去敏。
 
-## TEST-096 — Core Engine Safety Closure
+TEST-133：`python -m app.supervision --json`；startup gate=`app.preflight`，process=`app.server`，live/ready probe，SIGTERM 30s graceful window，on-failure restart，不绑定具体 systemd/Nginx/Docker/云厂商。
 
-锁定：`Confirmed Action Decision → Explicit Execution → Outcome`。
+## TEST-134 — Release Runbook Contract — GITHUB SELF-TEST PASSED
 
-安全边界：
-- Execution 必须引用当前 user/person scope 下的 confirmed Decision。
-- rejected / missing / other-scope Decision 不得执行。
-- Outcome 必须对应 confirmed Decision 且必须已有 execution。
-- 同一 Decision 不得重复 execution / outcome。
-- 保持 user/person isolation。
-- 对真实跨 scope UUID 与任意客户端字符串 ID 保持既有 HTTP 错误合同。
-- 未修改历史 migration 001~008。
+目标：把 TEST-126~133 的既有能力组合成可验证的发布/回滚顺序，而不是新增第二套运行逻辑。
 
-GitHub Actions 全量回归在修复后连续两次通过。
+实现：
+1. `backend/app/core/deployment.py` + 只读 CLI `python -m app.deployment --json`；CLI 只输出计划，不执行任何步骤；
+2. 发布顺序固定为 `online_backup → release_preflight → stop_current_process → switch_release → start_candidate_process → verify_liveness → verify_readiness`；
+3. online backup 必须在 release switch 前成功；preflight 必须在停止进程前成功；
+4. release switch 是 external platform action，不自动操作 Git/systemd/Nginx/Docker；
+5. stop/start/probe 复用 TEST-133/132；
+6. code rollback 与 database rollback 严格分离；发布失败不会自动 restore 数据库；
+7. DB restore 仅在明确需要 schema/data rollback、应用完全离线且 backup 已验证时人工执行 `app.restore --offline-confirmed`；
+8. 命令为 argv，不经 shell，不嵌入 secrets/database path；production-only、loopback-only、拒绝 8899；
+9. 无 schema migration，不启动/停止真实进程。
 
-## TEST-097 — Evidence-Backed Proposal Freshness
+第一轮 CI `35355252345`：11 pass / 1 fail，失败仅为新测试错误地把安全标志 `reserved_port_8899_forbidden=true` 当成实际使用 8899；生产实现无错误。修正测试后第二轮 run `35355369005` success：TEST-134 12、TEST-133 11、TEST-132 11、TEST-131 9、TEST-130 10、restore 8、backup 8、production auth 8、scope 4；full 734 passed、1 warning in 30.29s。临时 workflow 已删除。
 
-锁定：`Persisted Action Plan Snapshot → Current Canonical Evidence Validation → Explicit Action Decision`。
+## TEST-135 — Authenticated Product Shell — GITHUB SELF-TEST PASSED
 
-- snapshot 不是新的 Recommendation truth，只是 lifecycle state recovery mechanism。
-- snapshot 恢复时必须验证 Recommendation 与 Action Plan 的全部 `evidence_source_ids` 仍存在于当前 canonical evidence。
-- canonical evidence 已失效时，旧 snapshot 从当前可用 proposal context 排除，但不删除历史 snapshot。
-- ActionDecision evidence-backed validation 不放宽。
-- 未修改历史 migration 001~008。
+目标：解决旧 Auth UI 与 Provider UI 登录态无法安全跨页衔接的问题，让普通用户拥有一个真正统一的产品入口，同时继续坚持 session token 只存在当前页面内存。
 
-GitHub Actions 全量 pytest：513 passed，1 warning。
+实现：
+1. 新增 `backend/app/ui/product_shell.py`；
+2. 新增 `backend/app/ui/routes.py`，提供顶层 `/app`，隐藏于 OpenAPI；
+3. `backend/app/main.py` 挂载 product shell，并对 `/app` 设置 `Cache-Control: no-store`；基础安全头继续由 TEST-123 middleware 统一提供；
+4. `/app` 同页完成 register/login/logout/session management、LLM Provider 管理与 Structured Analysis；
+5. 登录/注册返回的 opaque session token 只保存于 `let currentAccessToken` 页面内存变量；不写 `localStorage`、`sessionStorage`、URL、DOM token input 或 X-User-ID；刷新/关闭页面即丢失；
+6. Provider 操作直接复用 `/api/v1/settings/llm` 与 `/test`；API Key 输入为 password，load/save/delete 后清空，服务端不回传 key；
+7. Structured Analysis 继续调用现有 `/api/v1/conversations/{id}/analysis/structured`，不另写分析逻辑；
+8. authenticated controls 登录前 disabled；session rotate 后用服务器新 token 替换页面内存 token；logout 清空 token 和敏感输入；
+9. 原 `/api/v1/auth/ui` 与 `/api/v1/settings/llm/ui` 保留，旧 VERIFIED 入口和测试不变；
+10. Workspace 只说明当前核心后端模块，不伪造 Person/Relationship/Conversation 等尚未完成的产品页面；
+11. 无 schema migration。
 
-## TEST-098 — Action Plan Snapshot Isolation
+GitHub Actions run `35356010017`：success；
+- TEST-135：6 passed；
+- Auth UI：4 passed；
+- Provider UI：3 passed；
+- HTTP security：6 passed；
+- Account login：7 passed；
+- Session management：7 passed；
+- Password change：8 passed；
+- Production auth：8 passed；
+- Scope isolation：4 passed；
+- full pytest：740 passed、1 warning in 29.93s；
+- warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
+- 临时 workflow 已删除。
 
-锁定 snapshot 的 user/person isolation：
-- 相同 recommendation id 在不同 user scope 下可以保存不同 snapshot。
-- 查询必须同时匹配 `user_id + person_id`。
-- 不得返回其他 user 或其他 person 的 snapshot。
+当前等待服务器累计验收 TEST-134 + TEST-135。验收只运行 pytest / git diff / git status；不执行 deployment/backup/restore/preflight/server/probe CLI，不修改 `.env`，不触碰 8899。
 
-无 production code / migration 修改。服务器 targeted 与全量 pytest 已通过。
+## 下一阶段候选
 
-## TEST-099 — Action Plan Persistence Gate
+累计服务器验收通过后，TEST-136 优先把真正的业务 Workspace 接入统一 `/app`：先审计并接入 Person / Relationship / Conversation 的已有 API，严格保持 user scope 与 existing canonical contracts；不一次性重写 Recommendation/Action Plan 全链路 UI。
 
-锁定：只有真正对应 Action Plan item 的 Recommendation 才能进入 `action_plan_snapshots`。
+## 架构与持续禁止事项
 
-- orphan Action Plan item 不得被持久化。
-- Recommendation / Action Plan / evidence snapshot 的 `evidence_source_ids` 必须保持一致。
-- 不修改历史 migration。
-
-服务器 targeted 与全量 pytest 已通过。
-
-## TEST-100 — Action Decision Proposal Gate + Execution Decision Gate
-
-锁定两道显式生命周期边界。
-
-第一道：只有 Action Plan item 同时满足：
-- `status == "proposed"`
-- `requires_user_confirmation is True`
-- 存在 `recommendation_id`
-
-才能进入 Action Decision。
-
-第二道：只有 `confirmed` Action Decision 才能进入 Execution；rejected Decision、重复 execution，以及已有 Outcome 的 Decision 均被阻断。
-
-`ActionDecisionCreate` 继续只允许显式 `confirmed | rejected`，系统不得伪造用户确认。
-
-GitHub Actions targeted + full pytest 均通过；当前分支待服务器验收。
-
-## TEST-101 — Execution Scope Isolation
-
-目标：锁定 Action Execution 对 Action Decision 的 user/person scope 隔离，不允许同一 decision id 在其他 person scope 下被执行。
-
-新增测试：
-- `test_execution_uses_exact_user_and_person_scope_for_decision`
-- `test_execution_does_not_cross_person_scope`
-
-测试使用与 production service 相同的 scoped repository contract，验证 service 必须以 `(user_id, person_id, decision_id)` 获取 Decision，并在 scope 不匹配时不得创建 execution。
-
-GitHub Actions：
-- targeted `backend/tests/test_execution_scope_isolation.py`：2 passed
-- full `pytest -q`：526 passed
-- 临时 TEST-101 validation workflow 已删除，不作为产品代码保留。
-
-服务器验收：
-- targeted：2 passed
-- full：526 passed
-- working tree clean
-- `git diff HEAD^ -- backend/migrations` 无输出
-
-当前状态：VERIFIED；verification tag 尚待创建。
-
-## TEST-102 — Action Outcome Idempotency
-
-目标：将 Action Outcome 的“单次结果”约束从 service 层 read-before-write 提升到数据库层，消除并发请求同时通过检查后重复写入的窗口。
-
-生产变更：
-- 新增 migration 009 `action_outcome_idempotency`。
-- 不修改历史 migration 005。
-- 对 `action_outcomes.decision_id` 建立唯一索引 `uq_action_outcomes_decision`。
-- 保持 ActionOutcomeService 现有 confirmed Decision + executed Decision + read-before-write 业务校验。
-
-新增测试：
-- 同一 `decision_id` 的第二个 outcome 必须被 SQLite UNIQUE 约束拒绝。
-- 即使 user/person scope 不同，同一 `decision_id` 也不得产生第二个 outcome。
-
-GitHub Actions：
-- targeted `backend/tests/test_action_outcome_idempotency.py`：通过
-- full `pytest -q`：通过
-- run `35189708708`：success
-- 临时 TEST-102 validation workflow 已删除，不作为产品代码保留。
-
-当前状态：VERIFIED PENDING SERVER ACCEPTANCE。
-
-## 核心安全边界
-
-1. AnalysisContext 必须 deterministic、source-backed、read-only。
-2. LLM 不直接访问 Repository / SQLite，不修改 canonical data，不执行 action，不发送消息。
-3. StructuredAnalysis 是 derived interpretation，不是 canonical truth。
-4. Fact / Inference / Unknown 必须严格区分；Unknown 不得被伪造为事实或成功证据。
-5. Recommendation 必须 evidence-backed，并保留 evidence provenance。
-6. Action Plan 只能由显式 Recommendation 提案产生，状态为 proposed，并要求用户确认。
-7. Action Decision 必须来自显式用户决策；不得自动 confirmed。
-8. Execution 必须来自当前 scope 下的 confirmed Action Decision。
-9. Outcome 必须来自已执行的 confirmed Action Decision。
-10. Feedback / Learning / Re-analysis 不得自动确认、执行或产生 Outcome。
-11. persisted snapshot 只能作为状态恢复机制，不能替代 canonical evidence 或 Recommendation truth。
-12. user/person/relationship/conversation isolation 必须保持在所有读写路径。
-13. 不得自动发送消息，不得自动修改 relationship。
-14. 不得建立第二套 Recommendation / Action Plan / Decision / Execution / Outcome / Learning lifecycle。
-15. MVP 不引入 PostgreSQL、Redis、Elasticsearch、Vector DB。
-16. 不修改历史 migration 001~008；后续 schema 变更必须使用新的 migration 编号。
-17. 不使用或修改端口 8899。
-
-## 当前下一审计点
-
-TEST-102 服务器验收通过后，继续审计 Action Outcome API 在数据库 UNIQUE 冲突下的 HTTP 错误合同，以及并发失败是否会被正确映射为业务冲突而非 500。
-
-随后继续审计：
-- Recommendation / Action Plan 不得绕过 Decision 直接进入 Execution。
-- Execution 不得绕过 Outcome 生命周期。
-- Learning → AnalysisContext 的反馈传播必须真实、可追踪、无跨 scope 污染。
-- Feedback / Learning 不得推断未经 evidence 支持的 success 或 relationship impact。
-
-## 验收规则
-
-每个 TEST 完成后必须：
-- GitHub 代码与测试通过；
-- 必要时进行服务器 targeted + full pytest；
-- 检查 `git status --short`；
-- 检查历史 migration 未被修改；
-- 更新本 handover；
-- verification tag 如当前 GitHub connector 无法创建，必须明确记录为 PENDING TAG，不得虚报。
+- AnalysisContext deterministic、source-backed、read-only。
+- StructuredAnalysis 是 derived interpretation，不是 canonical truth。
+- Recommendation 必须经过 StrategyRecommendationCandidate → RecommendationProducer。
+- Action Plan 必须 evidence-backed 且等待用户确认。
+- Action Decision 必须来自显式 user decision；不得自动确认、执行、发送消息、修改 relationship 或伪造 Outcome。
+- Outcome → Feedback → Learning → Re-analysis 必须继续沿唯一 canonical lifecycle。
+- 所有数据必须 user_id 隔离；Person / Relationship / Conversation 不得跨 scope 混用。
+- 不修改历史 migration；新增 schema 必须使用新 migration。
+- MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
+- Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~135 verification tag 已创建。
