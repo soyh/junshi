@@ -1,7 +1,7 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-135 — Authenticated Product Shell — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-135 — Authenticated Product Shell — SERVER FINAL RERUN PENDING AFTER CWD TEST FIX
 当前 Branch：test-135-authenticated-product-shell
 TEST-133 VERIFIED 服务器代码 HEAD：`74a9c5a976be094d9dd2d51e764ab457965f83ec`
 TEST-133 验收闭环文档基线：`6066e6b108592df427f265291c7af968c681a3d2`
@@ -16,8 +16,8 @@ TEST-133 验收闭环文档基线：`6066e6b108592df427f265291c7af968c681a3d2`
 ## 阶段状态
 
 TEST-008 ~ TEST-133：按既有交接记录 VERIFIED。
-TEST-134 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — platform-neutral release runbook / rollback safety contract；GitHub full 734。
-TEST-135 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — authenticated single-page product shell；GitHub full 740。
+TEST-134 GITHUB SELF-TEST PASSED / SERVER FINAL RERUN PENDING — platform-neutral release runbook / rollback safety contract；服务器 targeted 已通过。
+TEST-135 GITHUB SELF-TEST PASSED / SERVER FINAL RERUN PENDING — authenticated single-page product shell；服务器 targeted 已通过，服务器首次 full 仅暴露一个 cwd-dependent 测试缺陷，该测试修复已由 GitHub server-parity 回归验证。
 
 ## Runtime / Operations 产品化基线
 
@@ -33,7 +33,7 @@ TEST-135 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — authenticated s
 - TEST-131：HTTP liveness 与 runtime readiness 分离；高频 probe 不执行 backup checksum/integrity。
 - TEST-132：本机 loopback-only runtime probe CLI。
 - TEST-133：平台无关 supervisor lifecycle contract。
-- TEST-134：平台无关 release runbook，明确 backup/preflight/stop/switch/start/probe/rollback 顺序和数据库回滚安全门槛。
+- TEST-134：平台无关 release runbook，明确 backup/preflight/stop/switch/start/probe/rollback顺序和数据库回滚安全门槛。
 
 ## TEST-132 / TEST-133 — VERIFIED
 
@@ -91,7 +91,24 @@ GitHub Actions run `35356010017`：success；
 - warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
 - 临时 workflow 已删除。
 
-当前等待服务器累计验收 TEST-134 + TEST-135。验收只运行 pytest / git diff / git status；不执行 deployment/backup/restore/preflight/server/probe CLI，不修改 `.env`，不触碰 8899。
+## 2026-09-18 服务器累计验收与 cwd 测试修复
+
+服务器在 `8e62e788387992e37c976152f5120d45e1ad39a1` 上执行：
+- `tests/test_release_runbook_contract.py + tests/test_authenticated_product_shell.py`：18 passed；
+- full pytest：739 passed / 1 failed；
+- `git diff --check` 无输出，`git status --short` 无输出。
+
+唯一失败为 `tests/test_auth_bootstrap_retirement.py::test_env_example_disables_bootstrap_by_default`：测试使用 `Path(".env.example")`，从 `backend/` 工作目录运行时错误地寻找 `backend/.env.example`。这是测试 cwd 假设，不是生产代码失败。
+
+修复提交 `416dc6c3f5d1769161fb688eb4a8c7f12920e16b`：测试改为从 `Path(__file__).resolve().parents[2]` 定位仓库根目录，继续校验同一个根目录 `.env.example`，未修改 production code、migration、`.env` 或运行时配置。
+
+GitHub Actions server-parity run `35362679263` 从 `backend/` 工作目录验证成功：
+- bootstrap retirement：6 passed、1 warning；
+- TEST-134 + TEST-135 targeted：18 passed、1 warning；
+- full pytest：740 passed、1 warning in 36.70s；
+- 临时 workflow 已删除。
+
+当前只差服务器拉取最新分支后再次运行 bootstrap retirement + TEST-134/135 targeted + full pytest，并确认 `git diff --check` / `git status --short` clean。服务器最终复跑通过前，不把 TEST-134/135 标记为 VERIFIED，不创建 TEST-136 分支。
 
 ## 下一阶段候选
 
