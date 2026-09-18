@@ -6,15 +6,18 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
   <title>AI Love Strategist</title>
   <style>
     :root { color-scheme: light dark; font-family: Arial, sans-serif; }
-    body { max-width: 1080px; margin: 28px auto; padding: 0 20px 48px; }
+    body { max-width: 1180px; margin: 28px auto; padding: 0 20px 48px; }
     header { margin-bottom: 24px; }
     nav { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 24px; }
     nav a { padding: 8px 12px; border: 1px solid rgba(127,127,127,.35); border-radius: 8px; text-decoration: none; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+    .workspace-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    .workspace-card { padding: 14px; border: 1px solid rgba(127,127,127,.3); border-radius: 8px; }
     fieldset { margin: 0; padding: 18px; border-radius: 10px; min-width: 0; }
     label { display: block; margin: 12px 0 4px; font-weight: 600; }
-    input, select, button { font: inherit; }
-    input, select { width: 100%; box-sizing: border-box; padding: 9px; }
+    input, select, textarea, button { font: inherit; }
+    input, select, textarea { width: 100%; box-sizing: border-box; padding: 9px; }
+    textarea { min-height: 72px; resize: vertical; }
     button { margin: 12px 8px 0 0; padding: 9px 14px; cursor: pointer; }
     button:disabled { opacity: .5; cursor: not-allowed; }
     .note { opacity: .78; font-size: .92rem; }
@@ -31,9 +34,9 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
   <p class="note">登录态仅保存在当前页面运行内存中。页面刷新或关闭后需要重新登录；session token 不会被写入页面字段、URL 或浏览器持久化存储。</p>
   <nav aria-label="Product sections">
     <a href="#account">Account</a>
+    <a href="#workspace">Workspace</a>
     <a href="#provider">LLM Provider</a>
     <a href="#analysis">Structured Analysis</a>
-    <a href="#workspace">Workspace</a>
   </nav>
 </header>
 
@@ -57,6 +60,66 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
     <button id="rotate-session" class="requires-auth" type="button" disabled>Rotate current session</button>
     <button id="revoke-others" class="requires-auth" type="button" disabled>Revoke other sessions</button>
     <div id="sessions" class="status">Login to manage sessions.</div>
+  </fieldset>
+
+  <fieldset id="workspace" class="wide">
+    <legend>Workspace</legend>
+    <p>核心后端模块已包括 Person、Relationship、Conversation、Recommendation、Action Plan、Execution、Outcome、Feedback、Learning 与 Re-analysis。</p>
+    <p class="note">TEST-136 只把 Person、Relationship、Conversation 的既有 API 接入统一 authenticated shell。Recommendation 及后续生命周期仍不伪造尚未完成的业务页面。</p>
+
+    <div class="workspace-grid">
+      <section class="workspace-card" aria-labelledby="person-heading">
+        <h2 id="person-heading">Person</h2>
+        <label for="person-name">Name</label>
+        <input id="person-name" autocomplete="off" maxlength="200">
+        <label for="person-nickname">Nickname</label>
+        <input id="person-nickname" autocomplete="off" maxlength="200">
+        <label for="person-notes">Notes</label>
+        <textarea id="person-notes"></textarea>
+        <button id="load-persons" class="requires-auth" type="button" disabled>Refresh persons</button>
+        <button id="create-person" class="requires-auth" type="button" disabled>Create person</button>
+        <label for="person-select">Current person</label>
+        <select id="person-select" class="requires-auth" size="6" disabled></select>
+        <div id="person-status" class="status">Login to load persons.</div>
+      </section>
+
+      <section class="workspace-card" aria-labelledby="relationship-heading">
+        <h2 id="relationship-heading">Relationship</h2>
+        <p class="note">Relationship 始终绑定当前选中的 Person；服务端继续负责 scope 与 canonical consistency 校验。</p>
+        <label for="relationship-state">Status</label>
+        <input id="relationship-state" value="unknown" autocomplete="off">
+        <label for="relationship-stage">Stage</label>
+        <input id="relationship-stage" value="unknown" autocomplete="off">
+        <label for="relationship-long-term-goal">Long-term goal</label>
+        <textarea id="relationship-long-term-goal"></textarea>
+        <label for="relationship-current-goal">Current goal</label>
+        <textarea id="relationship-current-goal"></textarea>
+        <label for="relationship-notes">Notes</label>
+        <textarea id="relationship-notes"></textarea>
+        <button id="load-relationships" class="requires-auth" type="button" disabled>Refresh relationships</button>
+        <button id="create-relationship" class="requires-auth" type="button" disabled>Create relationship</button>
+        <label for="relationship-select">Current relationship</label>
+        <select id="relationship-select" class="requires-auth" size="6" disabled></select>
+        <div id="relationship-status" class="status">Select a person first.</div>
+      </section>
+
+      <section class="workspace-card" aria-labelledby="conversation-heading">
+        <h2 id="conversation-heading">Conversation</h2>
+        <p class="note">Conversation 必须绑定当前 Person；当前 Relationship 可选。选择 Conversation 后会同步到 Structured Analysis。</p>
+        <label for="conversation-title">Title</label>
+        <input id="conversation-title" autocomplete="off">
+        <label for="conversation-state">Status</label>
+        <select id="conversation-state" class="requires-auth" disabled>
+          <option value="active">active</option>
+          <option value="archived">archived</option>
+        </select>
+        <button id="load-conversations" class="requires-auth" type="button" disabled>Refresh conversations</button>
+        <button id="create-conversation" class="requires-auth" type="button" disabled>Create conversation</button>
+        <label for="conversation-select">Current conversation</label>
+        <select id="conversation-select" class="requires-auth" size="6" disabled></select>
+        <div id="conversation-status" class="status">Select a person first.</div>
+      </section>
+    </div>
   </fieldset>
 
   <fieldset id="provider" class="wide">
@@ -91,12 +154,6 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
     <button id="run-analysis" class="requires-auth" type="button" disabled>Run structured analysis</button>
     <div id="analysis-result" class="status">Login before running analysis.</div>
   </fieldset>
-
-  <fieldset id="workspace" class="wide">
-    <legend>Workspace</legend>
-    <p>核心后端模块已包括 Person、Relationship、Conversation、Recommendation、Action Plan、Execution、Outcome、Feedback、Learning 与 Re-analysis。</p>
-    <p class="note">本阶段只统一身份与 Provider/Analysis 入口，不伪造尚未完成的业务页面。后续 UI 将在同一 authenticated shell 中逐步接入。</p>
-  </fieldset>
 </div>
 
 <script>
@@ -106,7 +163,13 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
   const sessionsNode = byId('sessions');
   const providerStatus = byId('provider-status');
   const analysisResult = byId('analysis-result');
+  const personStatus = byId('person-status');
+  const relationshipStatus = byId('relationship-status');
+  const conversationStatus = byId('conversation-status');
   let currentAccessToken = null;
+  let selectedPersonId = null;
+  let selectedRelationshipId = null;
+  let selectedConversationId = null;
 
   function requireToken() {
     if (!currentAccessToken) throw new Error('Login is required');
@@ -138,6 +201,50 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
     return data;
   }
 
+  function resetSelect(id, placeholder) {
+    const select = byId(id);
+    select.replaceChildren();
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = placeholder;
+    select.appendChild(option);
+    select.value = '';
+  }
+
+  function renderSelect(id, items, labelFor, placeholder, selectedValue = null) {
+    const select = byId(id);
+    select.replaceChildren();
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = placeholder;
+    select.appendChild(empty);
+    items.forEach((item) => {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = labelFor(item);
+      select.appendChild(option);
+    });
+    select.value = selectedValue && items.some((item) => item.id === selectedValue) ? selectedValue : '';
+  }
+
+  function nullableText(id) {
+    const value = byId(id).value.trim();
+    return value || null;
+  }
+
+  function resetWorkspace(message = 'Login to load persons.') {
+    selectedPersonId = null;
+    selectedRelationshipId = null;
+    selectedConversationId = null;
+    resetSelect('person-select', 'No person selected');
+    resetSelect('relationship-select', 'Select a person first');
+    resetSelect('conversation-select', 'Select a person first');
+    byId('conversation-id').value = '';
+    personStatus.textContent = message;
+    relationshipStatus.textContent = 'Select a person first.';
+    conversationStatus.textContent = 'Select a person first.';
+  }
+
   function establishSession(data, message) {
     if (!data || !data.access_token) throw new Error('Server did not return a session token');
     currentAccessToken = data.access_token;
@@ -153,6 +260,7 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
     providerStatus.textContent = 'Login before managing provider settings.';
     analysisResult.textContent = 'Login before running analysis.';
     byId('api-key').value = '';
+    resetWorkspace();
     setAuthenticatedControls(false);
   }
 
@@ -166,6 +274,7 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
     }, false);
     establishSession(data, 'Registered and authenticated.');
     await loadProvider();
+    await loadWorkspace();
   }
 
   async function login() {
@@ -178,6 +287,7 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
     }, false);
     establishSession(data, 'Authenticated.');
     await loadProvider();
+    await loadWorkspace();
   }
 
   async function logout() {
@@ -264,6 +374,152 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
     providerStatus.textContent = 'Provider config deleted.';
   }
 
+  async function loadPersons() {
+    const items = await api('/api/v1/persons');
+    if (!items.some((item) => item.id === selectedPersonId)) {
+      selectedPersonId = null;
+      selectedRelationshipId = null;
+      selectedConversationId = null;
+      byId('conversation-id').value = '';
+    }
+    renderSelect(
+      'person-select',
+      items,
+      (item) => item.nickname ? `${item.name} (${item.nickname})` : item.name,
+      'No person selected',
+      selectedPersonId,
+    );
+    personStatus.textContent = `${items.length} person(s) available.`;
+    if (selectedPersonId) {
+      await loadRelationships();
+      await loadConversations();
+    } else {
+      resetSelect('relationship-select', 'Select a person first');
+      resetSelect('conversation-select', 'Select a person first');
+      relationshipStatus.textContent = 'Select a person first.';
+      conversationStatus.textContent = 'Select a person first.';
+    }
+  }
+
+  async function createPerson() {
+    const name = byId('person-name').value.trim();
+    if (!name) throw new Error('Person name is required');
+    const created = await api('/api/v1/persons', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        nickname: nullableText('person-nickname'),
+        notes: nullableText('person-notes'),
+      }),
+    });
+    selectedPersonId = created.id;
+    selectedRelationshipId = null;
+    selectedConversationId = null;
+    byId('person-name').value = '';
+    byId('person-nickname').value = '';
+    byId('person-notes').value = '';
+    await loadPersons();
+    personStatus.textContent = `Created and selected ${created.name}.`;
+  }
+
+  async function loadRelationships() {
+    if (!selectedPersonId) {
+      resetSelect('relationship-select', 'Select a person first');
+      relationshipStatus.textContent = 'Select a person first.';
+      return;
+    }
+    const allItems = await api('/api/v1/relationships');
+    const items = allItems.filter((item) => item.person_id === selectedPersonId);
+    if (!items.some((item) => item.id === selectedRelationshipId)) selectedRelationshipId = null;
+    renderSelect(
+      'relationship-select',
+      items,
+      (item) => `${item.status} · ${item.stage}`,
+      'No relationship selected',
+      selectedRelationshipId,
+    );
+    relationshipStatus.textContent = `${items.length} relationship(s) for current person.`;
+  }
+
+  async function createRelationship() {
+    if (!selectedPersonId) throw new Error('Select a person before creating a relationship');
+    const created = await api('/api/v1/relationships', {
+      method: 'POST',
+      body: JSON.stringify({
+        person_id: selectedPersonId,
+        status: byId('relationship-state').value.trim() || 'unknown',
+        stage: byId('relationship-stage').value.trim() || 'unknown',
+        long_term_goal: nullableText('relationship-long-term-goal'),
+        current_goal: nullableText('relationship-current-goal'),
+        notes: nullableText('relationship-notes'),
+      }),
+    });
+    selectedRelationshipId = created.id;
+    await loadRelationships();
+    relationshipStatus.textContent = `Created and selected relationship ${created.status} · ${created.stage}.`;
+  }
+
+  async function loadConversations() {
+    if (!selectedPersonId) {
+      resetSelect('conversation-select', 'Select a person first');
+      conversationStatus.textContent = 'Select a person first.';
+      return;
+    }
+    const items = await api(`/api/v1/conversations?person_id=${encodeURIComponent(selectedPersonId)}`);
+    if (!items.some((item) => item.id === selectedConversationId)) {
+      selectedConversationId = null;
+      byId('conversation-id').value = '';
+    }
+    renderSelect(
+      'conversation-select',
+      items,
+      (item) => `${item.title || '(untitled)'} · ${item.status}`,
+      'No conversation selected',
+      selectedConversationId,
+    );
+    conversationStatus.textContent = `${items.length} conversation(s) for current person.`;
+  }
+
+  async function createConversation() {
+    if (!selectedPersonId) throw new Error('Select a person before creating a conversation');
+    const created = await api('/api/v1/conversations', {
+      method: 'POST',
+      body: JSON.stringify({
+        person_id: selectedPersonId,
+        relationship_id: selectedRelationshipId || null,
+        title: nullableText('conversation-title'),
+        status: byId('conversation-state').value,
+      }),
+    });
+    selectedConversationId = created.id;
+    byId('conversation-title').value = '';
+    byId('conversation-id').value = created.id;
+    await loadConversations();
+    conversationStatus.textContent = `Created and selected ${created.title || '(untitled)'}.`;
+  }
+
+  async function loadWorkspace() {
+    await loadPersons();
+  }
+
+  async function selectPerson() {
+    selectedPersonId = byId('person-select').value || null;
+    selectedRelationshipId = null;
+    selectedConversationId = null;
+    byId('conversation-id').value = '';
+    await loadRelationships();
+    await loadConversations();
+  }
+
+  function selectRelationship() {
+    selectedRelationshipId = byId('relationship-select').value || null;
+  }
+
+  function selectConversation() {
+    selectedConversationId = byId('conversation-select').value || null;
+    byId('conversation-id').value = selectedConversationId || '';
+  }
+
   async function runAnalysis() {
     const conversationId = byId('conversation-id').value.trim();
     if (!conversationId) throw new Error('Conversation ID is required');
@@ -289,7 +545,21 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
   bind('save-provider', saveProvider, providerStatus);
   bind('test-provider', testProvider, providerStatus);
   bind('delete-provider', deleteProvider, providerStatus);
+  bind('load-persons', loadPersons, personStatus);
+  bind('create-person', createPerson, personStatus);
+  bind('load-relationships', loadRelationships, relationshipStatus);
+  bind('create-relationship', createRelationship, relationshipStatus);
+  bind('load-conversations', loadConversations, conversationStatus);
+  bind('create-conversation', createConversation, conversationStatus);
   bind('run-analysis', runAnalysis, analysisResult);
+
+  byId('person-select').addEventListener('change', async () => {
+    try { await selectPerson(); }
+    catch (error) { personStatus.textContent = error instanceof Error ? error.message : String(error); }
+  });
+  byId('relationship-select').addEventListener('change', selectRelationship);
+  byId('conversation-select').addEventListener('change', selectConversation);
+
   clearSession();
 })();
 </script>
