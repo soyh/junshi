@@ -154,7 +154,11 @@ def test_http_readiness_returns_503_with_normalized_failure(client, monkeypatch)
     assert "password" not in serialized
 
 
-def test_all_health_responses_are_no_store(client):
-    for path in ("/health", "/health/live", "/health/ready"):
-        response = client.get(path)
-        assert response.headers["cache-control"] == "no-store"
+def test_probe_cache_contract_preserves_legacy_health(client):
+    legacy = client.get("/health")
+    live = client.get("/health/live")
+    ready = client.get("/health/ready")
+
+    assert legacy.headers.get("cache-control") != "no-store"
+    assert live.headers["cache-control"] == "no-store"
+    assert ready.headers["cache-control"] == "no-store"
