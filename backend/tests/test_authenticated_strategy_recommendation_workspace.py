@@ -34,8 +34,7 @@ def _register(client, username: str):
         json={"username": username, "password": PASSWORD},
     )
     assert response.status_code == 201
-    body = response.json()
-    return body["access_token"], body["user"]["id"]
+    return response.json()["access_token"]
 
 
 def _auth(token: str):
@@ -49,14 +48,16 @@ def _create_person_conversation(client, token: str):
         json={"name": "TEST-139 Person"},
     )
     assert person.status_code == 201
-    person_id = person.json()["id"]
+    person_body = person.json()
+    person_id = person_body["id"]
+    user_id = person_body["user_id"]
     conversation = client.post(
         "/api/v1/conversations",
         headers=_auth(token),
         json={"person_id": person_id, "title": "TEST-139 Conversation"},
     )
     assert conversation.status_code == 201
-    return person_id, conversation.json()["id"]
+    return user_id, person_id, conversation.json()["id"]
 
 
 def _structured_analysis():
@@ -208,8 +209,8 @@ def test_strategy_recommendation_fragment_is_read_only(client):
 
 
 def test_real_bearer_identity_flows_into_strategy_route(client, monkeypatch):
-    token, user_id = _register(client, "test139-strategy-user")
-    person_id, conversation_id = _create_person_conversation(client, token)
+    token = _register(client, "test139-strategy-user")
+    user_id, person_id, conversation_id = _create_person_conversation(client, token)
     fake_service = FakeStrategyService(_strategy_result(person_id))
     fake_provider = FakeProvider()
     monkeypatch.setattr(analysis_strategy, "service", fake_service)
@@ -225,8 +226,8 @@ def test_real_bearer_identity_flows_into_strategy_route(client, monkeypatch):
 
 
 def test_real_bearer_identity_flows_into_recommendation_route(client, monkeypatch):
-    token, user_id = _register(client, "test139-recommendation-user")
-    person_id, conversation_id = _create_person_conversation(client, token)
+    token = _register(client, "test139-recommendation-user")
+    user_id, person_id, conversation_id = _create_person_conversation(client, token)
     fake_service = FakeRecommendationService(_recommendation_result(person_id))
     fake_provider = FakeProvider()
     monkeypatch.setattr(analysis_recommendation, "service", fake_service)
@@ -244,9 +245,9 @@ def test_real_bearer_identity_flows_into_recommendation_route(client, monkeypatc
 
 
 def test_foreign_conversation_is_rejected_before_analysis_generation(client):
-    alice, _ = _register(client, "test139-alice")
-    bob, _ = _register(client, "test139-bob")
-    _, conversation_id = _create_person_conversation(client, alice)
+    alice = _register(client, "test139-alice")
+    bob = _register(client, "test139-bob")
+    _, _, conversation_id = _create_person_conversation(client, alice)
 
     strategy = client.get(
         f"/api/v1/conversations/{conversation_id}/strategy/context",
