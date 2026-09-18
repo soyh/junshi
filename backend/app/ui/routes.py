@@ -9,6 +9,10 @@ from app.ui.action_execution_workspace import (
     ACTION_EXECUTION_HTML,
     ACTION_EXECUTION_SCRIPT,
 )
+from app.ui.action_feedback_workspace import (
+    ACTION_FEEDBACK_HTML,
+    ACTION_FEEDBACK_SCRIPT,
+)
 from app.ui.action_outcome_workspace import (
     ACTION_OUTCOME_HTML,
     ACTION_OUTCOME_SCRIPT,
@@ -49,6 +53,7 @@ def build_product_shell_html() -> str:
         f"{ACTION_DECISION_HTML}\n"
         f"{ACTION_EXECUTION_HTML}\n"
         f"{ACTION_OUTCOME_HTML}\n"
+        f"{ACTION_FEEDBACK_HTML}\n"
         f"{provider_marker}"
     )
     html = PRODUCT_SHELL_HTML.replace(
@@ -59,6 +64,7 @@ def build_product_shell_html() -> str:
     workspace_script = (
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
+        f"{ACTION_FEEDBACK_SCRIPT}\n\n"
         f"{ACTION_OUTCOME_SCRIPT}\n\n"
         f"{ACTION_EXECUTION_SCRIPT}\n\n"
         f"{ACTION_DECISION_SCRIPT}\n\n"
