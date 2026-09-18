@@ -1,0 +1,33 @@
+name: TEST-132 validation
+
+on:
+  push:
+    branches:
+      - test-132-local-runtime-probe
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: TEST-132 local runtime probe
+        run: pytest -q backend/tests/test_local_runtime_probe.py
+      - name: TEST-131 runtime health regression
+        run: pytest -q backend/tests/test_runtime_health.py
+      - name: TEST-130 preflight regression
+        run: pytest -q backend/tests/test_release_preflight.py
+      - name: TEST-125 launcher regression
+        run: pytest -q backend/tests/test_secure_uvicorn_launcher.py
+      - name: TEST-123 HTTP security regression
+        run: pytest -q backend/tests/test_http_security_boundary.py
+      - name: Production auth regression
+        run: pytest -q backend/tests/test_auth_boundary.py
+      - name: Scope isolation regression
+        run: pytest -q backend/tests/test_execution_scope_isolation.py backend/tests/test_action_plan_snapshot_isolation.py
+      - name: Full test suite
+        run: pytest -q
