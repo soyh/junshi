@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-127 — Offline Verified Restore Safety — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-127 — Offline Verified Restore Safety — VERIFIED
 当前 Branch：test-127-offline-verified-restore
-TEST-125 VERIFIED 服务器代码 HEAD：`e018aac176ed5214baf6b1084b91f3ed550436b7`
+服务器验收代码 HEAD：`023fb2391d47d692db8b3b1002c5fbb2637be7d3`
 
 ## 项目目标
 
@@ -46,8 +46,8 @@ TEST-122 VERIFIED — legacy `X-User-ID` retired；服务器累计验收通过�
 TEST-123 VERIFIED — HTTP security response boundary；服务器累计验收通过；full 636 passed；HEAD `77eddc8f84547cf5acae89142a463b7e64d72d78`。
 TEST-124 VERIFIED — production FastAPI debug/docs surface hardening；服务器累计验收通过；GitHub full 640 passed。
 TEST-125 VERIFIED — secure Uvicorn launcher；服务器 full 647 passed；HEAD `e018aac176ed5214baf6b1084b91f3ed550436b7`。
-TEST-126 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — SQLite online backup + integrity verification；full 655 passed。
-TEST-127 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — offline verified restore safety；full 663 passed。
+TEST-126 VERIFIED — SQLite online backup + integrity verification；服务器 8 passed，累计 full 663 passed。
+TEST-127 VERIFIED — offline verified restore safety；服务器 8 passed，累计 full 663 passed；服务器 HEAD `023fb2391d47d692db8b3b1002c5fbb2637be7d3`。
 
 ## Runtime / Operations 产品化基线
 
@@ -58,66 +58,38 @@ TEST-127 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING — offline verifie
 - TEST-126：SQLite online backup API + WAL-safe consistent snapshot + integrity verification + atomic publish。
 - TEST-127：offline-confirmed restore + pre/post integrity verification + atomic replace + stale WAL/SHM cleanup。
 
-## TEST-124 / TEST-125 — VERIFIED
+## TEST-126 / TEST-127 — VERIFIED
 
-服务器累计验收全部符合预期：TEST-125 7、TEST-124 4、TEST-123 6、TEST-122 4、production auth 8、Auth UI 4、Provider UI 3、scope isolation 4、full 647 passed in 121.15s；工作树 clean；migration diff 空；文件 diff 精确匹配。
+服务器累计验收：TEST-127 restore 8、TEST-126 backup 8、TEST-125 launcher 7、TEST-124 surface 4、production auth 8、scope isolation 4、full 663 passed in 123.02s；工作树 clean；migration diff 空；最终文件 diff 精确匹配。
 
-## TEST-126 — SQLite Online Backup / Integrity Verification — GITHUB SELF-TEST PASSED
+TEST-126：
+1. `sqlite3.Connection.backup()` 创建 WAL-safe 一致性 snapshot；
+2. `PRAGMA integrity_check` 必须严格返回 `ok`；
+3. sibling temp → integrity_check → fsync → atomic `os.replace()`；
+4. source missing / source=destination / existing destination / corrupt DB 均 fail closed；
+5. 异常不发布 partial backup；
+6. CLI `python -m app.backup` 已建立，但验收阶段未操作生产库。
 
-1. `backend/app/core/backup.py` 使用 `sqlite3.Connection.backup()`，source 只读打开；
-2. WAL writer 保持打开且 autocheckpoint disabled 时，backup 仍包含已提交 WAL 数据；
-3. `PRAGMA integrity_check` 必须严格返回 `ok`；
-4. destination 已存在不覆盖；source missing / source=destination fail closed；
-5. sibling temp → integrity_check → fsync → atomic `os.replace()`；
-6. 异常路径清理 temp，不发布 partial backup；
-7. `backend/app/backup.py` 提供 timestamp destination 与 `--verify-only`；
-8. GitHub run `35313426634`：TEST-126 8、TEST-125 7、TEST-124 4、TEST-123 6、production auth 8、scope 4、full 655 passed、1 warning in 36.43s；
-9. CI 只使用临时数据库；无 migration；临时 workflow 已删除。
+TEST-127：
+1. restore 必须显式 `offline_confirmed=True`；
+2. backup 在触碰 destination 前先完整性验证；
+3. candidate temp 再验证、chmod 0600、fsync；
+4. 仅验证通过后原子替换；
+5. 成功后清理 stale `-wal` / `-shm`；
+6. 最终 destination 再次 integrity verification；
+7. CLI `python -m app.restore` 必须显式 `--offline-confirmed`；
+8. 验收阶段未执行 backup/restore CLI、未停止服务、未修改 `.env`、未触碰 8899。
 
-## TEST-127 — Offline Verified Restore Safety — GITHUB SELF-TEST PASSED
+## 下一阶段
 
-目标：建立不会在应用仍在线或 backup 未验证时覆盖 SQLite 主库的 restore 契约。
-
-实现：
-1. 新增 `backend/app/core/restore.py`；
-2. `restore_verified_backup()` 默认拒绝执行，必须显式 `offline_confirmed=True`；
-3. backup=destination 直接拒绝；
-4. restore 前先调用 TEST-126 `verify_database()`，损坏 backup 在 destination 被触碰前 fail closed；
-5. backup 复制到 destination 同目录 sibling restore temp；
-6. temp 再次执行 integrity verification，并 chmod 0600 + fsync；
-7. 仅验证通过后 `os.replace()` 原子替换 destination；
-8. 替换成功后删除旧 destination 的 `-wal` / `-shm` sidecars，避免 stale WAL/SHM 作用于新主库；
-9. directory fsync 后对最终 destination 再次 integrity verification；
-10. 所有异常路径清理 restore temp；candidate verification 失败时原 destination 保持不变；
-11. 新增 `backend/app/restore.py` CLI，必须显式传 `--offline-confirmed`；默认 destination 为 `DATABASE_PATH`；
-12. GitHub/CI 全部使用 pytest 临时库，没有执行生产恢复，也没有停止/修改当前服务或 8899；
-13. 无 schema migration。
-
-新增 `backend/tests/test_sqlite_offline_restore.py` 8 个契约测试：
-- missing offline confirmation 拒绝且原库不变；
-- corrupt backup 在目标修改前拒绝；
-- backup=destination 拒绝；
-- atomic replace existing DB；
-- restore to missing destination；
-- stale WAL/SHM cleanup；
-- candidate verification forced failure 保留原库并清 temp；
-- CLI 只在显式 offline flag 下向核心 restore 传确认。
-
-GitHub Actions run `35313706511`：success；
-- TEST-127：8 passed；
-- TEST-126：8 passed；
-- TEST-125：7 passed；
-- TEST-124：4 passed；
-- production auth：8 passed；
-- scope isolation：4 passed；
-- full pytest：663 passed、1 warning in 57.23s；
-- 临时 validation workflow 已删除。
-
-当前等待服务器一次性验收 TEST-126 + TEST-127。服务器验收只运行 pytest，不执行 `python -m app.backup` 或 `python -m app.restore`，因此不会触碰生产数据库。
-
-## 下一阶段候选
-
-TEST-126/127 服务器通过后继续推进 TEST-128。优先候选：backup retention / manifest / checksum、release/runtime health 与运维检查，仍先以临时数据验证为主。
+TEST-128 — Backup Manifest / Checksum / Retention：
+1. 每个备份发布配套 manifest；
+2. manifest 记录 schema version、UTC created_at、backup filename、size、SHA-256、integrity 状态；
+3. 提供 manifest + file 双重验证；
+4. retention 只删除由有效 manifest 明确认领的历史备份，绝不扫描删除任意 SQLite 文件；
+5. retention 支持 dry-run，真实删除时 backup + manifest 成对处理；
+6. 所有测试继续只使用临时目录和临时 SQLite 数据；
+7. 不新增 schema migration。
 
 ## 架构与持续禁止事项
 
