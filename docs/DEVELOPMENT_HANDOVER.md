@@ -1,9 +1,9 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-125 — Secure Uvicorn Launcher Contract — VERIFIED
-当前 Branch：test-125-secure-uvicorn-launcher
-服务器验收代码 HEAD：`e018aac176ed5214baf6b1084b91f3ed550436b7`
+当前阶段：TEST-126 — SQLite Online Backup / Integrity Verification — GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED
+当前 Branch：test-126-sqlite-online-backup
+TEST-125 VERIFIED 服务器代码 HEAD：`e018aac176ed5214baf6b1084b91f3ed550436b7`
 
 ## 项目目标
 
@@ -43,56 +43,72 @@ TEST-119 VERIFIED — authenticated password change / credential rotation；服�
 TEST-120 VERIFIED — FastAPI-served account/session UI；服务器 full 619；HEAD `456cd94bacb85655c53a892f23cba742af76d925`。
 TEST-121 VERIFIED — production bootstrap default retirement；服务器 full 625；HEAD `43b514a5dfa454b85424b3abe5a96ffb93da0c24`。
 TEST-122 VERIFIED — legacy `X-User-ID` retired；服务器累计验收通过；GitHub full 630 passed。
-TEST-123 VERIFIED — HTTP security response boundary；服务器累计验收通过；full 636 passed；服务器 HEAD `77eddc8f84547cf5acae89142a463b7e64d72d78`。
-TEST-124 VERIFIED — production FastAPI debug/docs surface hardening；服务器 cumulative validation passed；GitHub full 640 passed。
-TEST-125 VERIFIED — secure Uvicorn launcher；服务器 targeted 全通过、full 647 passed in 121.15s；工作树 clean；migration diff 空；服务器 HEAD `e018aac176ed5214baf6b1084b91f3ed550436b7`。
+TEST-123 VERIFIED — HTTP security response boundary；服务器累计验收通过；full 636 passed；HEAD `77eddc8f84547cf5acae89142a463b7e64d72d78`。
+TEST-124 VERIFIED — production FastAPI debug/docs surface hardening；服务器累计验收通过；GitHub full 640 passed。
+TEST-125 VERIFIED — secure Uvicorn launcher；服务器 full 647 passed；HEAD `e018aac176ed5214baf6b1084b91f3ed550436b7`。
+TEST-126 GITHUB SELF-TEST PASSED / SERVER VALIDATION DEFERRED — SQLite online backup + integrity verification；full 655 passed。
 
-## Auth / Runtime 产品化基线
+## Runtime / Operations 产品化基线
 
-- TEST-114：production 禁止 `X-User-ID`；静态 bootstrap 仅作迁移兼容。
-- TEST-115：DB-backed opaque session，仅存 SHA-256 token hash。
-- TEST-116：normalized username + scrypt password；注册/登录签发 server-side session。
-- TEST-117：多设备 session list / revoke / rotate；bootstrap 有显式 disable 路径。
-- TEST-118：SQLite login throttle / progressive lockout。
-- TEST-119：password change 必须 active DB session + current password；成功后全部旧 session revoke 并签发新 session。
-- TEST-120：最小可用 Auth UI 只调用既有 VERIFIED API，不复制认证逻辑。
-- TEST-121：静态 `AUTH_BEARER_TOKEN → LOCAL_USER_ID` bootstrap 默认关闭；只有显式 `AUTH_BOOTSTRAP_ENABLED=true` 才保留迁移/应急兼容。
-- TEST-122：`X-User-ID` 在 production/development/test 均拒绝，不允许客户端通过 header 选择 `user_id`。
-- TEST-123：全局基础安全响应头；auth/settings 响应 `Cache-Control: no-store`；默认无 permissive CORS；Bearer 不切换 Cookie。
-- TEST-124：production 强制 `debug=False`，关闭 `/docs`、`/redoc`、`/openapi.json`。
-- TEST-125：统一 `python -m app.server` launcher；production 仅 loopback bind、单 worker、无 reload、无 proxy-header trust、无默认 Server header。
+- TEST-122：彻底退役 `X-User-ID` 身份来源。
+- TEST-123：基础 HTTP 安全响应头、auth/settings no-store、无 permissive CORS。
+- TEST-124：production 强制 `debug=False`，关闭 docs/redoc/openapi。
+- TEST-125：统一 `python -m app.server`；production loopback-only、single-worker、no reload、no proxy trust、no Server header。
+- TEST-126：SQLite online backup API + WAL-safe consistent snapshot + integrity verification + atomic publish。
 
-## TEST-124 — Production Surface Hardening — VERIFIED
+## TEST-124 / TEST-125 — VERIFIED
 
-1. `APP_ENV=production` 时 FastAPI 强制 `debug=False`；
-2. production 关闭 `/docs`、`/redoc`、`/openapi.json`；
-3. development/test 保留 docs/openapi 与可选 debug；
-4. GitHub run `35253423403`：TEST-124 4 passed，full 640 passed；
-5. 服务器累计验收：TEST-124 4 passed，相关回归全部通过；
-6. 无 migration。
+服务器累计验收全部符合预期：TEST-125 7、TEST-124 4、TEST-123 6、TEST-122 4、production auth 8、Auth UI 4、Provider UI 3、scope isolation 4、full 647 passed in 121.15s；工作树 clean；migration diff 空；文件 diff 精确匹配。TEST-124 / TEST-125 VERIFIED。
 
-## TEST-125 — Secure Uvicorn Launcher Contract — VERIFIED
+## TEST-126 — SQLite Online Backup / Integrity Verification — GITHUB SELF-TEST PASSED
 
-1. 新增 `backend/app/server.py`，标准入口 `python -m app.server`；
-2. production 仅接受 `127.0.0.1` / `::1` / `localhost`；
-3. production wildcard/public bind 直接拒绝；
-4. `workers=1`、`reload=False`；
-5. `proxy_headers=False`、`forwarded_allow_ips=""`；
-6. `server_header=False`；
-7. GitHub run `35253778818`：launcher 7 passed，full 647 passed；
-8. 服务器验收：launcher 7、TEST-124 4、TEST-123 6、TEST-122 4、production auth 8、Auth UI 4、Provider UI 3、scope isolation 4、full 647 passed；
-9. 工作树 clean；migration diff 为空；
-10. 本阶段未启动额外服务、未修改 `.env`、未触碰 8899。
+目标：建立可在线执行、可验证、不会因 WAL 文件复制遗漏已提交数据的 SQLite 备份基础。
+
+实现：
+1. 新增 `backend/app/core/backup.py`；
+2. `verify_database()` 使用只读连接执行 `PRAGMA integrity_check`，结果必须严格为 `ok`；
+3. `create_verified_backup()` 使用 `sqlite3.Connection.backup()` 创建一致性 snapshot；
+4. source 只读打开，支持 WAL 源库；
+5. destination 已存在时拒绝覆盖；source=destination、source 不存在均 fail closed；
+6. 先写 destination 同目录 sibling temp；完整 backup 后 integrity-check + fsync；
+7. 只有验证通过才 `os.replace()` 原子发布；
+8. 所有异常路径都清理临时文件，失败时不发布半成品；
+9. 新增 `backend/app/backup.py` CLI：支持显式 source/destination、默认 UTC timestamp 备份名以及 `--verify-only`；
+10. GitHub/CI 未读取或修改生产数据库，只使用 pytest `tmp_path` 临时库；
+11. 无 schema migration。
+
+新增 `backend/tests/test_sqlite_online_backup.py` 8 个契约测试：
+- healthy DB integrity；
+- corrupt DB rejection；
+- data-preserving backup；
+- writer 保持打开、WAL autocheckpoint disabled 时仍能捕获 committed WAL data；
+- missing source / same destination fail closed；
+- existing destination never overwritten；
+- forced verification failure 不发布 partial backup 且 temp 清理；
+- timestamp default destination 与 CLI verify-only contract。
+
+GitHub Actions run `35313426634`：success；
+- TEST-126：8 passed；
+- TEST-125：7 passed；
+- TEST-124：4 passed；
+- TEST-123：6 passed；
+- production auth：8 passed；
+- scope isolation：4 passed；
+- full pytest：655 passed、1 warning in 36.43s；
+- 临时 validation workflow 已删除。
+
+为加速推进，TEST-126 服务器验收与 TEST-127 合并执行，当前不标记 SERVER VERIFIED。
 
 ## 下一阶段
 
-TEST-126 — SQLite Online Backup / Integrity Verification：
-1. 使用 SQLite online backup API 创建一致性快照；
-2. 支持 WAL 源库，不通过文件复制拼接 WAL；
-3. 备份先落临时文件，验证 `PRAGMA integrity_check` 后原子发布；
-4. source 不存在、source=destination、损坏数据库必须 fail closed；
-5. 提供可测试 CLI，但 GitHub/服务器验收阶段只操作临时库，不直接备份生产数据库；
-6. 不新增 schema migration。
+TEST-127 — Offline Verified Restore Safety：
+1. restore 必须显式确认 application/database 已 offline；
+2. restore source 必须先通过 TEST-126 integrity verification；
+3. 先复制到 destination 同目录临时文件并再次验证，再原子替换 target；
+4. 成功替换后清理 stale `-wal` / `-shm` sidecars，避免旧 WAL 被应用到新数据库；
+5. 未显式 offline confirmation、损坏 backup、backup=destination 必须 fail closed；
+6. GitHub/服务器验收只操作临时库，不恢复生产数据库；
+7. 无 schema migration。
 
 ## 架构与持续禁止事项
 
@@ -106,4 +122,4 @@ TEST-126 — SQLite Online Backup / Integrity Verification：
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~125 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~126 verification tag 已创建。
