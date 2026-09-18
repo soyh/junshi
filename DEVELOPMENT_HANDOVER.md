@@ -1,8 +1,8 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-09-19
-当前阶段：TEST-139 — Strategy & Recommendation Workspace — VERIFIED
-当前 Branch：test-139-strategy-recommendation-workspace
+当前阶段：TEST-140 — Action Plan Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-140-action-plan-workspace
 TEST-139 VERIFIED 服务器代码 HEAD：`6a9eb85104d5fd7dc35bd09bb89d35f2efba52c6`
 TEST-138 VERIFIED 服务器代码 HEAD：`483d1f01d24de5c3ec53e96c62b26c46fac44713`
 TEST-137 VERIFIED 服务器代码 HEAD：`da5a3b355dbdb6345809cfe0e2c28cd880e9e849`
@@ -27,6 +27,7 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 - TEST-137 VERIFIED：Conversation Content Workspace，Messages + Text Import 产品化接入。
 - TEST-138 VERIFIED：Relationship Evidence / Timeline Workspace。
 - TEST-139 VERIFIED：Strategy & Recommendation Workspace。
+- TEST-140：GitHub self-test passed；服务器最终验收待执行。
 
 ## Runtime / Operations 产品化基线
 
@@ -51,58 +52,74 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 - TEST-137：Messages + Text Import；Text Import 保持“创建新 Conversation”既有语义；server verified targeted 81 / full 754。
 - TEST-138：Interaction + Person Timeline；Timeline 只读聚合 Conversation + Message + Interaction；server verified targeted 48 / full 761。
 
-TEST-138 服务器最终验收：branch `test-138-relationship-evidence-timeline-workspace`，HEAD `483d1f01d24de5c3ec53e96c62b26c46fac44713`，targeted 48 passed，full 761 passed，`git diff --check` 与 `git status --short` 无输出。
-
 ## TEST-139 — Strategy & Recommendation Workspace — VERIFIED
 
-目标：从 canonical evidence 输入工作区进入 AI 决策输出产品化，只复用已经存在的 Strategy / Recommendation context，不新建第二套策略或建议逻辑。
+目标：把 Strategy / Recommendation canonical context 接入统一 `/app`，不新建第二套策略或建议逻辑。
 
-既有 contract：
-- `GET /api/v1/conversations/{conversation_id}/strategy/context`：AnalysisContext → StructuredAnalysis → StrategyDecisionContext；保留 `must_not_auto_select`、`requires_explicit_decision` 等约束。
-- `GET /api/v1/conversations/{conversation_id}/recommendation/context`：StructuredAnalysis → StrategyRecommendationCandidate → RecommendationProducer → Recommendation；Recommendation 必须携带 evidence source/provenance，并保留 `must_not_auto_select / must_not_auto_execute`。
-- 两条 route 均先通过 canonical AnalysisContext 解析当前 authenticated user + Conversation；foreign Conversation 在进入 LLM 之前返回 404。
+关键约束：Conversation 切换不自动调用 LLM；用户显式点击加载；Recommendation 保留 evidence provenance、`must_not_auto_select` 与 `must_not_auto_execute`；无 Action Plan / Decision / Execution。
 
-实现：
-1. 新增 `backend/app/ui/strategy_recommendation_workspace.py`；
-2. `backend/app/ui/routes.py` 将该 fragment 注入统一 `/app`，继续复用原页面内存 bearer token 与 selected Conversation；
-3. Strategy UI 显示 structured-analysis summary、current state、selection status、strategy candidates 及 strategy constraints；
-4. Recommendation UI 显示 recommendation、`evidence_source_ids`、action/reply/priority/time_horizon/provenance 与 recommendation constraints；
-5. Conversation 选择变化只清空旧结果，不自动请求 Strategy/Recommendation；用户必须显式点击 `Load strategy` / `Load recommendations`，避免无意触发 LLM/provider/API 消耗；
-6. TEST-139 fragment 只发 GET，不提供 POST/PATCH/DELETE，不提供 auto-select、execute、send 或 Action Plan 按钮；
-7. server data 继续使用 `textContent/createElement/replaceChildren` 安全渲染；
-8. logout/person/conversation change 清理旧 Strategy/Recommendation 结果；
-9. 无 schema migration、无新业务 API、无 Action Plan / Decision / Execution / Outcome 提前实现。
+GitHub Actions run `35369269897`：full 768 passed。服务器最终验收 branch `test-139-strategy-recommendation-workspace`、HEAD `6a9eb85104d5fd7dc35bd09bb89d35f2efba52c6`：targeted 72 passed、full 768 passed，`git diff --check` 与 `git status --short` 无输出。TEST-139 VERIFIED。
 
-实现/测试提交：
-- `807dc42e739f287665fb1ddda46043a62b79def0` — Strategy & Recommendation workspace fragment；
-- `a2e3616cf61f0151254d5149382e967e9ed0e09d` — 注入统一 product shell；
-- `e04e6d2dc176da0ebe25867a8e34d8b942c31964` — 初始 TEST-139 contract/bearer tests；
-- `497ca1473664d586154eb32fb765751c187c4841` — 修正测试 bearer user_id 来源，改为从 authenticated Person response 获取 canonical `user_id`。
+## TEST-140 — Action Plan Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
 
-GitHub Actions run `35369269897` success：
-- TEST-139：7 passed、1 warning in 0.62s；
-- TEST-135~138 Product Workspace regression：27 passed、1 warning；
-- Strategy / Recommendation canonical regression：31 passed、1 warning；
-- account bearer scope regression：7 passed、1 warning；
-- full pytest：768 passed、1 warning in 38.57s；
+### Contract 审计
+
+现有系统有两类 Action Plan context，必须区分：
+
+1. `GET /api/v1/conversations/{conversation_id}/action-plan/context`
+   - 运行现有 Analysis → Recommendation → Action Plan orchestration；
+   - 当存在合格 Recommendation 时执行 `build_action_plan()`；
+   - 并调用 `persist_action_plan()` 写入 `action_plan_snapshots`；
+   - 因此虽为 GET，但不是纯 read-only，且可能调用 LLM/provider。
+
+2. `GET /api/v1/persons/{person_id}/action-plan/context`
+   - 读取已持久化 Action Plan context；
+   - existing service 会基于当前 canonical evidence 过滤失效 snapshot；
+   - 适合作为“Refresh saved plans”只读入口。
+
+Action Plan item 继续保持：`status=proposed`、`requires_user_confirmation=true`、evidence-backed。Action Decision 与 Execution 是后续独立边界，TEST-140 不调用。
+
+### 实现
+
+1. 新增 `backend/app/ui/action_plan_workspace.py`；
+2. `/app` 新增两个明确动作：
+   - `Generate & save action plan`：仅在用户显式点击时调用 Conversation-level orchestration；
+   - `Refresh saved plans`：读取 Person-level persisted Action Plan context；
+3. 登录、Person/Conversation 切换、Strategy/Recommendation 加载均不会自动生成 Action Plan；切换只清空旧 UI；
+4. 展示 action、recommendation_id、status、`requires_user_confirmation`、evidence IDs、priority、time horizon 与 action constraints；
+5. 生成结果明确提示仍需用户确认，未创建 Action Decision、未执行；
+6. TEST-140 fragment 不发 POST/PATCH/DELETE，不调用 `/decisions` 或 `/execution`；
+7. 继续复用 page-memory bearer token 与 `textContent/createElement/replaceChildren` 安全 DOM；
+8. foreign Person / Conversation 继续由 canonical authenticated scope 返回 404；
+9. 无新业务 API、无 schema migration、未提前实现 Action Decision / Execution / Outcome。
+
+### 实现与测试提交
+
+- `ded5914596ea744fb82c51b056ccab114827630a` — Action Plan workspace fragment；
+- `6df86e042adbe17fc60cdabaefc81363eb87b8bb` — 注入统一 product shell；
+- `c044c13451a2be5f89eb7eb0bab35cc52f3354ba` — 8 项 authenticated Action Plan workspace tests；
+- `6529104c5a670550ff8377e390e0b0f5befbeb70` — 保持 TEST-139 Strategy fragment 脚本隔离契约，未修改旧测试。
+
+第一次临时 GitHub Actions run `35370431025`：TEST-140 自身 8 项通过，但旧 TEST-139 `test_strategy_recommendation_fragment_is_read_only` 失败。原因是旧测试以“Strategy 脚本起点 → IIFE 结束”界定 Strategy fragment，新 Action Plan script 排在其后导致被误包含。没有删除或弱化旧测试；通过调整扩展 script 注入顺序保持 Strategy fragment 仍位于最后解决。
+
+第二次 GitHub Actions run `35370519984`：success：
+- TEST-140 focused：8 passed、1 warning in 0.73s；
+- TEST-135~139 Product Workspace regression：34 passed、1 warning；
+- Action Plan canonical/persistence/snapshot regression：32 passed、1 warning；
+- Action Decision + Execution safety gates：18 passed、1 warning；
+- account bearer scope：7 passed、1 warning；
+- 合并 targeted 集：99 passed；
+- full pytest：776 passed、1 warning in 40.10s；
 - warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
-- 临时 workflow 已删除，清理提交 `5b4756afe28460b37d1bb44e2cd0488478360963`。
+- 临时 workflow 已删除，清理提交 `de8e868a6ee517e688d97882ea7de7ca2b6056bf`。
 
-服务器最终验收于 2026-09-19 完成：
-- branch：`test-139-strategy-recommendation-workspace`；
-- HEAD：`6a9eb85104d5fd7dc35bd09bb89d35f2efba52c6`；
-- targeted：72 passed in 13.10s；
-- full pytest：768 passed in 133.70s；
-- `git diff --check` 无输出；
-- `git status --short` 无输出。
+服务器最终验收尚未执行，因此 TEST-140 尚未标记 VERIFIED。
 
-TEST-139 正式锁定 VERIFIED。
+## 下一阶段候选
 
-## 下一阶段
+TEST-141 — Action Decision Workspace。
 
-TEST-140 — Action Plan Workspace。
-
-预审发现现有 `GET /api/v1/conversations/{conversation_id}/action-plan/context` 在存在 Recommendation 时会执行 `build_action_plan()` 并调用 `persist_action_plan()`，因此不是纯 read-only endpoint。TEST-140 必须把“用户显式请求生成/持久化 Action Plan”和“用户确认/Action Decision/Execution”边界明确分开：不得在登录、Person/Conversation 切换、Strategy/Recommendation 加载时自动调用该 endpoint；不得自动确认、自动决策或执行。
+仅在 TEST-140 服务器 VERIFIED 后进入。预期只复用现有 Person-level Action Decision context/create API，让用户对当前 `proposed` 且 evidence-backed Action Plan 做明确 `confirmed / rejected` 决定；不得因为 Confirm 自动执行，Execution 继续保持后续独立阶段。
 
 ## 架构与持续禁止事项
 
@@ -116,4 +133,4 @@ TEST-140 — Action Plan Workspace。
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~139 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~140 verification tag 已创建。
