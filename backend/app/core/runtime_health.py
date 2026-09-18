@@ -32,7 +32,7 @@ def _database_available(database_path: Path) -> bool:
 
     try:
         with sqlite3.connect(_readonly_uri(database_path), uri=True, timeout=2.0) as conn:
-            conn.execute("SELECT 1").fetchone()
+            conn.execute("SELECT name FROM sqlite_schema LIMIT 1").fetchone()
     except sqlite3.DatabaseError:
         return False
     return True
