@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-19
-当前阶段：TEST-141 — Action Decision Workspace — VERIFIED
-当前 Branch：test-141-action-decision-workspace
+当前阶段：TEST-142 — Action Execution Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-142-action-execution-workspace
 TEST-141 VERIFIED 服务器代码 HEAD：`49275dab6f83620159fc2fba6ef4fda30a0088ad`
 TEST-140 VERIFIED 服务器代码 HEAD：`323eea1dab49c8e3cc96d95a936875781072a187`
 TEST-139 VERIFIED 服务器代码 HEAD：`6a9eb85104d5fd7dc35bd09bb89d35f2efba52c6`
@@ -31,6 +31,7 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 - TEST-139 VERIFIED：Strategy & Recommendation Workspace。
 - TEST-140 VERIFIED：Action Plan Workspace。
 - TEST-141 VERIFIED：Action Decision Workspace。
+- TEST-142：GitHub self-test passed，等待服务器最终验收，尚未标记 VERIFIED。
 
 ## Runtime / Operations 产品化基线
 
@@ -71,60 +72,68 @@ GitHub Actions run `35370519984` success：targeted 99 passed，full 776 passed�
 
 ## TEST-141 — Action Decision Workspace — VERIFIED
 
+现有 canonical Action Decision API 为 `GET /api/v1/persons/{person_id}/action-plan/decisions/context` 与 `POST /api/v1/persons/{person_id}/action-plan/decisions`。decision 只允许 `confirmed | rejected`；confirmed 必须引用当前仍为 `proposed` 且 `requires_user_confirmation=true` 的 recommendation。Action Decision create 只写 decision，不会调用 Execution service。
+
+TEST-141 UI 只在显式 `Load decision context` 后展示 proposal，并由用户显式 Confirm/Reject；Confirm 只记录用户决定，明确不会启动 execution。继续使用 page-memory bearer、安全 DOM，并保持 Person/logout reset，不自动加载或提交。
+
+GitHub Actions 修复后 run `35371684170`：combined targeted 80 passed，full 784 passed。服务器最终验收于 2026-09-19 完成：branch `test-141-action-decision-workspace`，HEAD `49275dab6f83620159fc2fba6ef4fda30a0088ad`，targeted 80 passed in 15.74s，full 784 passed in 138.02s，`git diff --check` 与 `git status --short` 无输出。TEST-141 VERIFIED。
+
+## TEST-142 — Action Execution Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+
 ### Contract 审计
 
-现有 canonical Action Decision API：
-- `GET /api/v1/persons/{person_id}/action-plan/decisions/context`：读取当前 Person Action Plan proposals、decision constraints 与 decision history；
-- `POST /api/v1/persons/{person_id}/action-plan/decisions`：记录显式用户决定；payload 为 `recommendation_id`、`decision`、可选 `note`；
-- `decision` 只允许 `confirmed | rejected`；
-- `confirmed` 必须提供 `recommendation_id`；
-- 任何带 `recommendation_id` 的 decision 只能引用当前 Action Plan 中仍满足 `status=proposed` 且 `requires_user_confirmation=true` 的 proposal；服务端在 POST 时再次校验，客户端不是 authority；
-- decision history 由 repository 按 `created_at DESC, id DESC` 返回；
-- Action Decision create 只写 `action_decisions`，不会调用 Execution service。
-
-Execution 是独立后续边界：`POST /api/v1/persons/{person_id}/action-plan/executions/{decision_id}` 才能创建 execution，并且只接受 confirmed decision。现有 execution constraints 明确包含 `must_require_explicit_execution=true`、`must_not_execute_from_confirmation_automatically=true`、`must_not_send=true`、`must_not_create_outcome_automatically=true`。
+现有 canonical Action Execution API：
+- `GET /api/v1/persons/{person_id}/action-plan/execution-context`：读取当前 Person 的 Action Decision execution status 与 execution constraints；
+- `POST /api/v1/persons/{person_id}/action-plan/executions/{decision_id}`：记录单独、显式的 Action Execution；payload 仅包含可选 `executed_at` 与 `note`；
+- context 对 decision 状态分类为 `execution_ready | executed | outcome_recorded | not_executable`；
+- 只有 `decision=confirmed` 且未 execution、未 Outcome 的 decision 才是 `execution_ready`；
+- 服务端 POST 时再次强制 confirmed、user/person/decision scope、no existing Outcome、no duplicate Execution；客户端筛选不是 authority；
+- rejected decision 不可执行，重复 execution 返回 conflict，Outcome 已存在时不可再次执行；
+- execution repository 只写 `action_executions`，不会发送消息、创建 Outcome 或修改 Relationship；
+- constraints 明确包含 `must_require_confirmed_decision=true`、`must_require_explicit_execution=true`、`must_not_execute_rejected_decision=true`、`must_not_execute_from_confirmation_automatically=true`、`must_not_send=true`、`must_not_create_outcome_automatically=true`。
 
 ### 实现
 
-1. 新增 `backend/app/ui/action_decision_workspace.py`；
-2. `/app` 新增显式 `Load decision context`，不会在登录或 Person 切换时自动加载/提交；
-3. UI 只展示/允许选择当前 `proposed + requires_user_confirmation=true` 的 Action Plan proposal；
-4. 用户可填写可选 note，并显式点击 `Confirm selected proposal` 或 `Reject selected proposal`；
-5. Confirm/Reject 都只 POST 到 canonical Action Decision API，成功后重新读取 context/history；
-6. UI 明确提示 Confirm 只记录用户决定，`No execution was started`；
-7. TEST-141 fragment 不调用 `/execution-context`、`/executions/{decision_id}`、Outcome、send 或 Relationship mutation；
-8. 继续复用 page-memory bearer token 与安全 DOM `textContent/createElement/replaceChildren`；
-9. Person 切换/logout 清理旧 candidate/history，不自动产生 Decision；
-10. 无 schema migration、无新业务 API、未提前实现 Action Execution / Outcome。
+1. 新增 `backend/app/ui/action_execution_workspace.py`；
+2. `/app` 在 Action Decision 后新增 Action Execution 区域；
+3. 只有用户显式点击 `Load execution context` 才 GET canonical execution context；登录、Person 切换、Action Decision Confirm 都不会自动加载或执行；
+4. UI 仅把 `decision=confirmed && execution_status=execution_ready` 的记录作为可选择候选；
+5. 用户可填写可选 `executed_at` 与 `note`，然后单独点击 `Record selected execution`；
+6. POST 成功后只重新加载 execution context，并明确提示 `No message was sent and no Outcome was created`；
+7. Person 切换/logout 只 reset Execution workspace；
+8. 继续复用 page-memory bearer token 和安全 DOM `textContent/createElement/replaceChildren`，不使用 localStorage/sessionStorage/innerHTML/X-User-ID；
+9. TEST-142 script 放在 TEST-141 Action Decision script 之前，HTML 仍按 Action Plan → Action Decision → Action Execution 排列，从而保持 TEST-139/140/141 fragment isolation；
+10. 无新业务 API、无 schema migration、未实现 Outcome UI。
 
-### 实现与修复提交
+### 实现提交
 
-- `ece63d191897ec2e257e4a593ca92a3c434b8e72` — Action Decision workspace fragment；
-- `75c45c0bbcd590d374595e7d06eedab6ed1d55a1` — 注入统一 product shell，并保持 TEST-139/140 fragment isolation；
-- `4fd489cf61cf3ecc098d142ee366ea13765c6bc8` — 8 项 authenticated Action Decision workspace tests；
-- `9ea1e71baad0b0820f93858bc97df94a12e838ff` — 修正 Action Decision POST Person/Relationship scope 错误状态映射。
+- `94e519ca01ef3d38d0464b86045c8d7f2eeaf023` — 新增 Action Execution workspace fragment；
+- `40d857c906ab049fa885a865562be977eb9d3401` — 注入统一 product shell 并保持旧 fragment isolation；
+- `be3d16efd0b787a083e888ba07f5eaf5cbaf02b0` — 新增 8 项 authenticated Action Execution workspace tests；
+- `c34e76babd2bc549bb1885520d49804d6beedae9` — 临时 TEST-142 validation workflow；
+- `b0ca633507939f36d9f910ecd7387045eee60bc7` — CI 成功后删除临时 workflow。
 
-首轮临时 GitHub Actions run `35371603903` 发现真实后端问题：focused tests 为 7 passed / 1 failed。foreign Person 的 GET 正确返回 404，但 POST 返回 409。原因是 route 用大小写敏感的 `"person" in detail` / `"relationship" in detail` 判断 scope error，而实际服务错误为 `"Person not found"`。没有修改或弱化测试；route 改为对 `detail.lower()` 分类，使 Person/Relationship scope error 正确返回 404，同时 unavailable proposal / invalid confirmation 等 domain conflict 继续返回 409。
+### GitHub Actions 验证
 
-修复后 GitHub Actions run `35371684170` success：
-- TEST-141 focused：8 passed、1 warning in 0.78s；
-- TEST-135~140 Product Workspace regression：42 passed、1 warning in 3.57s；
-- Action Decision canonical + proposal gate：13 passed、1 warning in 1.15s；
-- Execution separation gates：5 passed、1 warning；
-- Action Plan persistence/snapshot regression：5 passed、1 warning；
-- account bearer scope：7 passed、1 warning；
-- 合并 targeted 集：80 passed；
-- full pytest：784 passed、1 warning in 40.05s；
-- warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
-- 临时 workflow 已删除，清理提交 `3e162e4019a06cbd67d6fee60f9329d2c65edcb1`。
+临时 GitHub Actions run `35375105715`，job `105697834658`，测试 HEAD `c34e76babd2bc549bb1885520d49804d6beedae9`，整体 success：
+- TEST-142 focused：8 passed、1 warning in 0.80s；
+- TEST-135~141 Product Workspace regression：50 passed、1 warning in 5.63s；
+- Execution canonical + synthesis + bridge + gate + scope：26 passed、1 warning in 1.82s；
+- Action Decision regression：13 passed、1 warning in 5.02s；
+- Outcome separation regression：12 passed、1 warning in 0.44s；
+- account bearer scope：7 passed、1 warning in 1.10s；
+- combined targeted：116 passed、1 warning in 8.97s；
+- full pytest：792 passed、1 warning in 50.21s。
 
-服务器最终验收于 2026-09-19 完成：branch `test-141-action-decision-workspace`，HEAD `49275dab6f83620159fc2fba6ef4fda30a0088ad`，targeted 80 passed in 15.74s，full 784 passed in 138.02s，`git diff --check` 与 `git status --short` 无输出。TEST-141 VERIFIED。
+唯一 pytest warning 仍为 Starlette TestClient 对 `anyio.abc.BlockingPortal` alias 的 deprecation；GitHub runner 另提示 actions/checkout@v4 与 setup-python@v5 的 Node20 target 被强制 Node24，均非测试失败。临时 workflow 已删除。
+
+服务器最终验收尚未执行，因此 TEST-142 当前不能标记 VERIFIED。
 
 ## 下一阶段候选
 
-TEST-142 — Action Execution Workspace。
+TEST-143 — Outcome Workspace。
 
-TEST-141 已服务器 VERIFIED，可进入 TEST-142。预期只复用现有 execution context/create API：显式加载 execution context，只允许选择 `execution_ready` 的 confirmed Action Decision，并通过单独显式动作记录 execution。不得自动发送消息、自动创建 Outcome 或修改 Relationship；Outcome 继续保持后续独立阶段。
+只能在 TEST-142 服务器最终验收通过并标记 VERIFIED 后开始。预期只把现有 canonical Outcome create/read contract 接入统一 `/app`：只能基于已执行的 Action Decision 由用户显式记录 Outcome；不得由 Execution 自动生成，不得跳过 Execution，不得自动生成 Feedback/Learning/Re-analysis。具体范围必须先审计现有 Outcome schema、route、service、repository 与测试后再锁定。
 
 ## 架构与持续禁止事项
 
@@ -139,4 +148,4 @@ TEST-141 已服务器 VERIFIED，可进入 TEST-142。预期只复用现有 exec
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~141 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~142 verification tag 已创建。
