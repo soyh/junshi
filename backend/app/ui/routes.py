@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from app.ui.action_plan_workspace import ACTION_PLAN_HTML, ACTION_PLAN_SCRIPT
 from app.ui.conversation_content_workspace import (
     CONVERSATION_CONTENT_HTML,
     CONVERSATION_CONTENT_SCRIPT,
@@ -32,6 +33,7 @@ def build_product_shell_html() -> str:
         f"{CONVERSATION_CONTENT_HTML}\n"
         f"{RELATIONSHIP_EVIDENCE_HTML}\n"
         f"{STRATEGY_RECOMMENDATION_HTML}\n"
+        f"{ACTION_PLAN_HTML}\n"
         f"{provider_marker}"
     )
     html = PRODUCT_SHELL_HTML.replace(
@@ -43,6 +45,7 @@ def build_product_shell_html() -> str:
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
         f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
+        f"{ACTION_PLAN_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
