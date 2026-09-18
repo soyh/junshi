@@ -1,8 +1,8 @@
 # Development Handover
 
 更新时间：2026-09-18
-当前阶段：TEST-136 — Authenticated Core Workspace — VERIFIED
-当前 Branch：test-136-authenticated-core-workspace
+当前阶段：TEST-137 — Conversation Content Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：test-137-conversation-content-workspace
 TEST-136 VERIFIED 服务器代码 HEAD：`07d2cf6fe47f1f2ec7a0672dfb9a9120385d1066`
 TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f460f`
 TEST-133 VERIFIED 服务器代码 HEAD：`74a9c5a976be094d9dd2d51e764ab457965f83ec`
@@ -22,6 +22,7 @@ TEST-133 VERIFIED 服务器代码 HEAD：`74a9c5a976be094d9dd2d51e764ab457965f83
 - TEST-134 VERIFIED：platform-neutral release runbook / rollback safety contract。
 - TEST-135 VERIFIED：authenticated single-page product shell。
 - TEST-136 VERIFIED：authenticated Person / Relationship / Conversation Workspace。
+- TEST-137 GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING：Conversation Content Workspace，Messages + Text Import 产品化接入。
 
 ## Runtime / Operations 产品化基线
 
@@ -67,44 +68,59 @@ GitHub Actions run `35356010017`：full 740 passed。cwd-dependent `.env.example
 目标：把真正核心业务 Workspace 接入统一 `/app`，覆盖 `Person → Relationship → Conversation`；只复用既有 canonical API 和 bearer session，不增加第二套业务逻辑，不提前实现 Recommendation / Action Plan / Execution / Outcome UI。
 
 实现：
-1. Person Workspace：加载、创建、选择 Person，沿用 `name / nickname / notes` schema；
-2. Relationship Workspace：基于当前 Person，复用 `/api/v1/relationships`，创建沿用既有 status/stage/goal/notes contract；
-3. Conversation Workspace：基于当前 Person、Relationship 可选，复用 `/api/v1/conversations?person_id=...` 与现有 create contract；
-4. Conversation status 只暴露既有 `active / archived`；
-5. 选择 Conversation 后自动同步到 Structured Analysis conversation target；
-6. Person/Relationship cross-consistency 等规则仍由 backend canonical service 校验，前端不复制；
-7. 所有操作继续通过统一 `api()` 注入 `Authorization: Bearer <in-memory token>`；
-8. server data 用 `textContent/createElement/replaceChildren` 渲染，不使用 `innerHTML`；
-9. logout 清空 Person / Relationship / Conversation 选择与分析 target；
-10. 无新业务路由、无 schema migration、无后续 Action lifecycle UI 提前实现。
+1. Person Workspace：加载、创建、选择 Person；
+2. Relationship Workspace：基于当前 Person，复用 `/api/v1/relationships`；
+3. Conversation Workspace：基于当前 Person、Relationship 可选，复用现有 conversations API；
+4. Conversation status 只暴露 `active / archived`；
+5. 选择 Conversation 后自动同步到 Structured Analysis；
+6. cross-consistency 继续由 backend canonical service 校验；
+7. 所有操作继续通过统一 `api()` 注入 bearer token；
+8. server data 不通过不安全 HTML 拼接渲染；
+9. logout 清空 workspace selection；
+10. 无新业务路由、无 schema migration、无后续 lifecycle UI 提前实现。
+
+GitHub Actions run `35364179911`：TEST-136 7、TEST-135 6、canonical core 9、bearer scope 7、full 747 passed。
+
+服务器最终验收由用户于 2026-09-18 确认符合预期：branch `test-136-authenticated-core-workspace`，HEAD `07d2cf6fe47f1f2ec7a0672dfb9a9120385d1066`，targeted 29 passed，full 747 passed，`git diff --check` 与 `git status --short` 无输出。TEST-136 正式 VERIFIED。
+
+## TEST-137 — Conversation Content Workspace — GITHUB SELF-TEST PASSED
+
+目标：把已创建 Conversation 从“容器”推进为“可录入真实互动证据的工作区”，只复用 existing Messages / Text Import API。
+
+关键 contract 审计：
+- Messages：`POST /api/v1/messages` 向现有 Conversation 写单条消息；`GET /api/v1/conversations/{conversation_id}/messages` 读取并由后端按 `sent_at, created_at` 排序；sender_type 为 `user / person / system / assistant`。
+- Text Import：`POST /api/v1/text-imports` 的既有语义是“为 Person 创建新 Conversation 并批量写入消息”，不是向当前 Conversation 追加。TEST-137 明确保留这一语义，导入成功后 UI 自动选中新 Conversation。
+
+实现：
+1. 新增 `backend/app/ui/conversation_content_workspace.py`，以独立 fragment 提供 Conversation Content UI 与脚本；
+2. `backend/app/ui/routes.py` 在保持 TEST-135/136 `product_shell.py` 主体不复制的前提下，把 fragment 注入统一 `/app`，脚本仍运行在原单页 IIFE 内，因此直接复用同一个 in-memory bearer token、`api()`、selected Person/Conversation state；
+3. Messages UI 支持读取当前 Conversation 消息；
+4. 支持手工写入单条消息，sender_type 使用既有四种 canonical 值，sent_at 可选 ISO-8601；
+5. 所有消息渲染使用 DOM `textContent/createElement/replaceChildren`，不引入不安全 HTML 渲染；
+6. Text Import UI 明示 `timestamp | sender_type | content` 格式；导入按既有 contract 创建新 Conversation，成功后自动切换 conversation selection 并加载导入后的消息；
+7. 不把 import 伪装成 append，不修改 TextImportService / MessageService / repository 语义；
+8. logout/person/conversation 变更会清空或刷新内容工作区状态，避免展示旧 Conversation 数据；
+9. 无 schema migration、无新业务 API、无 Recommendation / Action Plan / Execution / Outcome 提前实现。
 
 实现提交：
-- `39a2dda6924a4a8c7bbbd793d84aadc30170ce87` — authenticated core workspace UI；
-- `0bf54a6bc52e2cdfb7ecc8980ca6d142a7d43a47` — Workspace contract + real bearer user-isolation tests。
+- `d59d4966dda405a5f755905a5be91c307977d970` — Conversation Content Workspace fragment；
+- `8ca77b952bc1d9cf295a716e2c5cddec912b8098` — fragment 注入统一 product shell；
+- `b891bb7a5b3f348676e63099a4915cec1f7835d1` — TEST-137 UI contract + real bearer message/import isolation tests。
 
-GitHub Actions run `35364179911` success：
-- TEST-136 Workspace：7 passed；
-- TEST-135 Product Shell：6 passed；
-- Person / Relationship / Conversation canonical regression：9 passed；
-- bearer account scope regression：7 passed；
-- full pytest：747 passed、1 warning in 36.59s；
-- 临时 workflow 已删除。
+GitHub Actions run `35365645959`：success；从与服务器一致的 `backend/` 工作目录执行：
+- TEST-137：7 passed、1 warning；
+- TEST-135 + TEST-136 product workspace regression：13 passed、1 warning；
+- Messages + Text Import canonical regression：54 passed、1 warning；
+- account bearer scope regression：7 passed、1 warning；
+- full pytest：754 passed、1 warning in 53.65s；
+- warning 仍为 Starlette TestClient / anyio BlockingPortal deprecation；
+- 临时 workflow 已删除，清理提交 `ef3f55a98de5277365b72f106dd121eb6d41b876`。
 
-服务器最终验收由用户于 2026-09-18 确认结果符合预期：
-- branch：`test-136-authenticated-core-workspace`；
-- HEAD：`07d2cf6fe47f1f2ec7a0672dfb9a9120385d1066`；
-- targeted：29 passed；
-- full pytest：747 passed；
-- `git diff --check` 无输出；
-- `git status --short` 无输出。
+当前等待服务器最终验收 TEST-137。未声称 TEST-137 VERIFIED。
 
-TEST-136 正式锁定 VERIFIED。
+## 下一阶段候选
 
-## 下一阶段
-
-TEST-137 — Conversation Content Workspace。
-
-目标：把已创建 Conversation 从“容器”推进为“可录入真实互动证据的工作区”。优先复用 existing Messages / Text Import API，使用户在选中 Conversation 后可以读取、手工录入或导入真实聊天内容，再进入现有 Structured Analysis；不新增第二套消息模型，不绕过 canonical scope，不提前展开 Recommendation / Action Plan / Execution / Outcome UI。
+TEST-137 服务器通过后，下一最小产品化增量应优先审计 Timeline / interaction evidence 的现有 API，决定 TEST-138 是否把 Conversation 之外的关系事件/时间线也接入统一 Workspace，再进入更上层 Strategy / Recommendation / Action Plan UI。不得绕过 canonical evidence pipeline。
 
 ## 架构与持续禁止事项
 
@@ -118,4 +134,4 @@ TEST-137 — Conversation Content Workspace。
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~136 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~137 verification tag 已创建。
