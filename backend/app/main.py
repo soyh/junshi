@@ -11,6 +11,7 @@ from app.core.database import initialize_database
 from app.core.logging import setup_logging
 from app.core.migrations import run_migrations
 from app.core.runtime_health import check_runtime_readiness
+from app.ui.routes import router as product_ui_router
 
 setup_logging()
 
@@ -62,6 +63,7 @@ async def apply_http_security_headers(request: Request, call_next):
     if (
         path.startswith("/api/v1/auth")
         or path.startswith("/api/v1/settings")
+        or path == "/app"
         or path in {"/health/live", "/health/ready"}
     ):
         response.headers["Cache-Control"] = "no-store"
@@ -101,4 +103,5 @@ def health_ready():
     )
 
 
+app.include_router(product_ui_router)
 app.include_router(api_router)
