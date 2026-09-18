@@ -137,7 +137,8 @@ def test_serialized_runbook_contains_no_secrets_or_database_path():
     assert "dashscope-secret" not in serialized
     assert "encryption-secret" not in serialized
     assert "/very/private/database/location.sqlite3" not in serialized
-    assert "8899" not in serialized
+    assert '"port": 8899' not in serialized
+    assert '"reserved_port_8899_forbidden": true' in serialized
 
 
 def test_cli_json_emits_contract_without_executing_steps(monkeypatch, capsys):
