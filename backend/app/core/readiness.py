@@ -49,6 +49,12 @@ def _expected_migration_versions(migration_dir: Path) -> list[str]:
     return versions
 
 
+def expected_migration_versions(migration_dir: str | Path | None = None) -> list[str]:
+    """Return the repository migration versions in deterministic order."""
+    directory = Path(migration_dir).resolve() if migration_dir else default_migration_dir().resolve()
+    return _expected_migration_versions(directory)
+
+
 def _applied_migration_versions(database_path: Path) -> list[str]:
     try:
         with sqlite3.connect(_readonly_uri(database_path), uri=True, timeout=5.0) as conn:
@@ -56,6 +62,11 @@ def _applied_migration_versions(database_path: Path) -> list[str]:
     except sqlite3.DatabaseError as exc:
         raise ReadinessCheckError("schema_migrations is unavailable") from exc
     return [str(row[0]) for row in rows]
+
+
+def applied_migration_versions(database_path: str | Path) -> list[str]:
+    """Return applied migration versions without modifying the database."""
+    return _applied_migration_versions(Path(database_path).resolve())
 
 
 def _parse_created_at(value: str) -> datetime:
@@ -125,9 +136,9 @@ def check_readiness(
     migration_ok = False
     migration_error: str | None = None
     try:
-        expected = _expected_migration_versions(migrations)
+        expected = expected_migration_versions(migrations)
         if database_ok:
-            applied = _applied_migration_versions(database)
+            applied = applied_migration_versions(database)
             migration_ok = applied == sorted(expected)
             if not migration_ok:
                 migration_error = "applied migrations do not match migration files"
