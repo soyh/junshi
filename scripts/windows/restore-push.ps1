@@ -76,19 +76,24 @@ $remoteBundle = "$remoteStage/$([IO.Path]::GetFileName($bundlePath))"
 $remoteEnv = "$remoteStage/production.env.pending"
 
 try {
-    Unprotect-DpapiFile $envProtected $plainEnv
-
     Invoke-SshText "install -d -m 0700 '$remoteStage'"
     Invoke-Scp $bundlePath "$Server`:$remoteBundle"
-    Invoke-Scp $plainEnv "$Server`:$remoteEnv"
-    Invoke-SshText "chmod 0600 '$remoteBundle' '$remoteEnv'"
+    Invoke-SshText "chmod 0600 '$remoteBundle'"
 
+    # Stage-only is deliberately non-sensitive: it transfers only the encrypted
+    # recovery bundle. The production .env is not decrypted or uploaded until
+    # the operator explicitly supplies -ApplyRestore.
     if (-not $ApplyRestore) {
         Write-Host "RESTORE_PUSH=STAGED"
         Write-Host "REMOTE_BUNDLE=$remoteBundle"
+        Write-Host "ENV_TRANSFERRED=NO"
         Write-Host "APPLY_RESTORE=NO"
         return
     }
+
+    Unprotect-DpapiFile $envProtected $plainEnv
+    Invoke-Scp $plainEnv "$Server`:$remoteEnv"
+    Invoke-SshText "chmod 0600 '$remoteEnv'"
 
     $remoteScript = @"
 set -euo pipefail
