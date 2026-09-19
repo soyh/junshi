@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "stage": null,
+  "status": "initialized",
+  "source_branch": null,
+  "source_head": null,
+  "recorded_at_utc": null,
+  "server": {
+    "project_dir": "/opt/ai-love-strategist"
+  },
+  "tests": {},
+  "runtime": {},
+  "systemd": {},
+  "security": {},
+  "backup": {},
+  "git": {},
+  "notes": [
+    "This file is the fixed machine-readable server acceptance result channel.",
+    "Do not write secrets, API keys, tokens, environment values, or raw process environments here."
+  ]
+}
