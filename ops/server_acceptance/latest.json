@@ -1,20 +1,29 @@
 {
-  "checkpoint": "startup-readiness-race-fix",
+  "checkpoint": "full-runtime-watchdog-acceptance",
+  "ci": {
+    "focused_passed": 14,
+    "full_passed": 847,
+    "operations_passed": 90,
+    "workflow_run_id": 35453484593
+  },
   "database_restore_executed": false,
   "local_full_log": "/opt/ai-love-strategist-validation.log",
   "runtime": {
+    "final_pid": 559990,
     "live_rc": 0,
-    "main_pid": 558463,
     "preflight_rc": 0,
     "ready_rc": 0,
-    "restart_rc": 0,
-    "service_active": "active",
-    "service_enabled": "enabled"
+    "recovery_pid_after": 559990,
+    "recovery_pid_before": 558463,
+    "systemd_owned": true
   },
+  "schema_version": 1,
   "security": {
     "db_mode": "600",
     "env_mode": "600",
-    "port_8899_pid": 52822
+    "port_8899_pid_after": 52822,
+    "port_8899_pid_before": 52822,
+    "port_8899_unchanged": true
   },
   "source_branch": "test-149-runtime-health-watchdog",
   "source_head": "39652fdad525703c03e1506f7ed8be3b5404ddc1",
@@ -22,6 +31,20 @@
   "status": "passed",
   "timers": {
     "backup_active": "active",
-    "watchdog_active": "active"
+    "watchdog_active": "active",
+    "watchdog_enabled": "enabled"
+  },
+  "watchdog": {
+    "controlled_recovery_verified": true,
+    "failure_exit_codes": [
+      0,
+      0,
+      1
+    ],
+    "failure_threshold": 3,
+    "healthy_unit_exit_status": 0,
+    "healthy_unit_result": "success",
+    "no_marker_restart_blocked": true,
+    "trigger": "readiness"
   }
 }
