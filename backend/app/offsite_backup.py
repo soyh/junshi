@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 
 from app.config.settings import get_settings
+from app.core.backup_manifest import verify_backup_manifest
 from app.core.offsite_backup import (
+    OFFSITE_SUFFIX,
     OffsiteBackupError,
     apply_offsite_retention,
     decode_offsite_key,
@@ -57,6 +59,33 @@ def _configuration(args) -> tuple[Path, Path, str, int]:
     return local_dir, destination_dir, str(key), keep
 
 
+def _export_or_reuse(local_dir: Path, destination_dir: Path, *, key: str):
+    backup_path, manifest_path = latest_verified_managed_backup(local_dir)
+    require_separate_storage(backup_path, destination_dir)
+    destination = destination_dir / f"{backup_path.name}{OFFSITE_SUFFIX}"
+
+    if destination.exists():
+        remote_report = verify_offsite_bundle(destination, key=key)
+        local_manifest = verify_backup_manifest(manifest_path)
+        if (
+            remote_report.source_backup_filename != local_manifest.backup_filename
+            or remote_report.source_sha256 != local_manifest.sha256
+            or remote_report.source_size_bytes != local_manifest.size_bytes
+        ):
+            raise OffsiteBackupError(
+                "existing offsite bundle does not match the latest verified managed backup"
+            )
+        return remote_report, True
+
+    report = export_latest_managed_backup(
+        local_dir,
+        destination_dir,
+        key=key,
+        require_distinct_storage=True,
+    )
+    return report, False
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -98,12 +127,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
-        report = export_latest_managed_backup(
-            local_dir,
-            destination_dir,
-            key=key,
-            require_distinct_storage=True,
-        )
+        report, reused = _export_or_reuse(local_dir, destination_dir, key=key)
         deleted = apply_offsite_retention(
             destination_dir,
             key=key,
@@ -117,6 +141,7 @@ def main(argv: list[str] | None = None) -> int:
                 "bundle_sha256": report.bundle_sha256,
                 "source_backup_filename": report.source_backup_filename,
                 "source_sha256": report.source_sha256,
+                "reused_existing": reused,
                 "retention_mode": "applied" if args.apply_retention else "dry-run",
                 "retention_count": len(deleted),
             },
