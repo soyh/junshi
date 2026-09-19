@@ -28,6 +28,32 @@ def test_runtime_unit_maps_verified_supervision_contract():
     assert "WantedBy=multi-user.target" in unit
 
 
+def test_runtime_unit_enforces_backup_retention_before_preflight_and_start():
+    unit = _read("ai-love-strategist.service")
+
+    backup = (
+        "ExecStartPre=/opt/ai-love-strategist/.venv/bin/python -m app.backup"
+    )
+    retention = (
+        "ExecStartPre=/opt/ai-love-strategist/.venv/bin/python -m app.backup "
+        "--retention-dir /opt/ai-love-strategist/data/backups "
+        "--keep 7 --apply-retention"
+    )
+    preflight = (
+        "ExecStartPre=/opt/ai-love-strategist/.venv/bin/python "
+        "-m app.preflight --json"
+    )
+    start = (
+        "ExecStart=/opt/ai-love-strategist/.venv/bin/python -m app.server"
+    )
+
+    assert backup in unit
+    assert retention in unit
+    assert preflight in unit
+    assert start in unit
+    assert unit.index(backup) < unit.index(retention) < unit.index(preflight) < unit.index(start)
+
+
 def test_runtime_unit_preserves_secure_runtime_boundary():
     unit = _read("ai-love-strategist.service")
 
