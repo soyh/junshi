@@ -17,11 +17,13 @@ No plaintext `.env` is intentionally retained in the snapshot directory.
 Generate a recovery key on the server:
 
 ```bash
-cd /opt/ai-love-strategist/backend
-../.venv/bin/python -m app.portable_backup --generate-key
+cd /opt/ai-love-strategist
+.venv/bin/python -m app.portable_backup --generate-key
 ```
 
 Store the generated value only as `PORTABLE_BACKUP_ENCRYPTION_KEY` in `/opt/ai-love-strategist/.env`, with the file remaining mode `0600`.
+
+The repository also provides `scripts/server/prepare-portable-recovery.sh`, which can generate the key internally without printing it, configure the portable export directory, run focused validation, restart the application through the existing systemd readiness gate, and create the first verified recovery bundle.
 
 The Windows backup process protects the full production `.env` with DPAPI, so this key is recoverable when replacing the server. Do not commit the real key or `.env` to GitHub.
 
@@ -64,7 +66,7 @@ After cloning the repository and creating the Python environment on the replacem
   -Server root@NEW_SERVER_IP
 ```
 
-This is stage-only by default. It uploads the encrypted bundle and a temporary decrypted `.env` to the private recovery staging directory, but it does not restore the database.
+This is stage-only by default. It uploads only the encrypted recovery bundle to the private recovery staging directory. It does not decrypt or upload `.env`, stop services, or restore the database.
 
 ## Apply the restore
 
@@ -77,7 +79,7 @@ Only after verifying the target server is the intended replacement server:
   -ApplyRestore
 ```
 
-The apply path:
+Only the explicit apply path decrypts the DPAPI-protected `.env` on Windows and transfers it over SSH to the replacement server. The apply path then:
 
 1. installs `.env` as mode `0600`;
 2. decrypts the portable recovery bundle;
