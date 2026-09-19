@@ -104,7 +104,7 @@ WATCHDOG_TIMER='ai-love-strategist-watchdog.timer'
 install -m 0600 '$remoteEnv' "`$PROJECT/.env"
 rm -rf "`$EXTRACT_DIR"
 install -d -m 0700 "`$EXTRACT_DIR"
-cd "`$PROJECT/backend"
+cd "`$PROJECT"
 EXTRACT_JSON="`$("`$PY" -m app.portable_backup --extract "`$BUNDLE" --destination-dir "`$EXTRACT_DIR" --json)"
 BACKUP="`$(printf '%s' "`$EXTRACT_JSON" | "`$PY" -c 'import json,sys; print(json.load(sys.stdin)["backup"])')"
 MANIFEST="`$(printf '%s' "`$EXTRACT_JSON" | "`$PY" -c 'import json,sys; print(json.load(sys.stdin)["manifest"])')"
