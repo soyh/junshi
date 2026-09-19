@@ -8,6 +8,8 @@ StartLimitBurst=5
 [Service]
 Type=simple
 WorkingDirectory=/opt/ai-love-strategist
+ExecStartPre=/opt/ai-love-strategist/.venv/bin/python -m app.backup
+ExecStartPre=/opt/ai-love-strategist/.venv/bin/python -m app.backup --retention-dir /opt/ai-love-strategist/data/backups --keep 7 --apply-retention
 ExecStartPre=/opt/ai-love-strategist/.venv/bin/python -m app.preflight --json
 ExecStart=/opt/ai-love-strategist/.venv/bin/python -m app.server
 Restart=on-failure
