@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     log_dir: str = "/opt/ai-love-strategist/logs"
     log_level: str = "INFO"
 
+    offsite_backup_directory: str | None = None
+    offsite_backup_encryption_key: str | None = None
+    offsite_backup_keep: int = 30
+
     local_user_id: str = "00000000-0000-0000-0000-000000000001"
     auth_bearer_token: str | None = None
     auth_bootstrap_enabled: bool = False
