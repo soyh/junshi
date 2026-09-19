@@ -1,0 +1,12 @@
+[Unit]
+Description=AI Love Strategist managed SQLite backup
+After=local-fs.target
+ConditionPathExists=/opt/ai-love-strategist/data/app.sqlite3
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ai-love-strategist
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/ai-love-strategist/.venv/bin/python -m app.backup
+ExecStart=/opt/ai-love-strategist/.venv/bin/python -m app.backup --retention-dir /opt/ai-love-strategist/data/backups --keep 7 --apply-retention
