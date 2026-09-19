@@ -534,3 +534,27 @@ TEST-147 是 TEST-008 ~ TEST-146 canonical lifecycle 与 TEST-122 ~ TEST-134 run
 - 此验收没有 stop/restart 当前服务、没有 switch release、没有 restore database、没有触碰端口 8899。production `.env` 是 release candidate 配置；实际 release execution 仍必须按 TEST-134 VERIFIED runbook 显式执行。
 
 结论：TEST-147 VERIFIED。至此 canonical product lifecycle + runtime/release acceptance baseline 已闭合。没有自动创建 TEST-148；后续只有在发现真实新 gap 时才定义新 TEST 阶段，或在用户明确要求发布时按 TEST-134 release runbook 执行实际 release。
+
+## 2026-09-19 Actual Release Execution — COMPLETED
+
+在 TEST-147 VERIFIED 后，按 TEST-134 VERIFIED release runbook 实际执行生产重启发布；未创建 TEST-148。
+
+- release baseline / HEAD：`0a0f4a931d7e82da877b4a55f933b13de5ab449a`；branch `test-147-full-lifecycle-release-acceptance`；发布前后 working tree clean。
+- production candidate config 检查通过：`APP_ENV=production`、`APP_DEBUG=false`、loopback `127.0.0.1`、port `18080`、bootstrap disabled、LLM encryption key configured。
+- VERIFIED runbook 顺序保持：online backup → release preflight → stop current process → switch release → start candidate process → verify liveness → verify readiness；数据库 restore 仍为 manual/offline-only。
+- fresh managed online backup：`/opt/ai-love-strategist/data/backups/app-20260919T144654Z.sqlite3`；manifest：`/opt/ai-love-strategist/data/backups/app-20260919T144654Z.sqlite3.manifest.json`。
+- release preflight（停止旧进程前）：overall `ready=true`、exit code 0；database OK；13/13 migrations (`001`~`013`)；fresh backup OK；secure launcher OK。
+- 旧 18080 runtime：PID `534089`，cwd `/opt/ai-love-strategist`，command `python -m app.server`；确认未占用/修改 8899 后以 SIGTERM 正常停止，无需数据库 restore。
+- switch release：代码已处于 VERIFIED baseline，无额外代码切换；保持 database / backups / runtime config。
+- 新 production runtime：PID `551359`；cwd `/opt/ai-love-strategist`；command `/opt/ai-love-strategist/.venv/bin/python -m app.server`；监听 `127.0.0.1:18080`。
+- release log：`/opt/ai-love-strategist/logs/release-20260919T144656Z.log`；PID file：`/opt/ai-love-strategist/logs/app.pid`。
+- liveness：HTTP 200、`ok=true`、exit code 0。
+- readiness：HTTP 200、`ok=true`、exit code 0。
+- post-start preflight：overall `ready=true`、exit code 0；再次确认 production configuration、secure launcher、database、13/13 migrations 与 fresh managed backup readiness。
+- `/proc/551359/environ` 未显示 APP_ENV/APP_DEBUG/HOST/PORT/LLM key 是预期现象：这些值由项目根 `.env` 通过 Settings 加载，不要求导出为父 shell 环境变量；启动后的 post-start preflight 已验证实际配置仍为 production-ready。
+- 8899 observation：`0.0.0.0:8899` 由独立 Python PID `52822` 监听；本次 release 未停止、修改、复用或接管该端口/进程。
+- `git diff --check` 与 `git status --short` 无输出。
+- database restore：`NOT_EXECUTED`。没有自动 restore，也没有 schema/data rollback。
+
+结论：TEST-147 VERIFIED baseline 已按 TEST-134 runbook 完成一次实际 production release execution。当前生产 runtime 为 PID `551359`、loopback `127.0.0.1:18080`，live/readiness/preflight 均通过。TEST-008 ~ TEST-147 的 canonical product lifecycle、release acceptance 与首次实际 release execution 至此闭合。后续不机械创建 TEST-148；只有发现新的真实产品/运维 gap 时才定义新阶段。
+
