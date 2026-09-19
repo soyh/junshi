@@ -1,39 +1,41 @@
 {
-  "backup": {
-    "backup_same_device_as_database": true,
-    "offsite_root_cron_ref": false,
-    "offsite_system_refs": 2
-  },
-  "ingress": {
-    "apache2_active": false,
-    "caddy_active": false,
-    "httpd_active": false,
-    "nginx_active": false,
-    "port_443_listener": false,
-    "port_80_listener": false,
-    "reverse_proxy_refs_to_18080": 0,
-    "tls_material_present": false
-  },
-  "logging": {
-    "logrotate_refs": 0
-  },
-  "monitoring": {
-    "node_exporter": false,
-    "prometheus": false,
-    "telegraf": false,
-    "zabbix_agent": false
-  },
   "notes": [
     "Read-only audit.",
-    "No services stopped or restarted.",
-    "No database restore executed."
+    "No config file contents uploaded.",
+    "No service restart or database restore executed.",
+    "Cloud-provider disk snapshots configured outside the guest OS cannot be proven by this audit."
   ],
+  "offsite_backup": {
+    "relevant_timer_names": [
+      "ai-love-strategist-backup.service"
+    ],
+    "relevant_unit_names": [
+      "ai-love-strategist-backup.service",
+      "ai-love-strategist-backup.timer",
+      "time-sync.target"
+    ],
+    "scheduled_candidate_count": 0,
+    "scheduled_candidate_paths": [],
+    "tools_present": {
+      "aws": false,
+      "ossutil": false,
+      "rclone": false,
+      "s3cmd": false
+    }
+  },
   "repo_head": "5e3669142b7c97061d370d5566bab61e3d83d9f4",
   "schema_version": 1,
   "security": {
-    "reserved_port_8899_checked_only": true
+    "reserved_port_8899_not_modified": true
   },
   "source_branch": "test-149-runtime-health-watchdog",
-  "stage": "POST-TEST-149-GAP-AUDIT",
-  "status": "observed"
+  "stage": "POST-TEST-149-OFFSITE-BACKUP-AUDIT",
+  "status": "observed",
+  "storage": {
+    "backup_fstype": "ext4",
+    "backup_source": "/dev/vda3",
+    "database_fstype": "ext4",
+    "database_source": "/dev/vda3",
+    "same_storage_source": true
+  }
 }
