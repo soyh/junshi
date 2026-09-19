@@ -49,6 +49,7 @@ def _derived_analysis(evidence_id: str, *, summary: str, hypothesis: str) -> dic
                 "content": hypothesis,
                 "confidence": 0.7,
                 "evidence_source_ids": [evidence_id],
+                "action": hypothesis,
             }
         ],
         "emotional_signals": [],
