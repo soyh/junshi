@@ -1,8 +1,8 @@
 # AI Love Strategist Development Handover
 
-更新时间：2026-09-19
-当前阶段：TEST-148 — Platform Supervision / Backup Scheduling / Runtime File Hardening — VERIFIED
-当前 Branch：`test-148-platform-supervision-backup-scheduling`
+更新时间：2026-09-20
+当前阶段：TEST-149 — Runtime Health Watchdog / Degraded-State Recovery — VERIFIED
+当前 Branch：`test-149-runtime-health-watchdog`
 TEST-146 post-verification 基线：`dcb4bef6f4d07fddfba80b9448408a1e436a736f`
 TEST-146 VERIFIED 服务器代码/文档 HEAD：`8a58d056897a2cfbb09ba284c386fe01cb9cbcf7`
 TEST-145 post-verification 基线：`ff33b34fa9896259cacd4dc4543486a8afc39df1`
@@ -34,7 +34,7 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 
 ## 阶段状态
 
-- TEST-008 ~ TEST-148：按既有交接记录 VERIFIED。
+- TEST-008 ~ TEST-149：按既有交接记录 VERIFIED。
 - TEST-147：GitHub self-test、服务器完整回归、真实 managed backup、production release preflight、liveness/readiness 均已通过；正式 VERIFIED。
 - TEST-148：systemd supervisor、daily persistent managed-backup timer、safe retention、runtime file permission hardening 已完成 GitHub + server 实机验证；正式 VERIFIED。
 - TEST-134 VERIFIED：platform-neutral release runbook / rollback safety contract。
@@ -596,3 +596,49 @@ GitHub Actions run `35450677053` / job `105917164725`，测试 HEAD `ab81b9dafa7
 - database restore：`NOT_EXECUTED`。
 
 结论：TEST-148 VERIFIED。生产 runtime 已从 SSH/nohup 进程升级为 OS-level systemd supervision，具备 boot enable、failure auto-restart、startup fail-closed preflight、启动前 fresh managed backup、daily persistent backup scheduling、safe retention 与敏感运行文件权限 hardening。后续不机械创建 TEST-149；先继续审计 TEST-148 之后仍存在的真实产品/运维 gap，再决定下一阶段。
+
+## TEST-149 — Runtime Health Watchdog / Degraded-State Recovery — VERIFIED
+
+TEST-148 完成 OS-level systemd process supervision 后继续审计 TEST-133 supervision contract，确认真实缺口：已有 contract 明确要求 readiness 每 10 秒、liveness 每 30 秒、连续失败阈值 3，但 platform deployment 尚未把“进程仍存活但 runtime degraded”映射为持续 health supervision。TEST-149 只补 runtime watchdog / degraded-state recovery，不修改业务 API、canonical lifecycle、database schema、历史 migration，也不触碰 reserved port 8899。
+
+### 实现与安全边界
+
+- 新增 `backend/app/core/runtime_watchdog.py`：readiness 每 tick 检查，liveness 每 3 tick 检查；默认 tick cadence 10 秒，对应 readiness 10 秒、liveness 30 秒；连续失败阈值 3；成功立即清零对应 failure counter。
+- 新增 `backend/app/watchdog.py`：复用既有 loopback-only `app.probe`，状态仅写 `/run/ai-love-strategist/watchdog.json`，目录 `0700`、文件 `0600`。
+- watchdog 只有真实达到 failure threshold 时才创建 `/run/ai-love-strategist/recovery-required`；monitoring/state-file 自身故障不会创建 recovery marker，避免 monitor failure 被误解释为 application failure。
+- 新增 `ai-love-strategist-watchdog.timer/service`：timer 每 10 秒运行一次 watchdog；`OnFailure` 仅进入独立 recovery unit。
+- 新增 `ai-love-strategist-recovery.service`：以 `ExecCondition` 要求 recovery marker 存在；没有 marker 不允许 restart；recovery 只执行 `systemctl restart ai-love-strategist.service`，不自动 restore database。
+- recovery service 有独立 rate limit；runtime restart 仍沿 TEST-148 启动门执行 managed backup → retention keep=7 → preflight → `app.server`。
+- runtime service 启动/重启后清除旧 watchdog state/recovery marker，避免 stale degraded state 穿越 restart。
+- 首次服务器验收发现真实 startup race：`Type=simple` service 在 Python process 刚创建约 20ms 即返回 started，18080 尚未 listen，紧接 probe 会得到 `probe connection failed`。未用 sleep 绕过，而是新增 `app.wait_ready` + systemd `ExecStartPost` readiness gate；`systemctl start/restart` 只有在 readiness 真正成功后才返回成功，默认最多等待 30 秒。
+- `app.wait_ready` 继续复用既有 runtime probe contract：loopback-only、拒绝 8899、machine-readable exit status；没有新增第二套 health endpoint。
+
+### GitHub verification
+
+最终 startup-readiness 修复 CI run `35453484593`，测试 HEAD `8d9e1b1c93f2d025092a4ff990d197cde6ab3f6a`：
+- focused watchdog + startup readiness：`14 passed`；
+- operations regression：`90 passed`；
+- full regression：`847 passed`；
+- `git diff --check` success。
+
+临时 validation workflow 随后删除；server candidate effective HEAD / server-acceptance source HEAD：`39652fdad525703c03e1506f7ed8be3b5404ddc1`。
+
+### Server full runtime acceptance
+
+固定 machine-readable acceptance channel：branch `ops-server-acceptance-results`，file `ops/server_acceptance/latest.json`；full acceptance result commit `eeba8830d0707148f69a22923cd36fa526f02cd1`。
+
+实机最终结果：
+- source branch `test-149-runtime-health-watchdog`；source HEAD `39652fdad525703c03e1506f7ed8be3b5404ddc1`；status `passed`。
+- startup readiness race fix 后：restart/live/ready/preflight 全部 exit code 0。
+- no-marker gate 实测：没有 `/run/ai-love-strategist/recovery-required` 时 recovery unit 不会重启 runtime。
+- 连续 failure threshold 实测 exit codes：`0, 0, 1`；第三次才进入 recovery-required；trigger=`readiness`。
+- watchdog state 与 recovery marker 权限均为 private runtime state；controlled recovery verified。
+- controlled recovery 将 systemd runtime PID `558463` 重启为 `559990`；恢复后 stale watchdog state/marker 被清理。
+- recovery 后 liveness/readiness/preflight 全部 exit code 0；最终 runtime PID `559990`，仍由 `ai-love-strategist.service` systemd cgroup 管理。
+- healthy watchdog unit：Result=`success`、ExecMainStatus=`0`。
+- backup timer active；watchdog timer active 且 enabled。
+- `.env` mode `0600`；`data/app.sqlite3` mode `0600`。
+- reserved port 8899 owner before/after 均为独立 PID `52822`；TEST-149 未停止、修改、复用或接管 8899。
+- database restore：`NOT_EXECUTED`。
+
+结论：TEST-149 VERIFIED。TEST-133 supervision contract 的 process failure 与 degraded-health recovery 均已完成 platform-level systemd 落地；startup readiness race 也已用显式 readiness gate 修复。后续不机械创建下一 TEST 编号，必须继续审计新的真实产品/运维缺口后再定义阶段。
