@@ -1,50 +1,39 @@
 {
-  "checkpoint": "full-runtime-watchdog-acceptance",
-  "ci": {
-    "focused_passed": 14,
-    "full_passed": 847,
-    "operations_passed": 90,
-    "workflow_run_id": 35453484593
+  "backup": {
+    "backup_same_device_as_database": true,
+    "offsite_root_cron_ref": false,
+    "offsite_system_refs": 2
   },
-  "database_restore_executed": false,
-  "local_full_log": "/opt/ai-love-strategist-validation.log",
-  "runtime": {
-    "final_pid": 559990,
-    "live_rc": 0,
-    "preflight_rc": 0,
-    "ready_rc": 0,
-    "recovery_pid_after": 559990,
-    "recovery_pid_before": 558463,
-    "systemd_owned": true
+  "ingress": {
+    "apache2_active": false,
+    "caddy_active": false,
+    "httpd_active": false,
+    "nginx_active": false,
+    "port_443_listener": false,
+    "port_80_listener": false,
+    "reverse_proxy_refs_to_18080": 0,
+    "tls_material_present": false
   },
+  "logging": {
+    "logrotate_refs": 0
+  },
+  "monitoring": {
+    "node_exporter": false,
+    "prometheus": false,
+    "telegraf": false,
+    "zabbix_agent": false
+  },
+  "notes": [
+    "Read-only audit.",
+    "No services stopped or restarted.",
+    "No database restore executed."
+  ],
+  "repo_head": "5e3669142b7c97061d370d5566bab61e3d83d9f4",
   "schema_version": 1,
   "security": {
-    "db_mode": "600",
-    "env_mode": "600",
-    "port_8899_pid_after": 52822,
-    "port_8899_pid_before": 52822,
-    "port_8899_unchanged": true
+    "reserved_port_8899_checked_only": true
   },
   "source_branch": "test-149-runtime-health-watchdog",
-  "source_head": "39652fdad525703c03e1506f7ed8be3b5404ddc1",
-  "stage": "TEST-149",
-  "status": "passed",
-  "timers": {
-    "backup_active": "active",
-    "watchdog_active": "active",
-    "watchdog_enabled": "enabled"
-  },
-  "watchdog": {
-    "controlled_recovery_verified": true,
-    "failure_exit_codes": [
-      0,
-      0,
-      1
-    ],
-    "failure_threshold": 3,
-    "healthy_unit_exit_status": 0,
-    "healthy_unit_result": "success",
-    "no_marker_restart_blocked": true,
-    "trigger": "readiness"
-  }
+  "stage": "POST-TEST-149-GAP-AUDIT",
+  "status": "observed"
 }
