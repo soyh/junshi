@@ -41,3 +41,4 @@ jobs:
         run: python -m pytest -q
       - name: Diff check
         run: git diff --check
+      # rerun after explicit recovery-marker isolation
