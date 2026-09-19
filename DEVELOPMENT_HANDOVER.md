@@ -1,8 +1,9 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-09-19
-当前阶段：TEST-145 — Learning Workspace — VERIFIED
-当前 Branch：`test-145-learning-workspace`
+当前阶段：TEST-146 — Re-analysis Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：`test-146-reanalysis-workspace`
+TEST-145 post-verification 基线：`ff33b34fa9896259cacd4dc4543486a8afc39df1`
 TEST-145 VERIFIED 服务器代码/文档 HEAD：`a6b98548d70eec000066f94c49531e462412d5bb`
 TEST-144 VERIFIED 服务器代码/文档 HEAD：`0108a2b5b46878d67514f174ba98b72e73736664`
 TEST-144 post-verification 基线：`aa34e958b4e1a95865870ce55e7bc36c663ef50b`
@@ -32,6 +33,7 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 ## 阶段状态
 
 - TEST-008 ~ TEST-145：按既有交接记录 VERIFIED。
+- TEST-146：GitHub self-test passed，服务器最终验收 pending。
 - TEST-134 VERIFIED：platform-neutral release runbook / rollback safety contract。
 - TEST-135 VERIFIED：authenticated single-page product shell。
 - TEST-136 VERIFIED：authenticated Person / Relationship / Conversation Workspace。
@@ -301,13 +303,99 @@ GitHub Actions run `35420818483`，job `105838048027`，测试 HEAD `0ab990889e9
 - `docs/DEVELOPMENT_HANDOVER.md` 不存在；
 - `.github/workflows/test-145-validation.yml` 不存在。
 
-TEST-145 VERIFIED。
+TEST-145 VERIFIED。正式 post-verification 文档提交：`ff33b34fa9896259cacd4dc4543486a8afc39df1`。
 
-## 下一阶段
+## TEST-146 — Re-analysis Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
 
-TEST-146 — Re-analysis Workspace。
+### Canonical contract 审计
 
-允许从 TEST-145 post-verification 文档提交进入 TEST-146。必须先审计现有 persisted memory → learning strategy / analysis bridge / re-analysis 的确切 canonical contract，尤其确认哪些调用会触发 LLM、哪些属于 read-only context、哪些必须由用户显式触发。不得因为 Learning 已 persist 就自动 Re-analysis、自动改 Strategy、自动发送消息或修改 Relationship。
+TEST-146 没有新增 `/re-analysis` backend API，也没有修改 Learning / Memory contract。现有 canonical Re-analysis 链路已经存在：
+
+`AnalysisContext(with Learning Strategy) → AnalysisLLMService → StructuredAnalysis → StrategyRecommendationCandidate → RecommendationProducer → Recommendation`
+
+关键边界：
+- `GET /api/v1/conversations/{conversation_id}/analysis/context` 是 deterministic、source-backed、read-only preflight；它聚合当前 Conversation / Person 的 canonical evidence 与 Learning Strategy，不调用 LLM；
+- Learning Strategy 继续消费 Action Feedback learning、Memory Learning synthesis 与 Strategy Decision learning，并明确 `must_not_call_llm=true`、`must_preserve_unknowns=true`、`must_not_infer_success=true`；
+- `GET /api/v1/conversations/{conversation_id}/recommendation/context` 是现有显式 fresh-analysis + fresh-recommendation HTTP 入口；它在用户显式调用时通过当前用户配置的 provider 运行 Analysis LLM，再走 StrategyRecommendationCandidate → RecommendationProducer；
+- Re-analysis 结果是 derived decision support，不是 canonical truth；
+- Recommendation constraints 继续保留 evidence provenance、`must_not_auto_select`、`must_not_auto_execute`；
+- Outcome / Feedback / Learning load / memory persist 均不会自动调用 Re-analysis；
+- 当前 canonical closure 直接从 source-backed Learning Strategy 进入 AnalysisContext，因此 persisted memory 不是 Re-analysis 的前置 gate。TEST-146 没有擅自新增“必须先 persist 才能 re-analyze”的前端伪规则；
+- missing Outcome 在 Learning Strategy 中继续保持 `outcome_unknown`，不会伪装成 observed success；
+- Re-analysis 不自动创建 Action Plan / Decision / Execution / Outcome，不发送消息、不修改 Relationship。
+
+### 产品实现
+
+1. 新增 `backend/app/ui/action_reanalysis_workspace.py`；
+2. `/app` HTML 顺序扩展为 Outcome → Feedback → Learning → Re-analysis → Provider；
+3. TEST-146 script 放在 TEST-145 Learning script 之前，保持 TEST-139~145 fragment isolation；
+4. `Load re-analysis inputs` 显式读取 `/analysis/context`，只展示 deterministic AnalysisContext/Learning Strategy preflight，不调用 provider/LLM；
+5. preflight 展示 Conversation/Person identity、feedback learning count、memory learning update count、strategy-decision learning count、learning_status、observed/unknown Outcome counts、unknowns 与 source counts；
+6. Person / Conversation 切换只 reset，不自动 preflight、不自动 Re-analysis；
+7. `Run re-analysis` 是独立显式动作，只调用现有 `/recommendation/context`；该调用才允许通过 configured provider/LLM 生成 fresh StructuredAnalysis；
+8. fresh result 展示 summary、fact/inference/unknown/hypothesis counts，以及经过 StrategyRecommendationCandidate → RecommendationProducer 的 Recommendation、evidence_source_ids 与 provenance；
+9. UI 明确 fresh result 不自动 select、plan、execute、send 或 apply Relationship；
+10. Learning fragment 不调用 Re-analysis；memory persist 完成也不会自动 Re-analysis；
+11. 继续复用 page-memory bearer token、安全 DOM `textContent/createElement/replaceChildren`；无 localStorage/sessionStorage/innerHTML/X-User-ID；
+12. 无新业务 API、无 migration、无第二套 Re-analysis service。
+
+### TEST-146 focused tests
+
+新增 `backend/tests/test_authenticated_action_reanalysis_workspace.py`，8 项覆盖：
+- `/app` Re-analysis controls 与 Learning→Re-analysis visual order；
+- fragment 只使用 canonical `/analysis/context` 与 `/recommendation/context`；不新增 `/re-analysis` endpoint、不使用 write methods；
+- preflight 与 provider/LLM run 是两个独立显式动作；Conversation/Person 切换只 reset；
+- Learning Workspace 不触发 Re-analysis；
+- unknown Outcome、source counts、derived result、safe DOM、page-memory bearer；
+- real bearer identity 流入 deterministic AnalysisContext preflight；
+- real bearer identity 流入 explicit recommendation/re-analysis run；
+- canonical Decision + Execution + Outcome + Message → Learning Strategy → provider → fresh StructuredAnalysis → evidence-backed Recommendation 闭环，并验证 Relationship 不变；
+- confirmed Decision 缺少 Outcome 时保持 `outcome_unknown` / observed=0 / unknown=1，且 foreign user scope 返回 404。
+
+### GitHub Actions 验证
+
+临时 workflow：`.github/workflows/test-146-validation.yml`；run 成功后已删除。
+
+GitHub Actions run `35421606290`，job `105840236242`，测试 HEAD `c15100158dd7c4668804126c8997da6fd66a8ed7`，整体 success：
+- TEST-146 focused：8 passed、1 warning in 0.51s；
+- TEST-135~145 Product Workspace regression：82 passed、1 warning in 6.12s；
+- canonical Outcome → Learning → Re-analysis closure：25 passed、1 warning in 0.97s；
+- Learning / unknown-preservation regression：46 passed、1 warning in 3.15s；
+- Provider / route boundary regression：22 passed、1 warning in 0.95s；
+- combined targeted：183 passed、1 warning in 10.90s；
+- full pytest：824 passed、1 warning in 40.60s。
+
+唯一 pytest warning 仍为 Starlette TestClient 对 `anyio.abc.BlockingPortal` alias 的 deprecation；GitHub runner Node20→Node24 action warning 非测试失败。
+
+### TEST-146 实现提交
+
+- `224096719536777a364c8cd22c7ad8f6846ef2d7` — Re-analysis workspace fragment；
+- `afcd4164c236061153ef192a2a5a612b925c23bf` — 注入统一 `/app` 并保持旧 fragment isolation；
+- `cfea693ffc0b7e83aab1f48839375918538cd902` — 修正 UI 对 unknown Outcome 的展示语义；
+- `f8a98ba15ab79d4bb10452a267653878d64f1a13` — 8 项 authenticated Re-analysis workspace tests；
+- `c15100158dd7c4668804126c8997da6fd66a8ed7` — 临时 TEST-146 validation workflow / GitHub tested HEAD；
+- `3db4638e078a4aa083f0cff0537e9e6977357bc9` — GitHub success 后删除临时 workflow。
+
+### 服务器最终验收
+
+PENDING。服务器必须验证：
+- branch `test-146-reanalysis-workspace`；
+- 当前 GitHub handover HEAD；
+- combined targeted 183；
+- full 824；
+- `git diff --check` 无输出；
+- `git status --short` 无输出；
+- root `DEVELOPMENT_HANDOVER.md` 存在；
+- duplicate handover 不存在；
+- `.github/workflows/test-146-validation.yml` 不存在。
+
+TEST-146 只有上述服务器验收全部通过后才可标记 VERIFIED。
+
+## 下一阶段候选
+
+Full Product Lifecycle E2E / Release Acceptance。
+
+当前只记录候选方向，不创建下一阶段 branch，也不提前锁定 TEST 编号。必须先完成 TEST-146 服务器 VERIFIED；之后再审计现有 release preflight / runbook / runtime probe 与完整产品生命周期测试覆盖，确定最终 E2E / release acceptance 的精确 contract。
 
 ## 架构与持续禁止事项
 
@@ -322,9 +410,11 @@ TEST-146 — Re-analysis Workspace。
 - Learning proposal 必须由 observed Outcome/source-backed Feedback 派生；不得把 unknown Outcome 当成学习事实。
 - Learning memory persistence 必须来自独立显式 persist；proposal/load 本身不得写 memory。
 - Persisted Learning 不得自动触发 Re-analysis、Strategy application、LLM、message send 或 Relationship mutation。
+- Re-analysis preflight 必须保持 deterministic/read-only/no-LLM；只有用户显式 Run re-analysis 才能进入 provider/LLM derived-analysis 路径。
+- Re-analysis 不得自动选择 Recommendation、创建 Action Plan、执行、发送消息或修改 Relationship。
 - Outcome → Feedback → Learning → Re-analysis 必须继续沿唯一 canonical lifecycle，各阶段边界必须保持显式、可审计。
 - 所有数据必须 user_id 隔离；Person / Relationship / Conversation 不得跨 scope 混用。
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~145 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~146 verification tag 已创建。
