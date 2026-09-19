@@ -70,6 +70,6 @@ TEST-148 完成 OS-level systemd process supervision 后继续审计 TEST-133 su
 
 结论：TEST-149 VERIFIED。TEST-133 supervision contract 的 process failure 与 degraded-health recovery 均已完成 platform-level systemd 落地；startup readiness race 也已用显式 readiness gate 修复。后续不机械创建下一 TEST 编号，必须继续审计新的真实产品/运维缺口后再定义阶段。
 '''
-    text = text.rstrip() + section + "\n"
+    text = text.rstrip() + section.rstrip() + "\n"
 
 HANDOVER.write_text(text, encoding="utf-8")
