@@ -147,6 +147,38 @@ def test_export_can_be_exercised_without_storage_gate_but_default_gate_is_strict
     assert verify_offsite_bundle(report.bundle_path, key=key).source_sha256 == report.source_sha256
 
 
+def test_cli_export_reuses_existing_verified_bundle_for_same_latest_backup(tmp_path: Path, monkeypatch):
+    source = tmp_path / "source.sqlite3"
+    local = tmp_path / "local"
+    remote = tmp_path / "remote"
+    local.mkdir()
+    remote.mkdir()
+    _database(source)
+    _managed(local, source, "latest.sqlite3", datetime(2026, 9, 20, 1, 0, tzinfo=timezone.utc))
+    key = generate_offsite_key()
+
+    original_export = offsite_cli.export_latest_managed_backup
+    monkeypatch.setattr(offsite_cli, "require_separate_storage", lambda source, destination: None)
+    monkeypatch.setattr(
+        offsite_cli,
+        "export_latest_managed_backup",
+        lambda local_dir, destination_dir, *, key, require_distinct_storage: original_export(
+            local_dir,
+            destination_dir,
+            key=key,
+            require_distinct_storage=False,
+        ),
+    )
+
+    first, reused_first = offsite_cli._export_or_reuse(local, remote, key=key)
+    second, reused_second = offsite_cli._export_or_reuse(local, remote, key=key)
+
+    assert reused_first is False
+    assert reused_second is True
+    assert first.bundle_path == second.bundle_path
+    assert first.bundle_sha256 == second.bundle_sha256
+
+
 def test_offsite_retention_deletes_only_verified_encrypted_bundles(tmp_path: Path):
     source = tmp_path / "source.sqlite3"
     local = tmp_path / "local"
