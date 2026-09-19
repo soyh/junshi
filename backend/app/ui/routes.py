@@ -22,6 +22,10 @@ from app.ui.action_outcome_workspace import (
     ACTION_OUTCOME_SCRIPT,
 )
 from app.ui.action_plan_workspace import ACTION_PLAN_HTML, ACTION_PLAN_SCRIPT
+from app.ui.action_reanalysis_workspace import (
+    ACTION_REANALYSIS_HTML,
+    ACTION_REANALYSIS_SCRIPT,
+)
 from app.ui.conversation_content_workspace import (
     CONVERSATION_CONTENT_HTML,
     CONVERSATION_CONTENT_SCRIPT,
@@ -59,6 +63,7 @@ def build_product_shell_html() -> str:
         f"{ACTION_OUTCOME_HTML}\n"
         f"{ACTION_FEEDBACK_HTML}\n"
         f"{ACTION_LEARNING_HTML}\n"
+        f"{ACTION_REANALYSIS_HTML}\n"
         f"{provider_marker}"
     )
     html = PRODUCT_SHELL_HTML.replace(
@@ -69,6 +74,7 @@ def build_product_shell_html() -> str:
     workspace_script = (
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
+        f"{ACTION_REANALYSIS_SCRIPT}\n\n"
         f"{ACTION_LEARNING_SCRIPT}\n\n"
         f"{ACTION_FEEDBACK_SCRIPT}\n\n"
         f"{ACTION_OUTCOME_SCRIPT}\n\n"
