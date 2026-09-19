@@ -465,7 +465,7 @@ TEST-147 不新增业务生命周期阶段，也不修改生产 API / service / 
 
 ### 服务器最终验收
 
-PENDING。服务器必须验证：
+2026-09-19 已完成并通过。以下为当时的服务器验收清单，现均已满足：
 - branch `test-147-full-lifecycle-release-acceptance` 与最终 handover HEAD；
 - combined targeted 209；
 - full 826；
@@ -476,11 +476,11 @@ PENDING。服务器必须验证：
 - root `DEVELOPMENT_HANDOVER.md` 存在、duplicate handover 不存在；
 - TEST-147 临时 workflows 不存在。
 
-TEST-147 只有上述服务器验收全部通过后才可标记 VERIFIED。
+上述服务器验收已经全部通过，TEST-147 已正式标记 VERIFIED；详细实测证据见本文末尾正式 VERIFIED 记录。
 
 ## 下一阶段
 
-当前不创建 TEST-148。TEST-147 server VERIFIED 后，产品业务闭环与 release acceptance 基线即完整闭合。若进入实际发布，必须执行已 VERIFIED 的 TEST-134 release runbook；若继续新增阶段，必须先审计新的真实产品/运维缺口，不得为了延长 TEST 编号重复实现既有能力。
+当前不创建 TEST-148。TEST-147 已 VERIFIED，产品业务闭环与 release acceptance 基线已经完整闭合。若进入实际发布，必须在用户明确要求后执行已 VERIFIED 的 TEST-134 release runbook；若继续新增阶段，必须先审计新的真实产品/运维缺口，不得为了延长 TEST 编号重复实现既有能力。
 
 ## 架构与持续禁止事项
 
