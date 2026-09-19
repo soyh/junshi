@@ -1,9 +1,10 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-09-19
-当前阶段：TEST-144 — Feedback Workspace — VERIFIED
-当前 Branch：`test-144-feedback-workspace`
+当前阶段：TEST-145 — Learning Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前 Branch：`test-145-learning-workspace`
 TEST-144 VERIFIED 服务器代码/文档 HEAD：`0108a2b5b46878d67514f174ba98b72e73736664`
+TEST-144 post-verification 基线：`aa34e958b4e1a95865870ce55e7bc36c663ef50b`
 TEST-143 VERIFIED 服务器代码/文档 HEAD：`02cc3c4805f199e9ce9c521f82b0c93672a95ef2`
 TEST-143 post-verification 基线：`97d82d30e85e412bdadc11698ff601736227ad5a`
 TEST-142 VERIFIED 服务器代码 HEAD：`06b2fd49aedc6a5d31bfd9d56025db755cd6b10b`
@@ -41,6 +42,7 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 - TEST-142 VERIFIED：Action Execution Workspace。
 - TEST-143 VERIFIED：Outcome Workspace。
 - TEST-144 VERIFIED：Feedback Workspace。
+- TEST-145：GitHub self-test passed，等待服务器最终验收，尚未标记 VERIFIED。
 
 ## Runtime / Operations 产品化基线
 
@@ -201,13 +203,96 @@ Repository 只 LEFT JOIN `action_decisions` 与 `action_outcomes` 并按当前 `
 - `docs/DEVELOPMENT_HANDOVER.md` 不存在；
 - `.github/workflows/test-144-validation.yml` 不存在。
 
-TEST-144 VERIFIED。
+TEST-144 VERIFIED。正式 post-verification 文档提交：`aa34e958b4e1a95865870ce55e7bc36c663ef50b`。
 
-## 下一阶段
+## TEST-145 — Learning Workspace — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
 
-TEST-145 — Learning Workspace。
+### Canonical contract 审计
 
-允许从 TEST-144 post-verification 文档提交进入 TEST-145。必须先审计现有 `/feedback/learning-context`、Learning service/repository/memory update、LLM/Re-analysis 边界，再决定统一 `/app` 应展示或触发哪些明确的 canonical Learning 能力。不得把 read-only Feedback 自动升级为学习写入，不得由 Feedback 自动调用 LLM/Re-analysis，不得修改 Relationship 或跨 user/person scope。
+Learning 不是从 Feedback 自动写入数据库。现有 canonical lifecycle 已明确分层：
+
+`Observed Outcome → Feedback learning context → Learning input → Learning candidate → Memory candidate → Memory synthesis / learning provenance → explicit persist → persisted memory`
+
+本阶段直接复用现有服务与 API，没有新增第二套 Learning 业务逻辑：
+
+- `GET /api/v1/persons/{person_id}/action-plan/feedback/learning-inputs`：只把 `feedback_status=outcome_observed` 的 Feedback 转成 deterministic、source-backed learning input；
+- `GET /api/v1/persons/{person_id}/action-plan/feedback/learning-synthesis`：生成 `status=proposed` 的 learning candidates；
+- `GET /api/v1/persons/{person_id}/memory-updates/context`：生成 proposed memory candidates；
+- `GET /api/v1/persons/{person_id}/memory-updates/synthesis`：生成 proposed memory updates；
+- `GET /api/v1/persons/{person_id}/memory-updates/learning-synthesis`：为 memory proposal 增加 source-backed learning provenance；
+- `POST /api/v1/persons/{person_id}/memory-updates/{candidate_id}/persist`：唯一显式 memory persistence gate。
+
+核心边界：
+- 没有 observed Outcome 时不会产生 Learning proposal；
+- learning/memory proposal 都是 deterministic、source-backed、`status=proposed`；
+- unknowns 保留 long-term relationship impact / future behavior 等未知项；
+- 不推断 recommendation quality、success 或 Relationship impact；
+- proposal 生成不调用 LLM、不写 memory、不改变 Relationship、不执行 action；
+- memory persist 必须来自用户单独显式 POST；
+- persist 按 `source_candidate_id` 幂等，同 candidate 重复 POST 返回同一 persisted record，不重复插入；
+- foreign user/person 无权 persist；
+- persist 只写既有 `memory_updates`，不会自动调用 Re-analysis、Learning Strategy、Structured Analysis、发送消息或修改 Relationship。
+
+当前 canonical API 没有 persisted-memory history GET。TEST-145 没有为方便 UI 擅自新增读取 API；persist 后只展示该次服务端返回，重新载入仍读取 canonical proposals。重复 persist 由服务端幂等性兜底。
+
+### 产品实现
+
+1. 新增 `backend/app/ui/action_learning_workspace.py`；
+2. `/app` HTML 顺序扩展为 Action Plan → Action Decision → Action Execution → Outcome → Feedback → Learning；
+3. TEST-145 script 放在 TEST-144 Feedback script 之前，因此 TEST-139~144 既有 fragment isolation 保持不变；
+4. 用户必须显式点击 `Load learning` 才读取 `/memory-updates/learning-synthesis`；
+5. Person 切换只 reset Learning Workspace，不自动 load、不自动 persist；
+6. Learning proposal 展示 `source_candidate_id`、Decision/Outcome provenance、recommendation identity、observed outcome counts 与 unknowns；
+7. 用户必须选择一个 proposal，再单独点击 `Persist selected learning memory`；
+8. persist 只 POST canonical `/memory-updates/{candidate_id}/persist`，没有自定义 payload；
+9. persist 后只显示服务器返回的 persisted memory record；不自动刷新/调用 Re-analysis、Learning Strategy 或 Structured Analysis；
+10. 页面明确提示没有启动 Re-analysis、strategy application、LLM、message send 或 Relationship change；
+11. 继续复用 page-memory bearer token 与安全 DOM `textContent/createElement/replaceChildren`；无 localStorage/sessionStorage/innerHTML/X-User-ID；
+12. 无新业务 API、无 schema migration、未提前实现 Re-analysis Workspace。
+
+### TEST-145 focused tests
+
+新增 `backend/tests/test_authenticated_action_learning_workspace.py`，8 项覆盖：
+- `/app` Learning controls；
+- 只使用 canonical learning-synthesis GET 与 explicit persist POST；
+- 不调用 learning-strategy / analysis / structured-analysis；
+- 显式 load + 显式 persist，Person change 只 reset；
+- Feedback Workspace 不会自动 load/persist Learning；
+- provenance、unknowns、page-memory bearer 与 safe DOM；
+- bearer identity 对 Learning GET 与 persist POST 的真实传递；
+- canonical observed-Outcome gate、candidate-level idempotency、数据库单行写入；
+- authenticated user scope isolation 与 Relationship non-mutation。
+
+### GitHub Actions 验证
+
+临时 workflow：`.github/workflows/test-145-validation.yml`；验证成功后已删除。
+
+GitHub Actions run `35420818483`，job `105838048027`，测试 HEAD `0ab990889e96232cf757bb0e89b7640c008c256d`，整体 success：
+- TEST-145 focused：8 passed、1 warning in 0.67s；
+- TEST-135~144 Product Workspace regression：74 passed、1 warning in 6.72s；
+- canonical Learning / Memory lifecycle：61 passed、1 warning in 4.32s；
+- Re-analysis / Strategy separation regression：13 passed、1 warning in 0.99s；
+- Feedback / Outcome / auth regression：52 passed、1 warning in 3.36s；
+- combined targeted：208 passed、1 warning in 14.06s；
+- full pytest：816 passed、1 warning in 40.53s。
+
+唯一 pytest warning 仍为 Starlette TestClient 对 `anyio.abc.BlockingPortal` alias 的 deprecation；GitHub runner Node20→Node24 action warning 非测试失败。
+
+### TEST-145 实现提交
+
+- `0228ac59672c1f6fe1f11aba827fb6f52a747d7e` — Learning workspace fragment；
+- `a25217c97f4a4f80d8a044c720f18c68cac3c2a9` — 注入统一 `/app` 并保持旧 fragment isolation；
+- `47bdca379311ec01686a9a7b6fa8ed4fb4b3a8bd` — 8 项 authenticated Learning workspace tests；
+- `0ab990889e96232cf757bb0e89b7640c008c256d` — 临时 TEST-145 validation workflow / GitHub tested HEAD；
+- `9fe55417d44a96a03f5ec95f47a44fc9b29c3ef3` — GitHub success 后删除临时 workflow。
+
+服务器最终验收尚未执行，因此 TEST-145 当前不能标记 VERIFIED。
+
+## 下一阶段候选
+
+TEST-146 — Re-analysis Workspace。
+
+只能在 TEST-145 服务器最终验收通过并标记 VERIFIED 后开始。进入 TEST-146 前必须先审计现有 persisted memory → learning strategy / analysis bridge / re-analysis 的确切 canonical contract，尤其确认哪些调用会触发 LLM、哪些属于 read-only context、哪些必须由用户显式触发。不得因为 Learning 已 persist 就自动 Re-analysis、自动改 Strategy、自动发送消息或修改 Relationship。
 
 ## 架构与持续禁止事项
 
@@ -219,9 +304,12 @@ TEST-145 — Learning Workspace。
 - Action Execution 必须来自独立显式 execution 动作；confirmed decision 本身不得触发执行。
 - Outcome 必须基于已存在的 Action Execution，并由用户显式记录；Execution 本身不得自动生成 Outcome。
 - Feedback 是 source-backed read model；missing Outcome 必须保持 unknown，不得推断成功、relationship impact 或 recommendation quality。
+- Learning proposal 必须由 observed Outcome/source-backed Feedback 派生；不得把 unknown Outcome 当成学习事实。
+- Learning memory persistence 必须来自独立显式 persist；proposal/load 本身不得写 memory。
+- Persisted Learning 不得自动触发 Re-analysis、Strategy application、LLM、message send 或 Relationship mutation。
 - Outcome → Feedback → Learning → Re-analysis 必须继续沿唯一 canonical lifecycle，各阶段边界必须保持显式、可审计。
 - 所有数据必须 user_id 隔离；Person / Relationship / Conversation 不得跨 scope 混用。
 - 不修改历史 migration；新增 schema 必须使用新 migration。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
-- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~144 verification tag 已创建。
+- verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~145 verification tag 已创建。
