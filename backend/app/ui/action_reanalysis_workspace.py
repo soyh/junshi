@@ -6,7 +6,7 @@ ACTION_REANALYSIS_HTML = r'''
     <div class="workspace-grid">
       <section class="workspace-card" aria-labelledby="action-reanalysis-input-heading">
         <h2 id="action-reanalysis-input-heading">Re-analysis Inputs</h2>
-        <p class="note">Load re-analysis inputs 只读取当前 Conversation 的 deterministic AnalysisContext，并展示其中 source-backed Learning Strategy。该步骤明确 must_not_call_llm。</p>
+        <p class="note">Load re-analysis inputs 只读取当前 Conversation 的 deterministic AnalysisContext，并展示其中 source-backed Learning Strategy。该步骤明确 must_not_call_llm；缺少 Outcome 的 learning item 继续保持 outcome_unknown，不会伪装成 observed success。</p>
         <button id="load-action-reanalysis-inputs" class="requires-auth" type="button" disabled>Load re-analysis inputs</button>
         <div id="action-reanalysis-input-status" class="status">Select a conversation, then load re-analysis inputs.</div>
         <div id="action-reanalysis-learning" class="status">No re-analysis inputs loaded.</div>
@@ -84,7 +84,7 @@ ACTION_REANALYSIS_SCRIPT = r'''
 
     appendReanalysisField(actionReanalysisLearning, 'conversation_id', body && body.conversation && body.conversation.id);
     appendReanalysisField(actionReanalysisLearning, 'person_id', body && body.person && body.person.id);
-    appendReanalysisField(actionReanalysisLearning, 'observed_feedback_count', feedback.length);
+    appendReanalysisField(actionReanalysisLearning, 'feedback_learning_count', feedback.length);
     appendReanalysisField(actionReanalysisLearning, 'memory_learning_update_count', memoryUpdates.length);
     appendReanalysisField(actionReanalysisLearning, 'strategy_decision_learning_count', decisionItems.length);
 
@@ -98,6 +98,7 @@ ACTION_REANALYSIS_SCRIPT = r'''
       appendReanalysisField(row, 'unknowns', Array.isArray(item.unknowns) ? item.unknowns.join(', ') : 'unknown');
       const source = item.source || {};
       appendReanalysisField(row, 'source_observed_outcomes', source.observed_outcomes);
+      appendReanalysisField(row, 'source_unknown_outcomes', source.unknown_outcomes);
       actionReanalysisLearning.appendChild(row);
     });
 
@@ -144,8 +145,8 @@ ACTION_REANALYSIS_SCRIPT = r'''
     renderReanalysisInputs(body);
     const learning = body && body.learning_strategy ? body.learning_strategy : {};
     const inputs = learning.learning_inputs || {};
-    const observed = Array.isArray(inputs.action_feedback) ? inputs.action_feedback.length : 0;
-    actionReanalysisInputStatus.textContent = `${observed} source-backed observed-feedback learning item(s) loaded. No LLM/provider call was made.`;
+    const feedbackCount = Array.isArray(inputs.action_feedback) ? inputs.action_feedback.length : 0;
+    actionReanalysisInputStatus.textContent = `${feedbackCount} source-backed feedback learning item(s) loaded. Unknown Outcome remains unknown. No LLM/provider call was made.`;
   }
 
   async function runActionReanalysis() {
