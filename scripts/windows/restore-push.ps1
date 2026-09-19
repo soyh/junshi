@@ -87,7 +87,7 @@ try {
         Write-Host "RESTORE_PUSH=STAGED"
         Write-Host "REMOTE_BUNDLE=$remoteBundle"
         Write-Host "APPLY_RESTORE=NO"
-        exit 0
+        return
     }
 
     $remoteScript = @"
