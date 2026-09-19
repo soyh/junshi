@@ -1,7 +1,7 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-09-19
-当前阶段：TEST-147 — Full Product Lifecycle E2E / Release Acceptance — GITHUB SELF-TEST PASSED / SERVER VALIDATION PENDING
+当前阶段：TEST-147 — Full Product Lifecycle E2E / Release Acceptance — VERIFIED
 当前 Branch：`test-147-full-lifecycle-release-acceptance`
 TEST-146 post-verification 基线：`dcb4bef6f4d07fddfba80b9448408a1e436a736f`
 TEST-146 VERIFIED 服务器代码/文档 HEAD：`8a58d056897a2cfbb09ba284c386fe01cb9cbcf7`
@@ -34,8 +34,8 @@ TEST-135 VERIFIED 服务器代码 HEAD：`a2792c0207b1d43e6ad488c6deefec9e679f46
 
 ## 阶段状态
 
-- TEST-008 ~ TEST-146：按既有交接记录 VERIFIED。
-- TEST-147：GitHub self-test passed，服务器最终验收 pending。
+- TEST-008 ~ TEST-147：按既有交接记录 VERIFIED。
+- TEST-147：GitHub self-test、服务器完整回归、真实 managed backup、production release preflight、liveness/readiness 均已通过；正式 VERIFIED。
 - TEST-134 VERIFIED：platform-neutral release runbook / rollback safety contract。
 - TEST-135 VERIFIED：authenticated single-page product shell。
 - TEST-136 VERIFIED：authenticated Person / Relationship / Conversation Workspace。
@@ -503,3 +503,34 @@ TEST-147 只有上述服务器验收全部通过后才可标记 VERIFIED。
 - MVP 不使用 PostgreSQL、Redis、Elasticsearch、Vector DB；不得使用或修改 8899。
 - Provider/API/Auth credentials 不得出现在 console/file log 或归一化 exception traceback 中。
 - verification tag 只有实际创建并验证存在后才能记录为完成；当前未声称 TEST-113~146 verification tag 已创建。
+
+## TEST-147 — Full Product Lifecycle E2E / Release Acceptance — VERIFIED
+
+TEST-147 是 TEST-008 ~ TEST-146 canonical lifecycle 与 TEST-122 ~ TEST-134 runtime/release contract 的最终产品验收阶段；没有新增第二套业务链路，也没有为通过验收修改 production API/service/repository/UI/schema/migration。
+
+### GitHub acceptance
+
+- TEST-146 post-verification 基线：`dcb4bef6f4d07fddfba80b9448408a1e436a736f`。
+- TEST-147 server-validation 前代码/文档 HEAD：`4646a32260da0a9deb38ccd57810137a71f80c60`。
+- 新增 acceptance test：`backend/tests/test_full_product_lifecycle_release_acceptance.py`。
+- GitHub successful validation run `35422430074` / job `105842430832`：focused 2、Product Workspace regression 90、canonical lifecycle/safety closure 17、release operations acceptance 100、combined targeted 209、full 826。
+- 最终从 TEST-146 baseline 到 server-validation HEAD 的有效 diff 仅为根 `DEVELOPMENT_HANDOVER.md` 与上述 acceptance test；temporary workflow/helper/trigger 已清理。
+
+### 2026-09-19 server final acceptance
+
+服务器目录：`/opt/ai-love-strategist`；branch `test-147-full-lifecycle-release-acceptance`；实际验证代码/文档 HEAD `4646a32260da0a9deb38ccd57810137a71f80c60`；验证前后 repository clean。
+
+- combined targeted：`209 passed in 30.19s`。
+- full regression：`826 passed in 145.31s`。
+- 真实当前数据库 managed online backup 成功：`/opt/ai-love-strategist-backups/app-test147-20260919T051320Z.sqlite3`；manifest：`/opt/ai-love-strategist-backups/app-test147-20260919T051320Z.sqlite3.manifest.json`。
+- operations readiness：database OK；13/13 migrations (`001` ~ `013`) 一致；managed backup OK。
+- 初次 release preflight 正确 fail closed，暴露 root `.env` 仍为 development、debug=true、无 LLM encryption key；没有修改代码绕过。
+- 安全配置准备确认 `user_llm_provider_configs` 中加密配置记录数为 0，`.env` 与当前 18080 进程均无旧 encryption key，因此在不存在既有密文兼容风险的前提下生成新的 Fernet key，并只写入被 gitignore 的本机 `.env`；旧 `.env` 保存为 `/opt/ai-love-strategist/.env.pre-test147-20260919T143411Z.bak`；密钥值未写入 handover / Git / 日志摘要。
+- candidate production config：`APP_ENV=production`、`APP_DEBUG=false`、`HOST=127.0.0.1`、`PORT=18080`、`AUTH_BOOTSTRAP_ENABLED=false`、`LLM_CONFIG_ENCRYPTION_KEY` configured、`LOG_LEVEL=INFO`。
+- 最终 release preflight：configuration OK、secure launcher OK（loopback、1 worker、no reload、no proxy trust、no Server header）、operations ready；overall `ready=true`；exit code 0。
+- runtime liveness probe：HTTP 200、`ok=true`、exit code 0。
+- runtime readiness probe：HTTP 200、`ok=true`、exit code 0。
+- `git diff --check` 与 `git status --short` 无输出；root handover 存在；`docs/DEVELOPMENT_HANDOVER.md` 不存在；TEST-147 temporary validation/handover workflow/helper/trigger 均不存在。
+- 此验收没有 stop/restart 当前服务、没有 switch release、没有 restore database、没有触碰端口 8899。production `.env` 是 release candidate 配置；实际 release execution 仍必须按 TEST-134 VERIFIED runbook 显式执行。
+
+结论：TEST-147 VERIFIED。至此 canonical product lifecycle + runtime/release acceptance baseline 已闭合。没有自动创建 TEST-148；后续只有在发现真实新 gap 时才定义新 TEST 阶段，或在用户明确要求发布时按 TEST-134 release runbook 执行实际 release。
