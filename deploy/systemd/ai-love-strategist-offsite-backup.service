@@ -1,0 +1,12 @@
+[Unit]
+Description=AI Love Strategist encrypted offsite backup
+After=network-online.target ai-love-strategist-backup.service
+Wants=network-online.target
+ConditionPathExists=/opt/ai-love-strategist/data/app.sqlite3
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ai-love-strategist
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/ai-love-strategist/.venv/bin/python -m app.offsite_backup --json --apply-retention
