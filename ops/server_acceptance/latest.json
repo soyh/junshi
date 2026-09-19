@@ -1,41 +1,45 @@
 {
-  "notes": [
-    "Read-only audit.",
-    "No config file contents uploaded.",
-    "No service restart or database restore executed.",
-    "Cloud-provider disk snapshots configured outside the guest OS cannot be proven by this audit."
-  ],
-  "offsite_backup": {
-    "relevant_timer_names": [
-      "ai-love-strategist-backup.service"
-    ],
-    "relevant_unit_names": [
-      "ai-love-strategist-backup.service",
-      "ai-love-strategist-backup.timer",
-      "time-sync.target"
-    ],
-    "scheduled_candidate_count": 0,
-    "scheduled_candidate_paths": [],
-    "tools_present": {
-      "aws": false,
-      "ossutil": false,
-      "rclone": false,
-      "s3cmd": false
-    }
+  "checkpoint": "implementation-server-validation",
+  "database_restore_executed": false,
+  "github_ci": {
+    "focused_passed": 10,
+    "full_passed": 857,
+    "operations_passed": 71,
+    "run_id": 35457791782
   },
-  "repo_head": "5e3669142b7c97061d370d5566bab61e3d83d9f4",
+  "implementation_validation": {
+    "bundle_mode": "600",
+    "distinct_device_verified": true,
+    "encrypted_export_created": true,
+    "idempotent_reuse_verified": true,
+    "reread_verification_ok": true,
+    "sqlite_plaintext_header_absent": true,
+    "tamper_rejected": true,
+    "validation_medium": "tmpfs"
+  },
+  "notes": [
+    "Implementation validation passed.",
+    "tmpfs was used only to simulate a distinct storage device.",
+    "tmpfs is not durable offsite storage.",
+    "TEST-150 is not VERIFIED until a real remote target is validated."
+  ],
+  "runtime": {
+    "live_rc": 0,
+    "pid_after": 559990,
+    "pid_before": 559990,
+    "pid_unchanged": true,
+    "ready_rc": 0
+  },
   "schema_version": 1,
   "security": {
-    "reserved_port_8899_not_modified": true
+    "port_8899_pid_after": 52822,
+    "port_8899_pid_before": 52822,
+    "port_8899_unchanged": true,
+    "temporary_encryption_key_not_persisted": true
   },
-  "source_branch": "test-149-runtime-health-watchdog",
-  "stage": "POST-TEST-149-OFFSITE-BACKUP-AUDIT",
-  "status": "observed",
-  "storage": {
-    "backup_fstype": "ext4",
-    "backup_source": "/dev/vda3",
-    "database_fstype": "ext4",
-    "database_source": "/dev/vda3",
-    "same_storage_source": true
-  }
+  "source_branch": "test-150-offsite-disaster-recovery",
+  "source_head": "fdec0503808a9f572645a13a267c8c829b076918",
+  "stage": "TEST-150",
+  "status": "passed",
+  "true_offsite_validation": false
 }
