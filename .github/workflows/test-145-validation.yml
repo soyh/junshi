@@ -1,0 +1,38 @@
+name: TEST-145 validation
+
+on:
+  push:
+    branches:
+      - test-145-learning-workspace
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: TEST-145 Learning workspace
+        working-directory: backend
+        run: pytest -q tests/test_authenticated_action_learning_workspace.py
+      - name: Product workspace regression through TEST-144
+        working-directory: backend
+        run: pytest -q tests/test_authenticated_product_shell.py tests/test_authenticated_core_workspace.py tests/test_authenticated_conversation_content_workspace.py tests/test_authenticated_relationship_evidence_workspace.py tests/test_authenticated_strategy_recommendation_workspace.py tests/test_authenticated_action_plan_workspace.py tests/test_authenticated_action_decision_workspace.py tests/test_authenticated_action_execution_workspace.py tests/test_authenticated_action_outcome_workspace.py tests/test_authenticated_action_feedback_workspace.py
+      - name: Canonical learning and memory lifecycle
+        working-directory: backend
+        run: pytest -q tests/test_action_feedback_learning.py tests/test_action_feedback_learning_context.py tests/test_action_feedback_learning_synthesis.py tests/test_memory_update.py tests/test_memory_update_contract.py tests/test_memory_synthesis.py tests/test_memory_persistence.py tests/test_memory_learning_provenance.py tests/test_memory_learning_synthesis.py
+      - name: Re-analysis and strategy separation regression
+        working-directory: backend
+        run: pytest -q tests/test_outcome_reanalysis_closure.py tests/test_learning_strategy_context.py tests/test_analysis_learning_strategy_bridge.py
+      - name: Feedback Outcome and auth regression
+        working-directory: backend
+        run: pytest -q tests/test_action_feedback.py tests/test_action_feedback_synthesis.py tests/test_action_feedback_trend.py tests/test_action_feedback_signals.py tests/test_action_outcome.py tests/test_action_outcome_http_conflict.py tests/test_action_outcome_idempotency.py tests/test_auth_account_login.py
+      - name: Combined TEST-145 targeted validation
+        working-directory: backend
+        run: pytest -q tests/test_authenticated_action_learning_workspace.py tests/test_authenticated_product_shell.py tests/test_authenticated_core_workspace.py tests/test_authenticated_conversation_content_workspace.py tests/test_authenticated_relationship_evidence_workspace.py tests/test_authenticated_strategy_recommendation_workspace.py tests/test_authenticated_action_plan_workspace.py tests/test_authenticated_action_decision_workspace.py tests/test_authenticated_action_execution_workspace.py tests/test_authenticated_action_outcome_workspace.py tests/test_authenticated_action_feedback_workspace.py tests/test_action_feedback_learning.py tests/test_action_feedback_learning_context.py tests/test_action_feedback_learning_synthesis.py tests/test_memory_update.py tests/test_memory_update_contract.py tests/test_memory_synthesis.py tests/test_memory_persistence.py tests/test_memory_learning_provenance.py tests/test_memory_learning_synthesis.py tests/test_outcome_reanalysis_closure.py tests/test_learning_strategy_context.py tests/test_analysis_learning_strategy_bridge.py tests/test_action_feedback.py tests/test_action_feedback_synthesis.py tests/test_action_feedback_trend.py tests/test_action_feedback_signals.py tests/test_action_outcome.py tests/test_action_outcome_http_conflict.py tests/test_action_outcome_idempotency.py tests/test_auth_account_login.py
+      - name: Full test suite from server-equivalent cwd
+        working-directory: backend
+        run: pytest -q
