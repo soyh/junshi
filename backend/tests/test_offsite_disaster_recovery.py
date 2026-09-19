@@ -227,8 +227,9 @@ def test_systemd_offsite_contract_is_explicit_and_does_not_restart_runtime():
     assert "After=network-online.target ai-love-strategist-backup.service" in service
     assert "Persistent=true" in timer
     assert "RandomizedDelaySec=15m" in timer
-    assert "python -m app.offsite_backup --check --json" in installer
-    assert installer.index("python -m app.offsite_backup --check --json") < installer.index("install -m 0644")
+    check_command = "-m app.offsite_backup --check --json"
+    assert check_command in installer
+    assert installer.index(check_command) < installer.index("install -m 0644")
     assert "systemctl enable \"$TIMER\"" in installer
     assert "systemctl start ai-love-strategist.service" not in installer
     assert "systemctl restart ai-love-strategist.service" not in installer
