@@ -6,7 +6,11 @@ from pathlib import Path
 
 from app.config.settings import get_settings
 from app.core.runtime_probe import probe_runtime
-from app.core.runtime_watchdog import RuntimeWatchdogError, evaluate_runtime_watchdog
+from app.core.runtime_watchdog import (
+    RuntimeWatchdogError,
+    evaluate_runtime_watchdog,
+    set_recovery_marker,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -17,6 +21,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--state-file",
         default="/run/ai-love-strategist/watchdog.json",
         help="Ephemeral watchdog state file.",
+    )
+    parser.add_argument(
+        "--recovery-marker",
+        default="/run/ai-love-strategist/recovery-required",
+        help="Marker consumed by the systemd recovery unit.",
     )
     parser.add_argument(
         "--failure-threshold",
@@ -43,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     settings = get_settings()
+    marker = Path(args.recovery_marker)
 
     def probe(kind):
         return probe_runtime(
@@ -59,16 +69,31 @@ def main(argv: list[str] | None = None) -> int:
             failure_threshold=args.failure_threshold,
             live_every_ticks=args.live_every_ticks,
         )
+        set_recovery_marker(
+            marker,
+            required=report.recovery_required,
+            trigger=report.trigger,
+        )
     except RuntimeWatchdogError as exc:
-        payload = {"ok": False, "recovery_required": True, "error": str(exc)}
+        try:
+            set_recovery_marker(marker, required=False)
+        except RuntimeWatchdogError:
+            pass
+        payload = {
+            "ok": False,
+            "recovery_required": False,
+            "monitoring_error": True,
+            "error": str(exc),
+        }
         if args.as_json:
             print(json.dumps(payload, sort_keys=True))
         else:
-            print(f"watchdog: failed ({exc})")
+            print(f"watchdog: monitoring failed ({exc})")
         return 1
 
     payload = report.to_dict()
     payload["ok"] = not report.recovery_required
+    payload["monitoring_error"] = False
     if args.as_json:
         print(json.dumps(payload, sort_keys=True))
     elif report.recovery_required:

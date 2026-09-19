@@ -2,7 +2,7 @@ import stat
 from pathlib import Path
 
 from app.core.runtime_probe import RuntimeProbeResult
-from app.core.runtime_watchdog import evaluate_runtime_watchdog
+from app.core.runtime_watchdog import evaluate_runtime_watchdog, set_recovery_marker
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -89,6 +89,18 @@ def test_watchdog_state_permissions_are_private(tmp_path):
     assert stat.S_IMODE(state_file.stat().st_mode) == 0o600
 
 
+def test_recovery_marker_exists_only_for_real_probe_recovery_request(tmp_path):
+    marker = tmp_path / "runtime" / "recovery-required"
+
+    set_recovery_marker(marker, required=True, trigger="readiness")
+    assert marker.read_text(encoding="utf-8") == "readiness\n"
+    assert stat.S_IMODE(marker.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(marker.stat().st_mode) == 0o600
+
+    set_recovery_marker(marker, required=False)
+    assert marker.exists() is False
+
+
 def test_corrupt_state_is_reset_without_immediate_recovery(tmp_path):
     state_file = tmp_path / "runtime" / "watchdog.json"
     state_file.parent.mkdir()
@@ -120,16 +132,25 @@ def test_systemd_watchdog_maps_supervision_probe_contract():
     assert "8899" not in timer
 
 
-def test_recovery_is_rate_limited_and_only_restarts_runtime_service():
+def test_recovery_requires_explicit_marker_and_only_restarts_runtime_service():
     recovery = (SYSTEMD / "ai-love-strategist-recovery.service").read_text(encoding="utf-8")
 
     assert "StartLimitIntervalSec=300" in recovery
     assert "StartLimitBurst=3" in recovery
     assert "Type=oneshot" in recovery
+    assert "ExecCondition=/usr/bin/test -f /run/ai-love-strategist/recovery-required" in recovery
     assert "ExecStart=/usr/bin/systemctl restart ai-love-strategist.service" in recovery
+    assert "ExecStart=/usr/bin/rm -f /run/ai-love-strategist/recovery-required" in recovery
     assert "ExecStart=/usr/bin/rm -f /run/ai-love-strategist/watchdog.json" in recovery
     assert "app.restore" not in recovery
     assert "8899" not in recovery
+
+
+def test_runtime_start_clears_stale_watchdog_state():
+    runtime = (SYSTEMD / "ai-love-strategist.service").read_text(encoding="utf-8")
+
+    assert "ExecStartPost=/usr/bin/rm -f /run/ai-love-strategist/watchdog.json" in runtime
+    assert "ExecStartPost=/usr/bin/rm -f /run/ai-love-strategist/recovery-required" in runtime
 
 
 def test_installer_enables_watchdog_without_activating_it():

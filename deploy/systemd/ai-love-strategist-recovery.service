@@ -7,5 +7,7 @@ StartLimitBurst=3
 [Service]
 Type=oneshot
 UMask=0077
+ExecCondition=/usr/bin/test -f /run/ai-love-strategist/recovery-required
 ExecStart=/usr/bin/systemctl restart ai-love-strategist.service
+ExecStart=/usr/bin/rm -f /run/ai-love-strategist/recovery-required
 ExecStart=/usr/bin/rm -f /run/ai-love-strategist/watchdog.json

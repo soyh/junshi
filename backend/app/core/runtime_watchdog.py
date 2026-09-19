@@ -48,6 +48,14 @@ class RuntimeWatchdogReport:
         }
 
 
+def _secure_parent(path: Path) -> None:
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    try:
+        os.chmod(path.parent, 0o700)
+    except OSError as exc:
+        raise RuntimeWatchdogError("watchdog runtime directory permissions could not be secured") from exc
+
+
 def _load_state(path: Path) -> tuple[RuntimeWatchdogState, bool]:
     if not path.exists():
         return RuntimeWatchdogState(), False
@@ -66,14 +74,8 @@ def _load_state(path: Path) -> tuple[RuntimeWatchdogState, bool]:
         return RuntimeWatchdogState(), True
 
 
-def _write_state(path: Path, state: RuntimeWatchdogState) -> None:
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    try:
-        os.chmod(path.parent, 0o700)
-    except OSError as exc:
-        raise RuntimeWatchdogError("watchdog state directory permissions could not be secured") from exc
-
-    payload = json.dumps(state.to_dict(), sort_keys=True) + "\n"
+def _atomic_private_write(path: Path, content: str) -> None:
+    _secure_parent(path)
     try:
         with tempfile.NamedTemporaryFile(
             mode="w",
@@ -83,14 +85,32 @@ def _write_state(path: Path, state: RuntimeWatchdogState) -> None:
             delete=False,
         ) as handle:
             temp_path = Path(handle.name)
-            handle.write(payload)
+            handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(temp_path, 0o600)
         os.replace(temp_path, path)
         os.chmod(path, 0o600)
     except OSError as exc:
-        raise RuntimeWatchdogError("watchdog state could not be persisted") from exc
+        raise RuntimeWatchdogError("watchdog runtime state could not be persisted") from exc
+
+
+def _write_state(path: Path, state: RuntimeWatchdogState) -> None:
+    _atomic_private_write(path, json.dumps(state.to_dict(), sort_keys=True) + "\n")
+
+
+def set_recovery_marker(path: str | Path, *, required: bool, trigger: str | None = None) -> None:
+    marker = Path(path)
+    if not required:
+        try:
+            marker.unlink(missing_ok=True)
+        except OSError as exc:
+            raise RuntimeWatchdogError("watchdog recovery marker could not be cleared") from exc
+        return
+
+    if trigger not in {"liveness", "readiness"}:
+        raise RuntimeWatchdogError("watchdog recovery marker requires a valid trigger")
+    _atomic_private_write(marker, f"{trigger}\n")
 
 
 def evaluate_runtime_watchdog(
