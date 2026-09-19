@@ -1,0 +1,11 @@
+[Unit]
+Description=AI Love Strategist runtime health watchdog timer
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=10s
+AccuracySec=1s
+Unit=ai-love-strategist-watchdog.service
+
+[Install]
+WantedBy=timers.target

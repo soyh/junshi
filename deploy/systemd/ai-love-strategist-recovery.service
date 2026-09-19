@@ -1,0 +1,11 @@
+[Unit]
+Description=AI Love Strategist runtime watchdog recovery
+After=ai-love-strategist-watchdog.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/systemctl restart ai-love-strategist.service
+ExecStart=/usr/bin/rm -f /run/ai-love-strategist/watchdog.json

@@ -14,6 +14,9 @@ required=(
     "$UNIT_SOURCE/ai-love-strategist.service"
     "$UNIT_SOURCE/ai-love-strategist-backup.service"
     "$UNIT_SOURCE/ai-love-strategist-backup.timer"
+    "$UNIT_SOURCE/ai-love-strategist-watchdog.service"
+    "$UNIT_SOURCE/ai-love-strategist-watchdog.timer"
+    "$UNIT_SOURCE/ai-love-strategist-recovery.service"
     "$PROJECT/.env"
     "$PROJECT/data/app.sqlite3"
 )
@@ -31,6 +34,12 @@ install -m 0644 "$UNIT_SOURCE/ai-love-strategist-backup.service" \
     "$UNIT_TARGET/ai-love-strategist-backup.service"
 install -m 0644 "$UNIT_SOURCE/ai-love-strategist-backup.timer" \
     "$UNIT_TARGET/ai-love-strategist-backup.timer"
+install -m 0644 "$UNIT_SOURCE/ai-love-strategist-watchdog.service" \
+    "$UNIT_TARGET/ai-love-strategist-watchdog.service"
+install -m 0644 "$UNIT_SOURCE/ai-love-strategist-watchdog.timer" \
+    "$UNIT_TARGET/ai-love-strategist-watchdog.timer"
+install -m 0644 "$UNIT_SOURCE/ai-love-strategist-recovery.service" \
+    "$UNIT_TARGET/ai-love-strategist-recovery.service"
 
 chmod 0600 "$PROJECT/.env" "$PROJECT/data/app.sqlite3"
 
@@ -43,7 +52,8 @@ fi
 systemctl daemon-reload
 systemctl enable ai-love-strategist.service
 systemctl enable ai-love-strategist-backup.timer
+systemctl enable ai-love-strategist-watchdog.timer
 
 echo "systemd units installed and enabled"
-echo "runtime service and backup timer were NOT started or restarted"
-echo "activate them only after TEST-148 validation"
+echo "runtime service, backup timer, and watchdog timer were NOT started or restarted"
+echo "activate them only after TEST-149 validation"
