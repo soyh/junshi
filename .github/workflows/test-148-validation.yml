@@ -1,0 +1,42 @@
+name: TEST-148 validation
+
+on:
+  push:
+    branches:
+      - test-148-platform-supervision-backup-scheduling
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Validate installer syntax
+        run: bash -n deploy/systemd/install.sh
+      - name: TEST-148 focused
+        working-directory: backend
+        run: python -m pytest -q tests/test_systemd_operational_hardening.py
+      - name: Operations regression
+        working-directory: backend
+        run: >-
+          python -m pytest -q
+          tests/test_systemd_operational_hardening.py
+          tests/test_supervisor_runtime_contract.py
+          tests/test_backup_manifest_retention.py
+          tests/test_release_preflight.py
+          tests/test_release_runbook_contract.py
+          tests/test_secure_uvicorn_launcher.py
+          tests/test_local_runtime_probe.py
+          tests/test_operations_readiness.py
+      - name: Full regression
+        working-directory: backend
+        run: python -m pytest -q
+      - name: Diff check
+        run: git diff --check
