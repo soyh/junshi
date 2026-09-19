@@ -45,7 +45,9 @@ $EnvTemp = Join-Path $Snapshot ".env.plain.tmp"
 $EnvProtected = Join-Path $Snapshot "production.env.dpapi"
 
 try {
-    $prepareCommand = "cd '$ProjectPath/backend' && '$ProjectPath/.venv/bin/python' -m app.portable_backup --prepare --json"
+    # Run from the same project root used by systemd so pydantic-settings finds
+    # /opt/ai-love-strategist/.env instead of looking under backend/.
+    $prepareCommand = "cd '$ProjectPath' && '$ProjectPath/.venv/bin/python' -m app.portable_backup --prepare --json"
     $prepareRaw = Invoke-SshText $prepareCommand
     $prepare = $prepareRaw | ConvertFrom-Json
 
