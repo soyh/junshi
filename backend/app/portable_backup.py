@@ -119,7 +119,8 @@ def main(argv: list[str] | None = None) -> int:
             raise PortableRecoveryError("one of --prepare, --check, --verify, --extract, or --generate-key is required")
 
         local_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-        destination = default_backup_destination(database_path)
+        default_destination = default_backup_destination(database_path)
+        destination = local_dir / default_destination.name
         try:
             backup_path, manifest_path = create_managed_backup(database_path, destination)
         except BackupManifestError as exc:
