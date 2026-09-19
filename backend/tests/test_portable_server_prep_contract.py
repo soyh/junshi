@@ -42,3 +42,16 @@ def test_windows_remote_commands_use_project_root_for_dotenv_loading():
     assert "cd '$ProjectPath/backend'" not in pull
     assert 'cd "`$PROJECT"' in restore
     assert 'cd "`$PROJECT/backend"' not in restore
+
+
+def test_stage_only_restore_transfers_no_plaintext_environment():
+    root = Path(__file__).resolve().parents[2]
+    restore = (root / "scripts/windows/restore-push.ps1").read_text(encoding="utf-8")
+
+    gate = restore.index("if (-not $ApplyRestore)")
+    unprotect = restore.index("Unprotect-DpapiFile $envProtected $plainEnv")
+    env_scp = restore.index('Invoke-Scp $plainEnv "$Server`:$remoteEnv"')
+    bundle_scp = restore.index('Invoke-Scp $bundlePath "$Server`:$remoteBundle"')
+
+    assert bundle_scp < gate < unprotect < env_scp
+    assert 'Write-Host "ENV_TRANSFERRED=NO"' in restore
