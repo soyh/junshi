@@ -42,6 +42,7 @@ class QwenProvider(LLMProvider):
                 {"role": "user", "content": self._user_prompt(context)},
             ],
             "response_format": {"type": "json_object"},
+            **self._analysis_request_options(),
         }
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -111,6 +112,11 @@ class QwenProvider(LLMProvider):
                 json=payload,
                 headers=headers,
             )
+
+    def _analysis_request_options(self) -> dict[str, Any]:
+        if self.model.strip().lower().startswith("qwen3.8"):
+            return {"enable_thinking": False}
+        return {}
 
     @staticmethod
     def _system_prompt() -> str:
