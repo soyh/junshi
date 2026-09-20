@@ -36,6 +36,34 @@ class StrategicReplyService:
 
         return None
 
+    def build_context_from_recommendation_context(
+        self,
+        context: dict,
+        *,
+        reply_candidates: list[dict] | None = None,
+    ) -> dict:
+        recommendations = context.get("recommendations")
+        evidence = context.get("evidence")
+        if not isinstance(recommendations, list):
+            recommendations = []
+        if not isinstance(evidence, list):
+            evidence = []
+
+        candidates = recommendations if reply_candidates is None else reply_candidates
+
+        return {
+            **context,
+            "reply_constraints": {
+                "must_be_evidence_backed": True,
+                "must_preserve_unknowns": True,
+                "must_preserve_evidence_provenance": True,
+                "must_treat_llm_output_as_derived": True,
+                "must_not_auto_send": True,
+                "must_not_change_relationship": True,
+            },
+            "draft": self.build_draft(candidates, evidence),
+        }
+
     def get_context(
         self,
         conn: sqlite3.Connection,
@@ -43,16 +71,4 @@ class StrategicReplyService:
         person_id: str,
     ) -> dict:
         context = self.recommendation_service.get_context(conn, user_id, person_id)
-        return {
-            **context,
-            "reply_constraints": {
-                "must_be_evidence_backed": True,
-                "must_preserve_unknowns": True,
-                "must_not_auto_send": True,
-                "must_not_change_relationship": True,
-            },
-            "draft": self.build_draft(
-                context["recommendations"],
-                context["evidence"],
-            ),
-        }
+        return self.build_context_from_recommendation_context(context)
