@@ -55,6 +55,18 @@ def test_restore_verifies_bundle_manifest_before_offline_restore():
     assert '--offline-confirmed' in script
 
 
+def test_restored_database_must_match_verified_backup_byte_for_byte():
+    script = _server_script()
+    restore = script.index('"$PY" -m app.restore')
+    backup_sha = script.index('BACKUP_SHA=')
+    restored_sha = script.index('RESTORED_SHA=')
+    sha_gate = script.index('[ "$BACKUP_SHA" = "$RESTORED_SHA" ]')
+    installer = script.index('deploy/systemd/install.sh')
+    assert restore < backup_sha < restored_sha < sha_gate < installer
+    assert 'fail "restored-database-sha-mismatch"' in script
+    assert 'echo "RESTORED_DB_SHA256=$RESTORED_SHA"' in script
+
+
 def test_restore_installs_systemd_only_after_database_exists():
     script = _server_script()
     restore = script.index('"$PY" -m app.restore')
