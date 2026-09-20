@@ -49,5 +49,5 @@ TEST-152 VERIFIED。当前产品功能基线已补齐认证与账号安全、Per
 
 后续继续坚持“产品功能优先”：只有审计出新的真实用户功能 gap 才继续产品阶段；replacement-server / environment-data migration / automatic migration / additional disaster-recovery work 全部延后。
 """
-    text = text.rstrip() + block + "\n"
+    text = text.rstrip() + block.rstrip() + "\n"
 path.write_text(text, encoding="utf-8")
