@@ -8,5 +8,7 @@ def test_password_change_fields_are_cleared_with_session(client):
     assert "baseClearSessionForAccountSecurity(message);" in html
 
     wrapper_start = html.index("const baseClearSessionForAccountSecurity = clearSession;")
-    lifecycle_start = html.index("const actionReanalysisStatus = byId('action-reanalysis-status')")
+    lifecycle_start = html.index(
+        "const actionReanalysisInputStatus = byId('action-reanalysis-input-status')"
+    )
     assert wrapper_start < lifecycle_start
