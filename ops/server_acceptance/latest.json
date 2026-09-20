@@ -1,45 +1,59 @@
 {
-  "checkpoint": "implementation-server-validation",
-  "database_restore_executed": false,
-  "github_ci": {
-    "focused_passed": 10,
-    "full_passed": 857,
-    "operations_passed": 71,
-    "run_id": 35457791782
+  "checkpoint": "product-function-server-acceptance",
+  "diagnosis": {
+    "first_restart_failure": "managed backup timestamp collision in acceptance harness",
+    "product_code_failure": false
   },
-  "implementation_validation": {
-    "bundle_mode": "600",
-    "distinct_device_verified": true,
-    "encrypted_export_created": true,
-    "idempotent_reuse_verified": true,
-    "reread_verification_ok": true,
-    "sqlite_plaintext_header_absent": true,
-    "tamper_rejected": true,
-    "validation_medium": "tmpfs"
+  "github_ci": {
+    "diff_check": true,
+    "focused_passed": 17,
+    "full_passed": 876,
+    "product_regression_passed": 134,
+    "run_id": 35496707431
   },
   "notes": [
-    "Implementation validation passed.",
-    "tmpfs was used only to simulate a distinct storage device.",
-    "tmpfs is not durable offsite storage.",
-    "TEST-150 is not VERIFIED until a real remote target is validated."
+    "TEST-152 prioritizes product functionality.",
+    "No environment/data migration was executed.",
+    "Initial restart failure was caused by the acceptance harness creating a normal managed backup immediately before systemd ExecStartPre created another second-granularity backup.",
+    "Retry used a uniquely named safety backup; production database restore was not executed."
   ],
+  "product_features": {
+    "conversation_management": true,
+    "interaction_management": true,
+    "interaction_refresh_state_sync": true,
+    "message_explicit_delete": true,
+    "nullable_patch_clear_semantics": true,
+    "password_change": true,
+    "persisted_learning_history": true,
+    "person_management": true,
+    "relationship_management": true,
+    "selective_session_revocation": true
+  },
   "runtime": {
-    "live_rc": 0,
-    "pid_after": 559990,
-    "pid_before": 559990,
-    "pid_unchanged": true,
-    "ready_rc": 0
+    "backup_timer_active": true,
+    "pid_after": 578548,
+    "watchdog_timer_active": true
+  },
+  "safety": {
+    "database_restore_executed": false,
+    "environment_data_migration_executed": false,
+    "historical_migration_modified": false,
+    "port_8899_pid_after": 52822,
+    "unique_managed_backup_created": true
   },
   "schema_version": 1,
-  "security": {
-    "port_8899_pid_after": 52822,
-    "port_8899_pid_before": 52822,
-    "port_8899_unchanged": true,
-    "temporary_encryption_key_not_persisted": true
+  "server_validation": {
+    "focused_passed": 17,
+    "full_passed": 876,
+    "isolated_test_database": true,
+    "live_ok": true,
+    "live_product_ui_verified": true,
+    "preflight_ok": true,
+    "product_regression_passed": 134,
+    "ready_ok": true
   },
-  "source_branch": "test-150-offsite-disaster-recovery",
-  "source_head": "fdec0503808a9f572645a13a267c8c829b076918",
-  "stage": "TEST-150",
-  "status": "passed",
-  "true_offsite_validation": false
+  "source_branch": "test-152-product-management-completeness",
+  "source_head": "bfab1ee55f91b0574c392d1fe08d5b16af458386",
+  "stage": "TEST-152",
+  "status": "passed"
 }
