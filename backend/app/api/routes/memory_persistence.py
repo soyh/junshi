@@ -14,6 +14,22 @@ router = APIRouter(
 service = MemoryPersistenceService()
 
 
+@router.get(
+    "",
+    response_model=list[MemoryPersistResponse],
+    status_code=status.HTTP_200_OK,
+)
+def list_persisted_memory_updates(
+    person_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    try:
+        with get_connection() as conn:
+            return service.list_persisted(conn, user_id, person_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
 @router.post(
     "/{candidate_id}/persist",
     response_model=MemoryPersistResponse,
