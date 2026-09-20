@@ -1,8 +1,11 @@
 # AI Love Strategist Development Handover
 
 更新时间：2026-09-20
-当前阶段：TEST-152 — Product Management Completeness — VERIFIED
-当前 Branch：`test-152-product-management-completeness`
+当前阶段：TEST-155 — Strategic Reply Message Handoff — VERIFIED
+当前 Branch：`test-155-strategic-reply-message-handoff`
+TEST-155 VERIFIED code HEAD：`a7423893d069ce87cf6c23f1360842b949b33b0a`
+TEST-154 VERIFIED code HEAD：`b6a48cfcdebdaf755af078d3ab53b0437f68c551`
+TEST-153 VERIFIED code HEAD：`aa190883bf259d19193ddaf522e897f635cc8355`
 TEST-150 post-verification 基线：`773101052fa98345e6a85b8c5b2e2c4f1d9f7d7e`
 TEST-146 post-verification 基线：`dcb4bef6f4d07fddfba80b9448408a1e436a736f`
 TEST-146 VERIFIED 服务器代码/文档 HEAD：`8a58d056897a2cfbb09ba284c386fe01cb9cbcf7`
@@ -743,3 +746,51 @@ GitHub Actions run `35496707431`：focused `17 passed`；authenticated product /
 TEST-152 VERIFIED。当前产品功能基线已补齐认证与账号安全、Person / Relationship / Conversation / Interaction / Message 管理、Text Import、Evidence / Timeline、Structured Analysis、Strategy / Recommendation、Action Plan、Decision、Execution、Outcome、Feedback、Learning、Persisted Learning history 与 Re-analysis，并保持唯一 canonical lifecycle 与 scope 边界。
 
 后续继续坚持“产品功能优先”：只有审计出新的真实用户功能 gap 才继续产品阶段；replacement-server / environment-data migration / automatic migration / additional disaster-recovery work 全部延后。
+
+## TEST-153 — Strategic Reply Workspace — VERIFIED
+
+TEST-153 将既有 AnalysisContext → StructuredAnalysis → Strategic Reply canonical 链路接入统一 `/app`。用户选择 Conversation 后必须显式点击 Generate reply draft 才会调用现有 strategic-reply context；Person / Conversation 切换只 reset，不自动调用 LLM。
+
+Workspace 展示 derived reply draft、StructuredAnalysis summary、current relationship state、evidence 数量、supporting recommendations、reply constraints 与 learning strategy。所有 derived 内容使用安全 DOM 渲染；没有自动发送 Message、保存 draft、创建 Action Plan、确认 Decision 或启动 Execution。
+
+GitHub Actions run `35500125382`：focused `34 passed`；authenticated product regression `114 passed`；full regression `883 passed`；`git diff --check` passed。
+
+2026-09-20 production acceptance：source HEAD `aa190883bf259d19193ddaf522e897f635cc8355`；server tests `34/114/883`；Strategic Reply live markers passed；runtime PID `581559`；reserved port 8899 PID `52822` 未变化；database restore / environment-data migration 均未执行。正式 acceptance result commit：`75bbe5daf3099815bbab5c5649b8bb3da12645b2`。
+
+TEST-153 VERIFIED。
+
+## TEST-154 — Strategic Reply Editable Handoff — VERIFIED
+
+TEST-154 将只读 reply draft 改为 browser-local editable reply，并增加显式 Copy edited reply 与 Restore generated draft。编辑、复制和 restore 都不调用 server-side write；copy 只使用 browser clipboard。Strategic Reply 仍不会自动发送或持久化 Message，也不会自动创建 Action Plan / Decision / Execution。
+
+GitHub Actions run `35501256285`：focused `35 passed`；authenticated product regression `115 passed`；full regression `884 passed`；`git diff --check` passed。
+
+2026-09-20 production acceptance：source HEAD `b6a48cfcdebdaf755af078d3ab53b0437f68c551`；server tests `35/115/884`；editable/copy/restore live markers passed；runtime PID `583555`；reserved port 8899 PID `52822` 未变化；database restore / environment-data migration 均未执行。正式 acceptance result commit：`b5f419ea88e539ac1b684e0a0533999aede7fe0c`。
+
+TEST-154 VERIFIED。
+
+## TEST-155 — Strategic Reply Message Handoff — VERIFIED
+
+TEST-155 补齐 Strategic Reply 与 canonical Message evidence 之间的最后一段产品 handoff，但继续保持两次显式用户动作。
+
+新增 `Prepare sent-message record`：
+- 只在用户已经通过外部聊天工具实际发送后使用；
+- 将当前 editable Strategic Reply 文本填入现有 Message composer；
+- 强制 composer `sender=user`；
+- 清空 Sent at，要求用户核对实际发送时间；
+- 不调用 `/messages` POST；
+- 不调用 `api()` / `fetch()` / `createMessage()`；
+- 不自动保存、不自动发送、不自动 Re-analysis；
+- 用户仍必须核对实际已发送文本与 Sent at，并再次显式点击现有 `Add message`，canonical Message 才会写入。
+
+因此未发送的 AI draft 不会因为 handoff 自动成为 Evidence；实际 Message persistence 继续复用唯一 canonical Message API 和现有用户确认边界。
+
+GitHub Actions run `35501840767`：focused `36 passed`；authenticated product regression `116 passed`；full regression `885 passed`；`git diff --check` passed。
+
+2026-09-20 production acceptance：source code HEAD `a7423893d069ce87cf6c23f1360842b949b33b0a`；server tests `36/116/885`；Strategic Reply → Message composer live markers passed；runtime PID `585381`；reserved port 8899 PID `52822` 未变化；database restore / environment-data migration 均未执行。
+
+TEST-155 VERIFIED。当前 Strategic Reply 产品链为：
+
+`Canonical Evidence → StructuredAnalysis → Strategic Reply → user edit/review → explicit copy → external send by user → explicit Message composer handoff → explicit Add message → Canonical Evidence`
+
+系统没有外部消息自动发送能力，也不会把 generated draft 自动写成真实 Evidence。replacement-server / environment-data migration 继续延期，产品功能优先原则保持不变。
