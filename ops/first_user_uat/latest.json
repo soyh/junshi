@@ -27,14 +27,14 @@
     "sanitized_results_only": true
   },
   "phase_a": {
-    "status": "blocked_at_A06_llm_fix_deploy",
+    "status": "blocked_at_A06_rerun",
     "steps": {
       "A01_account_session": "passed",
       "A02_llm_provider": "passed",
       "A03_person_relationship_conversation": "passed",
       "A04_real_evidence_input": "passed",
       "A05_evidence_timeline": "passed",
-      "A06_structured_analysis": "qwen38_non_thinking_fix_ci_passed_deploy_pending",
+      "A06_structured_analysis": "qwen38_non_thinking_fix_deployed_rerun_pending",
       "A07_strategy_recommendation": "pending",
       "A08_strategic_reply": "pending",
       "A09_external_send": "pending",
@@ -79,8 +79,8 @@
       "id": "TEST-156-UAT-003",
       "step": "A06",
       "severity": "high",
-      "status": "fix_ci_passed_deploy_pending",
-      "summary": "After schema repair, Structured Analysis reached the configured Qwen provider but full non-streaming analysis timed out. Connection testing and a minimal JSON-mode request succeeded, while the real analysis request hit a 60-second ReadTimeout; increasing the configured timeout to 180 seconds still did not complete A06. The targeted fix disables thinking only for qwen3.8 structured-analysis requests while preserving other model behavior and connection testing.",
+      "status": "fix_deployed_a06_rerun_pending",
+      "summary": "After schema repair, Structured Analysis reached the configured Qwen provider but full non-streaming analysis timed out. Connection testing and a minimal JSON-mode request succeeded, while the real analysis request hit a 60-second ReadTimeout; increasing the configured timeout to 180 seconds still did not complete A06. The deployed targeted fix disables thinking only for qwen3.8 structured-analysis requests while preserving other model behavior and connection testing.",
       "root_cause_class": "qwen38_default_thinking_latency_timeout",
       "provider_connection_test": "passed",
       "minimal_json_mode": "passed",
@@ -123,7 +123,11 @@
     "qwen38_ci_counts": "54/170/889",
     "temporary_qwen38_workflow_removed": true,
     "post_qwen38_ci_cleanup_head": "1e7b9caeba9a2f563d16ce5bf9e783b0714e3756",
-    "qwen38_server_deploy": "pending",
+    "qwen38_server_deploy": "passed",
+    "qwen38_server_code_head": "c305428906c2f6b894282810f64dacd961f23ac9",
+    "qwen38_runtime_pid": 593044,
+    "qwen38_predeploy_backup_created": true,
+    "protected_port_8899_pid_after_qwen38_deploy": 52822,
     "a06_rerun": "pending"
   },
   "usability_findings": [
@@ -152,9 +156,10 @@
     "The real Structured Analysis HTTP request used a 3079-character serialized AnalysisContext and hit httpx.ReadTimeout at approximately 60.17 seconds. Retrying A06 after raising the configured timeout to 180 seconds still returned LLM analysis failed.",
     "The targeted Qwen3.8 fix sends enable_thinking=false only for qwen3.8 structured-analysis requests. Existing non-Qwen3.8 request behavior and the connection-test contract remain unchanged.",
     "Qwen3.8 fix CI run 35517192052 passed 54 focused provider/analysis tests, 170 auth regression tests, and 889 full-suite tests. Its temporary workflow was removed afterward.",
+    "The CI-verified Qwen3.8 fix was deployed to production at code head c305428906c2f6b894282810f64dacd961f23ac9. The service returned active with runtime PID 593044, a verified pre-deploy SQLite backup was created, and protected port 8899 remained PID 52822.",
     "No username, password, API key, real name, relationship detail, private chat content, or conversation identifier is recorded in this UAT artifact.",
     "Real relationship and chat content remains in the production database and is not committed to GitHub.",
-    "Phase A remains blocked at A06 until the CI-verified Qwen3.8 fix is deployed to production and the first user reruns Structured Analysis successfully.",
+    "Phase A is now blocked only on the first user rerunning A06 against the deployed Qwen3.8 non-thinking structured-analysis path.",
     "Phase B is longitudinal and should use genuine real-world events rather than synthetic completion."
   ]
 }
