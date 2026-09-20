@@ -14,7 +14,9 @@ The Windows snapshot remains the authority for the application data and producti
 
 ## Safety boundary
 
-The replacement bootstrap refuses to run if `ai-love-strategist.service` is already active. This is deliberate: TEST-151 is for a replacement server, not an in-place restore of the currently running production server.
+The replacement bootstrap refuses destructive apply when `ai-love-strategist.service` is already active. This is deliberate: TEST-151 is for a replacement server, not an in-place restore of the currently running production server.
+
+A non-destructive stage-only drill may run beside an active production runtime only when `--project` points to a different isolated path. The production project path remains blocked while the production service is active.
 
 Stage-only is the default. It:
 
@@ -95,6 +97,25 @@ Alibaba Cloud Linux 3 keeps its system `python3` on an older version for system 
 
 `scripts/windows/restore-push.ps1` remains available for a server that has already been cloned, configured, and provisioned. For a genuinely empty replacement server, prefer `replacement-restore.ps1`.
 
+## 2026-09-20 non-destructive production-side stage drill
+
+A real stage-only drill was run on the production Alibaba Cloud Linux server using an isolated project path `/opt/ai-love-strategist-test151-stage`. This validated the cold bootstrap path without treating the production host as a replacement server and without executing a database restore.
+
+Observed result:
+
+```text
+TEST151_STAGE_DRILL=PASSED
+TEST151_CANDIDATE=faa7d39909181809d16970c00ff04fa0f47f568c
+SNAPSHOT_SOURCE_HEAD=773101052fa98345e6a85b8c5b2e2c4f1d9f7d7e
+PRODUCTION_PID=563415
+PORT8899_PID=52822
+BUNDLE_SHA256=839b18947750f4356b1b0dd721d66e4a2feb8432c5696bda0192fb1d79e4839d
+ENV_TRANSFERRED=NO
+DATABASE_RESTORE_EXECUTED=NO
+```
+
+The drill confirmed that the replacement bootstrap can clone the exact snapshot source commit, create an independent Python virtual environment, install requirements, and stage the encrypted recovery bundle while leaving the production runtime PID unchanged. No production `.env` was transferred, no restored `app.sqlite3` was created in the isolated stage directory, and reserved port 8899 retained the same owner.
+
 ## Verification requirement
 
-TEST-151 is not complete merely because the scripts pass CI. Final verification requires a real disposable/replacement server drill using a Windows snapshot: stage first, then explicit apply, then confirm live/ready/preflight and the restored application data. The current production server must not be used as the destructive drill target.
+TEST-151 is not complete merely because the scripts pass CI or because the non-destructive stage drill passed. Final verification still requires a real disposable/replacement server drill using a Windows snapshot: stage first, then explicit apply, then confirm live/ready/preflight and restored application data. The current production server must not be used as the destructive drill target.
