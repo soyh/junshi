@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, 'fix: keep selected interaction fields synchronized') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,16 +23,10 @@ jobs:
 
           path = Path('backend/app/ui/product_management_workspace.py')
           text = path.read_text(encoding='utf-8')
-          old = """    await populateRelationshipChoice('manage-interaction-relationship');
-              manageInteractionStatus.textContent = `${items.length} interaction(s) available.`;
-          """
-          new = """    if (selectedManagedInteractionId) {
-                await loadSelectedManagedInteraction();
-              } else {
-                await populateRelationshipChoice('manage-interaction-relationship');
-              }
-              manageInteractionStatus.textContent = `${items.length} interaction(s) available.`;
-          """
+          old = "    await populateRelationshipChoice('manage-interaction-relationship');\n    manageInteractionStatus.textContent = `${items.length} interaction(s) available.`;"
+          new = "    if (selectedManagedInteractionId) {\n      await loadSelectedManagedInteraction();\n    } else {\n      await populateRelationshipChoice('manage-interaction-relationship');\n    }\n    manageInteractionStatus.textContent = `${items.length} interaction(s) available.`;"
+          if new in text:
+              raise SystemExit(0)
           if old not in text:
               raise SystemExit('target snippet not found')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
@@ -43,8 +36,11 @@ jobs:
           python -m pip install -q -r backend/requirements.txt
           cd backend
           python -m pytest -q tests/test_product_management_state_sync.py
-      - name: Commit patch
+      - name: Commit patch if changed
         run: |
+          if git diff --quiet; then
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add backend/app/ui/product_management_workspace.py
