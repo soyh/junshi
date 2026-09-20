@@ -30,7 +30,7 @@
     "status": "in_progress",
     "steps": {
       "A01_account_session": "passed",
-      "A02_llm_provider": "awaiting_user_provider_configuration",
+      "A02_llm_provider": "passed",
       "A03_person_relationship_conversation": "pending",
       "A04_real_evidence_input": "pending",
       "A05_evidence_timeline": "pending",
@@ -71,8 +71,9 @@
   ],
   "notes": [
     "A01 account registration/session flow passed after using a username that conforms to the existing canonical server validation contract.",
-    "A02 Load correctly returned no saved provider configuration for the newly authenticated user; this is expected user-scoped behavior, not a product failure.",
-    "A02 remains open until the user explicitly saves and successfully tests an OpenAI-compatible provider configuration.",
+    "A02 Load correctly returned no saved provider configuration for the newly authenticated user; this confirmed expected user-scoped behavior.",
+    "A02 passed after the user explicitly saved an OpenAI-compatible provider configuration and the connection test succeeded.",
+    "The configured model identifier recorded for UAT is qwen3.8-flash; no API key or provider secret is recorded.",
     "No username, password, API key, real name, or private chat content is recorded in this UAT artifact.",
     "Real relationship and chat content must remain in the production database and must not be committed to GitHub.",
     "Phase A is the immediate first-user usability gate.",
