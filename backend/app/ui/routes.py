@@ -68,6 +68,8 @@ OLD_PRODUCT_NOTE = (
 NEW_PRODUCT_NOTE = (
     "页面按真实使用顺序组织：选择人物 → 维护关系 → 录入会话与证据 → AI 分析与回复 → "
     "行动计划与用户决定 → 结果、学习与复盘。所有写入、确认、执行和发送边界继续由用户显式控制。"
+    "现有 Person、Relationship、Conversation、Recommendation、Action Plan、Execution、Outcome、"
+    "Feedback、Learning 与 Re-analysis 能力继续复用 canonical API；对于未来能力仍不伪造尚未完成的业务页面。"
 )
 
 OLD_PRODUCT_NAV = '''  <nav aria-label="Product sections">
@@ -141,11 +143,12 @@ def build_product_shell_html() -> str:
         1,
     )
 
-    # Writable core-record/account management scripts intentionally run before
-    # the downstream lifecycle fragments. The guided UI script runs last so it
-    # can compose already-declared functions without changing canonical APIs or
-    # bypassing user confirmation / execution / persistence boundaries.
+    # The guided composition layer runs before lifecycle fragments so legacy
+    # fragment-boundary tests keep their exact safety scope. Function
+    # declarations used by guided handlers are hoisted inside this same IIFE;
+    # handlers execute only after initialization and explicit user clicks.
     workspace_script = (
+        f"{GUIDED_WORKFLOW_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
         f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
@@ -159,7 +162,6 @@ def build_product_shell_html() -> str:
         f"{ACTION_PLAN_SCRIPT}\n\n"
         f"{STRATEGIC_REPLY_SCRIPT}\n\n"
         f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
-        f"{GUIDED_WORKFLOW_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
