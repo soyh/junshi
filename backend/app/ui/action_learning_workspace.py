@@ -1,7 +1,7 @@
 ACTION_LEARNING_HTML = r'''
   <fieldset id="action-learning-workspace" class="wide">
     <legend>Learning</legend>
-    <p class="note">TEST-145 将现有 canonical Learning / Memory Update contract 接入统一 /app。Learning proposal 只来自已观察 Outcome，并保留 provenance 与 unknowns；不会自动持久化、调用 LLM、触发 Re-analysis、发送消息或修改 Relationship。</p>
+    <p class="note">Learning proposal 只来自已观察 Outcome，并保留 provenance 与 unknowns；不会自动持久化、调用 LLM、触发 Re-analysis、发送消息或修改 Relationship。已显式持久化的 learning memory 可随时重新读取。</p>
 
     <div class="workspace-grid">
       <section class="workspace-card" aria-labelledby="action-learning-heading">
@@ -13,13 +13,17 @@ ACTION_LEARNING_HTML = r'''
           <option value="">Load learning first</option>
         </select>
         <div id="action-learning-candidate-detail" class="status">No learning proposal selected.</div>
-        <button id="persist-action-learning" type="button" disabled>Persist selected learning memory</button>
+        <button id="persist-action-learning" class="requires-auth" type="button" disabled>Persist selected learning memory</button>
         <div id="action-learning-status" class="status">Select a person, then load learning.</div>
       </section>
 
       <section class="workspace-card" aria-labelledby="action-learning-persisted-heading">
-        <h2 id="action-learning-persisted-heading">Persist Result</h2>
-        <p class="note">当前 canonical API 没有 persisted-memory history GET。这里仅显示本页显式 persist 的服务端返回；重复 persist 由服务端 candidate-level idempotency 保证。</p>
+        <h2 id="action-learning-persisted-heading">Persisted Learning Memory</h2>
+        <p class="note">只有显式点击 Load persisted memories 才读取当前 Person 已保存的 learning memory。历史记录保持 source candidate / decision / outcome provenance；读取不会调用 LLM 或触发 Re-analysis。</p>
+        <button id="load-persisted-action-learning" class="requires-auth" type="button" disabled>Load persisted memories</button>
+        <div id="action-learning-history-status" class="status">Select a person, then load persisted memories.</div>
+        <div id="action-learning-history" class="status">Persisted learning memory history not loaded.</div>
+        <h3>Latest explicit persist result</h3>
         <div id="action-learning-persisted" class="status">No learning memory persisted in this page session.</div>
       </section>
     </div>
@@ -32,6 +36,8 @@ ACTION_LEARNING_SCRIPT = r'''
   const actionLearningSelect = byId('action-learning-candidate');
   const actionLearningCandidateDetail = byId('action-learning-candidate-detail');
   const actionLearningPersisted = byId('action-learning-persisted');
+  const actionLearningHistoryStatus = byId('action-learning-history-status');
+  const actionLearningHistory = byId('action-learning-history');
   const persistActionLearningButton = byId('persist-action-learning');
   let actionLearningCandidates = [];
 
@@ -48,9 +54,14 @@ ACTION_LEARNING_SCRIPT = r'''
     actionLearningCandidateDetail.textContent = 'No learning proposal selected.';
     actionLearningPersisted.replaceChildren();
     actionLearningPersisted.textContent = 'No learning memory persisted in this page session.';
+    actionLearningHistory.replaceChildren();
+    actionLearningHistory.textContent = 'Persisted learning memory history not loaded.';
     actionLearningStatus.textContent = selectedPersonId
       ? 'Click Load learning to read source-backed learning proposals.'
       : 'Select a person, then load learning.';
+    actionLearningHistoryStatus.textContent = selectedPersonId
+      ? 'Click Load persisted memories to read saved learning records.'
+      : 'Select a person, then load persisted memories.';
   }
 
   function appendLearningField(parent, label, value) {
@@ -127,6 +138,25 @@ ACTION_LEARNING_SCRIPT = r'''
     appendLearningField(actionLearningPersisted, 'created_at', item.created_at);
   }
 
+  function renderPersistedLearningHistory(items) {
+    actionLearningHistory.replaceChildren();
+    if (!Array.isArray(items) || items.length === 0) {
+      actionLearningHistory.textContent = 'No persisted learning memory for the selected person.';
+      return;
+    }
+    items.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'session-row';
+      appendLearningField(row, 'created_at', item.created_at);
+      appendLearningField(row, 'category', item.category);
+      appendLearningField(row, 'source_candidate_id', item.source_candidate_id);
+      appendLearningField(row, 'source_decision_id', item.source_decision_id);
+      appendLearningField(row, 'source_outcome_id', item.source_outcome_id);
+      appendLearningField(row, 'action_outcome', item.memory && item.memory.action_outcome);
+      actionLearningHistory.appendChild(row);
+    });
+  }
+
   async function loadActionLearning() {
     if (!selectedPersonId) throw new Error('Select a person first');
     actionLearningStatus.textContent = 'Loading source-backed learning proposals...';
@@ -136,6 +166,16 @@ ACTION_LEARNING_SCRIPT = r'''
     renderActionLearningCandidates(body);
     renderPersistedLearning(null);
     actionLearningStatus.textContent = `${actionLearningCandidates.length} learning proposal(s) loaded. Nothing was persisted, re-analyzed, executed, or sent automatically.`;
+  }
+
+  async function loadPersistedActionLearning() {
+    if (!selectedPersonId) throw new Error('Select a person first');
+    actionLearningHistoryStatus.textContent = 'Loading persisted learning memory...';
+    const items = await api(
+      `/api/v1/persons/${encodeURIComponent(selectedPersonId)}/memory-updates`
+    );
+    renderPersistedLearningHistory(items);
+    actionLearningHistoryStatus.textContent = `${items.length} persisted learning memory item(s) loaded. No LLM call or Re-analysis was started.`;
   }
 
   async function persistSelectedActionLearning() {
@@ -150,6 +190,7 @@ ACTION_LEARNING_SCRIPT = r'''
       {method: 'POST'},
     );
     renderPersistedLearning(created);
+    await loadPersistedActionLearning();
     actionLearningStatus.textContent = `Learning memory ${created.id} is persisted. No Re-analysis, strategy application, LLM call, message send, or Relationship change was started.`;
   }
 
@@ -160,6 +201,7 @@ ACTION_LEARNING_SCRIPT = r'''
   };
 
   bind('load-action-learning', loadActionLearning, actionLearningStatus);
+  bind('load-persisted-action-learning', loadPersistedActionLearning, actionLearningHistoryStatus);
   bind('persist-action-learning', persistSelectedActionLearning, actionLearningStatus);
 
   actionLearningSelect.addEventListener('change', renderSelectedActionLearningCandidate);
