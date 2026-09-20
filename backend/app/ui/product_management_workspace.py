@@ -358,7 +358,11 @@ PRODUCT_MANAGEMENT_SCRIPT = r'''
       'No interaction selected',
       selectedManagedInteractionId,
     );
-    await populateRelationshipChoice('manage-interaction-relationship');
+    if (selectedManagedInteractionId) {
+      await loadSelectedManagedInteraction();
+    } else {
+      await populateRelationshipChoice('manage-interaction-relationship');
+    }
     manageInteractionStatus.textContent = `${items.length} interaction(s) available.`;
   }
 
