@@ -132,9 +132,17 @@ def build_product_shell_html() -> str:
         workspace_html,
         1,
     )
+
+    # Writable core-record/account management scripts intentionally run before
+    # the downstream lifecycle fragments. Several lifecycle tests isolate each
+    # fragment from its declaration through clearSession() to enforce read-only
+    # or no-auto-execute boundaries; keeping management writes earlier preserves
+    # those boundaries without duplicating any business logic.
     workspace_script = (
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
+        f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
+        f"{ACCOUNT_SECURITY_SCRIPT}\n\n"
         f"{ACTION_REANALYSIS_SCRIPT}\n\n"
         f"{ACTION_LEARNING_SCRIPT}\n\n"
         f"{ACTION_FEEDBACK_SCRIPT}\n\n"
@@ -143,8 +151,6 @@ def build_product_shell_html() -> str:
         f"{ACTION_DECISION_SCRIPT}\n\n"
         f"{ACTION_PLAN_SCRIPT}\n\n"
         f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
-        f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
-        f"{ACCOUNT_SECURITY_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
