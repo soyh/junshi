@@ -13,6 +13,8 @@ STRATEGIC_REPLY_HTML = r'''
         <textarea id="strategic-reply-draft" class="requires-auth" disabled></textarea>
         <button id="copy-strategic-reply" class="requires-auth" type="button" disabled>Copy edited reply</button>
         <button id="restore-strategic-reply" class="requires-auth" type="button" disabled>Restore generated draft</button>
+        <button id="prepare-strategic-reply-message" class="requires-auth" type="button" disabled>Prepare sent-message record</button>
+        <p class="note">仅在你已经通过外部聊天工具实际发送后使用。此按钮只把当前编辑文本填入现有 Message 表单，不会保存 Message 或发送任何内容；请核对实际发送文本与 Sent at，再单独点击 Add message。</p>
       </section>
 
       <section class="workspace-card" aria-labelledby="strategic-reply-context-heading">
@@ -139,6 +141,18 @@ STRATEGIC_REPLY_SCRIPT = r'''
     strategicReplyStatus.textContent = 'Generated draft restored locally. Nothing was saved or sent.';
   }
 
+  function prepareStrategicReplyMessageRecord() {
+    if (!selectedConversationId) throw new Error('Select a conversation first');
+    const draft = strategicReplyDraft.value.trim();
+    if (!draft) throw new Error('Generate or enter the actual sent reply before preparing a message record');
+    byId('message-sender').value = 'user';
+    byId('message-content').value = draft;
+    byId('message-sent-at').value = '';
+    byId('messages-status').textContent = 'Strategic Reply text prepared in the Message form only. Verify the exact text actually sent and Sent at, then click Add message. Nothing has been saved or sent yet.';
+    byId('message-content').focus();
+    strategicReplyStatus.textContent = 'Prepared the existing Message composer only. Add message remains a separate explicit action; nothing has been saved or sent.';
+  }
+
   const baseResetWorkspaceForStrategicReply = resetWorkspace;
   resetWorkspace = function(message = 'Login to load persons.') {
     baseResetWorkspaceForStrategicReply(message);
@@ -148,6 +162,7 @@ STRATEGIC_REPLY_SCRIPT = r'''
   bind('load-strategic-reply', loadStrategicReply, strategicReplyStatus);
   bind('copy-strategic-reply', copyStrategicReply, strategicReplyStatus);
   bind('restore-strategic-reply', restoreStrategicReply, strategicReplyStatus);
+  bind('prepare-strategic-reply-message', prepareStrategicReplyMessageRecord, strategicReplyStatus);
 
   strategicReplyDraft.addEventListener('input', () => {
     if (strategicReplyDraft.value !== generatedStrategicReplyDraft) {
