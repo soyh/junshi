@@ -124,10 +124,10 @@ install_system_packages() {
     fi
 
     if command -v dnf >/dev/null 2>&1; then
-        dnf install -y git iproute >/dev/null
-        if ! dnf install -y python3.11 python3.11-pip >/dev/null 2>&1; then
-            dnf install -y python3 python3-pip >/dev/null
-        fi
+        # Alibaba Cloud Linux 3 keeps system python3 on 3.6. Install the
+        # version-suffixed Python 3.11 package alongside it; never replace the
+        # system python interpreter used by dnf/firewalld.
+        dnf install -y git iproute python3.11 >/dev/null
         return 0
     fi
 
