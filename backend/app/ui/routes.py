@@ -48,6 +48,7 @@ from app.ui.relationship_evidence_workspace import (
     RELATIONSHIP_EVIDENCE_HTML,
     RELATIONSHIP_EVIDENCE_SCRIPT,
 )
+from app.ui.sky_blue_tech_theme import SKY_BLUE_TECH_THEME_STYLE
 from app.ui.strategic_reply_workspace import (
     STRATEGIC_REPLY_HTML,
     STRATEGIC_REPLY_SCRIPT,
@@ -131,7 +132,7 @@ def build_product_shell_html() -> str:
         1,
     ).replace(
         style_marker,
-        f"{GUIDED_WORKFLOW_STYLE}\n{style_marker}",
+        f"{GUIDED_WORKFLOW_STYLE}\n{SKY_BLUE_TECH_THEME_STYLE}\n{style_marker}",
         1,
     )
 
