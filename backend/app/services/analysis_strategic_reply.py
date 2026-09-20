@@ -89,6 +89,7 @@ class AnalysisStrategicReplyService:
         reply_context = self.strategic_reply_service.build_context_from_recommendation_context(
             recommendation_context,
             reply_candidates=reply_candidates,
+            derived=True,
         )
 
         learning_context = self.learning_strategy_bridge_service.get_context(
