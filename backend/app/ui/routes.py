@@ -66,7 +66,7 @@ OLD_PRODUCT_NOTE = (
     "authenticated shell。Recommendation 及后续生命周期仍不伪造尚未完成的业务页面。"
 )
 NEW_PRODUCT_NOTE = (
-    "页面按真实使用顺序组织：选择人物 → 维护关系 → 录入会话与证据 → AI 分析与回复 → "
+    "页面按真实使用顺序组织完整生命周期：选择人物 → 维护关系 → 录入会话与证据 → AI 分析与回复 → "
     "行动计划与用户决定 → 结果、学习与复盘。所有写入、确认、执行和发送边界继续由用户显式控制。"
     "现有 Person、Relationship、Conversation、Recommendation、Action Plan、Execution、Outcome、"
     "Feedback、Learning 与 Re-analysis 能力继续复用 canonical API；对于未来能力仍不伪造尚未完成的业务页面。"
