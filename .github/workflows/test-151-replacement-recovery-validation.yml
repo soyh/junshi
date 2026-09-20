@@ -1,0 +1,72 @@
+name: TEST-151 replacement recovery validation
+
+on:
+  push:
+    branches:
+      - test-151-replacement-server-bootstrap-recovery
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Parse Windows PowerShell recovery scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($path in @(
+            'scripts/windows/backup-pull.ps1',
+            'scripts/windows/restore-push.ps1',
+            'scripts/windows/replacement-restore.ps1'
+          )) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error "${path}: $($_.Message)" }
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Validate replacement bootstrap shell syntax
+        run: bash -n scripts/server/bootstrap-replacement-server.sh
+
+      - name: TEST-151 focused
+        working-directory: backend
+        run: python -m pytest -q tests/test_replacement_server_recovery_contract.py
+
+      - name: Recovery and operations regression
+        working-directory: backend
+        run: |
+          python -m pytest -q \
+            tests/test_replacement_server_recovery_contract.py \
+            tests/test_portable_local_disaster_recovery.py \
+            tests/test_portable_server_prep_contract.py \
+            tests/test_backup_manifest_retention.py \
+            tests/test_systemd_operational_hardening.py \
+            tests/test_runtime_watchdog_operational.py \
+            tests/test_startup_readiness_gate.py \
+            tests/test_release_preflight.py \
+            tests/test_release_runbook_contract.py \
+            tests/test_operations_readiness.py
+
+      - name: Full regression
+        working-directory: backend
+        run: python -m pytest -q
+
+      - name: Diff check
+        run: git diff --check
