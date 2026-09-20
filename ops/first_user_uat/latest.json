@@ -43,10 +43,10 @@
     }
   },
   "phase_b": {
-    "status": "in_progress_at_B02",
+    "status": "in_progress_at_B03",
     "steps": {
       "B01_incoming_response": "passed",
-      "B02_reanalysis_after_new_evidence": "pending",
+      "B02_reanalysis_after_new_evidence": "passed",
       "B03_action_plan": "pending",
       "B04_action_decision": "pending",
       "B05_action_execution": "pending",
@@ -65,10 +65,7 @@
       "status": "resolved_server_repair_passed",
       "summary": "Structured Analysis originally failed before the LLM call because a historical migration-version collision left action_plan_snapshots absent while version 008 was already recorded. Additive migration 014 repaired the missing table/index, readiness was hardened, and production service recovery passed.",
       "root_cause_class": "migration_version_collision_schema_drift",
-      "missing_objects": [
-        "action_plan_snapshots",
-        "idx_action_plan_snapshots_user_person"
-      ],
+      "missing_objects": ["action_plan_snapshots", "idx_action_plan_snapshots_user_person"],
       "expected_migration": "008_action_plan_snapshots.sql",
       "repair_migration": "014_repair_action_plan_snapshots.sql",
       "readiness_false_green": true,
@@ -80,7 +77,7 @@
       "step": "A06",
       "severity": "high",
       "status": "resolved_a06_passed",
-      "summary": "After schema repair, Structured Analysis reached the configured Qwen provider but full non-streaming analysis timed out. Connection testing and a minimal JSON-mode request succeeded, while the real analysis request hit a 60-second ReadTimeout; increasing the configured timeout to 180 seconds still did not complete A06. The targeted production fix disables thinking only for qwen3.8 structured-analysis requests while preserving other model behavior and connection testing, and the first-user A06 rerun passed.",
+      "summary": "After schema repair, Structured Analysis reached the configured Qwen provider but full non-streaming analysis timed out. The targeted production fix disables thinking only for qwen3.8 structured-analysis requests while preserving other model behavior and connection testing, and the first-user A06 rerun passed.",
       "root_cause_class": "qwen38_default_thinking_latency_timeout",
       "provider_connection_test": "passed",
       "minimal_json_mode": "passed",
@@ -95,7 +92,7 @@
       "step": "A08",
       "severity": "high",
       "status": "resolved_a08_passed",
-      "summary": "Strategic Reply originally returned no supporting recommendations and an empty editable draft even though A07 Strategy / Recommendation passed. The repair reuses the conversation-level evidence-backed recommendation chain, adds a dedicated Strategic Reply generation boundary, validates recommendation and evidence provenance before accepting an LLM-produced reply candidate, and retains the existing rule that recommendation/action text must not be silently treated as a sendable reply. The first-user production rerun passed with non-empty recommendations and draft, and edit/restore/copy behavior passed.",
+      "summary": "Strategic Reply originally returned no supporting recommendations and an empty editable draft even though A07 passed. The repair reuses the conversation-level evidence-backed recommendation chain, adds a dedicated Strategic Reply generation boundary, validates recommendation/evidence provenance, and retains explicit user send/persist boundaries. The first-user production rerun passed.",
       "root_cause_class": "strategic_reply_generation_chain_missing_explicit_reply_candidate",
       "a07_recommendation": "passed",
       "a08_recommendations_before_fix": "empty",
@@ -167,7 +164,10 @@
     "a11_timeline_visibility": "passed",
     "a11_duplicate_message_reported": false,
     "phase_a": "passed",
-    "b01_incoming_response": "passed"
+    "b01_incoming_response": "passed",
+    "b02_reanalysis_after_new_evidence": "passed",
+    "b02_new_evidence_included": true,
+    "b02_cross_scope_contamination_reported": false
   },
   "usability_findings": [
     {
@@ -181,37 +181,19 @@
     }
   ],
   "notes": [
-    "A01 account registration/session flow passed after using a username that conforms to the existing canonical server validation contract.",
-    "A02 passed after the user explicitly saved an OpenAI-compatible provider configuration and the connection test succeeded.",
-    "A03 passed: the first user successfully created and selected a Person, a Relationship scoped to that Person, and a Conversation scoped to that Person.",
-    "A04 passed: four real Message records were explicitly added to the selected Conversation and remained present after refresh.",
-    "A05 passed: the first user confirmed the selected Person Timeline rendered the expected real evidence without reporting cross-person contamination or duplicate-on-refresh behavior.",
-    "The first A06 attempt displayed Failed to fetch because the local SSH tunnel had terminated; that attempt was an environment interruption rather than a product failure.",
-    "After the tunnel was restored, A06 initially failed before the provider call because action_plan_snapshots was absent due to the historical migration-version collision.",
-    "Additive migration 014 repaired the missing action_plan_snapshots table and index while preserving the historical 008 ledger entry, and runtime readiness now detects missing migration-declared table/index objects.",
-    "During server-side validation, migration 014 was applied to the production database before the production checkout contained 014. Production was recovered by aligning code to CI-verified TEST-156 head 0bdcc6064cd7dc8be88670d4ba8b0ffe7aa0bc97; live/ready/preflight passed, migrations matched 001-014, and protected port 8899 remained PID 52822.",
-    "Pytest process-level isolation was added so test collection/execution defaults to a disposable temporary DATABASE_PATH before application imports. Safety CI run 35513527825 passed 16 focused, 170 auth, and 888 full-suite tests.",
-    "After schema recovery, A06 reached the LLM layer. The configured provider connection test succeeded and a minimal JSON-mode request completed successfully, proving connectivity and JSON mode support.",
-    "The real Structured Analysis HTTP request used a 3079-character serialized AnalysisContext and hit httpx.ReadTimeout at approximately 60.17 seconds. Retrying A06 after raising the configured timeout to 180 seconds still returned LLM analysis failed.",
-    "The targeted Qwen3.8 fix sends enable_thinking=false only for qwen3.8 structured-analysis requests. Existing non-Qwen3.8 request behavior and the connection-test contract remain unchanged.",
-    "Qwen3.8 fix CI run 35517192052 passed 54 focused provider/analysis tests, 170 auth regression tests, and 889 full-suite tests. Its temporary workflow was removed afterward.",
-    "The CI-verified Qwen3.8 fix was deployed to production at code head c305428906c2f6b894282810f64dacd961f23ac9. The service returned active with runtime PID 593044, a verified pre-deploy SQLite backup was created, and protected port 8899 remained PID 52822.",
-    "A06 passed after the production Qwen3.8 non-thinking fix. The first user received a complete StructuredAnalysis response and no cross-user or cross-conversation contamination was reported.",
-    "A07 passed: the first user loaded Strategy Context and evidence-backed Recommendation output for the selected conversation without reporting automatic selection, execution, or cross-scope contamination.",
-    "A08 exposed a real product-contract gap: the explicit Strategic Reply request returned an empty draft and no supporting recommendations. This was traced to the orchestration path, not to the semantic tone or quality of the user's private conversation sample.",
-    "The A08 repair keeps StructuredAnalysis and Strategy semantics separate from sendable text: the conversation-level evidence-backed recommendations are inputs to a dedicated Strategic Reply LLM boundary, and the returned reply candidate is accepted only when its recommendation_id and evidence_source_ids match the trusted recommendation/evidence context.",
-    "The first A08 CI attempt correctly exposed an unintended expansion of the legacy person-level Strategic Reply response constraints. That production-contract regression was fixed in code while preserving the existing exact person-level contract rather than relaxing the test.",
-    "Final A08 CI run 35518833345 passed 70 focused Strategic Reply tests, 170 authentication/product regression tests, and 895 full-suite tests. The temporary A08 workflow was removed afterward.",
-    "The CI-verified A08 repair was deployed to production at code head 39e7f6d2196c0dce50601f63118f4440a6521ec2. The service returned active with runtime PID 593821, a pre-deploy SQLite backup was created, no database restore or server pytest was executed, and protected port 8899 remained PID 52822.",
-    "A08 passed on the first-user production rerun: supporting recommendations were non-empty, Editable Reply contained a generated draft, and local edit, restore, and copy interactions all passed without reporting automatic send or persistence.",
-    "A09 passed: the first user explicitly sent the selected Strategic Reply through the real external communication channel. The application did not perform or simulate the send, and no external message content is recorded in this UAT artifact.",
-    "A10 passed: Prepare sent-message record populated the canonical Message composer with sender=user and the actual externally sent text, while remaining a local-only handoff with no Message persistence before the explicit Add message action.",
-    "A11 passed: the first user explicitly added the sent message through the canonical Message API, confirmed it appeared in the Message list and Evidence/Timeline, and reported no duplicate Message after refresh.",
+    "A01-A05 passed for account/provider/canonical relationship data/evidence timeline using real first-user data.",
+    "A06 originally exposed schema drift and Qwen3.8 default-thinking latency blockers; both were repaired, CI-validated, deployed, and first-user reruns passed.",
+    "A07 passed Strategy/Recommendation with evidence-backed output and no automatic selection/execution.",
+    "A08 originally exposed an empty Strategic Reply generation chain; the dedicated evidence-backed reply generation repair passed CI, production deployment, and first-user rerun including edit/restore/copy.",
+    "A09 passed: the first user explicitly sent the selected Strategic Reply through the real external communication channel; the application did not perform or simulate the send.",
+    "A10 passed: Prepare sent-message record populated the canonical Message composer while remaining local-only and unsaved until explicit Add message.",
+    "A11 passed: the sent message was explicitly persisted through the canonical Message API, appeared in Evidence/Timeline, and no duplicate Message was reported after refresh.",
     "Phase A is complete: real evidence -> Structured Analysis -> Strategy/Recommendation -> Strategic Reply -> real external send -> explicit Message handoff -> canonical Message -> Evidence/Timeline closure all passed in production.",
-    "B01 passed: a genuine incoming response was added to the same canonical Conversation as sender=person. No incoming-response content, identifier, or other private relationship data is recorded in this UAT artifact.",
+    "B01 passed: a genuine incoming response was added to the same canonical Conversation as sender=person.",
+    "B02 passed: Structured Analysis was rerun after the genuine incoming response, returned non-empty analysis, included the new evidence, and no cross-scope contamination was reported.",
     "No username, password, API key, real name, relationship detail, private chat content, conversation identifier, evidence identifier, model-generated private analysis text, strategy text, recommendation text, or reply text is recorded in this UAT artifact.",
     "Real relationship and chat content remains in the production database and is not committed to GitHub.",
-    "TEST-156 is not yet VERIFIED. Phase B is now in progress using genuine real-world follow-up evidence.",
-    "Next Phase B step is B02 re-analysis after the newly added canonical evidence; B03 Action Plan must not begin until B02 passes."
+    "TEST-156 is not yet VERIFIED. Phase B is in progress using genuine real-world follow-up evidence.",
+    "Next Phase B step is B03 Action Plan. Generation is explicit and may persist a proposed Action Plan snapshot; it must not create a user decision or execute an action automatically."
   ]
 }
