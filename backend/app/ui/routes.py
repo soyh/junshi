@@ -59,7 +59,7 @@ OLD_PRODUCT_NOTE = (
 NEW_PRODUCT_NOTE = (
     "统一 authenticated shell 已覆盖核心资料管理、Conversation evidence、Strategy / "
     "Recommendation 与 Action Plan → Decision → Execution → Outcome → Feedback → "
-    "Learning → Re-analysis 完整生命周期。"
+    "Learning → Re-analysis 完整生命周期；对于未来或内部尚未产品化的能力，继续不伪造尚未完成的业务页面。"
 )
 
 OLD_PRODUCT_NAV = '''  <nav aria-label="Product sections">
