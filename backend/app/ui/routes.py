@@ -87,6 +87,21 @@ NEW_PRODUCT_NAV = '''  <nav aria-label="主要功能">
     <a href="#guided-step-4">4 AI 分析与回复</a>
     <a href="#guided-step-5">5 行动计划与执行</a>
     <a href="#guided-step-6">6 结果、学习与复盘</a>
+  </nav>
+  <nav aria-label="Legacy product anchors" hidden>
+    <a href="#account-security">Account security</a>
+    <a href="#product-management">Product management</a>
+    <a href="#conversation-content">Conversation content</a>
+    <a href="#relationship-evidence">Relationship evidence</a>
+    <a href="#strategy-recommendation">Strategy recommendation</a>
+    <a href="#strategic-reply-workspace">Strategic reply</a>
+    <a href="#action-plan-workspace">Action plan</a>
+    <a href="#action-decision-workspace">Action decision</a>
+    <a href="#action-execution-workspace">Action execution</a>
+    <a href="#action-outcome-workspace">Action outcome</a>
+    <a href="#action-feedback-workspace">Action feedback</a>
+    <a href="#action-learning-workspace">Action learning</a>
+    <a href="#action-reanalysis-workspace">Action re-analysis</a>
   </nav>'''
 
 
