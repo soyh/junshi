@@ -27,7 +27,7 @@
     "sanitized_results_only": true
   },
   "phase_a": {
-    "status": "blocked_at_A08_production_deploy",
+    "status": "blocked_at_A08_rerun",
     "steps": {
       "A01_account_session": "passed",
       "A02_llm_provider": "passed",
@@ -36,7 +36,7 @@
       "A05_evidence_timeline": "passed",
       "A06_structured_analysis": "passed",
       "A07_strategy_recommendation": "passed",
-      "A08_strategic_reply": "fix_ci_passed_production_deploy_pending",
+      "A08_strategic_reply": "fix_deployed_rerun_pending",
       "A09_external_send": "pending",
       "A10_message_handoff": "pending",
       "A11_evidence_loop_closure": "pending"
@@ -94,14 +94,14 @@
       "id": "TEST-156-UAT-004",
       "step": "A08",
       "severity": "high",
-      "status": "fix_ci_passed_production_deploy_pending",
+      "status": "fix_deployed_rerun_pending",
       "summary": "Strategic Reply returned no supporting recommendations and an empty editable draft even though A07 Strategy / Recommendation passed. The Strategic Reply orchestration used a person-level RecommendationService context whose recommendations list is intentionally empty, while the conversation-level A07 path independently produced recommendations. The repair reuses the conversation-level evidence-backed recommendation chain, adds a dedicated Strategic Reply generation boundary, validates recommendation and evidence provenance before accepting an LLM-produced reply candidate, and retains the existing rule that recommendation/action text must not be silently treated as a sendable reply.",
       "root_cause_class": "strategic_reply_generation_chain_missing_explicit_reply_candidate",
       "a07_recommendation": "passed",
       "a08_recommendations_before_fix": "empty",
       "a08_draft_before_fix": "empty",
       "fix_ci": "passed",
-      "production_deploy": "pending",
+      "production_deploy": "passed",
       "first_user_rerun": "pending",
       "data_corruption_reported": false,
       "cross_user_contamination_reported": false
@@ -151,7 +151,14 @@
     "a08_ci_counts": "70/170/895",
     "temporary_a08_workflow_removed": true,
     "post_a08_ci_cleanup_head": "39e7f6d2196c0dce50601f63118f4440a6521ec2",
-    "a08_fix": "ci_passed_production_deploy_pending"
+    "a08_server_deploy": "passed",
+    "a08_server_code_head": "39e7f6d2196c0dce50601f63118f4440a6521ec2",
+    "a08_runtime_pid": 593821,
+    "a08_predeploy_backup_created": true,
+    "protected_port_8899_pid_after_a08_deploy": 52822,
+    "a08_database_restore_executed": false,
+    "a08_server_pytest_executed": false,
+    "a08_fix": "deployed_rerun_pending"
   },
   "usability_findings": [
     {
@@ -186,9 +193,10 @@
     "The A08 repair keeps StructuredAnalysis and Strategy semantics separate from sendable text: the conversation-level evidence-backed recommendations are inputs to a dedicated Strategic Reply LLM boundary, and the returned reply candidate is accepted only when its recommendation_id and evidence_source_ids match the trusted recommendation/evidence context.",
     "The first A08 CI attempt correctly exposed an unintended expansion of the legacy person-level Strategic Reply response constraints. That production-contract regression was fixed in code while preserving the existing exact person-level contract rather than relaxing the test.",
     "Final A08 CI run 35518833345 passed 70 focused Strategic Reply tests, 170 authentication/product regression tests, and 895 full-suite tests. The temporary A08 workflow was removed afterward.",
+    "The CI-verified A08 repair was deployed to production at code head 39e7f6d2196c0dce50601f63118f4440a6521ec2. The service returned active with runtime PID 593821, a pre-deploy SQLite backup was created, no database restore or server pytest was executed, and protected port 8899 remained PID 52822.",
     "No username, password, API key, real name, relationship detail, private chat content, conversation identifier, evidence identifier, model-generated private analysis text, strategy text, recommendation text, or reply text is recorded in this UAT artifact.",
     "Real relationship and chat content remains in the production database and is not committed to GitHub.",
-    "Phase A remains blocked at A08 until the CI-verified repair is deployed to production and the first user reruns Strategic Reply successfully.",
+    "Phase A remains blocked at A08 until the first user reruns Strategic Reply successfully on the deployed repair.",
     "Phase B is longitudinal and should use genuine real-world events rather than synthetic completion."
   ]
 }
