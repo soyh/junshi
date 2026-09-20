@@ -34,6 +34,11 @@ from app.ui.conversation_content_workspace import (
     CONVERSATION_CONTENT_HTML,
     CONVERSATION_CONTENT_SCRIPT,
 )
+from app.ui.guided_workflow_workspace import (
+    GUIDED_WORKFLOW_HTML,
+    GUIDED_WORKFLOW_SCRIPT,
+    GUIDED_WORKFLOW_STYLE,
+)
 from app.ui.product_management_workspace import (
     PRODUCT_MANAGEMENT_HTML,
     PRODUCT_MANAGEMENT_SCRIPT,
@@ -61,9 +66,8 @@ OLD_PRODUCT_NOTE = (
     "authenticated shell。Recommendation 及后续生命周期仍不伪造尚未完成的业务页面。"
 )
 NEW_PRODUCT_NOTE = (
-    "统一 authenticated shell 已覆盖核心资料管理、Conversation evidence、Structured Analysis、"
-    "Strategy / Recommendation、Strategic Reply 与 Action Plan → Decision → Execution → Outcome → "
-    "Feedback → Learning → Re-analysis 完整生命周期；对于未来或内部尚未产品化的能力，继续不伪造尚未完成的业务页面。"
+    "页面按真实使用顺序组织：选择人物 → 维护关系 → 录入会话与证据 → AI 分析与回复 → "
+    "行动计划与用户决定 → 结果、学习与复盘。所有写入、确认、执行和发送边界继续由用户显式控制。"
 )
 
 OLD_PRODUCT_NAV = '''  <nav aria-label="Product sections">
@@ -73,35 +77,28 @@ OLD_PRODUCT_NAV = '''  <nav aria-label="Product sections">
     <a href="#analysis">Structured Analysis</a>
   </nav>'''
 
-NEW_PRODUCT_NAV = '''  <nav aria-label="Product sections">
-    <a href="#account">Account</a>
-    <a href="#account-security">Security</a>
-    <a href="#workspace">Workspace</a>
-    <a href="#product-management">Records</a>
-    <a href="#conversation-content">Conversation</a>
-    <a href="#relationship-evidence">Evidence</a>
-    <a href="#analysis">Structured Analysis</a>
-    <a href="#strategy-recommendation">Strategy</a>
-    <a href="#strategic-reply-workspace">Reply</a>
-    <a href="#action-plan-workspace">Action Plan</a>
-    <a href="#action-decision-workspace">Decision</a>
-    <a href="#action-execution-workspace">Execution</a>
-    <a href="#action-outcome-workspace">Outcome</a>
-    <a href="#action-feedback-workspace">Feedback</a>
-    <a href="#action-learning-workspace">Learning</a>
-    <a href="#action-reanalysis-workspace">Re-analysis</a>
-    <a href="#provider">LLM Provider</a>
+NEW_PRODUCT_NAV = '''  <nav aria-label="主要功能">
+    <a href="#account">账号登录</a>
+    <a href="#guided-step-1">1 选择人物</a>
+    <a href="#guided-step-2">2 维护关系</a>
+    <a href="#guided-step-3">3 会话与证据</a>
+    <a href="#guided-step-4">4 AI 分析与回复</a>
+    <a href="#guided-step-5">5 行动计划与执行</a>
+    <a href="#guided-step-6">6 结果、学习与复盘</a>
   </nav>'''
 
 
 def build_product_shell_html() -> str:
     provider_marker = '  <fieldset id="provider" class="wide">'
     script_marker = "  clearSession();\n})();"
+    style_marker = "  </style>"
 
     if provider_marker not in PRODUCT_SHELL_HTML:
         raise RuntimeError("Product shell provider insertion marker not found")
     if script_marker not in PRODUCT_SHELL_HTML:
         raise RuntimeError("Product shell script insertion marker not found")
+    if style_marker not in PRODUCT_SHELL_HTML:
+        raise RuntimeError("Product shell style insertion marker not found")
     if OLD_PRODUCT_NOTE not in PRODUCT_SHELL_HTML:
         raise RuntimeError("Product shell stale-note replacement marker not found")
     if OLD_PRODUCT_NAV not in PRODUCT_SHELL_HTML:
@@ -115,9 +112,14 @@ def build_product_shell_html() -> str:
         OLD_PRODUCT_NAV,
         NEW_PRODUCT_NAV,
         1,
+    ).replace(
+        style_marker,
+        f"{GUIDED_WORKFLOW_STYLE}\n{style_marker}",
+        1,
     )
 
     workspace_html = (
+        f"{GUIDED_WORKFLOW_HTML}\n"
         f"{ACCOUNT_SECURITY_HTML}\n"
         f"{PRODUCT_MANAGEMENT_HTML}\n"
         f"{CONVERSATION_CONTENT_HTML}\n"
@@ -140,10 +142,9 @@ def build_product_shell_html() -> str:
     )
 
     # Writable core-record/account management scripts intentionally run before
-    # the downstream lifecycle fragments. Several lifecycle tests isolate each
-    # fragment from its declaration through clearSession() to enforce read-only
-    # or no-auto-execute boundaries; keeping management writes earlier preserves
-    # those boundaries without duplicating any business logic.
+    # the downstream lifecycle fragments. The guided UI script runs last so it
+    # can compose already-declared functions without changing canonical APIs or
+    # bypassing user confirmation / execution / persistence boundaries.
     workspace_script = (
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
@@ -158,6 +159,7 @@ def build_product_shell_html() -> str:
         f"{ACTION_PLAN_SCRIPT}\n\n"
         f"{STRATEGIC_REPLY_SCRIPT}\n\n"
         f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
+        f"{GUIDED_WORKFLOW_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
