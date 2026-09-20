@@ -34,7 +34,7 @@
       "A03_person_relationship_conversation": "passed",
       "A04_real_evidence_input": "passed",
       "A05_evidence_timeline": "passed",
-      "A06_structured_analysis": "blocked_internal_server_error",
+      "A06_structured_analysis": "blocked_schema_drift_missing_action_plan_snapshots",
       "A07_strategy_recommendation": "pending",
       "A08_strategic_reply": "pending",
       "A09_external_send": "pending",
@@ -62,8 +62,11 @@
       "id": "TEST-156-UAT-002",
       "step": "A06",
       "severity": "high",
-      "status": "investigating",
-      "summary": "After the local SSH tunnel was restored, Run structured analysis reached the backend but returned HTTP 500 Internal Server Error for the selected conversation.",
+      "status": "root_cause_identified_schema_audit_pending",
+      "summary": "Structured Analysis fails before the LLM call because the production SQLite schema is missing action_plan_snapshots while runtime readiness remains green. Traceback ends in sqlite3.OperationalError: no such table: action_plan_snapshots.",
+      "root_cause_class": "database_schema_drift",
+      "missing_object": "action_plan_snapshots",
+      "expected_migration": "008_action_plan_snapshots.sql",
       "data_corruption_reported": false,
       "cross_user_contamination_reported": false
     }
@@ -85,12 +88,13 @@
     "A03 passed: the first user successfully created and selected a Person, a Relationship scoped to that Person, and a Conversation scoped to that Person.",
     "A04 passed: four real Message records were explicitly added to the selected Conversation and remained present after refresh.",
     "A05 passed: the first user confirmed the selected Person Timeline rendered the expected real evidence without reporting cross-person contamination or duplicate-on-refresh behavior.",
-    "The user reported five displayed Timeline entries after four Message records. Timeline is a read-only aggregate of Conversation, Message, and Interaction evidence, so a non-Message aggregate entry is expected; if all five entries are Message sources, this should be investigated as a duplicate-evidence defect.",
-    "The first A06 attempt displayed Failed to fetch because the local SSH tunnel had terminated; that attempt was classified as an environment interruption rather than a product failure.",
-    "After the tunnel was restored, A06 reached the backend and returned Internal Server Error. This is now a real blocking UAT defect pending traceback diagnosis.",
+    "The first A06 attempt displayed Failed to fetch because the local SSH tunnel had terminated; that attempt was an environment interruption rather than a product failure.",
+    "After the tunnel was restored, A06 returned HTTP 500. Server traceback identified sqlite3.OperationalError: no such table: action_plan_snapshots while constructing learning-strategy context before the provider call.",
+    "Migration 008 in source is expected to create action_plan_snapshots. Because application startup runs the migration runner and runtime readiness checks only migration version parity rather than required schema objects, a migration-ledger/schema mismatch can remain ready while failing at runtime.",
+    "No database repair has been executed yet. A read-only full schema audit must complete before any repair so other missing objects are not masked.",
     "No username, password, API key, real name, relationship detail, private chat content, or conversation identifier is recorded in this UAT artifact.",
     "Real relationship and chat content must remain in the production database and must not be committed to GitHub.",
-    "Phase A is blocked until A06 is diagnosed and rerun successfully.",
+    "Phase A remains blocked at A06 until schema drift is repaired and Structured Analysis is rerun successfully.",
     "Phase B is longitudinal and should use genuine real-world events rather than synthetic completion."
   ]
 }
