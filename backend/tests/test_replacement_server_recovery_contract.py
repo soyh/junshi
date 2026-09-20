@@ -13,10 +13,20 @@ def _windows_script() -> str:
     return (_root() / "scripts/windows/replacement-restore.ps1").read_text(encoding="utf-8")
 
 
-def test_replacement_server_refuses_active_production_runtime():
+def test_replacement_server_refuses_apply_or_default_path_on_active_production_runtime():
     script = _server_script()
-    assert 'systemctl is-active --quiet "$SERVICE"' in script
+    assert 'ACTIVE_RUNTIME=1' in script
+    assert '[ "$APPLY" -eq 1 ] || [ "$PROJECT" = "$PRODUCTION_PROJECT" ]' in script
     assert 'fail "target-has-active-production-runtime"' in script
+
+
+def test_active_production_allows_only_isolated_stage_project():
+    script = _server_script()
+    assert 'PRODUCTION_PROJECT="/opt/ai-love-strategist"' in script
+    assert 'stage-only is allowed only with a different' in script
+    stage_gate = script.index('if [ "$APPLY" -ne 1 ]; then')
+    env_install = script.index('install -m 0600 "$ENV_FILE" "$PROJECT/.env"')
+    assert stage_gate < env_install
 
 
 def test_replacement_server_checks_out_snapshot_exact_commit():
@@ -54,6 +64,14 @@ def test_restore_installs_systemd_only_after_database_exists():
     assert 'app.probe live --json' in script
     assert 'app.probe ready --json' in script
     assert 'app.preflight --json' in script
+
+
+def test_alibaba_linux_bootstrap_keeps_system_python_untouched():
+    script = _server_script()
+    assert 'dnf install -y git iproute python3.11' in script
+    assert 'never replace the' in script
+    assert 'alternatives' not in script
+    assert 'ln -s' not in script
 
 
 def test_replacement_server_only_observes_reserved_8899():
