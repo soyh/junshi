@@ -36,15 +36,25 @@ def valid_result():
     }
 
 
-def make_client(content, status_code=200):
+def make_client(
+    content,
+    status_code=200,
+    *,
+    model="qwen-plus",
+    expected_enable_thinking=None,
+):
     def handler(request):
         assert request.url.path == "/compatible-mode/v1/chat/completions"
         assert request.headers["authorization"] == "Bearer test-key"
         payload = json.loads(request.content)
-        assert payload["model"] == "qwen-plus"
+        assert payload["model"] == model
         assert payload["response_format"] == {"type": "json_object"}
         assert payload["messages"][0]["role"] == "system"
         assert payload["messages"][1]["role"] == "user"
+        if expected_enable_thinking is None:
+            assert "enable_thinking" not in payload
+        else:
+            assert payload["enable_thinking"] is expected_enable_thinking
         return httpx.Response(
             status_code,
             json={
@@ -68,6 +78,23 @@ def test_qwen_provider_returns_structured_result():
 
     assert result == valid_result()
     assert isinstance(LLMAnalysisService(provider).analyze({"messages": []}), StructuredAnalysis)
+
+
+def test_qwen38_structured_analysis_disables_thinking():
+    provider = QwenProvider(
+        api_key="test-key",
+        base_url="https://example.test/compatible-mode/v1",
+        model="qwen3.8-flash",
+        client=make_client(
+            json.dumps(valid_result()),
+            model="qwen3.8-flash",
+            expected_enable_thinking=False,
+        ),
+    )
+
+    result = provider.analyze({"messages": [], "unknowns": []})
+
+    assert result == valid_result()
 
 
 def test_qwen_provider_requires_api_key():
