@@ -66,6 +66,50 @@ class QwenProvider(LLMProvider):
             raise LLMAnalysisError("Qwen returned a non-object structured result")
         return result
 
+    def generate_strategic_reply(
+        self,
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
+        if not self.api_key:
+            raise LLMAnalysisError("Qwen API key is not configured")
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": self._strategic_reply_system_prompt(),
+                },
+                {
+                    "role": "user",
+                    "content": self._strategic_reply_user_prompt(context),
+                },
+            ],
+            "response_format": {"type": "json_object"},
+            **self._analysis_request_options(),
+        }
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            response = self._post(payload, headers)
+            response.raise_for_status()
+            body = response.json()
+            content = body["choices"][0]["message"]["content"]
+            if not isinstance(content, str):
+                raise LLMAnalysisError("Qwen returned non-text strategic reply content")
+            result = json.loads(content)
+        except LLMAnalysisError:
+            raise
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError):
+            raise LLMAnalysisError("Qwen strategic reply request failed") from None
+
+        if not isinstance(result, dict):
+            raise LLMAnalysisError("Qwen returned a non-object strategic reply result")
+        return result
+
     def test_connection(self) -> None:
         if not self.api_key:
             raise LLMAnalysisError("Qwen API key is not configured")
@@ -140,5 +184,30 @@ class QwenProvider(LLMProvider):
         return (
             "Analyze the following AnalysisContext and output the required JSON object. "
             "Do not add markdown fences or explanatory text.\n\n"
+            + json.dumps(context, ensure_ascii=False, sort_keys=True, default=str)
+        )
+
+    @staticmethod
+    def _strategic_reply_system_prompt() -> str:
+        return (
+            "You are the strategic reply drafting layer of AI Love Strategist. "
+            "Return JSON only. Use only the supplied evidence-backed recommendations, "
+            "canonical evidence, and unknowns. Do not invent facts, events, promises, "
+            "relationship status, intentions, or evidence IDs. Produce one concise, "
+            "natural message draft that the user could choose to send. Preserve "
+            "uncertainty and do not imply that any recommendation was selected, "
+            "approved, executed, or sent. The response must contain exactly these "
+            "top-level fields: recommendation_ids, reply, evidence_source_ids. "
+            "recommendation_ids must be a non-empty array containing only IDs from the "
+            "supplied recommendations. evidence_source_ids must be a non-empty array "
+            "containing only evidence IDs already cited by those supporting "
+            "recommendations and present in canonical evidence."
+        )
+
+    @staticmethod
+    def _strategic_reply_user_prompt(context: dict[str, Any]) -> str:
+        return (
+            "Draft one evidence-backed strategic reply from this context and output the "
+            "required JSON object. Do not add markdown fences or explanatory text.\n\n"
             + json.dumps(context, ensure_ascii=False, sort_keys=True, default=str)
         )
