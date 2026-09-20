@@ -1,0 +1,42 @@
+name: TEST-150 handover finalizer v2
+
+on:
+  push:
+    branches:
+      - test-150-offsite-disaster-recovery
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Finalize handover
+        run: |
+          python scripts/ops/finalize-test150-handover.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('DEVELOPMENT_HANDOVER.md')
+          p.write_text(p.read_text(encoding='utf-8').rstrip() + '\n', encoding='utf-8')
+          PY
+      - name: Validate handover
+        run: |
+          grep -F '当前阶段：TEST-150 — Portable Backup & Local Disaster Recovery — VERIFIED' DEVELOPMENT_HANDOVER.md
+          grep -F 'TEST-008 ~ TEST-150' DEVELOPMENT_HANDOVER.md
+          grep -F 'BACKUP_PULL=PASSED' DEVELOPMENT_HANDOVER.md
+          test ! -e docs/DEVELOPMENT_HANDOVER.md
+          git diff --check
+      - name: Commit final handover and remove temporary finalizers
+        run: |
+          rm -f scripts/ops/finalize-test150-handover.py
+          rm -f .github/workflows/test-150-handover-finalize.yml
+          rm -f .github/workflows/test-150-handover-finalize-v2.yml
+          git config user.name 'test-150-finalizer'
+          git config user.email 'test-150-finalizer@users.noreply.github.com'
+          git add -A
+          git commit -m 'docs: finalize TEST-150 verification handover'
+          git push origin HEAD:test-150-offsite-disaster-recovery
