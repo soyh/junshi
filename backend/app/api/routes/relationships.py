@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.core.context import get_current_user_id
+from app.core.database import get_connection
+from app.core.sentinels import UNSET
 from app.domain.errors import (
     PersonNotFoundError,
     RelationshipAlreadyExistsError,
 )
-
-from app.core.context import get_current_user_id
-from app.core.database import get_connection
 from app.schemas.relationship import (
     RelationshipCreate,
     RelationshipResponse,
@@ -109,11 +109,21 @@ def update_relationship(
             conn,
             user_id,
             relationship_id,
-            payload.status,
-            payload.stage,
-            payload.long_term_goal,
-            payload.current_goal,
-            payload.notes,
+            payload.status
+            if "status" in payload.model_fields_set
+            else UNSET,
+            payload.stage
+            if "stage" in payload.model_fields_set
+            else UNSET,
+            payload.long_term_goal
+            if "long_term_goal" in payload.model_fields_set
+            else UNSET,
+            payload.current_goal
+            if "current_goal" in payload.model_fields_set
+            else UNSET,
+            payload.notes
+            if "notes" in payload.model_fields_set
+            else UNSET,
         )
 
     if relationship is None:
