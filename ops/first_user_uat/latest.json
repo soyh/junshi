@@ -1,7 +1,7 @@
 {
   "stage": "TEST-156",
   "name": "First User End-to-End Validation",
-  "status": "in_progress",
+  "status": "blocked",
   "baseline": {
     "branch": "test-155-strategic-reply-message-handoff",
     "post_verification_handover_head": "9fad72ca9ef6f1721d22c458a61d97619261b4d1",
@@ -27,7 +27,7 @@
     "sanitized_results_only": true
   },
   "phase_a": {
-    "status": "in_progress_at_A08",
+    "status": "blocked_at_A08_strategic_reply_generation",
     "steps": {
       "A01_account_session": "passed",
       "A02_llm_provider": "passed",
@@ -36,7 +36,7 @@
       "A05_evidence_timeline": "passed",
       "A06_structured_analysis": "passed",
       "A07_strategy_recommendation": "passed",
-      "A08_strategic_reply": "pending",
+      "A08_strategic_reply": "blocked_empty_recommendations_and_draft",
       "A09_external_send": "pending",
       "A10_message_handoff": "pending",
       "A11_evidence_loop_closure": "pending"
@@ -89,6 +89,19 @@
       "configured_timeout_retry_seconds": 180,
       "data_corruption_reported": false,
       "cross_user_contamination_reported": false
+    },
+    {
+      "id": "TEST-156-UAT-004",
+      "step": "A08",
+      "severity": "high",
+      "status": "root_cause_confirmed_fix_pending",
+      "summary": "Strategic Reply returned no supporting recommendations and an empty editable draft even though A07 Strategy / Recommendation passed. The Strategic Reply orchestration used a person-level RecommendationService context whose recommendations list is intentionally empty, while the conversation-level A07 path independently produced recommendations. In addition, current strategy candidates do not carry an explicit reply field, so StrategicReplyService correctly refuses to invent a sendable message from recommendation or action text.",
+      "root_cause_class": "strategic_reply_generation_chain_missing_explicit_reply_candidate",
+      "a07_recommendation": "passed",
+      "a08_recommendations": "empty",
+      "a08_draft": "empty",
+      "data_corruption_reported": false,
+      "cross_user_contamination_reported": false
     }
   ],
   "repair_validation": {
@@ -128,7 +141,8 @@
     "qwen38_runtime_pid": 593044,
     "qwen38_predeploy_backup_created": true,
     "protected_port_8899_pid_after_qwen38_deploy": 52822,
-    "a06_rerun": "passed"
+    "a06_rerun": "passed",
+    "a08_fix": "pending"
   },
   "usability_findings": [
     {
@@ -159,9 +173,11 @@
     "The CI-verified Qwen3.8 fix was deployed to production at code head c305428906c2f6b894282810f64dacd961f23ac9. The service returned active with runtime PID 593044, a verified pre-deploy SQLite backup was created, and protected port 8899 remained PID 52822.",
     "A06 passed after the production Qwen3.8 non-thinking fix. The first user received a complete StructuredAnalysis response and no cross-user or cross-conversation contamination was reported.",
     "A07 passed: the first user loaded Strategy Context and evidence-backed Recommendation output for the selected conversation without reporting automatic selection, execution, or cross-scope contamination.",
-    "No username, password, API key, real name, relationship detail, private chat content, conversation identifier, evidence identifier, model-generated private analysis text, strategy text, or recommendation text is recorded in this UAT artifact.",
+    "A08 exposed a real product-contract gap: the explicit Strategic Reply request returned an empty draft and no supporting recommendations. This was traced to the orchestration path, not to the semantic tone or quality of the user's private conversation sample.",
+    "The existing StrategicReplyService safety contract is retained: it must not fabricate a reply from action-only or recommendation-only guidance. The A08 repair must introduce an explicit evidence-backed reply candidate and reuse the existing recommendation provenance chain.",
+    "No username, password, API key, real name, relationship detail, private chat content, conversation identifier, evidence identifier, model-generated private analysis text, strategy text, recommendation text, or reply text is recorded in this UAT artifact.",
     "Real relationship and chat content remains in the production database and is not committed to GitHub.",
-    "Phase A now proceeds to A08 Strategic Reply.",
+    "Phase A is blocked at A08 until the Strategic Reply generation-chain repair passes CI, production deployment, and first-user rerun.",
     "Phase B is longitudinal and should use genuine real-world events rather than synthetic completion."
   ]
 }
