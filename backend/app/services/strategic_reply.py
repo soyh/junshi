@@ -41,6 +41,7 @@ class StrategicReplyService:
         context: dict,
         *,
         reply_candidates: list[dict] | None = None,
+        derived: bool = False,
     ) -> dict:
         recommendations = context.get("recommendations")
         evidence = context.get("evidence")
@@ -50,17 +51,23 @@ class StrategicReplyService:
             evidence = []
 
         candidates = recommendations if reply_candidates is None else reply_candidates
+        reply_constraints = {
+            "must_be_evidence_backed": True,
+            "must_preserve_unknowns": True,
+            "must_not_auto_send": True,
+            "must_not_change_relationship": True,
+        }
+        if derived:
+            reply_constraints.update(
+                {
+                    "must_preserve_evidence_provenance": True,
+                    "must_treat_llm_output_as_derived": True,
+                }
+            )
 
         return {
             **context,
-            "reply_constraints": {
-                "must_be_evidence_backed": True,
-                "must_preserve_unknowns": True,
-                "must_preserve_evidence_provenance": True,
-                "must_treat_llm_output_as_derived": True,
-                "must_not_auto_send": True,
-                "must_not_change_relationship": True,
-            },
+            "reply_constraints": reply_constraints,
             "draft": self.build_draft(candidates, evidence),
         }
 
