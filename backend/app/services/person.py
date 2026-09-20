@@ -1,5 +1,6 @@
 import sqlite3
 
+from app.core.sentinels import UNSET
 from app.repositories.person import PersonRepository
 
 
@@ -47,9 +48,9 @@ class PersonService:
         conn: sqlite3.Connection,
         user_id: str,
         person_id: str,
-        name: str | None,
-        nickname: str | None,
-        notes: str | None,
+        name=UNSET,
+        nickname=UNSET,
+        notes=UNSET,
     ) -> sqlite3.Row | None:
         return self.repository.update(
             conn,
