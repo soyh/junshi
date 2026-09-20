@@ -2,6 +2,8 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 
+from app.core.sentinels import UNSET
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -84,20 +86,18 @@ class PersonRepository:
         conn: sqlite3.Connection,
         user_id: str,
         person_id: str,
-        name: str | None,
-        nickname: str | None,
-        notes: str | None,
+        name=UNSET,
+        nickname=UNSET,
+        notes=UNSET,
     ) -> sqlite3.Row | None:
         existing = self.get(conn, user_id, person_id)
 
         if existing is None:
             return None
 
-        new_name = name if name is not None else existing["name"]
-        new_nickname = (
-            nickname if nickname is not None else existing["nickname"]
-        )
-        new_notes = notes if notes is not None else existing["notes"]
+        new_name = existing["name"] if name is UNSET or name is None else name
+        new_nickname = existing["nickname"] if nickname is UNSET else nickname
+        new_notes = existing["notes"] if notes is UNSET else notes
 
         conn.execute(
             """
