@@ -85,6 +85,34 @@ def test_runtime_readiness_rejects_migration_mismatch(tmp_path: Path):
     }
 
 
+def test_runtime_readiness_rejects_missing_objects_even_when_versions_match(tmp_path: Path):
+    database = tmp_path / "app.sqlite3"
+    migrations = tmp_path / "migrations"
+    migrations.mkdir(parents=True)
+    (migrations / "001_required_table.sql").write_text(
+        """
+        CREATE TABLE IF NOT EXISTS required_table (
+            id TEXT PRIMARY KEY
+        );
+        CREATE INDEX IF NOT EXISTS idx_required_table_id
+            ON required_table(id);
+        """,
+        encoding="utf-8",
+    )
+    _write_database(database, ["001"])
+
+    report = check_runtime_readiness(database, migration_dir=migrations)
+
+    assert report.ready is False
+    assert report.database == {"ok": True, "error": None}
+    assert report.migrations == {
+        "ok": False,
+        "expected_count": 1,
+        "applied_count": 1,
+        "error": "migration schema objects are missing",
+    }
+
+
 def test_legacy_health_contract_remains_compatible(client):
     response = client.get("/health")
 
