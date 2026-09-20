@@ -260,6 +260,33 @@ fi
     --offline-confirmed >/dev/null
 chmod 0600 "$PROJECT/.env" "$PROJECT/data/app.sqlite3"
 
+# Prove that the restored runtime database is byte-for-byte the verified backup.
+BACKUP_SHA=$("$PY" - "$BACKUP" <<'PY'
+import hashlib
+import pathlib
+import sys
+p = pathlib.Path(sys.argv[1])
+h = hashlib.sha256()
+with p.open('rb') as f:
+    for chunk in iter(lambda: f.read(1024 * 1024), b''):
+        h.update(chunk)
+print(h.hexdigest())
+PY
+)
+RESTORED_SHA=$("$PY" - "$PROJECT/data/app.sqlite3" <<'PY'
+import hashlib
+import pathlib
+import sys
+p = pathlib.Path(sys.argv[1])
+h = hashlib.sha256()
+with p.open('rb') as f:
+    for chunk in iter(lambda: f.read(1024 * 1024), b''):
+        h.update(chunk)
+print(h.hexdigest())
+PY
+)
+[ "$BACKUP_SHA" = "$RESTORED_SHA" ] || fail "restored-database-sha-mismatch"
+
 # Create a fresh local managed backup from the restored DB before preflight.
 "$PY" -m app.backup >/dev/null
 "$PY" -m app.preflight --json >/dev/null
@@ -290,4 +317,5 @@ echo "SOURCE_HEAD=$SOURCE_HEAD"
 echo "PROJECT=$PROJECT"
 echo "RUNTIME_PID=$PID_AFTER"
 echo "PORT8899_PID=$PORT8899_AFTER"
+echo "RESTORED_DB_SHA256=$RESTORED_SHA"
 echo "DATABASE_RESTORE_EXECUTED=YES"
