@@ -2,6 +2,8 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 
+from app.core.sentinels import UNSET
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -98,16 +100,30 @@ class RelationshipRepository:
         conn: sqlite3.Connection,
         user_id: str,
         relationship_id: str,
-        status: str | None,
-        stage: str | None,
-        long_term_goal: str | None,
-        current_goal: str | None,
-        notes: str | None,
+        status=UNSET,
+        stage=UNSET,
+        long_term_goal=UNSET,
+        current_goal=UNSET,
+        notes=UNSET,
     ) -> sqlite3.Row | None:
         existing = self.get(conn, user_id, relationship_id)
 
         if existing is None:
             return None
+
+        new_status = existing["status"] if status is UNSET or status is None else status
+        new_stage = existing["stage"] if stage is UNSET or stage is None else stage
+        new_long_term_goal = (
+            existing["long_term_goal"]
+            if long_term_goal is UNSET
+            else long_term_goal
+        )
+        new_current_goal = (
+            existing["current_goal"]
+            if current_goal is UNSET
+            else current_goal
+        )
+        new_notes = existing["notes"] if notes is UNSET else notes
 
         conn.execute(
             """
@@ -122,19 +138,11 @@ class RelationshipRepository:
               AND user_id = ?
             """,
             (
-                status if status is not None else existing["status"],
-                stage if stage is not None else existing["stage"],
-                (
-                    long_term_goal
-                    if long_term_goal is not None
-                    else existing["long_term_goal"]
-                ),
-                (
-                    current_goal
-                    if current_goal is not None
-                    else existing["current_goal"]
-                ),
-                notes if notes is not None else existing["notes"],
+                new_status,
+                new_stage,
+                new_long_term_goal,
+                new_current_goal,
+                new_notes,
                 utc_now(),
                 relationship_id,
                 user_id,
