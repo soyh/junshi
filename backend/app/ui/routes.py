@@ -43,6 +43,10 @@ from app.ui.relationship_evidence_workspace import (
     RELATIONSHIP_EVIDENCE_HTML,
     RELATIONSHIP_EVIDENCE_SCRIPT,
 )
+from app.ui.strategic_reply_workspace import (
+    STRATEGIC_REPLY_HTML,
+    STRATEGIC_REPLY_SCRIPT,
+)
 from app.ui.strategy_recommendation_workspace import (
     STRATEGY_RECOMMENDATION_HTML,
     STRATEGY_RECOMMENDATION_SCRIPT,
@@ -57,9 +61,9 @@ OLD_PRODUCT_NOTE = (
     "authenticated shell。Recommendation 及后续生命周期仍不伪造尚未完成的业务页面。"
 )
 NEW_PRODUCT_NOTE = (
-    "统一 authenticated shell 已覆盖核心资料管理、Conversation evidence、Strategy / "
-    "Recommendation 与 Action Plan → Decision → Execution → Outcome → Feedback → "
-    "Learning → Re-analysis 完整生命周期；对于未来或内部尚未产品化的能力，继续不伪造尚未完成的业务页面。"
+    "统一 authenticated shell 已覆盖核心资料管理、Conversation evidence、Structured Analysis、"
+    "Strategy / Recommendation、Strategic Reply 与 Action Plan → Decision → Execution → Outcome → "
+    "Feedback → Learning → Re-analysis 完整生命周期；对于未来或内部尚未产品化的能力，继续不伪造尚未完成的业务页面。"
 )
 
 OLD_PRODUCT_NAV = '''  <nav aria-label="Product sections">
@@ -78,6 +82,7 @@ NEW_PRODUCT_NAV = '''  <nav aria-label="Product sections">
     <a href="#relationship-evidence">Evidence</a>
     <a href="#analysis">Structured Analysis</a>
     <a href="#strategy-recommendation">Strategy</a>
+    <a href="#strategic-reply-workspace">Reply</a>
     <a href="#action-plan-workspace">Action Plan</a>
     <a href="#action-decision-workspace">Decision</a>
     <a href="#action-execution-workspace">Execution</a>
@@ -118,6 +123,7 @@ def build_product_shell_html() -> str:
         f"{CONVERSATION_CONTENT_HTML}\n"
         f"{RELATIONSHIP_EVIDENCE_HTML}\n"
         f"{STRATEGY_RECOMMENDATION_HTML}\n"
+        f"{STRATEGIC_REPLY_HTML}\n"
         f"{ACTION_PLAN_HTML}\n"
         f"{ACTION_DECISION_HTML}\n"
         f"{ACTION_EXECUTION_HTML}\n"
@@ -150,6 +156,7 @@ def build_product_shell_html() -> str:
         f"{ACTION_EXECUTION_SCRIPT}\n\n"
         f"{ACTION_DECISION_SCRIPT}\n\n"
         f"{ACTION_PLAN_SCRIPT}\n\n"
+        f"{STRATEGIC_REPLY_SCRIPT}\n\n"
         f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
         f"{script_marker}"
     )
