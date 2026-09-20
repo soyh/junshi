@@ -15,6 +15,24 @@ class MemoryPersistenceService:
         self.synthesis_service = synthesis_service or MemorySynthesisService()
         self.repository = repository or MemoryUpdateRepository()
 
+    def list_persisted(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+    ) -> list[dict]:
+        person = conn.execute(
+            "SELECT id FROM persons WHERE id = ? AND user_id = ?",
+            (person_id, user_id),
+        ).fetchone()
+        if person is None:
+            raise ValueError("person not found")
+
+        return [
+            self._serialize(row)
+            for row in self.repository.list_for_person(conn, user_id, person_id)
+        ]
+
     def persist_candidate(
         self,
         conn: sqlite3.Connection,
