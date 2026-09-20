@@ -118,6 +118,7 @@ def test_product_shell_exposes_strategic_reply_workspace(client):
         "strategic-reply-draft",
         "copy-strategic-reply",
         "restore-strategic-reply",
+        "prepare-strategic-reply-message",
         "strategic-reply-context",
         "strategic-reply-recommendations",
         "strategic-reply-constraints",
@@ -128,6 +129,7 @@ def test_product_shell_exposes_strategic_reply_workspace(client):
     assert 'href="#strategic-reply-workspace"' in html
     assert "/strategic-reply/context`" in html
     assert "Nothing was sent, saved as a message, confirmed, or executed." in html
+    assert "再单独点击 Add message" in html
 
 
 def test_strategic_reply_workspace_preserves_auth_and_safe_dom_boundary(client):
@@ -156,7 +158,7 @@ def test_strategic_reply_fragment_has_no_server_side_write_or_send(client):
     assert "/strategic-reply/context`" in script
 
 
-def test_strategic_reply_handoff_is_local_edit_and_explicit_copy_only(client):
+def test_strategic_reply_handoff_is_local_edit_and_explicit_copy(client):
     html = client.get("/app").text
     script = _strategic_reply_fragment(html)
 
@@ -173,11 +175,31 @@ def test_strategic_reply_handoff_is_local_edit_and_explicit_copy_only(client):
     assert "fetch(" not in copy_fragment
     assert "method:" not in copy_fragment
 
-    restore_end = script.index("const baseResetWorkspaceForStrategicReply", restore_start)
-    restore_fragment = script[restore_start:restore_end]
+    prepare_start = script.index("function prepareStrategicReplyMessageRecord()", restore_start)
+    restore_fragment = script[restore_start:prepare_start]
     assert "api(" not in restore_fragment
     assert "fetch(" not in restore_fragment
     assert "method:" not in restore_fragment
+
+
+def test_strategic_reply_prepares_existing_message_composer_without_persisting(client):
+    html = client.get("/app").text
+    script = _strategic_reply_fragment(html)
+
+    start = script.index("function prepareStrategicReplyMessageRecord()")
+    end = script.index("const baseResetWorkspaceForStrategicReply", start)
+    fragment = script[start:end]
+
+    assert "byId('message-sender').value = 'user';" in fragment
+    assert "byId('message-content').value = draft;" in fragment
+    assert "byId('message-sent-at').value = '';" in fragment
+    assert "then click Add message" in fragment
+    assert "Add message remains a separate explicit action" in fragment
+    assert "api(" not in fragment
+    assert "fetch(" not in fragment
+    assert "createMessage(" not in fragment
+    assert "method:" not in fragment
+    assert "bind('prepare-strategic-reply-message', prepareStrategicReplyMessageRecord" in script
 
 
 def test_conversation_and_person_change_only_reset_strategic_reply(client):
@@ -191,9 +213,11 @@ def test_conversation_and_person_change_only_reset_strategic_reply(client):
     assert "resetStrategicReply" in conversation_listener
     assert "loadStrategicReply()" not in conversation_listener
     assert "copyStrategicReply()" not in conversation_listener
+    assert "prepareStrategicReplyMessageRecord()" not in conversation_listener
     assert "resetStrategicReply" in person_listener
     assert "loadStrategicReply()" not in person_listener
     assert "copyStrategicReply()" not in person_listener
+    assert "prepareStrategicReplyMessageRecord()" not in person_listener
 
 
 def test_real_bearer_identity_flows_into_strategic_reply_route(client, monkeypatch):
