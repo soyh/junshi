@@ -1,7 +1,7 @@
 {
   "stage": "TEST-156",
   "name": "First User End-to-End Validation",
-  "status": "in_progress",
+  "status": "blocked",
   "baseline": {
     "branch": "test-155-strategic-reply-message-handoff",
     "post_verification_handover_head": "9fad72ca9ef6f1721d22c458a61d97619261b4d1",
@@ -27,14 +27,14 @@
     "sanitized_results_only": true
   },
   "phase_a": {
-    "status": "in_progress",
+    "status": "blocked_at_A06",
     "steps": {
       "A01_account_session": "passed",
       "A02_llm_provider": "passed",
       "A03_person_relationship_conversation": "passed",
       "A04_real_evidence_input": "passed",
       "A05_evidence_timeline": "passed",
-      "A06_structured_analysis": "retry_pending_after_local_ssh_tunnel_interruption",
+      "A06_structured_analysis": "blocked_internal_server_error",
       "A07_strategy_recommendation": "pending",
       "A08_strategic_reply": "pending",
       "A09_external_send": "pending",
@@ -57,7 +57,17 @@
       "B10_reanalysis": "pending"
     }
   },
-  "blocking_defects": [],
+  "blocking_defects": [
+    {
+      "id": "TEST-156-UAT-002",
+      "step": "A06",
+      "severity": "high",
+      "status": "investigating",
+      "summary": "After the local SSH tunnel was restored, Run structured analysis reached the backend but returned HTTP 500 Internal Server Error for the selected conversation.",
+      "data_corruption_reported": false,
+      "cross_user_contamination_reported": false
+    }
+  ],
   "usability_findings": [
     {
       "id": "TEST-156-UAT-001",
@@ -71,17 +81,16 @@
   ],
   "notes": [
     "A01 account registration/session flow passed after using a username that conforms to the existing canonical server validation contract.",
-    "A02 Load correctly returned no saved provider configuration for the newly authenticated user; this confirmed expected user-scoped behavior.",
     "A02 passed after the user explicitly saved an OpenAI-compatible provider configuration and the connection test succeeded.",
-    "The configured model identifier recorded for UAT is qwen3.8-flash; no API key or provider secret is recorded.",
     "A03 passed: the first user successfully created and selected a Person, a Relationship scoped to that Person, and a Conversation scoped to that Person.",
     "A04 passed: four real Message records were explicitly added to the selected Conversation and remained present after refresh.",
     "A05 passed: the first user confirmed the selected Person Timeline rendered the expected real evidence without reporting cross-person contamination or duplicate-on-refresh behavior.",
     "The user reported five displayed Timeline entries after four Message records. Timeline is a read-only aggregate of Conversation, Message, and Interaction evidence, so a non-Message aggregate entry is expected; if all five entries are Message sources, this should be investigated as a duplicate-evidence defect.",
-    "The first A06 attempt displayed Failed to fetch, but subsequent Windows diagnostics showed no local listener on 127.0.0.1:18080, curl connection refused, and no ssh process. This establishes that the local SSH tunnel had terminated; the first A06 result is therefore not evidence of a product failure.",
-    "A06 must be rerun after the SSH tunnel is restored and health succeeds through the tunnel.",
+    "The first A06 attempt displayed Failed to fetch because the local SSH tunnel had terminated; that attempt was classified as an environment interruption rather than a product failure.",
+    "After the tunnel was restored, A06 reached the backend and returned Internal Server Error. This is now a real blocking UAT defect pending traceback diagnosis.",
     "No username, password, API key, real name, relationship detail, private chat content, or conversation identifier is recorded in this UAT artifact.",
     "Real relationship and chat content must remain in the production database and must not be committed to GitHub.",
+    "Phase A is blocked until A06 is diagnosed and rerun successfully.",
     "Phase B is longitudinal and should use genuine real-world events rather than synthetic completion."
   ]
 }
