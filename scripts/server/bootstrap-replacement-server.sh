@@ -4,6 +4,7 @@ set -euo pipefail
 REPOSITORY="https://github.com/soyh/junshi.git"
 SOURCE_HEAD=""
 PROJECT="/opt/ai-love-strategist"
+PRODUCTION_PROJECT="/opt/ai-love-strategist"
 BUNDLE=""
 ENV_FILE=""
 APPLY=0
@@ -35,6 +36,9 @@ an encrypted recovery bundle. It never installs a production .env or restores DB
 
 --apply requires --env-file and is intended only for a replacement server that
 has no active ai-love-strategist.service.
+
+When production is already active, stage-only is allowed only with a different
+--project path. This supports a non-destructive bootstrap drill beside production.
 EOF
 }
 
@@ -86,8 +90,14 @@ if [ "$APPLY" -eq 1 ] && [ ! -f "$ENV_FILE" ]; then
     fail "production-env-required-for-apply"
 fi
 
+ACTIVE_RUNTIME=0
 if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE"; then
-    fail "target-has-active-production-runtime"
+    ACTIVE_RUNTIME=1
+fi
+if [ "$ACTIVE_RUNTIME" -eq 1 ]; then
+    if [ "$APPLY" -eq 1 ] || [ "$PROJECT" = "$PRODUCTION_PROJECT" ]; then
+        fail "target-has-active-production-runtime"
+    fi
 fi
 
 port8899_pid() {
