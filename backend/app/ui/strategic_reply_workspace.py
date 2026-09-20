@@ -6,10 +6,13 @@ STRATEGIC_REPLY_HTML = r'''
     <div class="workspace-grid">
       <section class="workspace-card" aria-labelledby="strategic-reply-heading">
         <h2 id="strategic-reply-heading">Reply Draft</h2>
-        <p class="note">切换 Person / Conversation 只会清空当前结果，不会自动调用 LLM/API。</p>
+        <p class="note">切换 Person / Conversation 只会清空当前结果，不会自动调用 LLM/API。生成后可在本地编辑草稿并显式复制；编辑内容不会自动保存到数据库，也不会发送给任何人。</p>
         <button id="load-strategic-reply" class="requires-auth" type="button" disabled>Generate reply draft</button>
         <div id="strategic-reply-status" class="status">Select a conversation first.</div>
-        <div id="strategic-reply-draft" class="status">No reply draft generated.</div>
+        <label for="strategic-reply-draft">Editable reply</label>
+        <textarea id="strategic-reply-draft" class="requires-auth" disabled></textarea>
+        <button id="copy-strategic-reply" class="requires-auth" type="button" disabled>Copy edited reply</button>
+        <button id="restore-strategic-reply" class="requires-auth" type="button" disabled>Restore generated draft</button>
       </section>
 
       <section class="workspace-card" aria-labelledby="strategic-reply-context-heading">
@@ -31,11 +34,12 @@ STRATEGIC_REPLY_SCRIPT = r'''
   const strategicReplyRecommendations = byId('strategic-reply-recommendations');
   const strategicReplyConstraints = byId('strategic-reply-constraints');
   const strategicReplyLearning = byId('strategic-reply-learning');
+  let generatedStrategicReplyDraft = '';
 
   function resetStrategicReply(message = 'Select a conversation first.') {
     strategicReplyStatus.textContent = message;
-    strategicReplyDraft.replaceChildren();
-    strategicReplyDraft.textContent = 'No reply draft generated.';
+    generatedStrategicReplyDraft = '';
+    strategicReplyDraft.value = '';
     strategicReplyContext.replaceChildren();
     strategicReplyContext.textContent = 'No strategic reply context loaded.';
     strategicReplyRecommendations.replaceChildren();
@@ -65,10 +69,8 @@ STRATEGIC_REPLY_SCRIPT = r'''
   }
 
   function renderStrategicReply(data) {
-    strategicReplyDraft.replaceChildren();
-    const draft = document.createElement('div');
-    draft.textContent = data && data.draft ? data.draft : '(no draft returned)';
-    strategicReplyDraft.appendChild(draft);
+    generatedStrategicReplyDraft = data && data.draft ? String(data.draft) : '';
+    strategicReplyDraft.value = generatedStrategicReplyDraft;
 
     strategicReplyContext.replaceChildren();
     const analysis = data && data.structured_analysis ? data.structured_analysis : {};
@@ -118,7 +120,23 @@ STRATEGIC_REPLY_SCRIPT = r'''
       `/api/v1/conversations/${encodeURIComponent(selectedConversationId)}/strategic-reply/context`
     );
     renderStrategicReply(data);
-    strategicReplyStatus.textContent = 'Reply draft generated. Nothing was sent, saved as a message, confirmed, or executed.';
+    strategicReplyStatus.textContent = 'Reply draft generated. Review or edit it before copying. Nothing was sent, saved as a message, confirmed, or executed.';
+  }
+
+  async function copyStrategicReply() {
+    const draft = strategicReplyDraft.value;
+    if (!draft.trim()) throw new Error('Generate or enter a reply draft before copying');
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+      throw new Error('Clipboard access is unavailable in this browser context; copy the editable draft manually.');
+    }
+    await navigator.clipboard.writeText(draft);
+    strategicReplyStatus.textContent = 'Edited reply copied to clipboard. It was not saved or sent.';
+  }
+
+  function restoreStrategicReply() {
+    if (!generatedStrategicReplyDraft) throw new Error('Generate a reply draft before restoring it');
+    strategicReplyDraft.value = generatedStrategicReplyDraft;
+    strategicReplyStatus.textContent = 'Generated draft restored locally. Nothing was saved or sent.';
   }
 
   const baseResetWorkspaceForStrategicReply = resetWorkspace;
@@ -128,6 +146,14 @@ STRATEGIC_REPLY_SCRIPT = r'''
   };
 
   bind('load-strategic-reply', loadStrategicReply, strategicReplyStatus);
+  bind('copy-strategic-reply', copyStrategicReply, strategicReplyStatus);
+  bind('restore-strategic-reply', restoreStrategicReply, strategicReplyStatus);
+
+  strategicReplyDraft.addEventListener('input', () => {
+    if (strategicReplyDraft.value !== generatedStrategicReplyDraft) {
+      strategicReplyStatus.textContent = 'Draft edited locally. Changes are not saved or sent.';
+    }
+  });
 
   byId('conversation-select').addEventListener('change', () => {
     resetStrategicReply(
