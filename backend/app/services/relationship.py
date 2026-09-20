@@ -1,5 +1,6 @@
 import sqlite3
 
+from app.core.sentinels import UNSET
 from app.domain.errors import (
     PersonNotFoundError,
     RelationshipAlreadyExistsError,
@@ -87,11 +88,11 @@ class RelationshipService:
         conn: sqlite3.Connection,
         user_id: str,
         relationship_id: str,
-        status: str | None,
-        stage: str | None,
-        long_term_goal: str | None,
-        current_goal: str | None,
-        notes: str | None,
+        status=UNSET,
+        stage=UNSET,
+        long_term_goal=UNSET,
+        current_goal=UNSET,
+        notes=UNSET,
     ) -> sqlite3.Row | None:
         return self.repository.update(
             conn,
