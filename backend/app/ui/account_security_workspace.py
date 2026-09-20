@@ -50,5 +50,12 @@ ACCOUNT_SECURITY_SCRIPT = r'''
     changePasswordStatus.textContent = `Password changed. New session expires at ${data.expires_at}.`;
   }
 
+  const baseClearSessionForAccountSecurity = clearSession;
+  clearSession = function(message = 'Not authenticated.') {
+    clearPasswordChangeFields();
+    changePasswordStatus.textContent = 'Login before changing password.';
+    baseClearSessionForAccountSecurity(message);
+  };
+
   bind('change-password', changeAccountPassword, changePasswordStatus);
 '''
