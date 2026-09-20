@@ -166,7 +166,7 @@ fi
 
 if [ ! -d "$PROJECT/.git" ]; then
     rm -rf "$PROJECT"
-    git clone --no-checkout "$REPOSITORY" "$PROJECT" >/dev/null
+    git clone "$REPOSITORY" "$PROJECT" >/dev/null
 fi
 
 cd "$PROJECT"
