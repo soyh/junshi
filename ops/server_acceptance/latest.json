@@ -1,60 +1,69 @@
 {
-  "stage": "TEST-153",
+  "stage": "TEST-154",
   "checkpoint": "production-server-acceptance",
   "status": "passed",
-  "recorded_at": "2026-09-20T09:00:13Z",
+  "recorded_at": "2026-09-20T09:13:12Z",
   "source": {
-    "branch": "test-153-strategic-reply-workspace",
-    "head": "aa190883bf259d19193ddaf522e897f635cc8355"
+    "branch": "test-154-strategic-reply-handoff",
+    "head": "b6a48cfcdebdaf755af078d3ab53b0437f68c551"
   },
   "github_ci": {
-    "run_id": 35500125382,
+    "run_id": 35501256285,
     "status": "success",
-    "focused": 34,
-    "authenticated_product_regression": 114,
-    "full": 883,
+    "focused": 35,
+    "authenticated_product_regression": 115,
+    "full": 884,
     "diff_check": "passed"
   },
   "server_tests": {
-    "focused": 34,
-    "authenticated_product_regression": 114,
-    "full": 883,
+    "focused": 35,
+    "authenticated_product_regression": 115,
+    "full": 884,
     "isolated_worktree": true
   },
   "runtime": {
-    "pid_before": 578548,
-    "pid_after": 581559,
+    "pid_before": 581559,
+    "pid_after": 583555,
     "live": "passed",
     "ready": "passed",
     "preflight": "passed",
-    "strategic_reply_ui_markers": "passed",
+    "strategic_reply_handoff_ui_markers": "passed",
     "backup_timer": "active",
     "watchdog_timer": "active"
   },
   "security": {
-    "port_8899_pid_before": 52822,
-    "port_8899_pid_after": 52822,
+    "port_8899_pid_before": "52822",
+    "port_8899_pid_after": "52822",
     "port_8899_untouched": true
   },
   "safety": {
     "database_restore_executed": false,
     "environment_data_migration_executed": false,
     "historical_migration_modified": false,
+    "new_database_schema_added": false,
+    "new_message_send_api_added": false,
     "automatic_message_send": false,
+    "automatic_message_persist": false,
     "automatic_action_plan_created": false,
     "automatic_decision_created": false,
-    "automatic_execution_started": false
+    "automatic_execution_started": false,
+    "browser_local_edit_only": true,
+    "clipboard_handoff_only": true
   },
-  "acceptance_script": {
-    "initial_live_marker_check_interrupted": true,
-    "interruption_reason": "shell pipeline false failure caused by grep -q early exit under set -o pipefail",
-    "corrected_marker_check": "grep here-string without pipeline"
+  "product": {
+    "strategic_reply_editable": true,
+    "explicit_copy_action": true,
+    "restore_generated_draft_action": true,
+    "copy_calls_server": false,
+    "restore_calls_server": false
   },
   "notes": [
-    "Strategic Reply is user-triggered only.",
-    "Conversation/person selection does not automatically invoke the LLM pipeline.",
-    "The workspace renders derived reply context and does not send or persist the draft as a Message.",
-    "No database restore or environment/data migration was executed.",
-    "The initial production acceptance interruption was in the acceptance shell pipeline, not the product implementation."
+    "Strategic Reply generation remains explicitly user-triggered.",
+    "Generated reply text becomes editable only in browser-local state.",
+    "Editing the draft does not persist a Message or mutate canonical evidence.",
+    "Copying uses the browser clipboard and performs no API write.",
+    "Restoring the generated draft is browser-local only.",
+    "No Action Plan, Decision, Execution, or Message is automatically created.",
+    "No database restore or environment/data migration was executed."
   ]
 }
