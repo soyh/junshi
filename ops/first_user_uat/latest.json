@@ -1,0 +1,67 @@
+{
+  "stage": "TEST-156",
+  "name": "First User End-to-End Validation",
+  "status": "in_progress",
+  "baseline": {
+    "branch": "test-155-strategic-reply-message-handoff",
+    "post_verification_handover_head": "9fad72ca9ef6f1721d22c458a61d97619261b4d1",
+    "server_acceptance_result_commit": "bcba19ea396eb44f4ff6dffc3358c9bb54dd4761",
+    "production_code_head": "a7423893d069ce87cf6c23f1360842b949b33b0a",
+    "github_ci_run": 35501840767,
+    "github_ci_counts": "36/116/885"
+  },
+  "production_policy": {
+    "keep_test155_runtime_during_initial_uat": true,
+    "feature_expansion_during_uat": false,
+    "database_restore": false,
+    "environment_data_migration": false,
+    "historical_migration_edit": false,
+    "port_8899_must_remain_untouched": true
+  },
+  "privacy": {
+    "raw_private_chat_in_github": false,
+    "real_names_in_github": false,
+    "api_keys_in_github": false,
+    "passwords_in_github": false,
+    "production_database_in_github": false,
+    "sanitized_results_only": true
+  },
+  "phase_a": {
+    "status": "pending",
+    "steps": {
+      "A01_account_session": "pending",
+      "A02_llm_provider": "pending",
+      "A03_person_relationship_conversation": "pending",
+      "A04_real_evidence_input": "pending",
+      "A05_evidence_timeline": "pending",
+      "A06_structured_analysis": "pending",
+      "A07_strategy_recommendation": "pending",
+      "A08_strategic_reply": "pending",
+      "A09_external_send": "pending",
+      "A10_message_handoff": "pending",
+      "A11_evidence_loop_closure": "pending"
+    }
+  },
+  "phase_b": {
+    "status": "pending_real_world_events",
+    "steps": {
+      "B01_incoming_response": "pending",
+      "B02_reanalysis_after_new_evidence": "pending",
+      "B03_action_plan": "pending",
+      "B04_action_decision": "pending",
+      "B05_action_execution": "pending",
+      "B06_outcome": "pending",
+      "B07_feedback": "pending",
+      "B08_learning": "pending",
+      "B09_persisted_learning_history": "pending",
+      "B10_reanalysis": "pending"
+    }
+  },
+  "blocking_defects": [],
+  "usability_findings": [],
+  "notes": [
+    "Real relationship and chat content must remain in the production database and must not be committed to GitHub.",
+    "Phase A is the immediate first-user usability gate.",
+    "Phase B is longitudinal and should use genuine real-world events rather than synthetic completion."
+  ]
+}
