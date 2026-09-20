@@ -1,59 +1,60 @@
 {
-  "checkpoint": "product-function-server-acceptance",
-  "diagnosis": {
-    "first_restart_failure": "managed backup timestamp collision in acceptance harness",
-    "product_code_failure": false
+  "stage": "TEST-153",
+  "checkpoint": "production-server-acceptance",
+  "status": "passed",
+  "recorded_at": "2026-09-20T09:00:13Z",
+  "source": {
+    "branch": "test-153-strategic-reply-workspace",
+    "head": "aa190883bf259d19193ddaf522e897f635cc8355"
   },
   "github_ci": {
-    "diff_check": true,
-    "focused_passed": 17,
-    "full_passed": 876,
-    "product_regression_passed": 134,
-    "run_id": 35496707431
+    "run_id": 35500125382,
+    "status": "success",
+    "focused": 34,
+    "authenticated_product_regression": 114,
+    "full": 883,
+    "diff_check": "passed"
   },
-  "notes": [
-    "TEST-152 prioritizes product functionality.",
-    "No environment/data migration was executed.",
-    "Initial restart failure was caused by the acceptance harness creating a normal managed backup immediately before systemd ExecStartPre created another second-granularity backup.",
-    "Retry used a uniquely named safety backup; production database restore was not executed."
-  ],
-  "product_features": {
-    "conversation_management": true,
-    "interaction_management": true,
-    "interaction_refresh_state_sync": true,
-    "message_explicit_delete": true,
-    "nullable_patch_clear_semantics": true,
-    "password_change": true,
-    "persisted_learning_history": true,
-    "person_management": true,
-    "relationship_management": true,
-    "selective_session_revocation": true
+  "server_tests": {
+    "focused": 34,
+    "authenticated_product_regression": 114,
+    "full": 883,
+    "isolated_worktree": true
   },
   "runtime": {
-    "backup_timer_active": true,
-    "pid_after": 578548,
-    "watchdog_timer_active": true
+    "pid_before": 578548,
+    "pid_after": 581559,
+    "live": "passed",
+    "ready": "passed",
+    "preflight": "passed",
+    "strategic_reply_ui_markers": "passed",
+    "backup_timer": "active",
+    "watchdog_timer": "active"
+  },
+  "security": {
+    "port_8899_pid_before": 52822,
+    "port_8899_pid_after": 52822,
+    "port_8899_untouched": true
   },
   "safety": {
     "database_restore_executed": false,
     "environment_data_migration_executed": false,
     "historical_migration_modified": false,
-    "port_8899_pid_after": 52822,
-    "unique_managed_backup_created": true
+    "automatic_message_send": false,
+    "automatic_action_plan_created": false,
+    "automatic_decision_created": false,
+    "automatic_execution_started": false
   },
-  "schema_version": 1,
-  "server_validation": {
-    "focused_passed": 17,
-    "full_passed": 876,
-    "isolated_test_database": true,
-    "live_ok": true,
-    "live_product_ui_verified": true,
-    "preflight_ok": true,
-    "product_regression_passed": 134,
-    "ready_ok": true
+  "acceptance_script": {
+    "initial_live_marker_check_interrupted": true,
+    "interruption_reason": "shell pipeline false failure caused by grep -q early exit under set -o pipefail",
+    "corrected_marker_check": "grep here-string without pipeline"
   },
-  "source_branch": "test-152-product-management-completeness",
-  "source_head": "bfab1ee55f91b0574c392d1fe08d5b16af458386",
-  "stage": "TEST-152",
-  "status": "passed"
+  "notes": [
+    "Strategic Reply is user-triggered only.",
+    "Conversation/person selection does not automatically invoke the LLM pipeline.",
+    "The workspace renders derived reply context and does not send or persist the draft as a Message.",
+    "No database restore or environment/data migration was executed.",
+    "The initial production acceptance interruption was in the acceptance shell pipeline, not the product implementation."
+  ]
 }
