@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
+from app.core.sentinels import UNSET
 from app.schemas.person import (
     PersonCreate,
     PersonResponse,
@@ -77,9 +78,15 @@ def update_person(
             conn,
             user_id,
             person_id,
-            payload.name,
-            payload.nickname,
-            payload.notes,
+            payload.name
+            if "name" in payload.model_fields_set
+            else UNSET,
+            payload.nickname
+            if "nickname" in payload.model_fields_set
+            else UNSET,
+            payload.notes
+            if "notes" in payload.model_fields_set
+            else UNSET,
         )
 
     if person is None:
