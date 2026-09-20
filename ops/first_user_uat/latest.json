@@ -27,7 +27,7 @@
     "sanitized_results_only": true
   },
   "phase_a": {
-    "status": "in_progress_at_A09",
+    "status": "in_progress_at_A10",
     "steps": {
       "A01_account_session": "passed",
       "A02_llm_provider": "passed",
@@ -37,7 +37,7 @@
       "A06_structured_analysis": "passed",
       "A07_strategy_recommendation": "passed",
       "A08_strategic_reply": "passed",
-      "A09_external_send": "pending",
+      "A09_external_send": "passed",
       "A10_message_handoff": "pending",
       "A11_evidence_loop_closure": "pending"
     }
@@ -159,7 +159,8 @@
     "a08_database_restore_executed": false,
     "a08_server_pytest_executed": false,
     "a08_fix": "deployed_first_user_rerun_passed",
-    "a08_rerun": "passed"
+    "a08_rerun": "passed",
+    "a09_external_send": "passed"
   },
   "usability_findings": [
     {
@@ -196,9 +197,10 @@
     "Final A08 CI run 35518833345 passed 70 focused Strategic Reply tests, 170 authentication/product regression tests, and 895 full-suite tests. The temporary A08 workflow was removed afterward.",
     "The CI-verified A08 repair was deployed to production at code head 39e7f6d2196c0dce50601f63118f4440a6521ec2. The service returned active with runtime PID 593821, a pre-deploy SQLite backup was created, no database restore or server pytest was executed, and protected port 8899 remained PID 52822.",
     "A08 passed on the first-user production rerun: supporting recommendations were non-empty, Editable Reply contained a generated draft, and local edit, restore, and copy interactions all passed without reporting automatic send or persistence.",
+    "A09 passed: the first user explicitly sent the selected Strategic Reply through the real external communication channel. The application did not perform or simulate the send, and no external message content is recorded in this UAT artifact.",
     "No username, password, API key, real name, relationship detail, private chat content, conversation identifier, evidence identifier, model-generated private analysis text, strategy text, recommendation text, or reply text is recorded in this UAT artifact.",
     "Real relationship and chat content remains in the production database and is not committed to GitHub.",
-    "Phase A now proceeds to A09 external send. A09 is a real-world user action and must not be simulated by the application or UAT tooling.",
+    "Phase A now proceeds to A10 explicit Strategic Reply Message handoff into the canonical Message composer.",
     "Phase B is longitudinal and should use genuine real-world events rather than synthetic completion."
   ]
 }
