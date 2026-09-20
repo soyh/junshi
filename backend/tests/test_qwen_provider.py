@@ -67,6 +67,24 @@ def make_client(
     return httpx.Client(transport=httpx.MockTransport(handler))
 
 
+def make_reply_client(content, *, model="qwen3.8-flash"):
+    def handler(request):
+        assert request.url.path == "/compatible-mode/v1/chat/completions"
+        payload = json.loads(request.content)
+        assert payload["model"] == model
+        assert payload["response_format"] == {"type": "json_object"}
+        assert payload["enable_thinking"] is False
+        assert "recommendation_ids" in payload["messages"][0]["content"]
+        assert "evidence_source_ids" in payload["messages"][0]["content"]
+        assert "recommendations" in payload["messages"][1]["content"]
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": content}}]},
+        )
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
 def test_qwen_provider_returns_structured_result():
     provider = QwenProvider(
         api_key="test-key",
@@ -95,6 +113,34 @@ def test_qwen38_structured_analysis_disables_thinking():
     result = provider.analyze({"messages": [], "unknowns": []})
 
     assert result == valid_result()
+
+
+def test_qwen38_strategic_reply_is_json_and_disables_thinking():
+    expected = {
+        "recommendation_ids": ["recommendation-1"],
+        "reply": "What are you up to?",
+        "evidence_source_ids": ["message-1"],
+    }
+    provider = QwenProvider(
+        api_key="test-key",
+        base_url="https://example.test/compatible-mode/v1",
+        model="qwen3.8-flash",
+        client=make_reply_client(json.dumps(expected)),
+    )
+
+    result = provider.generate_strategic_reply(
+        {
+            "recommendations": [
+                {
+                    "id": "recommendation-1",
+                    "evidence_source_ids": ["message-1"],
+                }
+            ],
+            "evidence": [{"source_id": "message-1"}],
+        }
+    )
+
+    assert result == expected
 
 
 def test_qwen_provider_requires_api_key():
