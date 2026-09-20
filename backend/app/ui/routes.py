@@ -56,6 +56,10 @@ from app.ui.strategy_recommendation_workspace import (
     STRATEGY_RECOMMENDATION_HTML,
     STRATEGY_RECOMMENDATION_SCRIPT,
 )
+from app.ui.visual_theme_workspace import (
+    VISUAL_THEME_SCRIPT,
+    VISUAL_THEME_STYLE,
+)
 
 
 router = APIRouter(tags=["ui"])
@@ -131,7 +135,7 @@ def build_product_shell_html() -> str:
         1,
     ).replace(
         style_marker,
-        f"{GUIDED_WORKFLOW_STYLE}\n{style_marker}",
+        f"{GUIDED_WORKFLOW_STYLE}\n{VISUAL_THEME_STYLE}\n{style_marker}",
         1,
     )
 
@@ -158,12 +162,13 @@ def build_product_shell_html() -> str:
         1,
     )
 
-    # The guided composition layer runs before lifecycle fragments so legacy
-    # fragment-boundary tests keep their exact safety scope. Function
-    # declarations used by guided handlers are hoisted inside this same IIFE;
-    # handlers execute only after initialization and explicit user clicks.
+    # Guided composition and visual enhancement both run before lifecycle
+    # fragments so legacy fragment-boundary tests retain their exact safety
+    # scope. The visual layer only rearranges/render-controls browser-side and
+    # never performs API writes or bypasses explicit user confirmation.
     workspace_script = (
         f"{GUIDED_WORKFLOW_SCRIPT}\n\n"
+        f"{VISUAL_THEME_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
         f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
