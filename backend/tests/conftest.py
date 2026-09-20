@@ -1,16 +1,15 @@
 import atexit
 import os
 import shutil
-import sqlite3
 import tempfile
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-# Production hosts use an absolute default DATABASE_PATH under /opt.  Pytest may
+# Production hosts use an absolute default DATABASE_PATH under /opt. Pytest may
 # collect or execute tests that do not request the client fixture, so relying on
-# per-test monkeypatching alone is not a sufficient safety boundary.  Install a
+# per-test monkeypatching alone is not a sufficient safety boundary. Install a
 # process-wide disposable default before importing any application modules.
 # Individual tests remain free to monkeypatch DATABASE_PATH to their own tmp_path.
 _TEST_PROCESS_ROOT = Path(tempfile.mkdtemp(prefix="ai-love-strategist-pytest-"))
