@@ -27,9 +27,9 @@
     "sanitized_results_only": true
   },
   "phase_a": {
-    "status": "pending",
+    "status": "in_progress",
     "steps": {
-      "A01_account_session": "pending",
+      "A01_account_session": "passed",
       "A02_llm_provider": "pending",
       "A03_person_relationship_conversation": "pending",
       "A04_real_evidence_input": "pending",
@@ -58,8 +58,20 @@
     }
   },
   "blocking_defects": [],
-  "usability_findings": [],
+  "usability_findings": [
+    {
+      "id": "TEST-156-UAT-001",
+      "step": "A01",
+      "severity": "medium",
+      "status": "open_non_blocking",
+      "summary": "Registration UI does not expose username/password validation rules and reduces structured HTTP 422 validation details to a generic HTTP 422 message.",
+      "data_corruption": false,
+      "security_failure": false
+    }
+  ],
   "notes": [
+    "A01 account registration/session flow passed after using a username that conforms to the existing canonical server validation contract.",
+    "No username, password, API key, real name, or private chat content is recorded in this UAT artifact.",
     "Real relationship and chat content must remain in the production database and must not be committed to GitHub.",
     "Phase A is the immediate first-user usability gate.",
     "Phase B is longitudinal and should use genuine real-world events rather than synthetic completion."
