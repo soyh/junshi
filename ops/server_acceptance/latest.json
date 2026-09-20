@@ -1,33 +1,34 @@
 {
-  "stage": "TEST-154",
+  "stage": "TEST-155",
   "checkpoint": "production-server-acceptance",
   "status": "passed",
-  "recorded_at": "2026-09-20T09:13:12Z",
+  "recorded_at": "2026-09-20T09:59:12Z",
   "source": {
-    "branch": "test-154-strategic-reply-handoff",
-    "head": "b6a48cfcdebdaf755af078d3ab53b0437f68c551"
+    "branch": "test-155-strategic-reply-message-handoff",
+    "code_head": "a7423893d069ce87cf6c23f1360842b949b33b0a",
+    "post_verification_handover_head": "9fad72ca9ef6f1721d22c458a61d97619261b4d1"
   },
   "github_ci": {
-    "run_id": 35501256285,
+    "run_id": 35501840767,
     "status": "success",
-    "focused": 35,
-    "authenticated_product_regression": 115,
-    "full": 884,
+    "focused": 36,
+    "authenticated_product_regression": 116,
+    "full": 885,
     "diff_check": "passed"
   },
   "server_tests": {
-    "focused": 35,
-    "authenticated_product_regression": 115,
-    "full": 884,
+    "focused": 36,
+    "authenticated_product_regression": 116,
+    "full": 885,
     "isolated_worktree": true
   },
   "runtime": {
-    "pid_before": 581559,
-    "pid_after": 583555,
+    "pid_before": 583555,
+    "pid_after": 585381,
     "live": "passed",
     "ready": "passed",
     "preflight": "passed",
-    "strategic_reply_handoff_ui_markers": "passed",
+    "strategic_reply_message_handoff_ui_markers": "passed",
     "backup_timer": "active",
     "watchdog_timer": "active"
   },
@@ -41,29 +42,37 @@
     "environment_data_migration_executed": false,
     "historical_migration_modified": false,
     "new_database_schema_added": false,
-    "new_message_send_api_added": false,
+    "new_message_api_added": false,
     "automatic_message_send": false,
     "automatic_message_persist": false,
     "automatic_action_plan_created": false,
     "automatic_decision_created": false,
     "automatic_execution_started": false,
-    "browser_local_edit_only": true,
-    "clipboard_handoff_only": true
+    "automatic_reanalysis_started": false
   },
   "product": {
     "strategic_reply_editable": true,
     "explicit_copy_action": true,
-    "restore_generated_draft_action": true,
-    "copy_calls_server": false,
-    "restore_calls_server": false
+    "message_composer_handoff": true,
+    "handoff_calls_server": false,
+    "handoff_persists_message": false,
+    "message_add_remains_separate_explicit_action": true,
+    "prepared_sender_type": "user",
+    "sent_at_requires_user_review": true
+  },
+  "handover": {
+    "canonical_file_updated": true,
+    "recorded_test_153": true,
+    "recorded_test_154": true,
+    "recorded_test_155": true
   },
   "notes": [
     "Strategic Reply generation remains explicitly user-triggered.",
-    "Generated reply text becomes editable only in browser-local state.",
-    "Editing the draft does not persist a Message or mutate canonical evidence.",
-    "Copying uses the browser clipboard and performs no API write.",
-    "Restoring the generated draft is browser-local only.",
-    "No Action Plan, Decision, Execution, or Message is automatically created.",
-    "No database restore or environment/data migration was executed."
+    "Prepare sent-message record only populates the existing browser Message composer.",
+    "The handoff performs no Message POST and does not persist canonical evidence.",
+    "The user must verify the externally sent text and Sent at before explicitly adding the Message.",
+    "Generated or unsent draft text is not automatically converted into evidence.",
+    "No database restore or environment/data migration was executed.",
+    "The original TEST-155 acceptance run stopped only because git diff --check detected an extra blank line at EOF in DEVELOPMENT_HANDOVER.md; product deployment and runtime acceptance had already passed."
   ]
 }
