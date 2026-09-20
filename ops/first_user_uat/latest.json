@@ -27,7 +27,7 @@
     "sanitized_results_only": true
   },
   "phase_a": {
-    "status": "in_progress_at_A07",
+    "status": "in_progress_at_A08",
     "steps": {
       "A01_account_session": "passed",
       "A02_llm_provider": "passed",
@@ -35,7 +35,7 @@
       "A04_real_evidence_input": "passed",
       "A05_evidence_timeline": "passed",
       "A06_structured_analysis": "passed",
-      "A07_strategy_recommendation": "pending",
+      "A07_strategy_recommendation": "passed",
       "A08_strategic_reply": "pending",
       "A09_external_send": "pending",
       "A10_message_handoff": "pending",
@@ -158,9 +158,10 @@
     "Qwen3.8 fix CI run 35517192052 passed 54 focused provider/analysis tests, 170 auth regression tests, and 889 full-suite tests. Its temporary workflow was removed afterward.",
     "The CI-verified Qwen3.8 fix was deployed to production at code head c305428906c2f6b894282810f64dacd961f23ac9. The service returned active with runtime PID 593044, a verified pre-deploy SQLite backup was created, and protected port 8899 remained PID 52822.",
     "A06 passed after the production Qwen3.8 non-thinking fix. The first user received a complete StructuredAnalysis response and no cross-user or cross-conversation contamination was reported.",
-    "No username, password, API key, real name, relationship detail, private chat content, conversation identifier, evidence identifier, or model-generated private analysis text is recorded in this UAT artifact.",
+    "A07 passed: the first user loaded Strategy Context and evidence-backed Recommendation output for the selected conversation without reporting automatic selection, execution, or cross-scope contamination.",
+    "No username, password, API key, real name, relationship detail, private chat content, conversation identifier, evidence identifier, model-generated private analysis text, strategy text, or recommendation text is recorded in this UAT artifact.",
     "Real relationship and chat content remains in the production database and is not committed to GitHub.",
-    "Phase A now proceeds to A07 Strategy / Recommendation.",
+    "Phase A now proceeds to A08 Strategic Reply.",
     "Phase B is longitudinal and should use genuine real-world events rather than synthetic completion."
   ]
 }
