@@ -22,6 +22,24 @@ class MemoryUpdateRepository:
         ).fetchone()
 
     @staticmethod
+    def list_for_person(
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+    ):
+        return conn.execute(
+            """
+            SELECT id, user_id, person_id, source_candidate_id,
+                   source_decision_id, source_outcome_id, category,
+                   memory_json, created_at
+            FROM memory_updates
+            WHERE user_id = ? AND person_id = ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            (user_id, person_id),
+        ).fetchall()
+
+    @staticmethod
     def create(
         conn: sqlite3.Connection,
         memory_id: str,
