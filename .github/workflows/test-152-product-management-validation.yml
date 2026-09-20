@@ -22,12 +22,16 @@ jobs:
         run: python -m pip install -r backend/requirements.txt
       - name: TEST-152 focused product management
         working-directory: backend
-        run: python -m pytest -q tests/test_authenticated_product_management_workspace.py
+        run: |
+          python -m pytest -q \
+            tests/test_authenticated_product_management_workspace.py \
+            tests/test_authenticated_account_security_workspace.py
       - name: Authenticated product and CRUD regression
         working-directory: backend
         run: |
           python -m pytest -q \
             tests/test_authenticated_product_management_workspace.py \
+            tests/test_authenticated_account_security_workspace.py \
             tests/test_authenticated_core_workspace.py \
             tests/test_authenticated_conversation_content_workspace.py \
             tests/test_authenticated_relationship_evidence_workspace.py \
