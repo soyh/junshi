@@ -14,12 +14,14 @@ def test_product_shell_exposes_compact_user_presentation(client):
         "userPresentationObserver",
         "user-system-message",
         "user-system-copy",
+        "userDrawerSelectors",
     ):
         assert marker in html
 
 
 def test_long_content_drawer_uses_click_expand_and_double_click_collapse():
     assert "const userLongContentThreshold = 260" in USER_PRESENTATION_SCRIPT
+    assert "const userLongListRowThreshold = 4" in USER_PRESENTATION_SCRIPT
     assert "node.addEventListener('click'" in USER_PRESENTATION_SCRIPT
     assert "node.classList.add('is-expanded')" in USER_PRESENTATION_SCRIPT
     assert "node.addEventListener('dblclick'" in USER_PRESENTATION_SCRIPT
@@ -27,6 +29,59 @@ def test_long_content_drawer_uses_click_expand_and_double_click_collapse():
     assert "node.dataset.drawerLabel = '点击展开'" in USER_PRESENTATION_SCRIPT
     assert "node.dataset.drawerLabel = '双击收起'" in USER_PRESENTATION_SCRIPT
     assert "aria-expanded" in USER_PRESENTATION_SCRIPT
+
+
+def test_comprehensive_drawers_cover_long_user_result_windows(client):
+    html = client.get("/app").text
+
+    expected_targets = (
+        "manage-message-detail",
+        "message-list",
+        "interaction-list",
+        "timeline-list",
+        "analysis-result",
+        "strategy-context-summary",
+        "strategy-candidate-list",
+        "recommendation-list",
+        "strategic-reply-context",
+        "strategic-reply-recommendations",
+        "generated-action-plan-summary",
+        "generated-action-plan-list",
+        "saved-action-plan-list",
+        "action-decision-history",
+        "action-execution-decisions",
+        "action-outcome-history",
+        "action-feedback-items",
+        "action-feedback-trend",
+        "action-learning-history",
+        "action-reanalysis-learning",
+        "action-reanalysis-analysis",
+        "action-reanalysis-recommendations",
+    )
+
+    for target in expected_targets:
+        assert f'id="{target}"' in html
+        assert f"'#{target}'" in USER_PRESENTATION_SCRIPT
+
+
+def test_drawer_observer_handles_textcontent_replacement_and_list_growth():
+    # textContent assignment commonly arrives as a childList mutation whose
+    # added node is a Text node. TEST-160 missed that path for message detail.
+    assert "node.nodeType === Node.TEXT_NODE && node.parentElement" in USER_PRESENTATION_SCRIPT
+    assert "userEnhanceVisibleContent(node.parentElement)" in USER_PRESENTATION_SCRIPT
+    assert "const targetElement = mutation.target instanceof Element" in USER_PRESENTATION_SCRIPT
+
+    # A window with many short records must also collapse even if no individual
+    # message exceeds the character threshold.
+    assert "const rowCount = node.querySelectorAll(':scope > .session-row').length" in USER_PRESENTATION_SCRIPT
+    assert "forceWindow && rowCount > userLongListRowThreshold" in USER_PRESENTATION_SCRIPT
+
+
+def test_drawer_rechecks_when_dynamic_content_changes():
+    assert "node.dataset.userDrawerContentKey" in USER_PRESENTATION_SCRIPT
+    assert "const contentChanged" in USER_PRESENTATION_SCRIPT
+    assert "if (contentChanged || !node.hasAttribute('aria-expanded'))" in USER_PRESENTATION_SCRIPT
+    assert "userSetDrawerExpanded(node, false)" in USER_PRESENTATION_SCRIPT
 
 
 def test_compact_layout_prevents_large_grid_whitespace():
@@ -38,6 +93,7 @@ def test_compact_layout_prevents_large_grid_whitespace():
     assert "repeat(auto-fit, minmax(340px, 1fr))" in USER_PRESENTATION_STYLE
     assert ".status {" in USER_PRESENTATION_STYLE
     assert "min-height: 0 !important" in USER_PRESENTATION_STYLE
+    assert ".user-drawer-window.user-long-content:not(.is-expanded)" in USER_PRESENTATION_STYLE
 
 
 def test_user_presentation_hides_system_facing_metadata_without_deleting_data():
