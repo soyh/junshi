@@ -105,6 +105,9 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     byId('message-sent-at').value = '';
     await loadMessages();
     messagesStatus.textContent = `Added ${created.sender_type} message at ${created.sent_at}.`;
+    window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
+      detail: { source: '新消息', conversation_id: selectedConversationId },
+    }));
   }
 
   async function importTextConversation() {
@@ -130,6 +133,9 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     await loadMessages();
     conversationStatus.textContent = `Imported and selected conversation ${data.conversation_id}.`;
     textImportStatus.textContent = `已导入 ${data.imported_count} 条消息到新会话，并按 sent_at 自动整理为时间顺序。`;
+    window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
+      detail: { source: '批量导入', conversation_id: selectedConversationId },
+    }));
   }
 
   const baseResetWorkspace = resetWorkspace;
