@@ -1,51 +1,71 @@
 LIFECYCLE_V2_STYLE = r'''
-    /* TEST-163: compact settings + horizontal daily lifecycle presentation. */
+    /* TEST-164: vertical daily workflow + horizontal settings tabs. */
     body > header {
       display: none !important;
     }
 
-    body {
-      max-width: 1560px !important;
+    #guided-settings {
+      grid-column: 1 / -1;
+      width: 100%;
+      box-sizing: border-box;
     }
 
-    #guided-settings[open] { width: min(1120px, 100%); }
+    #guided-settings[open] { width: 100%; }
 
     #guided-settings-content {
       display: grid !important;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
-      gap: 10px !important;
+      grid-template-columns: repeat(4, minmax(150px, 1fr)) !important;
+      grid-auto-rows: auto;
+      gap: 8px 10px !important;
       align-items: start !important;
       max-height: min(72vh, 760px);
       overflow-y: auto;
-      overflow-x: hidden;
+      overflow-x: auto;
       padding: 10px 4px 6px 0;
       scrollbar-gutter: stable;
     }
 
     #guided-settings-content > .lifecycle-settings-panel {
-      min-width: 0;
-      margin: 0 !important;
-      border: 1px solid rgba(25, 167, 232, .20);
-      border-radius: 14px;
-      background: rgba(255,255,255,.68);
-      overflow: hidden;
+      display: contents;
     }
 
     #guided-settings-content > .lifecycle-settings-panel > summary {
+      grid-row: 1;
+      min-width: 0;
       cursor: pointer;
       padding: 10px 12px;
+      border: 1px solid rgba(25, 167, 232, .20);
+      border-radius: 12px;
       font-weight: 700;
       color: var(--sky-800, #075985);
       background: rgba(226, 246, 255, .72);
       user-select: none;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #guided-settings-content > .lifecycle-settings-panel[open] > summary {
+      color: #fff;
+      background: linear-gradient(135deg, var(--sky-500, #19a7e8), var(--sky-700, #0877b9));
+      border-color: transparent;
+      box-shadow: 0 8px 22px rgba(25, 167, 232, .18);
     }
 
     #guided-settings-content > .lifecycle-settings-panel > fieldset {
-      border: 0 !important;
-      border-top: 1px solid rgba(25, 167, 232, .14) !important;
-      border-radius: 0 !important;
-      padding: 10px 12px 12px !important;
+      grid-column: 1 / -1;
+      grid-row: 2;
+      min-width: 0;
+      max-height: min(58vh, 620px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-gutter: stable;
+      border: 1px solid rgba(25, 167, 232, .16) !important;
+      border-radius: 12px !important;
+      padding: 12px 14px 14px !important;
       margin: 0 !important;
+      background: rgba(255,255,255,.72);
     }
 
     #guided-settings-content > .lifecycle-settings-panel > fieldset > legend { display: none; }
@@ -95,72 +115,9 @@ LIFECYCLE_V2_STYLE = r'''
     .lifecycle-inline-section { margin-top: 12px; }
     .lifecycle-hidden-step { display: none !important; }
 
-    /* TEST-163: the four normal-use stages sit next to each other on desktop. */
-    #guided-workflow {
-      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-      gap: 14px !important;
-      align-items: start;
-    }
-
-    #guided-workflow > .guided-hero,
-    #guided-workflow > .guided-step-nav {
-      grid-column: 1 / -1;
-    }
-
-    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) {
-      min-width: 0;
-      max-height: calc(100vh - 245px);
-      overflow-y: auto;
-      overflow-x: hidden;
-      overscroll-behavior: contain;
-      scrollbar-gutter: stable;
-      padding: 14px;
-    }
-
-    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) .workspace-grid {
-      grid-template-columns: 1fr !important;
-    }
-
-    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) .workspace-card,
-    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) fieldset {
-      min-width: 0;
-      max-width: none !important;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) .guided-step-header {
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-
-    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) .guided-step-header h2 {
-      font-size: 1.05rem;
-    }
-
-    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) .guided-step-header p {
-      font-size: .88rem;
-      line-height: 1.45;
-    }
-
-    @media (max-width: 1399px) {
-      #guided-workflow {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-      }
-    }
-
-    @media (max-width: 820px) {
-      body {
-        max-width: 100% !important;
-      }
-
-      #guided-workflow {
-        grid-template-columns: 1fr !important;
-      }
-
-      #guided-workflow > .guided-step:not(.lifecycle-hidden-step) {
-        max-height: none;
-        overflow-y: visible;
+    @media (max-width: 760px) {
+      #guided-settings-content {
+        min-width: 660px;
       }
     }
 '''
@@ -199,6 +156,18 @@ LIFECYCLE_V2_SCRIPT = r'''
       details.appendChild(summary);
       child.parentNode.insertBefore(details, child);
       details.appendChild(child);
+    });
+
+    const panels = Array.from(settings.querySelectorAll(':scope > .lifecycle-settings-panel'));
+    const initiallyOpen = panels.filter((panel) => panel.open);
+    initiallyOpen.slice(1).forEach((panel) => { panel.open = false; });
+    panels.forEach((panel) => {
+      panel.addEventListener('toggle', () => {
+        if (!panel.open) return;
+        panels.forEach((other) => {
+          if (other !== panel) other.open = false;
+        });
+      });
     });
   }
 
