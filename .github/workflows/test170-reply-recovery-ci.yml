@@ -1,0 +1,50 @@
+name: TEST-170 Reply Recovery CI
+
+on:
+  push:
+    branches:
+      - test-170-reply-generation-recovery
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check recovery JavaScript syntax
+        run: |
+          python - <<'PY'
+          from app.ui.card_client_generation_recovery import CARD_CLIENT_GENERATION_RECOVERY_SCRIPT
+          with open('/tmp/test170-recovery.js', 'w', encoding='utf-8') as fh:
+              fh.write('(() => {\n')
+              fh.write(CARD_CLIENT_GENERATION_RECOVERY_SCRIPT)
+              fh.write('\n})();\n')
+          PY
+          node --check /tmp/test170-recovery.js
+
+      - name: Focused reply recovery
+        run: pytest -q tests/test_authenticated_reply_generation_recovery.py tests/test_authenticated_strategic_reply_workspace.py tests/test_analysis_strategic_reply.py tests/test_qwen_provider.py
+
+      - name: Customer UI regression
+        run: pytest -q tests/test_authenticated_card_client_*.py tests/test_authenticated_unified_conversation_import.py tests/test_authenticated_conversation_content_workspace.py
+
+      - name: Authenticated UI regression
+        run: pytest -q tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
