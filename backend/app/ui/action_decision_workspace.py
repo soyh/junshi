@@ -196,6 +196,9 @@ ACTION_DECISION_SCRIPT = r'''
     byId('action-decision-note').value = '';
     await loadActionDecisionContext();
     actionDecisionStatus.textContent = `Recorded ${created.decision} Action Decision ${created.id}. No execution was started.`;
+    window.dispatchEvent(new CustomEvent('junshi:decision-recorded', {
+      detail: { decision: created.decision, decision_id: created.id },
+    }));
   }
 
   const baseResetWorkspaceForActionDecision = resetWorkspace;
