@@ -30,6 +30,10 @@ from app.ui.action_reanalysis_workspace import (
     ACTION_REANALYSIS_HTML,
     ACTION_REANALYSIS_SCRIPT,
 )
+from app.ui.card_client_experience import (
+    CARD_CLIENT_EXPERIENCE_SCRIPT,
+    CARD_CLIENT_EXPERIENCE_STYLE,
+)
 from app.ui.conversation_content_workspace import (
     CONVERSATION_CONTENT_HTML,
     CONVERSATION_CONTENT_SCRIPT,
@@ -153,6 +157,7 @@ def build_product_shell_html() -> str:
             f"{USER_PRESENTATION_STYLE}\n"
             f"{LIFECYCLE_V2_STYLE}\n"
             f"{CONVERSATION_SESSION_STYLE}\n"
+            f"{CARD_CLIENT_EXPERIENCE_STYLE}\n"
             f"{style_marker}"
         ),
         1,
@@ -203,6 +208,7 @@ def build_product_shell_html() -> str:
         f"{ACTION_PLAN_SCRIPT}\n\n"
         f"{STRATEGIC_REPLY_SCRIPT}\n\n"
         f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
+        f"{CARD_CLIENT_EXPERIENCE_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
