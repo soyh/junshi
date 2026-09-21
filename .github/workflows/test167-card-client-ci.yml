@@ -38,7 +38,7 @@ jobs:
           node --check /tmp/test167-card-client.js
 
       - name: Focused card client experience
-        run: pytest -q tests/test_authenticated_card_client_experience.py tests/test_authenticated_visual_theme.py tests/test_authenticated_user_presentation.py
+        run: pytest -q tests/test_authenticated_card_client_experience.py tests/test_authenticated_visual_theme_workspace.py tests/test_authenticated_user_presentation_workspace.py
 
       - name: Lifecycle and conversation regression
         run: pytest -q tests/test_authenticated_guided_workflow_workspace.py tests/test_authenticated_lifecycle_v2_workspace.py tests/test_authenticated_conversation_content_workspace.py tests/test_text_import.py tests/test_text_import_auto_order.py tests/test_text_import_contract.py
