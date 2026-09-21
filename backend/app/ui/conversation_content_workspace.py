@@ -26,7 +26,7 @@ CONVERSATION_CONTENT_HTML = r'''
 
       <section class="workspace-card" aria-labelledby="text-import-heading">
         <h2 id="text-import-heading">Text Import</h2>
-        <p class="note">格式：ISO-8601 timestamp | sender_type | content。允许 sender_type：user / person / system / assistant。Import 会创建新 Conversation，不会向当前 Conversation 偷偷追加。</p>
+        <p class="note">格式：ISO-8601 timestamp | sender_type | content。允许 sender_type：user / person / system / assistant。Import 会创建新 Conversation，不会向当前 Conversation 偷偷追加。粘贴内容可以是正序、倒序或局部乱序；页面导入会按 sent_at 自动整理，同一时间的消息保持原粘贴顺序。</p>
         <label for="text-import-title">New conversation title (optional)</label>
         <input id="text-import-title" class="requires-auth" autocomplete="off" disabled>
         <label for="text-import-body">Text</label>
@@ -111,13 +111,14 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     if (!selectedPersonId) throw new Error('Select a person before importing');
     const text = byId('text-import-body').value;
     if (!text.trim()) throw new Error('Import text is required');
-    textImportStatus.textContent = 'Importing...';
+    textImportStatus.textContent = '正在校验消息时间并按 sent_at 自动整理…';
     const data = await api('/api/v1/text-imports', {
       method: 'POST',
       body: JSON.stringify({
         person_id: selectedPersonId,
         title: nullableText('text-import-title'),
         text,
+        auto_sort_by_sent_at: true,
       }),
     });
     selectedConversationId = data.conversation_id;
@@ -128,7 +129,7 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     byId('conversation-select').value = data.conversation_id;
     await loadMessages();
     conversationStatus.textContent = `Imported and selected conversation ${data.conversation_id}.`;
-    textImportStatus.textContent = `Imported ${data.imported_count} message(s) into a new conversation.`;
+    textImportStatus.textContent = `已导入 ${data.imported_count} 条消息到新会话，并按 sent_at 自动整理为时间顺序。`;
   }
 
   const baseResetWorkspace = resetWorkspace;
