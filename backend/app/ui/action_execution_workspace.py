@@ -197,6 +197,9 @@ ACTION_EXECUTION_SCRIPT = r'''
     byId('action-execution-note').value = '';
     await loadActionExecutionContext();
     actionExecutionStatus.textContent = `Recorded Action Execution ${created.id}. No message was sent and no Outcome was created.`;
+    window.dispatchEvent(new CustomEvent('junshi:execution-recorded', {
+      detail: { decision_id: decisionId },
+    }));
   }
 
   const baseResetWorkspaceForActionExecution = resetWorkspace;
