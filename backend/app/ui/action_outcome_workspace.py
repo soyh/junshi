@@ -175,7 +175,7 @@ ACTION_OUTCOME_SCRIPT = r'''
     byId('action-outcome-state').value = 'completed';
     byId('action-outcome-note').value = '';
     await loadActionOutcomeContext();
-    actionOutcomeStatus.textContent = `Recorded Outcome ${created.id}. Feedback, Learning and Re-analysis will refresh automatically in the guided workflow.`;
+    actionOutcomeStatus.textContent = `Recorded Outcome ${created.id}. No Feedback, Learning, Re-analysis, message send, or Relationship change was started.`;
     window.dispatchEvent(new CustomEvent('junshi:outcome-recorded', {
       detail: { decision_id: decisionId, outcome_id: created.id },
     }));
