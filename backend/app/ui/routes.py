@@ -35,6 +35,10 @@ from app.ui.card_client_experience import (
     CARD_CLIENT_EXPERIENCE_SCRIPT,
     CARD_CLIENT_EXPERIENCE_STYLE,
 )
+from app.ui.card_client_unified_import import (
+    CARD_CLIENT_UNIFIED_IMPORT_SCRIPT,
+    CARD_CLIENT_UNIFIED_IMPORT_STYLE,
+)
 from app.ui.conversation_content_workspace import (
     CONVERSATION_CONTENT_HTML,
     CONVERSATION_CONTENT_SCRIPT,
@@ -159,6 +163,7 @@ def build_product_shell_html() -> str:
             f"{LIFECYCLE_V2_STYLE}\n"
             f"{CONVERSATION_SESSION_STYLE}\n"
             f"{CARD_CLIENT_EXPERIENCE_STYLE}\n"
+            f"{CARD_CLIENT_UNIFIED_IMPORT_STYLE}\n"
             f"{style_marker}"
         ),
         1,
@@ -197,6 +202,7 @@ def build_product_shell_html() -> str:
         f"{LIFECYCLE_V2_SCRIPT}\n\n"
         f"{CARD_CLIENT_EXPERIENCE_SCRIPT}\n\n"
         f"{CARD_CLIENT_AUTOMATION_SCRIPT}\n\n"
+        f"{CARD_CLIENT_UNIFIED_IMPORT_SCRIPT}\n\n"
         f"{CONVERSATION_SESSION_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
