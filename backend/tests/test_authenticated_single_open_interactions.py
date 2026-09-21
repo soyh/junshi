@@ -29,13 +29,31 @@ def test_all_action_buttons_receive_visible_hover_and_keyboard_focus_feedback():
 def test_opening_a_second_details_surface_closes_the_previous_surface():
     for marker in (
         "document.querySelectorAll('details[open]')",
-        'if (details !== activeDetails) details.open = false;',
+        'if (details === activeDetails) return;',
+        'details.open = false;',
         "event.target.closest('summary')",
         'singleOpenActivateDetails(details);',
         "document.addEventListener('toggle'",
         'if (!(details instanceof HTMLDetailsElement) || !details.open) return;',
     ):
         assert marker in SINGLE_OPEN_INTERACTION_SCRIPT
+
+
+def test_nested_settings_tab_keeps_its_parent_details_open():
+    html = PRODUCT_SHELL_WITH_CONTENT_HTML
+
+    assert 'id="guided-settings"' in html
+    assert 'guided-settings-content' in html
+    assert 'lifecycle-settings-panel' in html
+    assert 'if (activeDetails && details.contains(activeDetails)) return;' in SINGLE_OPEN_INTERACTION_SCRIPT
+
+    # Regression contract: child settings panels may close their siblings, but
+    # must not close the outer settings container that contains the active tab.
+    containment_guard = SINGLE_OPEN_INTERACTION_SCRIPT.index(
+        'if (activeDetails && details.contains(activeDetails)) return;'
+    )
+    close_statement = SINGLE_OPEN_INTERACTION_SCRIPT.index('details.open = false;')
+    assert containment_guard < close_statement
 
 
 def test_opening_person_card_closes_previous_expanded_panel_and_card():
