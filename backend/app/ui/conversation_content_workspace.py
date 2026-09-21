@@ -1,12 +1,12 @@
 CONVERSATION_CONTENT_HTML = r'''
   <fieldset id="conversation-content" class="wide">
     <legend>Conversation Content</legend>
-    <p class="note">TEST-137 只复用现有 Messages / Text Import canonical API。单条消息写入当前 Conversation；批量 Text Import 按现有 contract 创建新的 Conversation，成功后自动选中新会话。</p>
+    <p class="note">单条消息和批量文本都会写入当前选中的 Conversation。切换会话后，消息列表与后续分析作用域一起切换；不会因为批量导入而自动新建会话。</p>
 
     <div class="workspace-grid">
       <section class="workspace-card" aria-labelledby="message-heading">
-        <h2 id="message-heading">Messages</h2>
-        <p class="note">先在上方选择 Conversation。列表继续由服务端按 sent_at / created_at 排序。</p>
+        <h2 id="message-heading">Single Message</h2>
+        <p class="note">用于逐条补充聊天内容。请先选择当前人物下的目标会话。</p>
         <label for="message-sender">Sender</label>
         <select id="message-sender" class="requires-auth" disabled>
           <option value="user">user</option>
@@ -25,14 +25,12 @@ CONVERSATION_CONTENT_HTML = r'''
       </section>
 
       <section class="workspace-card" aria-labelledby="text-import-heading">
-        <h2 id="text-import-heading">Text Import</h2>
-        <p class="note">格式：ISO-8601 timestamp | sender_type | content。允许 sender_type：user / person / system / assistant。Import 会创建新 Conversation，不会向当前 Conversation 偷偷追加。粘贴内容可以是正序、倒序或局部乱序；页面导入会按 sent_at 自动整理，同一时间的消息保持原粘贴顺序。</p>
-        <label for="text-import-title">New conversation title (optional)</label>
-        <input id="text-import-title" class="requires-auth" autocomplete="off" disabled>
+        <h2 id="text-import-heading">Batch Text</h2>
+        <p class="note">格式：ISO-8601 timestamp | sender_type | content。允许 sender_type：user / person / system / assistant。批量文本会追加到当前选中的 Conversation，并按 sent_at 自动整理；同一时间的消息保持原粘贴顺序。</p>
         <label for="text-import-body">Text</label>
         <textarea id="text-import-body" class="requires-auth" placeholder="2026-09-18T12:00:00+00:00 | user | 你好&#10;2026-09-18T12:01:00+00:00 | person | 你好呀" disabled></textarea>
-        <button id="import-text" class="requires-auth" type="button" disabled>Import as new conversation</button>
-        <div id="text-import-status" class="status">Select a person before importing.</div>
+        <button id="import-text" class="requires-auth" type="button" disabled>Import into current conversation</button>
+        <div id="text-import-status" class="status">Select a conversation before importing.</div>
       </section>
     </div>
   </fieldset>
@@ -48,9 +46,9 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     messageList.replaceChildren();
     messageList.textContent = 'No conversation selected.';
     messagesStatus.textContent = message;
-    textImportStatus.textContent = selectedPersonId
-      ? 'Ready to import a new conversation for the selected person.'
-      : 'Select a person before importing.';
+    textImportStatus.textContent = selectedConversationId
+      ? 'Ready to import messages into the selected conversation.'
+      : 'Select a conversation before importing.';
     byId('message-content').value = '';
     byId('message-sent-at').value = '';
   }
@@ -79,6 +77,7 @@ CONVERSATION_CONTENT_SCRIPT = r'''
       return;
     }
     messagesStatus.textContent = 'Loading messages...';
+    textImportStatus.textContent = 'Ready to import messages into the selected conversation.';
     const items = await api(
       `/api/v1/conversations/${encodeURIComponent(selectedConversationId)}/messages`
     );
@@ -110,31 +109,30 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     }));
   }
 
-  async function importTextConversation() {
+  async function importTextBatch() {
     if (!selectedPersonId) throw new Error('Select a person before importing');
+    if (!selectedConversationId) throw new Error('Select a conversation before importing');
+    const targetConversationId = selectedConversationId;
     const text = byId('text-import-body').value;
     if (!text.trim()) throw new Error('Import text is required');
-    textImportStatus.textContent = '正在校验消息时间并按 sent_at 自动整理…';
+    textImportStatus.textContent = '正在校验消息时间并追加到当前会话…';
     const data = await api('/api/v1/text-imports', {
       method: 'POST',
       body: JSON.stringify({
         person_id: selectedPersonId,
-        title: nullableText('text-import-title'),
+        conversation_id: targetConversationId,
         text,
         auto_sort_by_sent_at: true,
       }),
     });
-    selectedConversationId = data.conversation_id;
-    byId('conversation-id').value = data.conversation_id;
-    byId('text-import-title').value = '';
+    if (data.conversation_id !== targetConversationId) {
+      throw new Error('Import returned an unexpected conversation scope');
+    }
     byId('text-import-body').value = '';
-    await loadConversations();
-    byId('conversation-select').value = data.conversation_id;
     await loadMessages();
-    conversationStatus.textContent = `Imported and selected conversation ${data.conversation_id}.`;
-    textImportStatus.textContent = `已导入 ${data.imported_count} 条消息到新会话，并按 sent_at 自动整理为时间顺序。`;
+    textImportStatus.textContent = `已向当前会话追加 ${data.imported_count} 条消息，并按 sent_at 自动整理。`;
     window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
-      detail: { source: '批量导入', conversation_id: selectedConversationId },
+      detail: { source: '批量导入', conversation_id: targetConversationId },
     }));
   }
 
@@ -146,7 +144,7 @@ CONVERSATION_CONTENT_SCRIPT = r'''
 
   bind('load-messages', loadMessages, messagesStatus);
   bind('create-message', createMessage, messagesStatus);
-  bind('import-text', importTextConversation, textImportStatus);
+  bind('import-text', importTextBatch, textImportStatus);
 
   byId('conversation-select').addEventListener('change', async () => {
     try { await loadMessages(); }
@@ -158,6 +156,6 @@ CONVERSATION_CONTENT_SCRIPT = r'''
   });
 
   byId('create-conversation').addEventListener('click', () => {
-    resetConversationContent('Conversation may change; refresh messages after creation.');
+    resetConversationContent('Conversation may change; loading the selected conversation after creation.');
   });
 '''
