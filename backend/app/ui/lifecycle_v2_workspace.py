@@ -1,5 +1,13 @@
 LIFECYCLE_V2_STYLE = r'''
-    /* TEST-162: compact nested settings + simplified lifecycle presentation. */
+    /* TEST-163: compact settings + horizontal daily lifecycle presentation. */
+    body > header {
+      display: none !important;
+    }
+
+    body {
+      max-width: 1560px !important;
+    }
+
     #guided-settings[open] { width: min(1120px, 100%); }
 
     #guided-settings-content {
@@ -86,6 +94,75 @@ LIFECYCLE_V2_STYLE = r'''
 
     .lifecycle-inline-section { margin-top: 12px; }
     .lifecycle-hidden-step { display: none !important; }
+
+    /* TEST-163: the four normal-use stages sit next to each other on desktop. */
+    #guided-workflow {
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+      gap: 14px !important;
+      align-items: start;
+    }
+
+    #guided-workflow > .guided-hero,
+    #guided-workflow > .guided-step-nav {
+      grid-column: 1 / -1;
+    }
+
+    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) {
+      min-width: 0;
+      max-height: calc(100vh - 245px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+      padding: 14px;
+    }
+
+    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) .workspace-grid {
+      grid-template-columns: 1fr !important;
+    }
+
+    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) .workspace-card,
+    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) fieldset {
+      min-width: 0;
+      max-width: none !important;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) .guided-step-header {
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) .guided-step-header h2 {
+      font-size: 1.05rem;
+    }
+
+    #guided-workflow > .guided-step:not(.lifecycle-hidden-step) .guided-step-header p {
+      font-size: .88rem;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 1399px) {
+      #guided-workflow {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+    }
+
+    @media (max-width: 820px) {
+      body {
+        max-width: 100% !important;
+      }
+
+      #guided-workflow {
+        grid-template-columns: 1fr !important;
+      }
+
+      #guided-workflow > .guided-step:not(.lifecycle-hidden-step) {
+        max-height: none;
+        overflow-y: visible;
+      }
+    }
 '''
 
 
