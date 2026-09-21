@@ -36,6 +36,19 @@ def valid_result():
     }
 
 
+def _assert_response_format(payload, *, model, schema_name):
+    if model.startswith(("qwen3.7", "qwen3.8")):
+        response_format = payload["response_format"]
+        assert response_format["type"] == "json_schema"
+        json_schema = response_format["json_schema"]
+        assert json_schema["name"] == schema_name
+        assert json_schema["strict"] is True
+        assert json_schema["schema"]["type"] == "object"
+        assert "properties" in json_schema["schema"]
+    else:
+        assert payload["response_format"] == {"type": "json_object"}
+
+
 def make_client(
     content,
     status_code=200,
@@ -48,7 +61,7 @@ def make_client(
         assert request.headers["authorization"] == "Bearer test-key"
         payload = json.loads(request.content)
         assert payload["model"] == model
-        assert payload["response_format"] == {"type": "json_object"}
+        _assert_response_format(payload, model=model, schema_name="structured_analysis")
         assert payload["messages"][0]["role"] == "system"
         assert payload["messages"][1]["role"] == "user"
         if expected_enable_thinking is None:
@@ -72,7 +85,7 @@ def make_reply_client(content, *, model="qwen3.8-flash"):
         assert request.url.path == "/compatible-mode/v1/chat/completions"
         payload = json.loads(request.content)
         assert payload["model"] == model
-        assert payload["response_format"] == {"type": "json_object"}
+        _assert_response_format(payload, model=model, schema_name="strategic_reply")
         assert payload["enable_thinking"] is False
         assert "recommendation_ids" in payload["messages"][0]["content"]
         assert "evidence_source_ids" in payload["messages"][0]["content"]
@@ -98,7 +111,7 @@ def test_qwen_provider_returns_structured_result():
     assert isinstance(LLMAnalysisService(provider).analyze({"messages": []}), StructuredAnalysis)
 
 
-def test_qwen37_structured_analysis_disables_thinking():
+def test_qwen37_structured_analysis_uses_strict_schema_and_disables_thinking():
     provider = QwenProvider(
         api_key="test-key",
         base_url="https://example.test/compatible-mode/v1",
@@ -115,7 +128,7 @@ def test_qwen37_structured_analysis_disables_thinking():
     assert result == valid_result()
 
 
-def test_qwen38_structured_analysis_disables_thinking():
+def test_qwen38_structured_analysis_uses_strict_schema_and_disables_thinking():
     provider = QwenProvider(
         api_key="test-key",
         base_url="https://example.test/compatible-mode/v1",
@@ -132,7 +145,7 @@ def test_qwen38_structured_analysis_disables_thinking():
     assert result == valid_result()
 
 
-def test_qwen37_strategic_reply_is_json_and_disables_thinking():
+def test_qwen37_strategic_reply_uses_strict_schema_and_disables_thinking():
     expected = {
         "recommendation_ids": ["recommendation-1"],
         "reply": "What are you up to?",
@@ -160,7 +173,7 @@ def test_qwen37_strategic_reply_is_json_and_disables_thinking():
     assert result == expected
 
 
-def test_qwen38_strategic_reply_is_json_and_disables_thinking():
+def test_qwen38_strategic_reply_uses_strict_schema_and_disables_thinking():
     expected = {
         "recommendation_ids": ["recommendation-1"],
         "reply": "What are you up to?",
@@ -186,6 +199,60 @@ def test_qwen38_strategic_reply_is_json_and_disables_thinking():
     )
 
     assert result == expected
+
+
+def test_qwen37_falls_back_to_json_object_when_endpoint_rejects_json_schema():
+    calls = []
+
+    def handler(request):
+        payload = json.loads(request.content)
+        calls.append(payload["response_format"]["type"])
+        if len(calls) == 1:
+            assert payload["response_format"]["type"] == "json_schema"
+            return httpx.Response(
+                400,
+                json={"message": "response_format json_schema is not supported in this region"},
+            )
+        assert payload["response_format"] == {"type": "json_object"}
+        assert payload["enable_thinking"] is False
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps(valid_result())}}]},
+        )
+
+    provider = QwenProvider(
+        api_key="test-key",
+        base_url="https://example.test/compatible-mode/v1",
+        model="qwen3.7-flash",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    assert provider.analyze({"messages": []}) == valid_result()
+    assert calls == ["json_schema", "json_object"]
+
+
+def test_analysis_service_normalizes_only_lossless_shape_drift():
+    drifted = valid_result()
+    drifted["unknowns"] = None
+    drifted["analysis_constraints"] = {
+        "must_preserve_unknowns": True,
+        "must_treat_llm_output_as_derived": True,
+    }
+    drifted["observed_facts"] = drifted["observed_facts"][0]
+
+    class Provider:
+        def analyze(self, context):
+            return drifted
+
+    result = LLMAnalysisService(Provider()).analyze({})
+
+    assert result.unknowns == []
+    assert len(result.observed_facts) == 1
+    assert result.observed_facts[0].action is None
+    assert result.analysis_constraints == [
+        "must_preserve_unknowns: true",
+        "must_treat_llm_output_as_derived: true",
+    ]
 
 
 def test_qwen_provider_requires_api_key():
@@ -217,7 +284,7 @@ def test_qwen_provider_translates_malformed_json():
         provider.analyze({})
 
 
-def test_qwen_provider_preserves_provider_result_for_contract_validation():
+def test_qwen_provider_preserves_required_field_validation_and_reports_paths():
     malformed = {"summary": "missing contract fields"}
     provider = QwenProvider(
         api_key="test-key",
@@ -225,5 +292,8 @@ def test_qwen_provider_preserves_provider_result_for_contract_validation():
         client=make_client(json.dumps(malformed)),
     )
 
-    with pytest.raises(LLMAnalysisError, match="invalid structured analysis"):
+    with pytest.raises(
+        LLMAnalysisError,
+        match=r"invalid structured analysis fields=.*observed_facts",
+    ):
         LLMAnalysisService(provider).analyze({})
