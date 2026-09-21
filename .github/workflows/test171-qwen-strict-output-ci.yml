@@ -1,0 +1,39 @@
+name: TEST-171 Qwen Strict Output CI
+
+on:
+  push:
+    branches:
+      - test-171-qwen-strict-structured-output
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Qwen structured output focused
+        run: pytest -q tests/test_qwen_provider.py tests/test_analysis_strategic_reply.py tests/test_authenticated_reply_generation_recovery.py
+
+      - name: Customer UI regression
+        run: pytest -q tests/test_authenticated_card_client_*.py tests/test_authenticated_unified_conversation_import.py tests/test_authenticated_conversation_content_workspace.py
+
+      - name: Authenticated UI regression
+        run: pytest -q tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
