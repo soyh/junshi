@@ -46,7 +46,14 @@ SINGLE_OPEN_INTERACTION_SCRIPT = r'''
 
   function singleOpenCloseDetails(activeDetails = null) {
     document.querySelectorAll('details[open]').forEach((details) => {
-      if (details !== activeDetails) details.open = false;
+      if (details === activeDetails) return;
+
+      // Nested panels must never collapse their own parent container. This is
+      // required by the settings shell: clicking a child settings tab keeps
+      // "账号、安全与模型设置" open while sibling child tabs remain single-open.
+      if (activeDetails && details.contains(activeDetails)) return;
+
+      details.open = false;
     });
   }
 
@@ -69,7 +76,9 @@ SINGLE_OPEN_INTERACTION_SCRIPT = r'''
   document.documentElement.dataset.singleOpenSurface = singleOpenSurfaceMarker;
 
   // Native <details> remains click-to-open / click-again-to-close. Before a
-  // different summary opens, close every other expandable surface.
+  // different summary opens, close every other unrelated expandable surface.
+  // Ancestor <details> elements are intentionally preserved so nested tabs can
+  // open inside an already-open parent surface.
   document.addEventListener('click', (event) => {
     const summary = event.target instanceof Element
       ? event.target.closest('summary')
