@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
-from app.domain.errors import PersonNotFoundError
+from app.domain.errors import ConversationNotFoundError, PersonNotFoundError
 from app.schemas.text_import import TextImportRequest, TextImportResponse
 from app.services.text_import_service import TextImportService
 
@@ -27,17 +27,23 @@ def import_text(
     try:
         with get_connection() as conn:
             conversation, messages, candidates = service.import_text(
-                conn,
-                user_id,
-                payload.person_id,
-                payload.text,
-                payload.title,
-                payload.auto_sort_by_sent_at,
+                conn=conn,
+                user_id=user_id,
+                person_id=payload.person_id,
+                text=payload.text,
+                title=payload.title,
+                auto_sort_by_sent_at=payload.auto_sort_by_sent_at,
+                conversation_id=payload.conversation_id,
             )
     except PersonNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Person not found",
+        ) from exc
+    except ConversationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found for this person",
         ) from exc
     except ValueError as exc:
         raise HTTPException(
