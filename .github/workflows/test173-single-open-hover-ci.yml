@@ -23,6 +23,9 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
       - name: Single-open nested settings focused
         run: pytest -q tests/test_authenticated_single_open_interactions.py tests/test_authenticated_card_client_experience.py tests/test_authenticated_guided_workflow_workspace.py tests/test_authenticated_account_security_workspace.py tests/test_authenticated_visual_theme_workspace.py
 
