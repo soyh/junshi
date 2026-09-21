@@ -1,3 +1,7 @@
+from app.ui.conversation_session_workspace import (
+    CONVERSATION_SESSION_SCRIPT,
+    CONVERSATION_SESSION_STYLE,
+)
 from app.ui.lifecycle_v2_workspace import LIFECYCLE_V2_SCRIPT, LIFECYCLE_V2_STYLE
 
 
@@ -50,14 +54,24 @@ def test_guided_flow_is_recomposed_to_four_user_stages():
     assert "step6.classList.add('lifecycle-hidden-step')" in LIFECYCLE_V2_SCRIPT
 
 
-def test_one_primary_conversation_is_presented_without_deleting_history():
+def test_multi_conversation_presentation_overrides_legacy_primary_conversation_without_deleting_history(client):
+    html = client.get('/app').text
+
+    # The older lifecycle layer is retained for compatibility and still contains no
+    # destructive history operation, but TEST-166 removes its single-primary UI rule.
     assert 'lifecycle-primary-conversation-only' in LIFECYCLE_V2_STYLE
-    assert 'lifecycleEnsurePrimaryConversation' in LIFECYCLE_V2_SCRIPT
-    assert 'lifecycleSelectPrimaryConversation' in LIFECYCLE_V2_SCRIPT
-    assert "options[options.length - 1]" in LIFECYCLE_V2_SCRIPT
-    assert '已有历史会话不会删除' in LIFECYCLE_V2_SCRIPT
     for forbidden in ("method: 'DELETE'", '.splice(', 'removeChild('):
         assert forbidden not in LIFECYCLE_V2_SCRIPT
+
+    assert "card.classList.remove('lifecycle-primary-conversation-only')" in CONVERSATION_SESSION_SCRIPT
+    assert "select.size = 8" in CONVERSATION_SESSION_SCRIPT
+    assert "options.find((option) => option.value === selectedConversationId)" in CONVERSATION_SESSION_SCRIPT
+    assert "options[0]" in CONVERSATION_SESSION_SCRIPT
+    assert "await loadConversations();" in CONVERSATION_SESSION_SCRIPT
+    assert "api('/api/v1/conversations'" not in CONVERSATION_SESSION_SCRIPT
+    assert "method: 'POST'" not in CONVERSATION_SESSION_SCRIPT
+    assert '当前人物可以保留多个会话' in html
+    assert '#conversation-select' in CONVERSATION_SESSION_STYLE
 
 
 def test_evidence_change_automatically_refreshes_reply_and_action_plan():
