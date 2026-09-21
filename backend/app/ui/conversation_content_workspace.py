@@ -26,7 +26,7 @@ CONVERSATION_CONTENT_HTML = r'''
 
       <section class="workspace-card" aria-labelledby="text-import-heading">
         <h2 id="text-import-heading">Batch Text</h2>
-        <p class="note">格式：ISO-8601 timestamp | sender_type | content。允许 sender_type：user / person / system / assistant。批量文本会追加到当前选中的 Conversation，并按 sent_at 自动整理；同一时间的消息保持原粘贴顺序。</p>
+        <p class="note">格式：ISO-8601 timestamp | sender_type | content。允许 sender_type：user / person / system / assistant。粘贴内容可以是正序、倒序或局部乱序；批量文本会追加到当前选中的 Conversation，并按 sent_at 自动整理；同一时间的消息保持原粘贴顺序。</p>
         <label for="text-import-body">Text</label>
         <textarea id="text-import-body" class="requires-auth" placeholder="2026-09-18T12:00:00+00:00 | user | 你好&#10;2026-09-18T12:01:00+00:00 | person | 你好呀" disabled></textarea>
         <button id="import-text" class="requires-auth" type="button" disabled>Import into current conversation</button>
