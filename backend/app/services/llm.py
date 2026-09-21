@@ -36,11 +36,13 @@ _ANALYSIS_ITEM_LIST_FIELDS = (
 
 
 def _normalize_structured_analysis_result(result: dict[str, Any]) -> dict[str, Any]:
-    """Normalize only lossless/empty-shape drift; never rewrite analysis semantics."""
+    """Normalize only lossless/empty-shape drift; never invent missing fields."""
     normalized = dict(result)
 
     for field in _ANALYSIS_ITEM_LIST_FIELDS:
-        value = normalized.get(field)
+        if field not in normalized:
+            continue
+        value = normalized[field]
         if value is None:
             normalized[field] = []
             continue
@@ -56,29 +58,31 @@ def _normalize_structured_analysis_result(result: dict[str, Any]) -> dict[str, A
                 continue
             normalized_item = dict(item)
             normalized_item.setdefault("confidence", None)
-            if normalized_item.get("evidence_source_ids") is None:
+            if "evidence_source_ids" in normalized_item and normalized_item["evidence_source_ids"] is None:
                 normalized_item["evidence_source_ids"] = []
             normalized_item.setdefault("evidence_source_ids", [])
             normalized_item.setdefault("action", None)
             normalized_items.append(normalized_item)
         normalized[field] = normalized_items
 
-    evidence_links = normalized.get("evidence_links")
-    if evidence_links is None:
-        normalized["evidence_links"] = []
-    elif isinstance(evidence_links, dict):
-        normalized["evidence_links"] = [evidence_links]
+    if "evidence_links" in normalized:
+        evidence_links = normalized["evidence_links"]
+        if evidence_links is None:
+            normalized["evidence_links"] = []
+        elif isinstance(evidence_links, dict):
+            normalized["evidence_links"] = [evidence_links]
 
-    constraints = normalized.get("analysis_constraints")
-    if constraints is None:
-        normalized["analysis_constraints"] = []
-    elif isinstance(constraints, str):
-        normalized["analysis_constraints"] = [constraints]
-    elif isinstance(constraints, dict):
-        normalized["analysis_constraints"] = [
-            f"{key}: {json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)}"
-            for key, value in constraints.items()
-        ]
+    if "analysis_constraints" in normalized:
+        constraints = normalized["analysis_constraints"]
+        if constraints is None:
+            normalized["analysis_constraints"] = []
+        elif isinstance(constraints, str):
+            normalized["analysis_constraints"] = [constraints]
+        elif isinstance(constraints, dict):
+            normalized["analysis_constraints"] = [
+                f"{key}: {json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)}"
+                for key, value in constraints.items()
+            ]
 
     return normalized
 
