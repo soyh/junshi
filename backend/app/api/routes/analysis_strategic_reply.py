@@ -27,6 +27,21 @@ def _build_provider(conn, user_id: str):
     return provider_config_service.build_provider(conn, user_id)
 
 
+def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
+    message = str(exc).lower()
+    if "invalid structured analysis" in message:
+        return "LLM analysis failed: invalid structured response"
+    if "strategic reply request failed" in message:
+        return "LLM analysis failed: strategic reply provider request failed"
+    if "provider request failed" in message:
+        return "LLM analysis failed: provider request failed"
+    if "api key" in message or "not configured" in message:
+        return "LLM analysis failed: provider configuration"
+    if "non-object" in message or "non-text" in message:
+        return "LLM analysis failed: invalid provider response"
+    return "LLM analysis failed"
+
+
 @router.get(
     "/context",
     response_model=AnalysisStrategicReplyContextResponse,
@@ -57,5 +72,5 @@ def get_analysis_strategic_reply_context(
     except LLMAnalysisError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="LLM analysis failed",
+            detail=_safe_llm_failure_detail(exc),
         ) from exc
