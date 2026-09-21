@@ -73,6 +73,10 @@ from app.ui.relationship_evidence_workspace import (
     RELATIONSHIP_EVIDENCE_HTML,
     RELATIONSHIP_EVIDENCE_SCRIPT,
 )
+from app.ui.single_open_interaction_workspace import (
+    SINGLE_OPEN_INTERACTION_SCRIPT,
+    SINGLE_OPEN_INTERACTION_STYLE,
+)
 from app.ui.strategic_reply_workspace import (
     STRATEGIC_REPLY_HTML,
     STRATEGIC_REPLY_SCRIPT,
@@ -174,6 +178,7 @@ def build_product_shell_html() -> str:
             f"{CARD_CLIENT_UNIFIED_IMPORT_STYLE}\n"
             f"{CARD_CLIENT_COMPACT_SURFACE_STYLE}\n"
             f"{CARD_CLIENT_GENERATION_RECOVERY_STYLE}\n"
+            f"{SINGLE_OPEN_INTERACTION_STYLE}\n"
             f"{style_marker}"
         ),
         1,
@@ -211,6 +216,7 @@ def build_product_shell_html() -> str:
         f"{USER_PRESENTATION_SCRIPT}\n\n"
         f"{LIFECYCLE_V2_SCRIPT}\n\n"
         f"{CARD_CLIENT_EXPERIENCE_SCRIPT}\n\n"
+        f"{SINGLE_OPEN_INTERACTION_SCRIPT}\n\n"
         f"{CARD_CLIENT_AUTOMATION_SCRIPT}\n\n"
         f"{CARD_CLIENT_UNIFIED_IMPORT_SCRIPT}\n\n"
         f"{CONVERSATION_SESSION_SCRIPT}\n\n"
