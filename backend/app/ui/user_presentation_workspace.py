@@ -280,7 +280,6 @@ USER_PRESENTATION_SCRIPT = r'''
   }
 
   function userEnhanceVisibleContent(root = document.body) {
-    userHideTechnicalCopy();
     const scope = root instanceof Element ? root : document.body;
     if (scope.matches && scope.matches('.session-row')) {
       userNormalizeMessageRow(scope);
@@ -311,6 +310,7 @@ USER_PRESENTATION_SCRIPT = r'''
     });
   });
 
+  userHideTechnicalCopy();
   userEnhanceVisibleContent();
   userPresentationObserver.observe(document.body, {
     childList: true,
