@@ -19,6 +19,28 @@ def test_collapsed_long_content_remains_scrollable():
     assert 'overscroll-behavior: contain' in LIFECYCLE_V2_STYLE
 
 
+def test_duplicate_product_shell_header_is_hidden_but_not_deleted(client):
+    html = client.get('/app').text
+    assert '<header>' in html
+    assert 'body > header' in LIFECYCLE_V2_STYLE
+    assert 'display: none !important' in LIFECYCLE_V2_STYLE
+    assert '<h1>AI Love Strategist</h1>' in html
+
+
+def test_daily_workflow_is_horizontal_and_responsive():
+    assert '#guided-workflow {' in LIFECYCLE_V2_STYLE
+    assert 'grid-template-columns: repeat(4, minmax(0, 1fr)) !important' in LIFECYCLE_V2_STYLE
+    assert '#guided-workflow > .guided-hero' in LIFECYCLE_V2_STYLE
+    assert '#guided-workflow > .guided-step-nav' in LIFECYCLE_V2_STYLE
+    assert 'grid-column: 1 / -1' in LIFECYCLE_V2_STYLE
+    assert 'max-height: calc(100vh - 245px)' in LIFECYCLE_V2_STYLE
+    assert 'overflow-y: auto' in LIFECYCLE_V2_STYLE
+    assert '@media (max-width: 1399px)' in LIFECYCLE_V2_STYLE
+    assert 'grid-template-columns: repeat(2, minmax(0, 1fr)) !important' in LIFECYCLE_V2_STYLE
+    assert '@media (max-width: 820px)' in LIFECYCLE_V2_STYLE
+    assert 'grid-template-columns: 1fr !important' in LIFECYCLE_V2_STYLE
+
+
 def test_guided_flow_is_recomposed_to_four_user_stages():
     assert "['#guided-step-1', '1 选择人物']" in LIFECYCLE_V2_SCRIPT
     assert "['#guided-step-2', '2 编辑关系']" in LIFECYCLE_V2_SCRIPT
