@@ -31,6 +31,10 @@ from app.ui.action_reanalysis_workspace import (
     ACTION_REANALYSIS_SCRIPT,
 )
 from app.ui.card_client_automation import CARD_CLIENT_AUTOMATION_SCRIPT
+from app.ui.card_client_compact_surface import (
+    CARD_CLIENT_COMPACT_SURFACE_SCRIPT,
+    CARD_CLIENT_COMPACT_SURFACE_STYLE,
+)
 from app.ui.card_client_experience import (
     CARD_CLIENT_EXPERIENCE_SCRIPT,
     CARD_CLIENT_EXPERIENCE_STYLE,
@@ -164,6 +168,7 @@ def build_product_shell_html() -> str:
             f"{CONVERSATION_SESSION_STYLE}\n"
             f"{CARD_CLIENT_EXPERIENCE_STYLE}\n"
             f"{CARD_CLIENT_UNIFIED_IMPORT_STYLE}\n"
+            f"{CARD_CLIENT_COMPACT_SURFACE_STYLE}\n"
             f"{style_marker}"
         ),
         1,
@@ -204,6 +209,7 @@ def build_product_shell_html() -> str:
         f"{CARD_CLIENT_AUTOMATION_SCRIPT}\n\n"
         f"{CARD_CLIENT_UNIFIED_IMPORT_SCRIPT}\n\n"
         f"{CONVERSATION_SESSION_SCRIPT}\n\n"
+        f"{CARD_CLIENT_COMPACT_SURFACE_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
         f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
