@@ -176,8 +176,13 @@ def build_product_shell_html() -> str:
         1,
     )
 
+    # The guided + TEST-162 composition layers run before lifecycle fragments.
+    # Function declarations in later fragments are hoisted, while keeping each
+    # legacy lifecycle fragment's static safety boundary intact for regression
+    # tests (for example Action Plan remains free of POST/Execution code).
     workspace_script = (
         f"{GUIDED_WORKFLOW_SCRIPT}\n\n"
+        f"{STREAMLINED_LIFECYCLE_SCRIPT}\n\n"
         f"{VISUAL_THEME_SCRIPT}\n\n"
         f"{USER_PRESENTATION_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
@@ -193,7 +198,6 @@ def build_product_shell_html() -> str:
         f"{ACTION_PLAN_SCRIPT}\n\n"
         f"{STRATEGIC_REPLY_SCRIPT}\n\n"
         f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
-        f"{STREAMLINED_LIFECYCLE_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
