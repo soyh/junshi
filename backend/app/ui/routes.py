@@ -34,6 +34,10 @@ from app.ui.conversation_content_workspace import (
     CONVERSATION_CONTENT_HTML,
     CONVERSATION_CONTENT_SCRIPT,
 )
+from app.ui.conversation_session_workspace import (
+    CONVERSATION_SESSION_SCRIPT,
+    CONVERSATION_SESSION_STYLE,
+)
 from app.ui.guided_workflow_workspace import (
     GUIDED_WORKFLOW_HTML,
     GUIDED_WORKFLOW_SCRIPT,
@@ -148,6 +152,7 @@ def build_product_shell_html() -> str:
             f"{VISUAL_THEME_STYLE}\n"
             f"{USER_PRESENTATION_STYLE}\n"
             f"{LIFECYCLE_V2_STYLE}\n"
+            f"{CONVERSATION_SESSION_STYLE}\n"
             f"{style_marker}"
         ),
         1,
@@ -184,6 +189,7 @@ def build_product_shell_html() -> str:
         f"{VISUAL_THEME_SCRIPT}\n\n"
         f"{USER_PRESENTATION_SCRIPT}\n\n"
         f"{LIFECYCLE_V2_SCRIPT}\n\n"
+        f"{CONVERSATION_SESSION_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
         f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
