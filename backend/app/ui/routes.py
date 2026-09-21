@@ -39,6 +39,10 @@ from app.ui.guided_workflow_workspace import (
     GUIDED_WORKFLOW_SCRIPT,
     GUIDED_WORKFLOW_STYLE,
 )
+from app.ui.lifecycle_v2_workspace import (
+    LIFECYCLE_V2_SCRIPT,
+    LIFECYCLE_V2_STYLE,
+)
 from app.ui.product_management_workspace import (
     PRODUCT_MANAGEMENT_HTML,
     PRODUCT_MANAGEMENT_SCRIPT,
@@ -143,6 +147,7 @@ def build_product_shell_html() -> str:
             f"{GUIDED_WORKFLOW_STYLE}\n"
             f"{VISUAL_THEME_STYLE}\n"
             f"{USER_PRESENTATION_STYLE}\n"
+            f"{LIFECYCLE_V2_STYLE}\n"
             f"{style_marker}"
         ),
         1,
@@ -171,10 +176,6 @@ def build_product_shell_html() -> str:
         1,
     )
 
-    # Guided composition, visual theme, and TEST-160 presentation enhancement
-    # run before lifecycle fragments. The presentation layer only changes the
-    # browser rendering of existing data; it does not create a second API path
-    # or bypass any explicit user confirmation/write boundary.
     workspace_script = (
         f"{GUIDED_WORKFLOW_SCRIPT}\n\n"
         f"{VISUAL_THEME_SCRIPT}\n\n"
@@ -192,6 +193,7 @@ def build_product_shell_html() -> str:
         f"{ACTION_PLAN_SCRIPT}\n\n"
         f"{STRATEGIC_REPLY_SCRIPT}\n\n"
         f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
+        f"{LIFECYCLE_V2_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
