@@ -56,7 +56,7 @@ from app.ui.strategy_recommendation_workspace import (
     STRATEGY_RECOMMENDATION_HTML,
     STRATEGY_RECOMMENDATION_SCRIPT,
 )
-from app.ui.streamlined_lifecycle_workspace import (
+from app.ui.streamlined_lifecycle_runtime import (
     STREAMLINED_LIFECYCLE_SCRIPT,
     STREAMLINED_LIFECYCLE_STYLE,
 )
