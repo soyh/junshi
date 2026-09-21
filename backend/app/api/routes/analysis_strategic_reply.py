@@ -44,6 +44,11 @@ def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
         )
     if "invalid structured analysis" in message:
         return "LLM analysis failed: invalid structured response"
+    if (
+        "no fresh recommendation" in message
+        or "stale strategic reply provenance" in message
+    ):
+        return "LLM analysis failed: latest conversation was not incorporated"
     if "strategic reply request failed" in message:
         return "LLM analysis failed: strategic reply provider request failed"
     if "provider request failed" in message:
