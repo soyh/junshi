@@ -32,6 +32,7 @@ def import_text(
                 payload.person_id,
                 payload.text,
                 payload.title,
+                payload.auto_sort_by_sent_at,
             )
     except PersonNotFoundError as exc:
         raise HTTPException(
