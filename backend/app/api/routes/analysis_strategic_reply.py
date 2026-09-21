@@ -28,7 +28,20 @@ def _build_provider(conn, user_id: str):
 
 
 def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
-    message = str(exc).lower()
+    raw_message = str(exc)
+    message = raw_message.lower()
+    marker = "invalid structured analysis fields="
+    if marker in message:
+        raw_fields = raw_message.split("fields=", 1)[1]
+        safe_fields = "".join(
+            character
+            for character in raw_fields
+            if character.isalnum() or character in "._,-[]"
+        )[:240]
+        return (
+            "LLM analysis failed: invalid structured response"
+            + (f" (fields: {safe_fields})" if safe_fields else "")
+        )
     if "invalid structured analysis" in message:
         return "LLM analysis failed: invalid structured response"
     if "strategic reply request failed" in message:
