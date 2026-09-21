@@ -61,3 +61,18 @@ def test_safe_llm_failure_category_preserves_no_raw_provider_message():
     assert _safe_llm_failure_detail(
         LLMAnalysisError("secret upstream detail")
     ) == "LLM analysis failed"
+
+
+def test_safe_llm_failure_can_expose_only_validation_field_paths():
+    detail = _safe_llm_failure_detail(
+        LLMAnalysisError(
+            "LLM provider returned invalid structured analysis "
+            "fields=analysis_constraints,observed_facts.0.evidence_source_ids"
+        )
+    )
+
+    assert detail == (
+        "LLM analysis failed: invalid structured response "
+        "(fields: analysis_constraints,observed_facts.0.evidence_source_ids)"
+    )
+    assert "secret" not in detail
