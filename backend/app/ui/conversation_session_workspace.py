@@ -27,8 +27,7 @@ CONVERSATION_SESSION_SCRIPT = r'''
       options.forEach((option, index) => {
         const baseLabel = option.dataset.test166BaseLabel || option.textContent;
         option.dataset.test166BaseLabel = baseLabel;
-        const prefix = index === 0 ? '最近 · ' : `${index + 1} · `;
-        option.textContent = `${prefix}${baseLabel}`;
+        option.textContent = `${index + 1} · ${baseLabel}`;
       });
     }
 
