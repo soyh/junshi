@@ -1,14 +1,21 @@
 from app.ui.lifecycle_v2_workspace import LIFECYCLE_V2_SCRIPT, LIFECYCLE_V2_STYLE
 
 
-def test_settings_are_nested_compact_panels_with_scrollable_content(client):
+def test_settings_are_horizontal_tabs_with_scrollable_content(client):
     html = client.get('/app').text
     assert 'lifecycle-settings-panel' in html
     assert '#guided-settings-content' in LIFECYCLE_V2_STYLE
-    assert 'repeat(auto-fit, minmax(280px, 1fr))' in LIFECYCLE_V2_STYLE
+    assert 'repeat(4, minmax(150px, 1fr))' in LIFECYCLE_V2_STYLE
+    assert '#guided-settings-content > .lifecycle-settings-panel {' in LIFECYCLE_V2_STYLE
+    assert 'display: contents' in LIFECYCLE_V2_STYLE
+    assert 'grid-row: 1' in LIFECYCLE_V2_STYLE
+    assert 'grid-column: 1 / -1' in LIFECYCLE_V2_STYLE
     assert 'max-height: min(72vh, 760px)' in LIFECYCLE_V2_STYLE
     assert 'overflow-y: auto' in LIFECYCLE_V2_STYLE
+    assert 'overflow-x: auto' in LIFECYCLE_V2_STYLE
     assert 'scrollbar-gutter: stable' in LIFECYCLE_V2_STYLE
+    assert "settings.querySelectorAll(':scope > .lifecycle-settings-panel')" in LIFECYCLE_V2_SCRIPT
+    assert 'other.open = false' in LIFECYCLE_V2_SCRIPT
 
 
 def test_collapsed_long_content_remains_scrollable():
@@ -27,18 +34,11 @@ def test_duplicate_product_shell_header_is_hidden_but_not_deleted(client):
     assert '<h1>AI Love Strategist</h1>' in html
 
 
-def test_daily_workflow_is_horizontal_and_responsive():
-    assert '#guided-workflow {' in LIFECYCLE_V2_STYLE
-    assert 'grid-template-columns: repeat(4, minmax(0, 1fr)) !important' in LIFECYCLE_V2_STYLE
-    assert '#guided-workflow > .guided-hero' in LIFECYCLE_V2_STYLE
-    assert '#guided-workflow > .guided-step-nav' in LIFECYCLE_V2_STYLE
-    assert 'grid-column: 1 / -1' in LIFECYCLE_V2_STYLE
-    assert 'max-height: calc(100vh - 245px)' in LIFECYCLE_V2_STYLE
-    assert 'overflow-y: auto' in LIFECYCLE_V2_STYLE
-    assert '@media (max-width: 1399px)' in LIFECYCLE_V2_STYLE
-    assert 'grid-template-columns: repeat(2, minmax(0, 1fr)) !important' in LIFECYCLE_V2_STYLE
-    assert '@media (max-width: 820px)' in LIFECYCLE_V2_STYLE
-    assert 'grid-template-columns: 1fr !important' in LIFECYCLE_V2_STYLE
+def test_daily_workflow_is_restored_to_vertical_layout():
+    assert 'grid-template-columns: repeat(4, minmax(0, 1fr)) !important' not in LIFECYCLE_V2_STYLE
+    assert 'max-height: calc(100vh - 245px)' not in LIFECYCLE_V2_STYLE
+    assert '#guided-workflow > .guided-step:not(.lifecycle-hidden-step)' not in LIFECYCLE_V2_STYLE
+    assert 'grid-template-columns: repeat(2, minmax(0, 1fr)) !important' not in LIFECYCLE_V2_STYLE
 
 
 def test_guided_flow_is_recomposed_to_four_user_stages():
