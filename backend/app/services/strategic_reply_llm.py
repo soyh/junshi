@@ -69,4 +69,16 @@ class StrategicReplyLLMService:
                 "LLM provider returned invalid strategic reply provenance"
             )
 
+        required_evidence_ids = {
+            source_id
+            for source_id in context.get("required_evidence_source_ids", []) or []
+            if isinstance(source_id, str)
+        }
+        if required_evidence_ids and not required_evidence_ids.intersection(
+            candidate.evidence_source_ids
+        ):
+            raise LLMAnalysisError(
+                "LLM provider returned stale strategic reply provenance"
+            )
+
         return candidate.model_dump(mode="json")
