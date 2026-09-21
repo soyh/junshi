@@ -28,12 +28,16 @@ class TextImportService:
         person_id: str,
         text: str,
         title: str | None,
+        auto_sort_by_sent_at: bool = False,
     ) -> tuple[sqlite3.Row, list[sqlite3.Row], list[TextImportCandidate]]:
         person = self.person_repository.get(conn, user_id, person_id)
         if person is None:
             raise PersonNotFoundError("Person not found")
 
-        candidates = validate_candidates(parse_text(text))
+        candidates = validate_candidates(
+            parse_text(text),
+            auto_sort_by_sent_at=auto_sort_by_sent_at,
+        )
 
         conversation = self.conversation_repository.create(
             conn,
