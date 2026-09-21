@@ -1,6 +1,6 @@
 import sqlite3
 
-from app.domain.errors import PersonNotFoundError
+from app.domain.errors import ConversationNotFoundError, PersonNotFoundError
 from app.repositories.conversation import ConversationRepository
 from app.repositories.message import MessageRepository
 from app.repositories.person import PersonRepository
@@ -29,24 +29,39 @@ class TextImportService:
         text: str,
         title: str | None,
         auto_sort_by_sent_at: bool = False,
+        conversation_id: str | None = None,
     ) -> tuple[sqlite3.Row, list[sqlite3.Row], list[TextImportCandidate]]:
         person = self.person_repository.get(conn, user_id, person_id)
         if person is None:
             raise PersonNotFoundError("Person not found")
+
+        if conversation_id is not None:
+            conversation = self.conversation_repository.get(
+                conn,
+                user_id,
+                conversation_id,
+            )
+            if conversation is None:
+                raise ConversationNotFoundError("Conversation not found")
+            if conversation["person_id"] != person_id:
+                raise ValueError("Conversation does not belong to person")
+        else:
+            conversation = None
 
         candidates = validate_candidates(
             parse_text(text),
             auto_sort_by_sent_at=auto_sort_by_sent_at,
         )
 
-        conversation = self.conversation_repository.create(
-            conn,
-            user_id,
-            person_id,
-            None,
-            title,
-            "active",
-        )
+        if conversation is None:
+            conversation = self.conversation_repository.create(
+                conn,
+                user_id,
+                person_id,
+                None,
+                title,
+                "active",
+            )
 
         messages: list[sqlite3.Row] = []
         for candidate in candidates:
