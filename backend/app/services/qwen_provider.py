@@ -193,7 +193,15 @@ class QwenProvider(LLMProvider):
             "json_schema" in text
             or (
                 "response_format" in text
-                and any(token in text for token in ("unsupported", "not supported", "unknown", "invalid format"))
+                and any(
+                    token in text
+                    for token in (
+                        "unsupported",
+                        "not supported",
+                        "unknown",
+                        "invalid format",
+                    )
+                )
             )
         )
 
@@ -231,6 +239,15 @@ class QwenProvider(LLMProvider):
             "Do not invent facts, evidence IDs, events, intentions, or outcomes. "
             "Treat canonical evidence as the source of truth. Preserve uncertainty "
             "and unknowns. Put interpretations in inferences or hypotheses, not facts. "
+            "If conversation_focus is present, treat its recent_messages as the current "
+            "conversation window and its latest_human_message as the newest state. "
+            "Newer current-conversation evidence takes priority over older history when "
+            "they conflict. If conversation_focus.reply_target_message is present, it "
+            "is the primary incoming message the next reply must answer. Produce at "
+            "least one useful hypothesis whose evidence_source_ids includes that reply "
+            "target ID so downstream reply generation cannot drift to old messages. "
+            "If the latest human message was sent by the user, do not behave as though "
+            "an older incoming message is still unanswered. "
             "The response must contain exactly these top-level fields: summary, "
             "observed_facts, inferences, unknowns, hypotheses, emotional_signals, "
             "relationship_signals, risk_signals, intent_signals, evidence_links, "
@@ -244,6 +261,7 @@ class QwenProvider(LLMProvider):
     def _user_prompt(context: dict[str, Any]) -> str:
         return (
             "Analyze the following AnalysisContext and output the required JSON object. "
+            "Apply conversation_focus before older context when it is present. "
             "Do not add markdown fences or explanatory text.\n\n"
             + json.dumps(context, ensure_ascii=False, sort_keys=True, default=str)
         )
@@ -257,18 +275,25 @@ class QwenProvider(LLMProvider):
             "relationship status, intentions, or evidence IDs. Produce one concise, "
             "natural message draft that the user could choose to send. Preserve "
             "uncertainty and do not imply that any recommendation was selected, "
-            "approved, executed, or sent. The response must contain exactly these "
-            "top-level fields: recommendation_ids, reply, evidence_source_ids. "
-            "recommendation_ids must be a non-empty array containing only IDs from the "
-            "supplied recommendations. evidence_source_ids must be a non-empty array "
-            "containing only evidence IDs already cited by those supporting "
-            "recommendations and present in canonical evidence."
+            "approved, executed, or sent. If conversation_focus is present, prioritize "
+            "its recent_messages and newest state over older context. When "
+            "reply_target_message is present, answer that message directly rather than "
+            "continuing an older topic. Every ID in required_evidence_source_ids must be "
+            "treated as mandatory current-turn provenance, and the generated "
+            "evidence_source_ids must include at least one of those IDs. "
+            "The response must contain exactly these top-level fields: "
+            "recommendation_ids, reply, evidence_source_ids. recommendation_ids must be "
+            "a non-empty array containing only IDs from the supplied recommendations. "
+            "evidence_source_ids must be a non-empty array containing only evidence IDs "
+            "already cited by those supporting recommendations and present in canonical "
+            "evidence."
         )
 
     @staticmethod
     def _strategic_reply_user_prompt(context: dict[str, Any]) -> str:
         return (
             "Draft one evidence-backed strategic reply from this context and output the "
-            "required JSON object. Do not add markdown fences or explanatory text.\n\n"
+            "required JSON object. The current conversation focus is authoritative for "
+            "what needs a reply now. Do not add markdown fences or explanatory text.\n\n"
             + json.dumps(context, ensure_ascii=False, sort_keys=True, default=str)
         )
