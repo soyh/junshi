@@ -1,0 +1,50 @@
+name: TEST-168 Unified Import CI
+
+on:
+  push:
+    branches:
+      - test-168-unified-conversation-import
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check unified import JavaScript syntax
+        run: |
+          python - <<'PY'
+          from app.ui.card_client_unified_import import CARD_CLIENT_UNIFIED_IMPORT_SCRIPT
+          with open('/tmp/test168-unified-import.js', 'w', encoding='utf-8') as fh:
+              fh.write('(() => {\n')
+              fh.write(CARD_CLIENT_UNIFIED_IMPORT_SCRIPT)
+              fh.write('\n})();\n')
+          PY
+          node --check /tmp/test168-unified-import.js
+
+      - name: Focused unified import
+        run: pytest -q tests/test_authenticated_unified_conversation_import.py tests/test_authenticated_conversation_content_workspace.py tests/test_authenticated_card_client_experience.py
+
+      - name: Strategic reply handoff regression
+        run: pytest -q tests/test_authenticated_strategic_reply_workspace.py
+
+      - name: Authenticated UI regression
+        run: pytest -q tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
