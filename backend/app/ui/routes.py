@@ -30,6 +30,7 @@ from app.ui.action_reanalysis_workspace import (
     ACTION_REANALYSIS_HTML,
     ACTION_REANALYSIS_SCRIPT,
 )
+from app.ui.card_client_automation import CARD_CLIENT_AUTOMATION_SCRIPT
 from app.ui.card_client_experience import (
     CARD_CLIENT_EXPERIENCE_SCRIPT,
     CARD_CLIENT_EXPERIENCE_STYLE,
@@ -195,6 +196,7 @@ def build_product_shell_html() -> str:
         f"{USER_PRESENTATION_SCRIPT}\n\n"
         f"{LIFECYCLE_V2_SCRIPT}\n\n"
         f"{CARD_CLIENT_EXPERIENCE_SCRIPT}\n\n"
+        f"{CARD_CLIENT_AUTOMATION_SCRIPT}\n\n"
         f"{CONVERSATION_SESSION_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
