@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from pydantic import BaseModel, Field
 
 
@@ -14,6 +12,7 @@ class TextImportRequest(BaseModel):
     person_id: str
     text: str
     title: str | None = None
+    auto_sort_by_sent_at: bool = False
 
 
 class TextImportResponse(BaseModel):
