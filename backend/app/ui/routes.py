@@ -176,10 +176,14 @@ def build_product_shell_html() -> str:
         1,
     )
 
+    # Composition/presentation/orchestration run before lifecycle fragments.
+    # Referenced function declarations are hoisted inside the same IIFE; the
+    # event-driven orchestrator does not execute lifecycle writes on selection.
     workspace_script = (
         f"{GUIDED_WORKFLOW_SCRIPT}\n\n"
         f"{VISUAL_THEME_SCRIPT}\n\n"
         f"{USER_PRESENTATION_SCRIPT}\n\n"
+        f"{LIFECYCLE_V2_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
         f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
@@ -193,7 +197,6 @@ def build_product_shell_html() -> str:
         f"{ACTION_PLAN_SCRIPT}\n\n"
         f"{STRATEGIC_REPLY_SCRIPT}\n\n"
         f"{STRATEGY_RECOMMENDATION_SCRIPT}\n\n"
-        f"{LIFECYCLE_V2_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
