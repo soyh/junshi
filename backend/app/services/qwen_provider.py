@@ -158,7 +158,8 @@ class QwenProvider(LLMProvider):
             )
 
     def _analysis_request_options(self) -> dict[str, Any]:
-        if self.model.strip().lower().startswith("qwen3.8"):
+        model = self.model.strip().lower()
+        if model.startswith(("qwen3.7", "qwen3.8")):
             return {"enable_thinking": False}
         return {}
 
