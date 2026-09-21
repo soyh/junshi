@@ -25,8 +25,10 @@ CONVERSATION_SESSION_SCRIPT = r'''
       select.size = 8;
       const options = Array.from(select.options).filter((option) => option.value);
       options.forEach((option, index) => {
+        const baseLabel = option.dataset.test166BaseLabel || option.textContent;
+        option.dataset.test166BaseLabel = baseLabel;
         const prefix = index === 0 ? '最近 · ' : `${index + 1} · `;
-        option.textContent = `${prefix}${option.textContent}`;
+        option.textContent = `${prefix}${baseLabel}`;
       });
     }
 
@@ -89,6 +91,10 @@ CONVERSATION_SESSION_SCRIPT = r'''
   lifecycleEnsurePrimaryConversation = async function() {
     if (!selectedPersonId) return null;
     await loadConversations();
+    if (selectedConversationId) {
+      lifecyclePrimaryConversationId = selectedConversationId;
+      return selectedConversationId;
+    }
     return lifecycleSelectPrimaryConversation();
   };
 
