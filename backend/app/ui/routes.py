@@ -56,6 +56,10 @@ from app.ui.strategy_recommendation_workspace import (
     STRATEGY_RECOMMENDATION_HTML,
     STRATEGY_RECOMMENDATION_SCRIPT,
 )
+from app.ui.user_presentation_workspace import (
+    USER_PRESENTATION_SCRIPT,
+    USER_PRESENTATION_STYLE,
+)
 from app.ui.visual_theme_workspace import (
     VISUAL_THEME_SCRIPT,
     VISUAL_THEME_STYLE,
@@ -135,7 +139,12 @@ def build_product_shell_html() -> str:
         1,
     ).replace(
         style_marker,
-        f"{GUIDED_WORKFLOW_STYLE}\n{VISUAL_THEME_STYLE}\n{style_marker}",
+        (
+            f"{GUIDED_WORKFLOW_STYLE}\n"
+            f"{VISUAL_THEME_STYLE}\n"
+            f"{USER_PRESENTATION_STYLE}\n"
+            f"{style_marker}"
+        ),
         1,
     )
 
@@ -162,13 +171,14 @@ def build_product_shell_html() -> str:
         1,
     )
 
-    # Guided composition and visual enhancement both run before lifecycle
-    # fragments so legacy fragment-boundary tests retain their exact safety
-    # scope. The visual layer only rearranges/render-controls browser-side and
-    # never performs API writes or bypasses explicit user confirmation.
+    # Guided composition, visual theme, and TEST-160 presentation enhancement
+    # run before lifecycle fragments. The presentation layer only changes the
+    # browser rendering of existing data; it does not create a second API path
+    # or bypass any explicit user confirmation/write boundary.
     workspace_script = (
         f"{GUIDED_WORKFLOW_SCRIPT}\n\n"
         f"{VISUAL_THEME_SCRIPT}\n\n"
+        f"{USER_PRESENTATION_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
         f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
