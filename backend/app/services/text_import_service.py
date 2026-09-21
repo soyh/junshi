@@ -1,6 +1,6 @@
 import sqlite3
 
-from app.domain.errors import PersonNotFoundError
+from app.domain.errors import ConversationNotFoundError, PersonNotFoundError
 from app.repositories.conversation import ConversationRepository
 from app.repositories.message import MessageRepository
 from app.repositories.person import PersonRepository
@@ -29,6 +29,7 @@ class TextImportService:
         text: str,
         title: str | None,
         auto_sort_by_sent_at: bool = False,
+        conversation_id: str | None = None,
     ) -> tuple[sqlite3.Row, list[sqlite3.Row], list[TextImportCandidate]]:
         person = self.person_repository.get(conn, user_id, person_id)
         if person is None:
@@ -39,14 +40,32 @@ class TextImportService:
             auto_sort_by_sent_at=auto_sort_by_sent_at,
         )
 
-        conversation = self.conversation_repository.create(
-            conn,
-            user_id,
-            person_id,
-            None,
-            title,
-            "active",
-        )
+        if conversation_id:
+            conversation = self.conversation_repository.get(
+                conn,
+                user_id,
+                conversation_id,
+            )
+            if conversation is None or conversation["person_id"] != person_id:
+                raise ConversationNotFoundError(
+                    "Conversation not found for this person"
+                )
+            if title is not None:
+                conversation = self.conversation_repository.update(
+                    conn,
+                    user_id,
+                    conversation_id,
+                    title=title,
+                )
+        else:
+            conversation = self.conversation_repository.create(
+                conn,
+                user_id,
+                person_id,
+                None,
+                title,
+                "active",
+            )
 
         messages: list[sqlite3.Row] = []
         for candidate in candidates:
@@ -59,6 +78,13 @@ class TextImportService:
                     candidate.content,
                     candidate.sent_at,
                 )
+            )
+
+        if conversation_id and title is None:
+            conversation = self.conversation_repository.update(
+                conn,
+                user_id,
+                conversation["id"],
             )
 
         return conversation, messages, candidates
