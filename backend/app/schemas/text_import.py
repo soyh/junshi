@@ -10,6 +10,7 @@ class TextImportCandidate(BaseModel):
 
 class TextImportRequest(BaseModel):
     person_id: str
+    conversation_id: str | None = None
     text: str
     title: str | None = None
     auto_sort_by_sent_at: bool = False
