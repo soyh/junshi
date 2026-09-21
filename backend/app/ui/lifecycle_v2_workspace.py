@@ -1,8 +1,6 @@
 LIFECYCLE_V2_STYLE = r'''
     /* TEST-162: compact nested settings + simplified lifecycle presentation. */
-    #guided-settings[open] {
-      width: min(1120px, 100%);
-    }
+    #guided-settings[open] { width: min(1120px, 100%); }
 
     #guided-settings-content {
       display: grid !important;
@@ -42,20 +40,9 @@ LIFECYCLE_V2_STYLE = r'''
       margin: 0 !important;
     }
 
-    #guided-settings-content > .lifecycle-settings-panel > fieldset > legend {
-      display: none;
-    }
-
-    #guided-settings-content textarea {
-      min-height: 56px !important;
-      max-height: 120px;
-    }
-
-    #guided-settings-content .status {
-      max-height: 132px;
-      overflow-y: auto;
-      scrollbar-gutter: stable;
-    }
+    #guided-settings-content > .lifecycle-settings-panel > fieldset > legend { display: none; }
+    #guided-settings-content textarea { min-height: 56px !important; max-height: 120px; }
+    #guided-settings-content .status { max-height: 132px; overflow-y: auto; scrollbar-gutter: stable; }
 
     .user-long-content:not(.is-expanded),
     .user-long-list:not(.is-expanded) {
@@ -68,9 +55,7 @@ LIFECYCLE_V2_STYLE = r'''
     }
 
     .user-long-content.is-expanded,
-    .user-long-list.is-expanded {
-      overflow: visible !important;
-    }
+    .user-long-list.is-expanded { overflow: visible !important; }
 
     .lifecycle-primary-conversation-only #conversation-select,
     .lifecycle-primary-conversation-only label[for="conversation-select"],
@@ -98,6 +83,9 @@ LIFECYCLE_V2_STYLE = r'''
       overflow-y: auto;
       scrollbar-gutter: stable;
     }
+
+    .lifecycle-inline-section { margin-top: 12px; }
+    .lifecycle-hidden-step { display: none !important; }
 '''
 
 
@@ -120,7 +108,6 @@ LIFECYCLE_V2_SCRIPT = r'''
   function lifecycleCompactSettings() {
     const settings = byId('guided-settings-content');
     if (!settings) return;
-
     const account = byId('account');
     if (account && account.parentElement !== settings) settings.prepend(account);
 
@@ -136,6 +123,53 @@ LIFECYCLE_V2_SCRIPT = r'''
       child.parentNode.insertBefore(details, child);
       details.appendChild(child);
     });
+  }
+
+  function lifecycleRecomposeGuidedFlow() {
+    const nav = document.querySelector('#guided-workflow > .guided-step-nav');
+    if (nav) {
+      nav.replaceChildren();
+      [
+        ['#guided-step-1', '1 选择人物'],
+        ['#guided-step-2', '2 编辑关系'],
+        ['#guided-step-3', '3 主会话与 AI'],
+        ['#guided-step-5', '4 行动与复盘'],
+      ].forEach(([href, text]) => {
+        const a = document.createElement('a');
+        a.href = href;
+        a.textContent = text;
+        nav.appendChild(a);
+      });
+    }
+
+    const step3 = byId('guided-step-3');
+    const step4 = byId('guided-step-4');
+    const step5 = byId('guided-step-5');
+    const step6 = byId('guided-step-6');
+
+    if (step3 && step4) {
+      const header = step3.querySelector('.guided-step-header h2');
+      const copy = step3.querySelector('.guided-step-header p');
+      if (header) header.textContent = '主会话、AI 分析与回复';
+      if (copy) copy.textContent = '一个人物只展示一个主会话。新增真实消息后，系统自动刷新 AI 分析、回复建议和行动计划。';
+      const primary = byId('guided-analysis-primary');
+      const advanced = byId('guided-analysis-advanced')?.closest('details');
+      if (primary) { primary.classList.add('lifecycle-inline-section'); step3.appendChild(primary); }
+      if (advanced) step3.appendChild(advanced);
+      step4.classList.add('lifecycle-hidden-step');
+    }
+
+    if (step5 && step6) {
+      const header = step5.querySelector('.guided-step-header h2');
+      const copy = step5.querySelector('.guided-step-header p');
+      if (header) header.textContent = '行动更新与自动复盘';
+      if (copy) copy.textContent = '你只需要确认真实行动、记录执行和 Outcome；系统随后自动刷新反馈、学习建议和最新复盘。';
+      const actionBar = step6.querySelector('.guided-action-bar');
+      const learning = byId('guided-learning-primary');
+      if (actionBar) step5.appendChild(actionBar);
+      if (learning) { learning.classList.add('lifecycle-inline-section'); step5.appendChild(learning); }
+      step6.classList.add('lifecycle-hidden-step');
+    }
   }
 
   function lifecycleInstallPrimaryConversationPresentation() {
@@ -158,7 +192,7 @@ LIFECYCLE_V2_SCRIPT = r'''
       lifecyclePrimaryConversationId = null;
       return null;
     }
-    const selected = options.find((option) => option.value === selectedConversationId) || options[0];
+    const selected = options.find((option) => option.value === selectedConversationId) || options[options.length - 1];
     lifecyclePrimaryConversationId = selected.value;
     if (select.value !== selected.value) {
       select.value = selected.value;
@@ -172,7 +206,6 @@ LIFECYCLE_V2_SCRIPT = r'''
     await loadConversations();
     const existing = lifecycleSelectPrimaryConversation();
     if (existing) return existing;
-
     const titleInput = byId('conversation-title');
     if (titleInput && !titleInput.value.trim()) titleInput.value = '主会话';
     await createConversation();
@@ -186,7 +219,7 @@ LIFECYCLE_V2_SCRIPT = r'''
     const select = byId('relationship-select');
     const options = select ? Array.from(select.options).filter((option) => option.value) : [];
     if (!selectedRelationshipId && options.length > 0) {
-      selectedRelationshipId = options[0].value;
+      selectedRelationshipId = options[options.length - 1].value;
       select.value = selectedRelationshipId;
       select.dispatchEvent(new Event('change', { bubbles: true }));
     }
@@ -208,6 +241,16 @@ LIFECYCLE_V2_SCRIPT = r'''
       lifecycleAutomationStatus.textContent = `自动跟进未完全完成：${error instanceof Error ? error.message : String(error)}`;
     } finally {
       lifecycleAutomationBusy = false;
+    }
+  }
+
+  async function lifecycleAfterDecisionRecorded(detail) {
+    if (!detail || detail.decision !== 'confirmed') return;
+    try {
+      await loadActionExecutionContext();
+      lifecycleAutomationStatus.textContent = '行动已确认，待执行状态已自动刷新。现实中执行后，请明确记录“已执行”。';
+    } catch (error) {
+      lifecycleAutomationStatus.textContent = `确认后刷新失败：${error instanceof Error ? error.message : String(error)}`;
     }
   }
 
@@ -240,10 +283,8 @@ LIFECYCLE_V2_SCRIPT = r'''
     }
   }
 
-  window.addEventListener('junshi:evidence-changed', (event) => {
-    lifecycleAfterEvidenceChanged(event.detail?.source || '证据');
-  });
-
+  window.addEventListener('junshi:evidence-changed', (event) => lifecycleAfterEvidenceChanged(event.detail?.source || '证据'));
+  window.addEventListener('junshi:decision-recorded', (event) => lifecycleAfterDecisionRecorded(event.detail));
   window.addEventListener('junshi:execution-recorded', () => lifecycleAfterExecutionRecorded());
   window.addEventListener('junshi:outcome-recorded', () => lifecycleAfterOutcomeRecorded());
 
@@ -259,5 +300,6 @@ LIFECYCLE_V2_SCRIPT = r'''
   });
 
   lifecycleCompactSettings();
+  lifecycleRecomposeGuidedFlow();
   lifecycleInstallPrimaryConversationPresentation();
 '''
