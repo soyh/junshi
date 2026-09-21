@@ -13,6 +13,7 @@ class TextImportRequest(BaseModel):
     text: str
     title: str | None = None
     auto_sort_by_sent_at: bool = False
+    conversation_id: str | None = None
 
 
 class TextImportResponse(BaseModel):
