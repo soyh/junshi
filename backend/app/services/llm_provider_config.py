@@ -1,4 +1,5 @@
 import sqlite3
+from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -9,11 +10,21 @@ from app.schemas.llm_provider_config import (
     LLMProviderConfigUpdate,
 )
 from app.services.llm import LLMAnalysisError, LLMProvider
+from app.services.openai_chat_provider import OpenAICompatibleProvider
 from app.services.qwen_provider import QwenProvider
 
 
 class LLMProviderConfigError(ValueError):
     pass
+
+
+_PROVIDER_PROFILES: dict[str, tuple[str, bool]] = {
+    "deepseek": ("DeepSeek", False),
+    "kimi": ("Kimi", False),
+    "openai": ("OpenAI", True),
+    "gemini": ("Gemini", True),
+    "openai_compatible": ("OpenAI-compatible", False),
+}
 
 
 class LLMProviderConfigService:
@@ -71,6 +82,19 @@ class LLMProviderConfigService:
     def delete(self, conn: sqlite3.Connection, user_id: str) -> bool:
         return self.repository.delete(conn, user_id)
 
+    @staticmethod
+    def _is_legacy_qwen_compatible_config(provider: str, base_url: str) -> bool:
+        if provider != "openai_compatible":
+            return False
+        hostname = (urlsplit(base_url).hostname or "").lower()
+        return (
+            "dashscope" in hostname
+            or (
+                hostname.endswith(".aliyuncs.com")
+                and "compatible-mode" in urlsplit(base_url).path
+            )
+        )
+
     def build_provider(
         self,
         conn: sqlite3.Connection,
@@ -79,9 +103,6 @@ class LLMProviderConfigService:
         row = self.repository.get(conn, user_id)
         if row is None:
             return QwenProvider()
-
-        if row["provider"] != "openai_compatible":
-            raise LLMProviderConfigError("unsupported LLM provider")
 
         try:
             api_key = self._fernet().decrypt(
@@ -92,11 +113,34 @@ class LLMProviderConfigService:
                 "stored LLM provider API key cannot be decrypted"
             ) from None
 
-        return QwenProvider(
+        provider_name = row["provider"]
+        base_url = row["base_url"]
+        model = row["model"]
+        timeout_seconds = float(row["timeout_seconds"])
+
+        if provider_name == "qwen" or self._is_legacy_qwen_compatible_config(
+            provider_name,
+            base_url,
+        ):
+            return QwenProvider(
+                api_key=api_key,
+                base_url=base_url,
+                model=model,
+                timeout_seconds=timeout_seconds,
+            )
+
+        profile = _PROVIDER_PROFILES.get(provider_name)
+        if profile is None:
+            raise LLMProviderConfigError("unsupported LLM provider")
+
+        label, supports_json_schema = profile
+        return OpenAICompatibleProvider(
             api_key=api_key,
-            base_url=row["base_url"],
-            model=row["model"],
-            timeout_seconds=float(row["timeout_seconds"]),
+            base_url=base_url,
+            model=model,
+            timeout_seconds=timeout_seconds,
+            provider_name=label,
+            supports_json_schema=supports_json_schema,
         )
 
     def test_connection(self, conn: sqlite3.Connection, user_id: str) -> None:
