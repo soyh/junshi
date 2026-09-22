@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     portable_backup_encryption_key: str | None = None
     portable_backup_keep: int = 7
 
+    media_storage_directory: str = "/opt/ai-love-strategist/data/media"
+    media_max_upload_bytes: int = 50 * 1024 * 1024
+
     local_user_id: str = "00000000-0000-0000-0000-000000000001"
     auth_bearer_token: str | None = None
     auth_bootstrap_enabled: bool = False
