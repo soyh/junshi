@@ -51,6 +51,10 @@ from app.ui.conversation_content_workspace import (
     CONVERSATION_CONTENT_HTML,
     CONVERSATION_CONTENT_SCRIPT,
 )
+from app.ui.conversation_controls_workspace import (
+    CONVERSATION_CONTROLS_SCRIPT,
+    CONVERSATION_CONTROLS_STYLE,
+)
 from app.ui.conversation_session_workspace import (
     CONVERSATION_SESSION_SCRIPT,
     CONVERSATION_SESSION_STYLE,
@@ -149,6 +153,19 @@ NEW_PRODUCT_NAV = '''  <nav aria-label="主要功能">
     <a href="#action-reanalysis-workspace">Action re-analysis</a>
   </nav>'''
 
+OLD_PROVIDER_SELECT = '''    <select id="provider-name">
+      <option value="openai_compatible">OpenAI-compatible</option>
+    </select>'''
+
+NEW_PROVIDER_SELECT = '''    <select id="provider-name">
+      <option value="qwen">Qwen / 阿里云百炼</option>
+      <option value="deepseek">DeepSeek</option>
+      <option value="kimi">Kimi / Moonshot</option>
+      <option value="openai">OpenAI</option>
+      <option value="gemini">Gemini / Google</option>
+      <option value="openai_compatible">其他 OpenAI-compatible</option>
+    </select>'''
+
 
 def build_product_shell_html() -> str:
     provider_marker = '  <fieldset id="provider" class="wide">'
@@ -165,6 +182,8 @@ def build_product_shell_html() -> str:
         raise RuntimeError("Product shell stale-note replacement marker not found")
     if OLD_PRODUCT_NAV not in PRODUCT_SHELL_HTML:
         raise RuntimeError("Product shell navigation replacement marker not found")
+    if OLD_PROVIDER_SELECT not in PRODUCT_SHELL_HTML:
+        raise RuntimeError("Product shell provider select replacement marker not found")
 
     base_html = PRODUCT_SHELL_HTML.replace(
         OLD_PRODUCT_NOTE,
@@ -173,6 +192,10 @@ def build_product_shell_html() -> str:
     ).replace(
         OLD_PRODUCT_NAV,
         NEW_PRODUCT_NAV,
+        1,
+    ).replace(
+        OLD_PROVIDER_SELECT,
+        NEW_PROVIDER_SELECT,
         1,
     ).replace(
         style_marker,
@@ -189,6 +212,7 @@ def build_product_shell_html() -> str:
             f"{SINGLE_OPEN_INTERACTION_STYLE}\n"
             f"{SETTINGS_TAB_WORKSPACE_STYLE}\n"
             f"{MULTI_PROVIDER_SETTINGS_STYLE}\n"
+            f"{CONVERSATION_CONTROLS_STYLE}\n"
             f"{style_marker}"
         ),
         1,
@@ -235,6 +259,7 @@ def build_product_shell_html() -> str:
         f"{CARD_CLIENT_COMPACT_SURFACE_SCRIPT}\n\n"
         f"{CARD_CLIENT_GENERATION_RECOVERY_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
+        f"{CONVERSATION_CONTROLS_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
         f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
         f"{ACCOUNT_SECURITY_SCRIPT}\n\n"
