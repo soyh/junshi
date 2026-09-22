@@ -9,6 +9,9 @@ from app.repositories.llm_provider_config import LLMProviderConfigRepository
 from app.schemas.llm_provider_config import (
     LLMProviderConfigResponse,
     LLMProviderConfigUpdate,
+    LLMProviderProfileCreate,
+    LLMProviderProfileResponse,
+    LLMProviderProfileUpdate,
     LLMProviderValidationResult,
 )
 from app.services.llm import LLMAnalysisError, LLMProvider
@@ -46,10 +49,8 @@ class LLMProviderConfigService:
                 "LLM provider config encryption key is invalid"
             ) from None
 
-    def get(self, conn: sqlite3.Connection, user_id: str) -> LLMProviderConfigResponse | None:
-        row = self.repository.get(conn, user_id)
-        if row is None:
-            return None
+    @staticmethod
+    def _config_response(row: sqlite3.Row) -> LLMProviderConfigResponse:
         return LLMProviderConfigResponse(
             provider=row["provider"],
             base_url=row["base_url"],
@@ -58,7 +59,39 @@ class LLMProviderConfigService:
             api_key_configured=bool(row["api_key_encrypted"]),
         )
 
-    def save(self, conn: sqlite3.Connection, user_id: str, config: LLMProviderConfigUpdate) -> LLMProviderConfigResponse:
+    @staticmethod
+    def _profile_response(row: sqlite3.Row) -> LLMProviderProfileResponse:
+        return LLMProviderProfileResponse(
+            id=row["id"],
+            name=row["name"],
+            provider=row["provider"],
+            base_url=row["base_url"],
+            model=row["model"],
+            timeout_seconds=float(row["timeout_seconds"]),
+            api_key_configured=bool(row["api_key_encrypted"]),
+            is_active=bool(row["is_active"]),
+        )
+
+    def _runtime_row(self, conn: sqlite3.Connection, user_id: str) -> sqlite3.Row | None:
+        getter = getattr(self.repository, "get_active_profile", None)
+        if callable(getter):
+            row = getter(conn, user_id)
+            if row is not None:
+                return row
+        return self.repository.get(conn, user_id)
+
+    def get(self, conn: sqlite3.Connection, user_id: str) -> LLMProviderConfigResponse | None:
+        row = self._runtime_row(conn, user_id)
+        if row is None:
+            return None
+        return self._config_response(row)
+
+    def save(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        config: LLMProviderConfigUpdate,
+    ) -> LLMProviderConfigResponse:
         api_key = config.api_key.get_secret_value()
         encrypted = self._fernet().encrypt(api_key.encode("utf-8")).decode("ascii")
         self.repository.upsert(
@@ -70,10 +103,143 @@ class LLMProviderConfigService:
             config.timeout_seconds,
             encrypted,
         )
+        sync_profile = getattr(self.repository, "upsert_legacy_profile", None)
+        if callable(sync_profile):
+            sync_profile(
+                conn,
+                user_id,
+                config.provider,
+                config.base_url.rstrip("/"),
+                config.model,
+                config.timeout_seconds,
+                encrypted,
+            )
         return self.get(conn, user_id)  # type: ignore[return-value]
 
     def delete(self, conn: sqlite3.Connection, user_id: str) -> bool:
-        return self.repository.delete(conn, user_id)
+        deleted = self.repository.delete(conn, user_id)
+        delete_profiles = getattr(self.repository, "delete_all_profiles", None)
+        if callable(delete_profiles):
+            delete_profiles(conn, user_id)
+        return deleted
+
+    def list_profiles(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+    ) -> list[LLMProviderProfileResponse]:
+        return [
+            self._profile_response(row)
+            for row in self.repository.list_profiles(conn, user_id)
+        ]
+
+    def create_profile(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        payload: LLMProviderProfileCreate,
+    ) -> LLMProviderProfileResponse:
+        encrypted = self._fernet().encrypt(
+            payload.api_key.get_secret_value().encode("utf-8")
+        ).decode("ascii")
+        existing = self.repository.list_profiles(conn, user_id)
+        activate = payload.activate or not existing
+        try:
+            row = self.repository.create_profile(
+                conn,
+                user_id,
+                payload.name,
+                payload.provider,
+                payload.base_url.rstrip("/"),
+                payload.model,
+                payload.timeout_seconds,
+                encrypted,
+                activate,
+            )
+        except sqlite3.IntegrityError as exc:
+            raise LLMProviderConfigError("LLM profile name already exists") from exc
+        if activate:
+            self._sync_legacy_from_profile(conn, user_id, row)
+        return self._profile_response(row)
+
+    def update_profile(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        profile_id: str,
+        payload: LLMProviderProfileUpdate,
+    ) -> LLMProviderProfileResponse:
+        current = self.repository.get_profile(conn, user_id, profile_id)
+        if current is None:
+            raise LLMProviderConfigError("LLM profile not found")
+        values: dict[str, object] = {}
+        for field in ("name", "provider", "base_url", "model", "timeout_seconds"):
+            if field in payload.model_fields_set:
+                value = getattr(payload, field)
+                if value is not None:
+                    values[field] = value.rstrip("/") if field == "base_url" else value
+        if "api_key" in payload.model_fields_set and payload.api_key is not None:
+            values["api_key_encrypted"] = self._fernet().encrypt(
+                payload.api_key.get_secret_value().encode("utf-8")
+            ).decode("ascii")
+        try:
+            row = self.repository.update_profile(conn, user_id, profile_id, values)
+        except sqlite3.IntegrityError as exc:
+            raise LLMProviderConfigError("LLM profile name already exists") from exc
+        if row is None:
+            raise LLMProviderConfigError("LLM profile not found")
+        if bool(row["is_active"]):
+            self._sync_legacy_from_profile(conn, user_id, row)
+        return self._profile_response(row)
+
+    def activate_profile(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        profile_id: str,
+    ) -> LLMProviderProfileResponse:
+        row = self.repository.activate_profile(conn, user_id, profile_id)
+        if row is None:
+            raise LLMProviderConfigError("LLM profile not found")
+        self._sync_legacy_from_profile(conn, user_id, row)
+        return self._profile_response(row)
+
+    def delete_profile(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        profile_id: str,
+    ) -> bool:
+        current = self.repository.get_profile(conn, user_id, profile_id)
+        if current is None:
+            raise LLMProviderConfigError("LLM profile not found")
+        was_active = bool(current["is_active"])
+        if not self.repository.delete_profile(conn, user_id, profile_id):
+            raise LLMProviderConfigError("LLM profile not found")
+        remaining = self.repository.list_profiles(conn, user_id)
+        if was_active and remaining:
+            replacement = self.repository.activate_profile(conn, user_id, remaining[0]["id"])
+            if replacement is not None:
+                self._sync_legacy_from_profile(conn, user_id, replacement)
+        elif not remaining:
+            self.repository.delete(conn, user_id)
+        return True
+
+    def _sync_legacy_from_profile(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        row: sqlite3.Row,
+    ) -> None:
+        self.repository.upsert(
+            conn,
+            user_id,
+            row["provider"],
+            row["base_url"],
+            row["model"],
+            float(row["timeout_seconds"]),
+            row["api_key_encrypted"],
+        )
 
     @staticmethod
     def _is_legacy_qwen_compatible_config(provider: str, base_url: str) -> bool:
@@ -84,22 +250,24 @@ class LLMProviderConfigService:
             hostname.endswith(".aliyuncs.com") and "compatible-mode" in urlsplit(base_url).path
         )
 
-    def build_provider(self, conn: sqlite3.Connection, user_id: str) -> LLMProvider:
-        row = self.repository.get(conn, user_id)
-        if row is None:
-            return QwenProvider()
-
+    def _build_provider_from_row(self, row: sqlite3.Row) -> LLMProvider:
         try:
-            api_key = self._fernet().decrypt(row["api_key_encrypted"].encode("ascii")).decode("utf-8")
+            api_key = self._fernet().decrypt(
+                row["api_key_encrypted"].encode("ascii")
+            ).decode("utf-8")
         except (InvalidToken, UnicodeDecodeError, ValueError):
-            raise LLMProviderConfigError("stored LLM provider API key cannot be decrypted") from None
+            raise LLMProviderConfigError(
+                "stored LLM provider API key cannot be decrypted"
+            ) from None
 
         provider_name = row["provider"]
         base_url = row["base_url"]
         model = row["model"]
         timeout_seconds = float(row["timeout_seconds"])
 
-        if provider_name == "qwen" or self._is_legacy_qwen_compatible_config(provider_name, base_url):
+        if provider_name == "qwen" or self._is_legacy_qwen_compatible_config(
+            provider_name, base_url
+        ):
             return QwenProvider(
                 api_key=api_key,
                 base_url=base_url,
@@ -121,8 +289,19 @@ class LLMProviderConfigService:
             supports_json_schema=supports_json_schema,
         )
 
+    def build_provider(self, conn: sqlite3.Connection, user_id: str) -> LLMProvider:
+        row = self._runtime_row(conn, user_id)
+        if row is None:
+            return QwenProvider()
+        return self._build_provider_from_row(row)
+
     @staticmethod
-    def _validation_result(provider_name: str, model: str, code: str, message: str) -> LLMProviderValidationResult:
+    def _validation_result(
+        provider_name: str,
+        model: str,
+        code: str,
+        message: str,
+    ) -> LLMProviderValidationResult:
         return LLMProviderValidationResult(
             status="ok" if code == "ok" else "error",
             code=code,
@@ -150,16 +329,11 @@ class LLMProviderConfigService:
             return "model_invalid", "Configured model was rejected by the provider."
         return "unknown", "Provider rejected the connection test request."
 
-    def test_connection(
+    def _test_provider(
         self,
-        conn: sqlite3.Connection,
-        user_id: str,
+        provider: LLMProvider,
+        provider_name: str,
     ) -> LLMProviderValidationResult | None:
-        provider = self.build_provider(conn, user_id)
-
-        # Preserve the pre-TEST-176 provider boundary for any non-OpenAI transport.
-        # All currently supported runtime providers inherit OpenAIChatProvider, but
-        # this fallback keeps older/custom providers and redaction tests unchanged.
         if not isinstance(provider, OpenAIChatProvider):
             try:
                 provider.test_connection()
@@ -169,19 +343,7 @@ class LLMProviderConfigService:
                 raise LLMAnalysisError("LLM provider connection test failed") from None
             return None
 
-        row = None
-        repository_get = getattr(self.repository, "get", None)
-        if callable(repository_get):
-            row = repository_get(conn, user_id)
-
-        if row is not None:
-            provider_name = row["provider"]
-        elif isinstance(provider, QwenProvider):
-            provider_name = "qwen"
-        else:
-            provider_name = "openai_compatible"
         model = provider.model
-
         if not provider.api_key:
             return self._validation_result(
                 provider_name,
@@ -202,11 +364,20 @@ class LLMProviderConfigService:
         try:
             response = provider._post(payload, headers)
         except httpx.TimeoutException:
-            return self._validation_result(provider_name, model, "timeout", "Provider request timed out.")
+            return self._validation_result(
+                provider_name, model, "timeout", "Provider request timed out."
+            )
         except (httpx.ConnectError, httpx.InvalidURL):
-            return self._validation_result(provider_name, model, "endpoint_invalid", "Provider endpoint could not be reached.")
+            return self._validation_result(
+                provider_name,
+                model,
+                "endpoint_invalid",
+                "Provider endpoint could not be reached.",
+            )
         except httpx.HTTPError:
-            return self._validation_result(provider_name, model, "unknown", "Provider connection test failed.")
+            return self._validation_result(
+                provider_name, model, "unknown", "Provider connection test failed."
+            )
 
         if not response.is_success:
             code, message = self._classify_http_failure(response.status_code, response.text)
@@ -225,4 +396,30 @@ class LLMProviderConfigService:
                 "Provider returned an unexpected response shape.",
             )
 
-        return self._validation_result(provider_name, model, "ok", "Provider connection succeeded.")
+        return self._validation_result(
+            provider_name, model, "ok", "Provider connection succeeded."
+        )
+
+    def test_connection(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+    ) -> LLMProviderValidationResult | None:
+        row = self._runtime_row(conn, user_id)
+        provider = QwenProvider() if row is None else self._build_provider_from_row(row)
+        provider_name = row["provider"] if row is not None else "qwen"
+        return self._test_provider(provider, provider_name)
+
+    def test_profile_connection(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        profile_id: str,
+    ) -> LLMProviderValidationResult | None:
+        row = self.repository.get_profile(conn, user_id, profile_id)
+        if row is None:
+            raise LLMProviderConfigError("LLM profile not found")
+        return self._test_provider(
+            self._build_provider_from_row(row),
+            row["provider"],
+        )
