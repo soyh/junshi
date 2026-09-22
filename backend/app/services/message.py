@@ -49,7 +49,6 @@ class MessageService:
             user_id,
             conversation_id,
         )
-
         if conversation is None:
             raise ConversationNotFoundError(
                 "Conversation not found"
@@ -65,13 +64,7 @@ class MessageService:
         sent_at: str | None,
     ) -> sqlite3.Row:
         self._validate_sender_type(sender_type)
-
-        self._validate_conversation(
-            conn,
-            user_id,
-            conversation_id,
-        )
-
+        self._validate_conversation(conn, user_id, conversation_id)
         return self.repository.create(
             conn,
             user_id,
@@ -87,16 +80,31 @@ class MessageService:
         user_id: str,
         conversation_id: str,
     ) -> list[sqlite3.Row]:
-        self._validate_conversation(
-            conn,
-            user_id,
-            conversation_id,
-        )
+        """Return the complete canonical history for analysis and internal services."""
+        self._validate_conversation(conn, user_id, conversation_id)
+        return self.repository.list(conn, user_id, conversation_id)
 
-        return self.repository.list(
+    def list_window(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        conversation_id: str,
+        *,
+        from_time: str | None = None,
+        to_time: str | None = None,
+        before: str | None = None,
+        limit: int = 100,
+    ) -> list[sqlite3.Row]:
+        """Return a bounded display window without truncating canonical history."""
+        self._validate_conversation(conn, user_id, conversation_id)
+        return self.repository.list_window(
             conn,
             user_id,
             conversation_id,
+            from_time=from_time,
+            to_time=to_time,
+            before=before,
+            limit=limit,
         )
 
     def get(
@@ -105,18 +113,43 @@ class MessageService:
         user_id: str,
         message_id: str,
     ) -> sqlite3.Row:
-        message = self.repository.get(
+        message = self.repository.get(conn, user_id, message_id)
+        if message is None:
+            raise MessageNotFoundError("Message not found")
+        return message
+
+    def update(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        message_id: str,
+        *,
+        sender_type: str | None = None,
+        content: str | None = None,
+        sent_at: str | None = None,
+        fields_set: set[str] | None = None,
+    ) -> sqlite3.Row:
+        current = self.get(conn, user_id, message_id)
+        fields_set = fields_set or set()
+        next_sender = sender_type if "sender_type" in fields_set else current["sender_type"]
+        next_content = content if "content" in fields_set else current["content"]
+        next_sent_at = sent_at if "sent_at" in fields_set else current["sent_at"]
+        if next_sender is None or next_content is None or next_sent_at is None:
+            raise ValueError("Message fields cannot be null")
+        self._validate_sender_type(next_sender)
+        if not str(next_content).strip():
+            raise ValueError("Message content cannot be empty")
+        updated = self.repository.update(
             conn,
             user_id,
             message_id,
+            sender_type=next_sender,
+            content=next_content,
+            sent_at=next_sent_at,
         )
-
-        if message is None:
-            raise MessageNotFoundError(
-                "Message not found"
-            )
-
-        return message
+        if updated is None:
+            raise MessageNotFoundError("Message not found")
+        return updated
 
     def delete(
         self,
@@ -124,15 +157,7 @@ class MessageService:
         user_id: str,
         message_id: str,
     ) -> bool:
-        deleted = self.repository.delete(
-            conn,
-            user_id,
-            message_id,
-        )
-
+        deleted = self.repository.delete(conn, user_id, message_id)
         if not deleted:
-            raise MessageNotFoundError(
-                "Message not found"
-            )
-
+            raise MessageNotFoundError("Message not found")
         return True
