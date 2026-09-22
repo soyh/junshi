@@ -12,7 +12,7 @@ class FakeFernet:
 def test_configured_provider_materializes_persisted_runtime_parameters(monkeypatch):
     captured = {}
 
-    class FakeQwenProvider:
+    class FakeOpenAICompatibleProvider:
         def __init__(self, **kwargs):
             captured.update(kwargs)
 
@@ -32,14 +32,20 @@ def test_configured_provider_materializes_persisted_runtime_parameters(monkeypat
         raising=False,
     )
     monkeypatch.setattr(service, "_fernet", lambda: FakeFernet())
-    monkeypatch.setattr(llm_provider_config, "QwenProvider", FakeQwenProvider)
+    monkeypatch.setattr(
+        llm_provider_config,
+        "OpenAICompatibleProvider",
+        FakeOpenAICompatibleProvider,
+    )
 
     provider = service.build_provider(object(), "user-a")
 
-    assert isinstance(provider, FakeQwenProvider)
+    assert isinstance(provider, FakeOpenAICompatibleProvider)
     assert captured == {
         "api_key": "encrypted-key",
         "base_url": "https://provider.example/v1",
         "model": "custom-model",
         "timeout_seconds": 42.5,
+        "provider_name": "OpenAI-compatible",
+        "supports_json_schema": False,
     }
