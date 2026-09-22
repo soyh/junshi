@@ -23,6 +23,7 @@ from app.api.routes.learning_strategy import router as learning_strategy_router
 from app.api.routes.learning_strategy_synthesis import router as learning_strategy_synthesis_router
 from app.api.routes.llm_provider_config import router as llm_provider_config_router
 from app.api.routes.llm_provider_ui import router as llm_provider_ui_router
+from app.api.routes.media_attachments import router as media_attachments_router
 from app.api.routes.memory_learning_synthesis import router as memory_learning_synthesis_router
 from app.api.routes.memory_persistence import router as memory_persistence_router
 from app.api.routes.memory_synthesis import router as memory_synthesis_router
@@ -104,6 +105,7 @@ api_router.include_router(memory_persistence_router)
 api_router.include_router(interactions_router)
 api_router.include_router(messages_router)
 api_router.include_router(conversation_messages_router)
+api_router.include_router(media_attachments_router)
 api_router.include_router(conversations_router)
 api_router.include_router(timeline_router)
 api_router.include_router(text_imports_router)
