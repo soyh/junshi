@@ -69,7 +69,7 @@ class MessageRepository:
             FROM messages
             WHERE user_id = ?
               AND conversation_id = ?
-            ORDER BY sent_at ASC, created_at ASC
+            ORDER BY julianday(sent_at) ASC, created_at ASC
             """,
             (user_id, conversation_id),
         ).fetchall()
@@ -88,13 +88,13 @@ class MessageRepository:
         clauses = ["user_id = ?", "conversation_id = ?"]
         params: list[object] = [user_id, conversation_id]
         if from_time is not None:
-            clauses.append("sent_at >= ?")
+            clauses.append("julianday(sent_at) >= julianday(?)")
             params.append(from_time)
         if to_time is not None:
-            clauses.append("sent_at <= ?")
+            clauses.append("julianday(sent_at) <= julianday(?)")
             params.append(to_time)
         if before is not None:
-            clauses.append("sent_at < ?")
+            clauses.append("julianday(sent_at) < julianday(?)")
             params.append(before)
         params.append(limit)
         rows = conn.execute(
@@ -102,7 +102,7 @@ class MessageRepository:
             SELECT *
             FROM messages
             WHERE {' AND '.join(clauses)}
-            ORDER BY sent_at DESC, created_at DESC
+            ORDER BY julianday(sent_at) DESC, created_at DESC
             LIMIT ?
             """,
             tuple(params),
