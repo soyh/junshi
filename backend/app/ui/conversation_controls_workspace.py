@@ -349,26 +349,69 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
       const card = document.createElement('section');
       card.id = 'client-media-card';
       card.className = 'workspace-card';
-      card.innerHTML = `
-        <h3>图片 / 视频</h3>
-        <p class="note">上传聊天截图、照片、表情包或视频。系统会使用当前配置的多模态 LLM 识别内容；识别结果作为系统证据加入完整会话链路。</p>
-        <div id="client-media-controls">
-          <div>
-            <label for="client-media-file">媒体文件</label>
-            <input id="client-media-file" class="requires-auth" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" disabled>
-          </div>
-          <div>
-            <label for="client-media-sent-at">发送时间（可选）</label>
-            <input id="client-media-sent-at" class="requires-auth" type="datetime-local" disabled>
-          </div>
-        </div>
-        <div id="client-media-actions">
-          <button id="client-upload-media" class="requires-auth client-primary-button" type="button" disabled>上传并识别</button>
-          <button id="client-refresh-media" class="requires-auth" type="button" disabled>刷新附件</button>
-        </div>
-        <div id="client-media-status" class="status">选择会话后可上传图片或视频。</div>
-        <div id="client-media-list" class="status">当前会话还没有图片或视频。</div>
-      `;
+
+      const heading = document.createElement('h3');
+      heading.textContent = '图片 / 视频';
+
+      const note = document.createElement('p');
+      note.className = 'note';
+      note.textContent = '上传聊天截图、照片、表情包或视频。系统会使用当前配置的多模态 LLM 识别内容；识别结果作为系统证据加入完整会话链路。';
+
+      const mediaControls = document.createElement('div');
+      mediaControls.id = 'client-media-controls';
+
+      const fileWrap = document.createElement('div');
+      const fileLabel = document.createElement('label');
+      fileLabel.htmlFor = 'client-media-file';
+      fileLabel.textContent = '媒体文件';
+      const fileInput = document.createElement('input');
+      fileInput.id = 'client-media-file';
+      fileInput.className = 'requires-auth';
+      fileInput.type = 'file';
+      fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime';
+      fileInput.disabled = !currentAccessToken;
+      fileWrap.append(fileLabel, fileInput);
+
+      const sentAtWrap = document.createElement('div');
+      const sentAtLabel = document.createElement('label');
+      sentAtLabel.htmlFor = 'client-media-sent-at';
+      sentAtLabel.textContent = '发送时间（可选）';
+      const sentAtInput = document.createElement('input');
+      sentAtInput.id = 'client-media-sent-at';
+      sentAtInput.className = 'requires-auth';
+      sentAtInput.type = 'datetime-local';
+      sentAtInput.disabled = !currentAccessToken;
+      sentAtWrap.append(sentAtLabel, sentAtInput);
+
+      mediaControls.append(fileWrap, sentAtWrap);
+
+      const mediaActions = document.createElement('div');
+      mediaActions.id = 'client-media-actions';
+      const upload = document.createElement('button');
+      upload.id = 'client-upload-media';
+      upload.className = 'requires-auth client-primary-button';
+      upload.type = 'button';
+      upload.disabled = !currentAccessToken;
+      upload.textContent = '上传并识别';
+      const refresh = document.createElement('button');
+      refresh.id = 'client-refresh-media';
+      refresh.className = 'requires-auth';
+      refresh.type = 'button';
+      refresh.disabled = !currentAccessToken;
+      refresh.textContent = '刷新附件';
+      mediaActions.append(upload, refresh);
+
+      const mediaStatus = document.createElement('div');
+      mediaStatus.id = 'client-media-status';
+      mediaStatus.className = 'status';
+      mediaStatus.textContent = '选择会话后可上传图片或视频。';
+
+      const mediaList = document.createElement('div');
+      mediaList.id = 'client-media-list';
+      mediaList.className = 'status';
+      mediaList.textContent = '当前会话还没有图片或视频。';
+
+      card.append(heading, note, mediaControls, mediaActions, mediaStatus, mediaList);
       contentWorkspace.appendChild(card);
       bind('client-upload-media', clientUploadAndAnalyzeMedia, byId('client-media-status'));
       bind('client-refresh-media', clientLoadMediaAttachments, byId('client-media-status'));
