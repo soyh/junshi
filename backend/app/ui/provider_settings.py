@@ -57,6 +57,7 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
       <button id="test" type="button">Test connection</button>
       <button id="delete" type="button">Delete config</button>
     </div>
+    <p class="note">Connection test reports a safe diagnostic code for credential, model, endpoint, timeout, rate limit, provider availability, or response-shape failures. Provider response bodies and API keys are not shown.</p>
   </fieldset>
 
   <h2>Status</h2>
@@ -159,7 +160,12 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
 
   async function testConnection() {
     const result = await api('/api/v1/settings/llm/test', { method: 'POST' });
-    renderStatus(result && result.status === 'ok' ? 'Connection test succeeded.' : 'Connection test returned an unexpected response.');
+    if (!result || typeof result !== 'object') {
+      renderStatus('Connection test returned an unexpected response.');
+      return;
+    }
+    const label = result.status === 'ok' ? 'PASS' : 'FAIL';
+    renderStatus(`${label} [${result.code}] ${result.provider} / ${result.model}: ${result.message}`);
   }
 
   async function deleteConfig() {
