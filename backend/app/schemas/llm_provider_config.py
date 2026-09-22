@@ -13,6 +13,18 @@ ProviderName = Literal[
     "openai_compatible",
 ]
 
+ProviderValidationCode = Literal[
+    "ok",
+    "api_key_invalid",
+    "model_invalid",
+    "endpoint_invalid",
+    "timeout",
+    "rate_limited",
+    "provider_unavailable",
+    "malformed_response",
+    "unknown",
+]
+
 
 class LLMProviderConfigUpdate(BaseModel):
     provider: ProviderName = "openai_compatible"
@@ -40,3 +52,11 @@ class LLMProviderConfigResponse(BaseModel):
     model: str
     timeout_seconds: float
     api_key_configured: bool
+
+
+class LLMProviderValidationResult(BaseModel):
+    status: Literal["ok", "error"]
+    code: ProviderValidationCode
+    provider: ProviderName
+    model: str
+    message: str
