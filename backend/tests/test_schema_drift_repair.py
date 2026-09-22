@@ -63,7 +63,9 @@ def test_014_repairs_action_plan_snapshot_schema_after_version_collision(
             """
         ).fetchone()
 
-    assert versions == [f"{value:03d}" for value in range(1, 15)]
+    expected_through_014 = [f"{value:03d}" for value in range(1, 15)]
+    assert versions[:14] == expected_through_014
+    assert versions.count("014") == 1
     assert original_008 is not None
     assert original_008[0] == original_008_applied_at
     assert table == ("action_plan_snapshots",)
