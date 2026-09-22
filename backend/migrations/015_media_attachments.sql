@@ -24,5 +24,5 @@ CREATE TABLE IF NOT EXISTS media_attachments (
 CREATE INDEX IF NOT EXISTS idx_media_attachments_conversation
     ON media_attachments(user_id, conversation_id, created_at);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_media_attachments_user_sha256
-    ON media_attachments(user_id, sha256, conversation_id);
+CREATE INDEX IF NOT EXISTS idx_media_attachments_sha256
+    ON media_attachments(user_id, sha256);
