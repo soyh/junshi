@@ -27,7 +27,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: TEST-177 focused
-        run: pytest -q tests/test_177_conversation_controls.py tests/test_conversations.py tests/test_authenticated_*.py
+        run: pytest -q tests/test_177_conversation_controls.py tests/test_177_media_attachments.py tests/test_conversations.py tests/test_authenticated_*.py
 
       - name: Full suite
         run: pytest -q
