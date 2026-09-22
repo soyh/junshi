@@ -68,6 +68,7 @@ from app.ui.lifecycle_v2_workspace import (
     LIFECYCLE_V2_SCRIPT,
     LIFECYCLE_V2_STYLE,
 )
+from app.ui.message_history_window_workspace import MESSAGE_HISTORY_WINDOW_SCRIPT
 from app.ui.multi_provider_settings_workspace import (
     MULTI_PROVIDER_SETTINGS_SCRIPT,
     MULTI_PROVIDER_SETTINGS_STYLE,
@@ -260,6 +261,7 @@ def build_product_shell_html() -> str:
         f"{CARD_CLIENT_GENERATION_RECOVERY_SCRIPT}\n\n"
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{CONVERSATION_CONTROLS_SCRIPT}\n\n"
+        f"{MESSAGE_HISTORY_WINDOW_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
         f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
         f"{ACCOUNT_SECURITY_SCRIPT}\n\n"
