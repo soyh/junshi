@@ -150,61 +150,79 @@ class LLMProviderConfigService:
             return "model_invalid", "Configured model was rejected by the provider."
         return "unknown", "Provider rejected the connection test request."
 
-    def test_connection(self, conn: sqlite3.Connection, user_id: str) -> LLMProviderValidationResult:
-        row = self.repository.get(conn, user_id)
-        provider_name = row["provider"] if row is not None else "qwen"
+    def test_connection(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+    ) -> LLMProviderValidationResult | None:
         provider = self.build_provider(conn, user_id)
-        model = getattr(provider, "model", row["model"] if row is not None else "")
 
-        if isinstance(provider, OpenAIChatProvider):
-            if not provider.api_key:
-                return self._validation_result(
-                    provider_name,
-                    model,
-                    "api_key_invalid",
-                    "Provider API key is not configured.",
-                )
-            payload = {
-                "model": provider.model,
-                "messages": [{"role": "user", "content": "Reply with OK."}],
-                "max_tokens": 8,
-            }
-            headers = {
-                "Authorization": f"Bearer {provider.api_key}",
-                "Content-Type": "application/json",
-            }
+        # Preserve the pre-TEST-176 provider boundary for any non-OpenAI transport.
+        # All currently supported runtime providers inherit OpenAIChatProvider, but
+        # this fallback keeps older/custom providers and redaction tests unchanged.
+        if not isinstance(provider, OpenAIChatProvider):
             try:
-                response = provider._post(payload, headers)
-            except httpx.TimeoutException:
-                return self._validation_result(provider_name, model, "timeout", "Provider request timed out.")
-            except (httpx.ConnectError, httpx.InvalidURL):
-                return self._validation_result(provider_name, model, "endpoint_invalid", "Provider endpoint could not be reached.")
-            except httpx.HTTPError:
-                return self._validation_result(provider_name, model, "unknown", "Provider connection test failed.")
+                provider.test_connection()
+            except LLMAnalysisError:
+                raise
+            except Exception:
+                raise LLMAnalysisError("LLM provider connection test failed") from None
+            return None
 
-            if not response.is_success:
-                code, message = self._classify_http_failure(response.status_code, response.text)
-                return self._validation_result(provider_name, model, code, message)
+        row = None
+        repository_get = getattr(self.repository, "get", None)
+        if callable(repository_get):
+            row = repository_get(conn, user_id)
 
-            try:
-                body = response.json()
-                choices = body["choices"]
-                if not isinstance(choices, list) or not choices:
-                    raise ValueError
-            except (ValueError, KeyError, TypeError):
-                return self._validation_result(
-                    provider_name,
-                    model,
-                    "malformed_response",
-                    "Provider returned an unexpected response shape.",
-                )
+        if row is not None:
+            provider_name = row["provider"]
+        elif isinstance(provider, QwenProvider):
+            provider_name = "qwen"
+        else:
+            provider_name = "openai_compatible"
+        model = provider.model
 
-            return self._validation_result(provider_name, model, "ok", "Provider connection succeeded.")
+        if not provider.api_key:
+            return self._validation_result(
+                provider_name,
+                model,
+                "api_key_invalid",
+                "Provider API key is not configured.",
+            )
+
+        payload = {
+            "model": provider.model,
+            "messages": [{"role": "user", "content": "Reply with OK."}],
+            "max_tokens": 8,
+        }
+        headers = {
+            "Authorization": f"Bearer {provider.api_key}",
+            "Content-Type": "application/json",
+        }
+        try:
+            response = provider._post(payload, headers)
+        except httpx.TimeoutException:
+            return self._validation_result(provider_name, model, "timeout", "Provider request timed out.")
+        except (httpx.ConnectError, httpx.InvalidURL):
+            return self._validation_result(provider_name, model, "endpoint_invalid", "Provider endpoint could not be reached.")
+        except httpx.HTTPError:
+            return self._validation_result(provider_name, model, "unknown", "Provider connection test failed.")
+
+        if not response.is_success:
+            code, message = self._classify_http_failure(response.status_code, response.text)
+            return self._validation_result(provider_name, model, code, message)
 
         try:
-            provider.test_connection()
-        except LLMAnalysisError:
-            return self._validation_result(provider_name, model, "unknown", "Provider connection test failed.")
-        except Exception:
-            return self._validation_result(provider_name, model, "unknown", "Provider connection test failed.")
+            body = response.json()
+            choices = body["choices"]
+            if not isinstance(choices, list) or not choices:
+                raise ValueError
+        except (ValueError, KeyError, TypeError):
+            return self._validation_result(
+                provider_name,
+                model,
+                "malformed_response",
+                "Provider returned an unexpected response shape.",
+            )
+
         return self._validation_result(provider_name, model, "ok", "Provider connection succeeded.")
