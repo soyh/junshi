@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - test-175-multi-provider-byok
+  pull_request:
+    branches:
+      - main
 
 jobs:
   test:
