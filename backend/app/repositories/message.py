@@ -71,11 +71,43 @@ class MessageRepository:
               AND conversation_id = ?
             ORDER BY sent_at ASC, created_at ASC
             """,
-            (
-                user_id,
-                conversation_id,
-            ),
+            (user_id, conversation_id),
         ).fetchall()
+
+    def list_window(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        conversation_id: str,
+        *,
+        from_time: str | None = None,
+        to_time: str | None = None,
+        before: str | None = None,
+        limit: int = 100,
+    ) -> list[sqlite3.Row]:
+        clauses = ["user_id = ?", "conversation_id = ?"]
+        params: list[object] = [user_id, conversation_id]
+        if from_time is not None:
+            clauses.append("sent_at >= ?")
+            params.append(from_time)
+        if to_time is not None:
+            clauses.append("sent_at <= ?")
+            params.append(to_time)
+        if before is not None:
+            clauses.append("sent_at < ?")
+            params.append(before)
+        params.append(limit)
+        rows = conn.execute(
+            f"""
+            SELECT *
+            FROM messages
+            WHERE {' AND '.join(clauses)}
+            ORDER BY sent_at DESC, created_at DESC
+            LIMIT ?
+            """,
+            tuple(params),
+        ).fetchall()
+        return list(reversed(rows))
 
     def get(
         self,
@@ -90,11 +122,41 @@ class MessageRepository:
             WHERE id = ?
               AND user_id = ?
             """,
+            (message_id, user_id),
+        ).fetchone()
+
+    def update(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        message_id: str,
+        *,
+        sender_type: str,
+        content: str,
+        sent_at: str,
+    ) -> sqlite3.Row | None:
+        cursor = conn.execute(
+            """
+            UPDATE messages
+            SET sender_type = ?,
+                content = ?,
+                sent_at = ?,
+                updated_at = ?
+            WHERE id = ?
+              AND user_id = ?
+            """,
             (
+                sender_type,
+                content,
+                sent_at,
+                utc_now(),
                 message_id,
                 user_id,
             ),
-        ).fetchone()
+        )
+        if cursor.rowcount == 0:
+            return None
+        return self.get(conn, user_id, message_id)
 
     def delete(
         self,
@@ -108,10 +170,6 @@ class MessageRepository:
             WHERE id = ?
               AND user_id = ?
             """,
-            (
-                message_id,
-                user_id,
-            ),
+            (message_id, user_id),
         )
-
         return cursor.rowcount > 0
