@@ -1,3 +1,8 @@
+from cryptography.fernet import Fernet
+
+from app.config.settings import get_settings
+
+
 def _conversation(client):
     person = client.post(
         "/api/v1/persons",
@@ -13,6 +18,14 @@ def _conversation(client):
     )
     assert conversation.status_code == 201
     return conversation.json()["id"]
+
+
+def _enable_llm_encryption(monkeypatch):
+    monkeypatch.setenv(
+        "LLM_CONFIG_ENCRYPTION_KEY",
+        Fernet.generate_key().decode("ascii"),
+    )
+    get_settings.cache_clear()
 
 
 def test_history_defaults_to_latest_100_and_supports_time_window(client):
@@ -103,7 +116,8 @@ def test_history_message_can_be_modified_deleted_and_is_user_scoped(client):
     assert deleted.status_code == 204
 
 
-def test_multiple_llm_profiles_can_be_saved_and_switched(client):
+def test_multiple_llm_profiles_can_be_saved_and_switched(client, monkeypatch):
+    _enable_llm_encryption(monkeypatch)
     first = client.post(
         "/api/v1/settings/llm/profiles",
         json={
@@ -163,9 +177,11 @@ def test_multiple_llm_profiles_can_be_saved_and_switched(client):
     assert renamed.json()["name"] == "DeepSeek active"
     assert renamed.json()["model"] == "deepseek-reasoner"
     assert renamed.json()["api_key_configured"] is True
+    get_settings.cache_clear()
 
 
-def test_llm_profiles_are_user_isolated(client):
+def test_llm_profiles_are_user_isolated(client, monkeypatch):
+    _enable_llm_encryption(monkeypatch)
     created = client.post(
         "/api/v1/settings/llm/profiles",
         json={
@@ -190,3 +206,4 @@ def test_llm_profiles_are_user_isolated(client):
         headers=other_user,
     )
     assert denied.status_code == 404
+    get_settings.cache_clear()
