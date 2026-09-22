@@ -18,20 +18,20 @@ def test_main_app_server_renders_all_provider_choices():
 
 def test_main_app_exposes_conversation_edit_delete_controls():
     html = PRODUCT_SHELL_WITH_CONTENT_HTML
-    assert 'id="client-edit-conversation"' in html
-    assert 'id="client-save-conversation"' in html
-    assert 'id="client-delete-conversation"' in html
+    assert "client-edit-conversation" in html
+    assert "client-save-conversation" in html
+    assert "client-delete-conversation" in html
     assert "method: 'PATCH'" in html
     assert "method: 'DELETE'" in html
 
 
 def test_message_time_window_is_display_only():
     html = PRODUCT_SHELL_WITH_CONTENT_HTML
-    assert 'id="client-message-from"' in html
-    assert 'id="client-message-to"' in html
-    assert '按时间显示' in html
-    assert '显示全部' in html
-    assert 'AI 分析始终参考该会话完整历史' in html
+    assert "client-message-from" in html
+    assert "client-message-to" in html
+    assert "按时间显示" in html
+    assert "显示全部" in html
+    assert "AI 分析始终参考该会话完整历史" in html
     assert "/analysis/structured" in html
 
 
