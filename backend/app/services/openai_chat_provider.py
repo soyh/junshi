@@ -125,6 +125,68 @@ class OpenAIChatProvider(LLMProvider):
             )
         return result
 
+    def analyze_media(
+        self,
+        *,
+        media_type: str,
+        mime_type: str,
+        data_url: str,
+        prompt: str,
+    ) -> str:
+        """Ask a vision-capable OpenAI-compatible model to describe uploaded media."""
+        if not self.api_key:
+            raise LLMAnalysisError(f"{self.provider_label} API key is not configured")
+        if media_type not in {"image", "video"}:
+            raise LLMAnalysisError(f"unsupported media type: {media_type}")
+
+        media_part_type = "image_url" if media_type == "image" else "video_url"
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are the multimodal evidence extraction layer of AI Love "
+                        "Strategist. Describe only observable content in the supplied "
+                        "media. For chat screenshots, transcribe visible text and "
+                        "describe observable emoji, stickers, photos, or video cues. "
+                        "Do not infer hidden intentions or relationship conclusions."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": media_part_type,
+                            media_part_type: {"url": data_url},
+                        },
+                    ],
+                },
+            ],
+        }
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            response = self._post(payload, headers)
+            response.raise_for_status()
+            body = response.json()
+            content = body["choices"][0]["message"]["content"]
+            if not isinstance(content, str) or not content.strip():
+                raise LLMAnalysisError(
+                    f"{self.provider_label} returned empty media analysis"
+                )
+            return content.strip()
+        except LLMAnalysisError:
+            raise
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError):
+            raise LLMAnalysisError(
+                f"{self.provider_label} media analysis request failed"
+            ) from None
+
     def test_connection(self) -> None:
         if not self.api_key:
             raise LLMAnalysisError(f"{self.provider_label} API key is not configured")
