@@ -6,7 +6,7 @@ on:
       - test-175-multi-provider-byok
   pull_request:
     branches:
-      - main
+      - test-174-settings-shared-panel-tabs
 
 jobs:
   test:
