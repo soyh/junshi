@@ -1,0 +1,33 @@
+name: TEST-178 Multi LLM Message History CI
+
+on:
+  push:
+    branches:
+      - test-178-multi-llm-message-history
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: TEST-178 focused
+        run: pytest -q tests/test_178_multi_llm_message_history.py tests/test_llm_provider_config.py tests/test_multi_provider_byok.py tests/test_messages.py tests/test_authenticated_*.py tests/test_177_*.py
+
+      - name: Full suite
+        run: pytest -q
