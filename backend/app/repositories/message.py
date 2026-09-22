@@ -57,6 +57,7 @@ class MessageRepository:
             (message_id, user_id),
         ).fetchone()
 
+    # Canonical full-history reader. Keep this unbounded for analysis/evidence.
     def list(
         self,
         conn: sqlite3.Connection,
@@ -77,6 +78,46 @@ class MessageRepository:
             ),
         ).fetchall()
 
+    # Presentation-only reader. Fetch newest N efficiently, then return them in
+    # chronological order so the UI still reads like a normal conversation.
+    def list_window(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        conversation_id: str,
+        limit: int,
+        from_time: str | None = None,
+        to_time: str | None = None,
+        before: str | None = None,
+    ) -> list[sqlite3.Row]:
+        conditions = ["user_id = ?", "conversation_id = ?"]
+        params: list[object] = [user_id, conversation_id]
+        if from_time is not None:
+            conditions.append("sent_at >= ?")
+            params.append(from_time)
+        if to_time is not None:
+            conditions.append("sent_at <= ?")
+            params.append(to_time)
+        if before is not None:
+            conditions.append("sent_at < ?")
+            params.append(before)
+        params.append(limit)
+        where_clause = " AND ".join(conditions)
+        return conn.execute(
+            f"""
+            SELECT *
+            FROM (
+                SELECT *
+                FROM messages
+                WHERE {where_clause}
+                ORDER BY sent_at DESC, created_at DESC
+                LIMIT ?
+            )
+            ORDER BY sent_at ASC, created_at ASC
+            """,
+            params,
+        ).fetchall()
+
     def get(
         self,
         conn: sqlite3.Connection,
@@ -95,6 +136,32 @@ class MessageRepository:
                 user_id,
             ),
         ).fetchone()
+
+    def update(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        message_id: str,
+        values: dict[str, str],
+    ) -> sqlite3.Row | None:
+        allowed = {"sender_type", "content", "sent_at"}
+        updates = [(key, value) for key, value in values.items() if key in allowed]
+        if not updates:
+            return self.get(conn, user_id, message_id)
+        assignments = ", ".join(f"{key} = ?" for key, _ in updates)
+        params: list[object] = [value for _, value in updates]
+        params.extend([utc_now(), message_id, user_id])
+        cursor = conn.execute(
+            f"""
+            UPDATE messages
+            SET {assignments}, updated_at = ?
+            WHERE id = ? AND user_id = ?
+            """,
+            params,
+        )
+        if cursor.rowcount == 0:
+            return None
+        return self.get(conn, user_id, message_id)
 
     def delete(
         self,
