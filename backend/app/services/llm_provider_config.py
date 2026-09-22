@@ -86,11 +86,24 @@ class LLMProviderConfigService:
             updated_at=row["updated_at"],
         )
 
+    def _active_profile_row(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+    ) -> sqlite3.Row | None:
+        getter = getattr(self.repository, "get_active_profile", None)
+        if not callable(getter):
+            return None
+        return getter(conn, user_id)
+
     def _selected_row(self, conn: sqlite3.Connection, user_id: str) -> sqlite3.Row | None:
-        active = self.repository.get_active_profile(conn, user_id)
+        active = self._active_profile_row(conn, user_id)
         if active is not None:
             return active
-        return self.repository.get(conn, user_id)
+        getter = getattr(self.repository, "get", None)
+        if not callable(getter):
+            return None
+        return getter(conn, user_id)
 
     def get(self, conn: sqlite3.Connection, user_id: str) -> LLMProviderConfigResponse | None:
         row = self._selected_row(conn, user_id)
@@ -105,7 +118,7 @@ class LLMProviderConfigService:
         config: LLMProviderConfigUpdate,
     ) -> LLMProviderConfigResponse:
         encrypted = self._encrypt(config.api_key.get_secret_value())
-        active = self.repository.get_active_profile(conn, user_id)
+        active = self._active_profile_row(conn, user_id)
         if active is not None:
             self.repository.update_profile(
                 conn,
@@ -131,7 +144,7 @@ class LLMProviderConfigService:
         return self.get(conn, user_id)  # type: ignore[return-value]
 
     def delete(self, conn: sqlite3.Connection, user_id: str) -> bool:
-        active = self.repository.get_active_profile(conn, user_id)
+        active = self._active_profile_row(conn, user_id)
         if active is not None:
             return self.repository.delete_profile(conn, user_id, active["id"])
         return self.repository.delete(conn, user_id)
