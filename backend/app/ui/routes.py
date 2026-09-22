@@ -64,6 +64,10 @@ from app.ui.lifecycle_v2_workspace import (
     LIFECYCLE_V2_SCRIPT,
     LIFECYCLE_V2_STYLE,
 )
+from app.ui.multi_provider_settings_workspace import (
+    MULTI_PROVIDER_SETTINGS_SCRIPT,
+    MULTI_PROVIDER_SETTINGS_STYLE,
+)
 from app.ui.product_management_workspace import (
     PRODUCT_MANAGEMENT_HTML,
     PRODUCT_MANAGEMENT_SCRIPT,
@@ -184,6 +188,7 @@ def build_product_shell_html() -> str:
             f"{CARD_CLIENT_GENERATION_RECOVERY_STYLE}\n"
             f"{SINGLE_OPEN_INTERACTION_STYLE}\n"
             f"{SETTINGS_TAB_WORKSPACE_STYLE}\n"
+            f"{MULTI_PROVIDER_SETTINGS_STYLE}\n"
             f"{style_marker}"
         ),
         1,
@@ -223,6 +228,7 @@ def build_product_shell_html() -> str:
         f"{CARD_CLIENT_EXPERIENCE_SCRIPT}\n\n"
         f"{SINGLE_OPEN_INTERACTION_SCRIPT}\n\n"
         f"{SETTINGS_TAB_WORKSPACE_SCRIPT}\n\n"
+        f"{MULTI_PROVIDER_SETTINGS_SCRIPT}\n\n"
         f"{CARD_CLIENT_AUTOMATION_SCRIPT}\n\n"
         f"{CARD_CLIENT_UNIFIED_IMPORT_SCRIPT}\n\n"
         f"{CONVERSATION_SESSION_SCRIPT}\n\n"
