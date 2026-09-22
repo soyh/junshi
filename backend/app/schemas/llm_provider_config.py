@@ -4,7 +4,14 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
 
-ProviderName = Literal["openai_compatible"]
+ProviderName = Literal[
+    "qwen",
+    "deepseek",
+    "kimi",
+    "openai",
+    "gemini",
+    "openai_compatible",
+]
 
 
 class LLMProviderConfigUpdate(BaseModel):
