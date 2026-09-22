@@ -71,7 +71,7 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
     if (!providerFieldset.querySelector('.provider-preset-note')) {
       const note = document.createElement('p');
       note.className = 'provider-preset-note';
-      note.innerHTML = '<strong>厂商预设只负责填写推荐地址和模型。</strong> Base URL 与 Model 始终可由用户修改；API Key 仍只在服务端加密保存。';
+      note.textContent = '厂商预设只负责填写推荐地址和模型。Base URL 与 Model 始终可由用户修改；API Key 仍只在服务端加密保存。';
       providerSelect.insertAdjacentElement('afterend', note);
     }
 
