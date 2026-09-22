@@ -52,10 +52,8 @@ CONVERSATION_CONTROLS_STYLE = r'''
 
 
 CONVERSATION_CONTROLS_SCRIPT = r'''
-  // TEST-177: display-window controls stay presentation-only; analysis continues
-  // to call the canonical conversation analysis endpoint with the full history.
-  let clientAllConversationMessages = [];
-
+  // TEST-178: message windows are server-side presentation queries only.
+  // Canonical analysis continues to read the complete conversation history.
   function clientMessageFilterDate(value, endOfDay = false) {
     if (!value) return null;
     const parsed = new Date(value);
@@ -63,45 +61,41 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
     if (endOfDay && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
       parsed.setHours(23, 59, 59, 999);
     }
-    return parsed;
+    return parsed.toISOString();
   }
 
-  function clientFilteredMessages(items) {
-    const fromInput = byId('client-message-from');
-    const toInput = byId('client-message-to');
-    if (!fromInput || !toInput) return items;
-    const from = clientMessageFilterDate(fromInput.value);
-    const to = clientMessageFilterDate(toInput.value, true);
-    return items.filter((item) => {
-      const sent = new Date(item.sent_at);
-      if (Number.isNaN(sent.getTime())) return true;
-      if (from && sent < from) return false;
-      if (to && sent > to) return false;
-      return true;
+  function clientSelectedMessageLimit() {
+    const value = Number(byId('client-message-limit')?.value || 100);
+    return [100, 200, 500].includes(value) ? value : 100;
+  }
+
+  async function clientApplyMessageWindow() {
+    if (!selectedConversationId) throw new Error('请先选择会话');
+    const from = clientMessageFilterDate(byId('client-message-from')?.value || '');
+    const to = clientMessageFilterDate(byId('client-message-to')?.value || '', true);
+    const items = await loadMessages({
+      limit: clientSelectedMessageLimit(),
+      ...(from ? {from} : {}),
+      ...(to ? {to} : {}),
     });
-  }
-
-  const baseRenderMessagesForClientWindow = renderMessages;
-  renderMessages = function(items) {
-    clientAllConversationMessages = Array.isArray(items) ? items.slice() : [];
-    const visible = clientFilteredMessages(clientAllConversationMessages);
-    baseRenderMessagesForClientWindow(visible);
     const info = byId('client-message-window-status');
     if (info) {
-      info.textContent = `当前显示 ${visible.length} / ${clientAllConversationMessages.length} 条；AI 分析仍使用该会话完整历史。`;
+      info.textContent = `当前显示 ${items.length} 条；筛选在服务端执行。AI 分析仍使用该会话完整历史。`;
     }
-  };
-
-  function clientApplyMessageWindow() {
-    renderMessages(clientAllConversationMessages);
   }
 
-  function clientClearMessageWindow() {
+  async function clientClearMessageWindow() {
     const from = byId('client-message-from');
     const to = byId('client-message-to');
+    const limit = byId('client-message-limit');
     if (from) from.value = '';
     if (to) to.value = '';
-    renderMessages(clientAllConversationMessages);
+    if (limit) limit.value = '100';
+    const items = await loadMessages({limit: 100});
+    const info = byId('client-message-window-status');
+    if (info) {
+      info.textContent = `当前显示最新 ${items.length} 条（默认最多 100 条）；AI 分析仍使用该会话完整历史。`;
+    }
   }
 
   async function clientLoadSelectedConversationForEdit() {
@@ -139,7 +133,6 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
     selectedConversationId = null;
     byId('conversation-id').value = '';
     byId('conversation-title').value = '';
-    clientAllConversationMessages = [];
     await loadConversations();
     resetConversationContent('会话已删除，请选择其它会话。');
     conversationStatus.textContent = '会话已删除。';
@@ -194,7 +187,7 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
           status.textContent = '正在让当前 LLM 模型识别媒体内容…';
           await clientMediaApi(`/api/v1/media/${encodeURIComponent(item.id)}/analyze`, {method: 'POST'});
           await clientLoadMediaAttachments();
-          await loadMessages();
+          await loadMessages(currentMessageDisplayWindow);
           status.textContent = '媒体识别完成，结果已作为系统证据写入完整会话链路。';
           window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
             detail: {source: '媒体识别', conversation_id: selectedConversationId},
@@ -249,7 +242,7 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
     try {
       await clientMediaApi(`/api/v1/media/${encodeURIComponent(created.id)}/analyze`, {method: 'POST'});
       status.textContent = '识别完成，结果已写入完整会话证据链。';
-      await loadMessages();
+      await loadMessages(currentMessageDisplayWindow);
       window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
         detail: {source: '媒体识别', conversation_id: selectedConversationId},
       }));
@@ -319,6 +312,21 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
       to.type = 'datetime-local';
       toWrap.append(toLabel, to);
 
+      const limitWrap = document.createElement('div');
+      const limitLabel = document.createElement('label');
+      limitLabel.htmlFor = 'client-message-limit';
+      limitLabel.textContent = '最多显示条数';
+      const limit = document.createElement('select');
+      limit.id = 'client-message-limit';
+      ['100', '200', '500'].forEach((value) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        limit.appendChild(option);
+      });
+      limit.value = '100';
+      limitWrap.append(limitLabel, limit);
+
       const actions = document.createElement('div');
       actions.className = 'client-controls-actions';
       const apply = document.createElement('button');
@@ -328,20 +336,26 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
       const clear = document.createElement('button');
       clear.id = 'client-clear-message-window';
       clear.type = 'button';
-      clear.textContent = '显示全部';
+      clear.textContent = '最新100条';
       actions.append(apply, clear);
 
       const status = document.createElement('div');
       status.id = 'client-message-window-status';
       status.className = 'client-controls-actions note';
-      status.textContent = '仅过滤页面显示；AI 分析始终参考该会话完整历史。';
+      status.textContent = '登录/切换会话默认只显示最新 100 条；筛选在服务端执行，AI 分析始终参考完整历史。';
 
-      controls.append(fromWrap, toWrap, actions, status);
+      controls.append(fromWrap, toWrap, limitWrap, actions, status);
       if (history) history.insertAdjacentElement('beforebegin', controls);
       else host.insertBefore(controls, messageListNode || null);
 
-      apply.addEventListener('click', clientApplyMessageWindow);
-      clear.addEventListener('click', clientClearMessageWindow);
+      apply.addEventListener('click', async () => {
+        try { await clientApplyMessageWindow(); }
+        catch (error) { status.textContent = error instanceof Error ? error.message : String(error); }
+      });
+      clear.addEventListener('click', async () => {
+        try { await clientClearMessageWindow(); }
+        catch (error) { status.textContent = error instanceof Error ? error.message : String(error); }
+      });
     }
 
     const contentWorkspace = byId('conversation-content')?.querySelector(':scope > .workspace-grid');
@@ -419,6 +433,14 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
   }
 
   byId('conversation-select')?.addEventListener('change', async () => {
+    const from = byId('client-message-from');
+    const to = byId('client-message-to');
+    const limit = byId('client-message-limit');
+    if (from) from.value = '';
+    if (to) to.value = '';
+    if (limit) limit.value = '100';
+    const info = byId('client-message-window-status');
+    if (info) info.textContent = '当前会话默认显示最新 100 条；AI 分析仍使用完整历史。';
     try { await clientLoadMediaAttachments(); }
     catch (error) {
       const status = byId('client-media-status');
