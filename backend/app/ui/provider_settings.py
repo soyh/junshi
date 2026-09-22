@@ -28,10 +28,16 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
 
   <fieldset>
     <legend>Provider</legend>
-    <label for="provider">Provider</label>
+    <label for="provider">模型服务商</label>
     <select id="provider">
-      <option value="openai_compatible">OpenAI-compatible</option>
+      <option value="qwen">Qwen / 阿里云百炼</option>
+      <option value="deepseek">DeepSeek</option>
+      <option value="kimi">Kimi / Moonshot</option>
+      <option value="openai">OpenAI</option>
+      <option value="gemini">Gemini / Google</option>
+      <option value="openai_compatible">其他 OpenAI-compatible</option>
     </select>
+    <p class="note">厂商预设只负责填写推荐 Base URL 和 Model；两项都允许手动修改。</p>
 
     <label for="base-url">Base URL</label>
     <input id="base-url" placeholder="https://example.com/v1" autocomplete="off">
@@ -72,6 +78,14 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
   const byId = (id) => document.getElementById(id);
   const status = byId('status');
   const analysisResult = byId('analysis-result');
+  const presets = {
+    qwen: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen3.7-flash' },
+    deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash' },
+    kimi: { baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.6' },
+    openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-5.6-luna' },
+    gemini: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-3.8-flash' },
+    openai_compatible: { baseUrl: '', model: '' },
+  };
 
   function accessToken() {
     const value = byId('access-token').value.trim();
@@ -101,12 +115,19 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
     status.textContent = message;
   }
 
+  function applyPreset() {
+    const preset = presets[byId('provider').value];
+    if (!preset) return;
+    byId('base-url').value = preset.baseUrl;
+    byId('model').value = preset.model;
+  }
+
   async function loadConfig() {
     const config = await api('/api/v1/settings/llm');
     byId('api-key').value = '';
     if (!config) {
-      byId('base-url').value = '';
-      byId('model').value = '';
+      byId('provider').value = 'qwen';
+      applyPreset();
       byId('timeout').value = '60';
       renderStatus('No provider config saved for this authenticated user.');
       return;
@@ -144,8 +165,8 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
   async function deleteConfig() {
     await api('/api/v1/settings/llm', { method: 'DELETE' });
     byId('api-key').value = '';
-    byId('base-url').value = '';
-    byId('model').value = '';
+    byId('provider').value = 'qwen';
+    applyPreset();
     byId('timeout').value = '60';
     renderStatus('Provider config deleted. Runtime will use the existing default provider behavior.');
   }
@@ -165,11 +186,13 @@ PROVIDER_SETTINGS_HTML = r'''<!doctype html>
     });
   };
 
+  byId('provider').addEventListener('change', applyPreset);
   bind('load', loadConfig);
   bind('save', saveConfig);
   bind('test', testConnection);
   bind('delete', deleteConfig);
   bind('run-analysis', runAnalysis, analysisResult);
+  applyPreset();
 })();
 </script>
 </body>
