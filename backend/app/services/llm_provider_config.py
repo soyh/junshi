@@ -406,7 +406,7 @@ class LLMProviderConfigService:
         user_id: str,
     ) -> LLMProviderValidationResult | None:
         row = self._runtime_row(conn, user_id)
-        provider = QwenProvider() if row is None else self._build_provider_from_row(row)
+        provider = self.build_provider(conn, user_id)
         provider_name = row["provider"] if row is not None else "qwen"
         return self._test_provider(provider, provider_name)
 
