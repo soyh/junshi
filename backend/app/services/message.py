@@ -65,13 +65,11 @@ class MessageService:
         sent_at: str | None,
     ) -> sqlite3.Row:
         self._validate_sender_type(sender_type)
-
         self._validate_conversation(
             conn,
             user_id,
             conversation_id,
         )
-
         return self.repository.create(
             conn,
             user_id,
@@ -81,6 +79,7 @@ class MessageService:
             sent_at,
         )
 
+    # Canonical history. Analysis/evidence callers keep using this unbounded API.
     def list(
         self,
         conn: sqlite3.Connection,
@@ -92,11 +91,36 @@ class MessageService:
             user_id,
             conversation_id,
         )
-
         return self.repository.list(
             conn,
             user_id,
             conversation_id,
+        )
+
+    # Presentation history for the authenticated UI/API only.
+    def list_window(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        conversation_id: str,
+        limit: int = 100,
+        from_time: str | None = None,
+        to_time: str | None = None,
+        before: str | None = None,
+    ) -> list[sqlite3.Row]:
+        self._validate_conversation(
+            conn,
+            user_id,
+            conversation_id,
+        )
+        return self.repository.list_window(
+            conn,
+            user_id,
+            conversation_id,
+            limit,
+            from_time,
+            to_time,
+            before,
         )
 
     def get(
@@ -110,13 +134,29 @@ class MessageService:
             user_id,
             message_id,
         )
-
         if message is None:
             raise MessageNotFoundError(
                 "Message not found"
             )
-
         return message
+
+    def update(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        message_id: str,
+        values: dict[str, str],
+    ) -> sqlite3.Row:
+        existing = self.repository.get(conn, user_id, message_id)
+        if existing is None:
+            raise MessageNotFoundError("Message not found")
+        sender_type = values.get("sender_type")
+        if sender_type is not None:
+            self._validate_sender_type(sender_type)
+        updated = self.repository.update(conn, user_id, message_id, values)
+        if updated is None:
+            raise MessageNotFoundError("Message not found")
+        return updated
 
     def delete(
         self,
@@ -129,10 +169,8 @@ class MessageService:
             user_id,
             message_id,
         )
-
         if not deleted:
             raise MessageNotFoundError(
                 "Message not found"
             )
-
         return True
