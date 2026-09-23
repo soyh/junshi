@@ -155,7 +155,7 @@ class MediaAttachmentService:
     def _safe_media_prompt() -> str:
         return (
             "Analyze this media as conversation evidence for a relationship-advice system. "
-            "Describe only visible/audible evidence. Distinguish observations from inference. "
+            "Describe only visible evidence. Distinguish observations from inference. "
             "Pay attention to visible text, emoji/sticker meaning, facial expression, body language, "
             "scene/context, and interaction tone when supported. Do not identify unknown people. "
             "Return concise JSON with keys: media_summary, visible_text, emotional_signals, "
@@ -179,7 +179,7 @@ class MediaAttachmentService:
             {"type": "text", "text": self._safe_media_prompt()},
         ]
         content.extend(
-            {"type": "image_url", "image_url": {"url": url, "detail": "auto"}}
+            {"type": "image_url", "image_url": {"url": url}}
             for url in image_urls
         )
         payload = {
