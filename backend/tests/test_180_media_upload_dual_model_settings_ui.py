@@ -11,10 +11,10 @@ def test_test180_ui_exposes_visible_media_upload_surface():
     html = PRODUCT_SHELL_WITH_CONTENT_HTML
 
     assert "聊天截图 / 图片 / 视频" in html
-    assert 'id="client-media-file"' in html
+    assert "fileInput.id = 'client-media-file'" in html
     assert "image/jpeg,image/png,image/webp,image/gif" in html
     assert "video/mp4,video/webm,video/quicktime" in html
-    assert 'id="client-media-upload"' in html
+    assert "upload.id = 'client-media-upload'" in html
     assert "上传并识别" in html
     assert "new FormData()" in html
     assert "/api/v1/conversations/${encodeURIComponent(conversationId)}/media" in html
@@ -29,21 +29,18 @@ def test_test180_ui_exposes_independent_primary_and_vision_credentials():
     assert "主文本 / 分析模型" in html
     assert "视觉 / 图片视频模型" in html
 
-    for field in (
-        "provider",
-        "base-url",
-        "model",
-        "api-key",
-        "timeout",
-    ):
-        assert f'id="dual-primary-{field}"' in html
-        assert f'id="dual-vision-{field}"' in html
+    for role in ("primary", "vision"):
+        assert f"dual-{role}-provider" in html
+        assert f"dual-{role}-base-url" in html
+        assert f"dual-{role}-model" in html
+        assert f"dual-{role}-api-key" in html
+        assert f"dual-{role}-timeout" in html
 
-    assert 'id="dual-primary-save"' in html
-    assert 'id="dual-primary-test"' in html
-    assert 'id="dual-vision-save"' in html
-    assert 'id="dual-vision-test"' in html
-    assert 'id="dual-vision-follow-primary"' in html
+    assert "savePrimary.id = 'dual-primary-save'" in html
+    assert "testPrimary.id = 'dual-primary-test'" in html
+    assert "saveVision.id = 'dual-vision-save'" in html
+    assert "testVision.id = 'dual-vision-test'" in html
+    assert "follow.id = 'dual-vision-follow-primary'" in html
     assert "两套配置的 Provider、API Key、Base URL、Model、Timeout 可完全不同" in html
     assert "高级：Profile 管理与兼容设置" in html
 
