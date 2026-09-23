@@ -1,0 +1,33 @@
+name: TEST-179 Vision Model Routing CI
+
+on:
+  push:
+    branches:
+      - test-179-vision-model-routing-runtime-config
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: TEST-179 focused
+        run: pytest -q tests/test_179_vision_model_routing.py tests/test_178_history_and_llm_profiles.py tests/test_177_media_attachments.py tests/test_llm_provider_config.py tests/test_provider_runtime_validation.py tests/test_schema_drift_repair.py tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
