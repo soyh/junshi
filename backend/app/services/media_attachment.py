@@ -17,6 +17,7 @@ from app.services.llm import LLMAnalysisError
 from app.services.llm_provider_config import LLMProviderConfigService
 from app.services.message import MessageService
 from app.services.openai_chat_provider import OpenAIChatProvider
+from app.services.vision_llm_provider import LLMVisionProviderService
 
 
 class MediaAttachmentError(ValueError):
@@ -39,6 +40,9 @@ class MediaAttachmentService:
         self.conversation_service = conversation_service or ConversationService()
         self.message_service = message_service or MessageService()
         self.provider_config_service = provider_config_service or LLMProviderConfigService()
+        self.vision_provider_service = LLMVisionProviderService(
+            self.provider_config_service
+        )
 
     @staticmethod
     def _storage_root() -> Path:
@@ -209,7 +213,7 @@ class MediaAttachmentService:
         row = self.repository.get(conn, user_id, attachment_id)
         if row is None:
             raise MediaAttachmentError("media attachment not found")
-        provider = self.provider_config_service.build_provider(conn, user_id)
+        provider = self.vision_provider_service.build_provider(conn, user_id)
         if not isinstance(provider, OpenAIChatProvider):
             raise MediaAttachmentError("configured provider does not support media analysis")
         try:
