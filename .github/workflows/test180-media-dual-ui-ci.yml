@@ -26,6 +26,28 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Validate composed browser JavaScript syntax
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+
+          scripts = re.findall(
+              r"<script>(.*?)</script>",
+              PRODUCT_SHELL_WITH_CONTENT_HTML,
+              flags=re.S,
+          )
+          if not scripts:
+              raise SystemExit("no browser script found")
+          Path("/tmp/test180-app.js").write_text(
+              "\n".join(scripts),
+              encoding="utf-8",
+          )
+          print("browser scripts:", len(scripts))
+          PY
+          node --check /tmp/test180-app.js
+
       - name: TEST-180 focused
         run: >-
           pytest -q
