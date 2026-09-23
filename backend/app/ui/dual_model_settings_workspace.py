@@ -101,7 +101,7 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     const baseUrl = byId(ids.baseUrl);
     const model = byId(ids.model);
     const preset = provider ? multiProviderPresets[provider.value] : null;
-    if (!preset) return;
+    if (!preset || !baseUrl || !model) return;
     const knownBaseUrls = new Set(Object.values(multiProviderPresets).map((item) => item.baseUrl).filter(Boolean));
     const knownModels = new Set(Object.values(multiProviderPresets).map((item) => item.model).filter(Boolean));
     if (!baseUrl.value.trim() || knownBaseUrls.has(baseUrl.value.trim())) baseUrl.value = preset.baseUrl;
@@ -175,6 +175,12 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     status.textContent = `${primaryText}；${visionText}。两套配置的 Provider、API Key、Base URL、Model、Timeout 可完全不同。`;
   }
 
+  async function dualRefreshAdvancedProfiles() {
+    if (typeof loadLlmProfiles === 'function') {
+      await loadLlmProfiles();
+    }
+  }
+
   async function saveDualPrimary() {
     const requireKey = !dualPrimaryProfileId;
     const payload = dualRolePayload('primary', requireKey);
@@ -195,14 +201,16 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     await api(`/api/v1/settings/llm/profiles/${encodeURIComponent(profile.id)}/activate`, {method: 'POST'});
     byId('dual-primary-api-key').value = '';
     await loadDualModelSettings();
+    await dualRefreshAdvancedProfiles();
     byId('dual-model-status').textContent = `主文本/分析模型已保存：${profile.name} · ${profile.provider} / ${profile.model}`;
   }
 
   async function saveDualVision() {
-    const requireKey = !dualVisionProfileId;
+    const sharesPrimary = Boolean(dualVisionProfileId && dualVisionProfileId === dualPrimaryProfileId);
+    const requireKey = !dualVisionProfileId || sharesPrimary;
     const payload = dualRolePayload('vision', requireKey);
     let profile;
-    if (dualVisionProfileId) {
+    if (dualVisionProfileId && !sharesPrimary) {
       profile = await api(`/api/v1/settings/llm/profiles/${encodeURIComponent(dualVisionProfileId)}`, {
         method: 'PUT',
         body: JSON.stringify(payload),
@@ -221,6 +229,7 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     });
     byId('dual-vision-api-key').value = '';
     await loadDualModelSettings();
+    await dualRefreshAdvancedProfiles();
     byId('dual-model-status').textContent = `视觉模型已保存：${profile.name} · ${profile.provider} / ${profile.model}`;
   }
 
@@ -232,7 +241,6 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
   }
 
   async function testDualVision() {
-    if (!dualVisionProfileId) throw new Error('请先保存视觉模型，或选择“视觉跟随主模型”');
     const result = await api('/api/v1/settings/llm/vision/test', {method: 'POST'});
     const label = result?.status === 'ok' ? 'PASS' : 'FAIL';
     byId('dual-model-status').textContent = `${label} [视觉图片测试/${result?.code || 'unknown'}] ${result?.provider || ''} / ${result?.model || ''}: ${result?.message || ''}`;
@@ -242,6 +250,7 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     await api('/api/v1/settings/llm/vision', {method: 'DELETE'});
     dualVisionProfileId = null;
     await loadDualModelSettings();
+    await dualRefreshAdvancedProfiles();
     byId('dual-model-status').textContent = '视觉模型已改为跟随主文本模型。独立视觉 Profile 仍保留在高级 Profile 管理中，不会删除。';
   }
 
@@ -302,7 +311,10 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
       dualMakeInput(role, 'apiKey', 'API Key', 'password'),
       dualMakeInput(role, 'timeout', 'Timeout seconds', 'number'),
     );
-    byId(dualRoleIds(role).provider)?.addEventListener('change', () => dualApplyPreset(role));
+    card.querySelector(`#${dualRoleIds(role).provider}`)?.addEventListener(
+      'change',
+      () => dualApplyPreset(role),
+    );
     return card;
   }
 
@@ -414,7 +426,9 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     const baseEstablishSession = establishSession;
     establishSession = function(data, message) {
       baseEstablishSession(data, message);
-      loadDualModelSettings().catch((error) => { status.textContent = error instanceof Error ? error.message : String(error); });
+      loadDualModelSettings().catch((error) => {
+        status.textContent = error instanceof Error ? error.message : String(error);
+      });
     };
 
     loadDualModelSettings().catch(() => {});
