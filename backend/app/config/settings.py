@@ -1,6 +1,11 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+_PROJECT_ROOT = _BACKEND_ROOT.parent
 
 
 class Settings(BaseSettings):
@@ -32,8 +37,14 @@ class Settings(BaseSettings):
     qwen_timeout_seconds: float = 60.0
     llm_config_encryption_key: str | None = None
 
+    # Load deployment secrets deterministically instead of depending on the
+    # process working directory. The backend-local file may override the
+    # project-root file for installation-specific settings.
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            str(_PROJECT_ROOT / ".env"),
+            str(_BACKEND_ROOT / ".env"),
+        ),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
