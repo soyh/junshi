@@ -1,4 +1,6 @@
+import base64
 import json
+import struct
 from pathlib import Path
 
 import httpx
@@ -252,9 +254,15 @@ def test_vision_capability_test_sends_real_image_request(client, monkeypatch):
     content = captured["payload"]["messages"][0]["content"]
     assert content[0]["type"] == "text"
     assert content[1]["type"] == "image_url"
-    assert content[1]["image_url"]["url"].startswith(
-        "data:image/png;base64,"
-    )
+    image_part = content[1]["image_url"]
+    assert set(image_part) == {"url"}
+    assert image_part["url"].startswith("data:image/png;base64,")
+
+    encoded = image_part["url"].split(",", 1)[1]
+    png = base64.b64decode(encoded)
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    width, height = struct.unpack(">II", png[16:24])
+    assert (width, height) == (64, 64)
 
     get_settings.cache_clear()
 
