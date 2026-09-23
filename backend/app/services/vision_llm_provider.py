@@ -1,10 +1,20 @@
 import sqlite3
 
+import httpx
+
+from app.schemas.llm_provider_config import LLMProviderValidationResult
 from app.schemas.vision_llm_provider import LLMVisionSelectionResponse
 from app.services.llm import LLMProvider
 from app.services.llm_provider_config import (
     LLMProviderConfigError,
     LLMProviderConfigService,
+)
+from app.services.openai_chat_provider import OpenAIChatProvider
+
+
+_TEST_IMAGE_DATA_URL = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z2S8AAAAASUVORK5CYII="
 )
 
 
@@ -115,3 +125,115 @@ class LLMVisionProviderService:
         # Reuse the exact provider materialization/decryption path already used
         # by the primary model. The only difference here is profile selection.
         return self.provider_config_service._provider_from_row(row)
+
+    def test_vision_capability(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+    ) -> LLMProviderValidationResult:
+        row = self._selected_row(conn, user_id)
+        if row is None:
+            row = self.provider_config_service._selected_row(conn, user_id)
+
+        provider = self.build_provider(conn, user_id)
+        provider_name = row["provider"] if row is not None else "qwen"
+        model = provider.model if isinstance(provider, OpenAIChatProvider) else ""
+
+        if not isinstance(provider, OpenAIChatProvider):
+            return self.provider_config_service._validation_result(
+                provider_name,
+                model,
+                "unknown",
+                "Configured provider does not support vision requests.",
+            )
+
+        if not provider.api_key:
+            return self.provider_config_service._validation_result(
+                provider_name,
+                provider.model,
+                "api_key_invalid",
+                "Provider API key is not configured.",
+            )
+
+        payload = {
+            "model": provider.model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Reply with OK if you can process this image.",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": _TEST_IMAGE_DATA_URL,
+                                "detail": "low",
+                            },
+                        },
+                    ],
+                }
+            ],
+            "max_tokens": 8,
+        }
+        headers = {
+            "Authorization": f"Bearer {provider.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            response = provider._post(payload, headers)
+        except httpx.TimeoutException:
+            return self.provider_config_service._validation_result(
+                provider_name,
+                provider.model,
+                "timeout",
+                "Vision provider request timed out.",
+            )
+        except (httpx.ConnectError, httpx.InvalidURL):
+            return self.provider_config_service._validation_result(
+                provider_name,
+                provider.model,
+                "endpoint_invalid",
+                "Vision provider endpoint could not be reached.",
+            )
+        except httpx.HTTPError:
+            return self.provider_config_service._validation_result(
+                provider_name,
+                provider.model,
+                "unknown",
+                "Vision provider connection test failed.",
+            )
+
+        if not response.is_success:
+            code, message = self.provider_config_service._classify_http_failure(
+                response.status_code,
+                response.text,
+            )
+            return self.provider_config_service._validation_result(
+                provider_name,
+                provider.model,
+                code,
+                message,
+            )
+
+        try:
+            body = response.json()
+            choices = body["choices"]
+            if not isinstance(choices, list) or not choices:
+                raise ValueError
+        except (ValueError, KeyError, TypeError):
+            return self.provider_config_service._validation_result(
+                provider_name,
+                provider.model,
+                "malformed_response",
+                "Vision provider returned an unexpected response shape.",
+            )
+
+        return self.provider_config_service._validation_result(
+            provider_name,
+            provider.model,
+            "ok",
+            "Vision provider accepted an image request.",
+        )
