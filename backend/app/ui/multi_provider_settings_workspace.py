@@ -28,8 +28,9 @@ MULTI_PROVIDER_SETTINGS_STYLE = r'''
 
 
 MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
-  // TEST-178: multiple encrypted LLM profiles; the existing /settings/llm
-  // contract continues to operate on the currently active profile.
+  // TEST-179: multiple encrypted LLM profiles can have independent roles.
+  // /settings/llm remains the primary text/analysis model. Media analysis may
+  // select a separate vision profile and falls back to the primary when unset.
   const multiProviderPresets = {
     qwen: {
       label: 'Qwen / 阿里云百炼',
@@ -65,6 +66,7 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
 
   let llmProfiles = [];
   let selectedLlmProfileId = null;
+  let selectedVisionProfileId = null;
 
   function fillProviderFields(profile) {
     if (!profile) return;
@@ -75,6 +77,13 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
     byId('api-key').value = '';
     const nameInput = byId('provider-profile-name');
     if (nameInput) nameInput.value = profile.name || '';
+  }
+
+  function profileRolePrefix(profile) {
+    const roles = [];
+    if (profile.is_active) roles.push('主');
+    if (profile.id === selectedVisionProfileId) roles.push('视觉');
+    return roles.length ? `[${roles.join('+')}] ` : '';
   }
 
   function renderLlmProfiles(items) {
@@ -89,7 +98,7 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
     llmProfiles.forEach((profile) => {
       const option = document.createElement('option');
       option.value = profile.id;
-      option.textContent = `${profile.is_active ? '✓ ' : ''}${profile.name} · ${profile.provider} / ${profile.model}`;
+      option.textContent = `${profileRolePrefix(profile)}${profile.name} · ${profile.provider} / ${profile.model}`;
       select.appendChild(option);
     });
     const active = llmProfiles.find((profile) => profile.is_active);
@@ -107,12 +116,22 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
 
   async function loadLlmProfiles() {
     if (!currentAccessToken) return;
-    const items = await api('/api/v1/settings/llm/profiles');
+    const [items, vision] = await Promise.all([
+      api('/api/v1/settings/llm/profiles'),
+      api('/api/v1/settings/llm/vision'),
+    ]);
+    selectedVisionProfileId = vision?.profile_id || null;
     renderLlmProfiles(items);
     const active = llmProfiles.find((profile) => profile.is_active);
-    providerStatus.textContent = active
-      ? `当前模型：${active.name} · ${active.provider} / ${active.model}。API Key 仅服务端加密保存。`
-      : '暂无多模型配置；可创建新的模型接口配置。';
+    const primaryText = active
+      ? `主模型：${active.name} · ${active.provider} / ${active.model}`
+      : '主模型：未配置';
+    const visionText = vision
+      ? `视觉模型：${vision.name} · ${vision.provider} / ${vision.model}`
+      : active
+        ? '视觉模型：跟随主模型'
+        : '视觉模型：未配置';
+    providerStatus.textContent = `${primaryText}；${visionText}。API Key 仅服务端加密保存。`;
   }
 
   function providerProfilePayload(requireKey = false) {
@@ -161,7 +180,25 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
       method: 'POST',
     });
     await loadLlmProfiles();
-    providerStatus.textContent = `已切换当前模型：${active.name} · ${active.provider} / ${active.model}`;
+    providerStatus.textContent = `已切换主模型：${active.name} · ${active.provider} / ${active.model}`;
+  }
+
+  async function activateVisionLlmProfile() {
+    if (!selectedLlmProfileId) throw new Error('请先选择模型配置');
+    const vision = await api('/api/v1/settings/llm/vision', {
+      method: 'PUT',
+      body: JSON.stringify({ profile_id: selectedLlmProfileId }),
+    });
+    selectedVisionProfileId = vision.profile_id;
+    await loadLlmProfiles();
+    providerStatus.textContent = `已切换视觉模型：${vision.name} · ${vision.provider} / ${vision.model}`;
+  }
+
+  async function clearVisionLlmProfile() {
+    await api('/api/v1/settings/llm/vision', { method: 'DELETE' });
+    selectedVisionProfileId = null;
+    await loadLlmProfiles();
+    providerStatus.textContent = '视觉模型已恢复为跟随主模型。';
   }
 
   async function testSelectedLlmProfile() {
@@ -183,7 +220,7 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
     selectedLlmProfileId = null;
     byId('api-key').value = '';
     await loadLlmProfiles();
-    providerStatus.textContent = '模型配置已删除；若删除的是当前配置，系统已自动选择剩余配置。';
+    providerStatus.textContent = '模型配置已删除；主模型按既有规则选择剩余配置，视觉模型无有效选择时自动回退主模型。';
   }
 
   function installMultiProviderSettings() {
@@ -207,7 +244,7 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
     ) ? previousProvider : 'qwen';
 
     const legend = providerFieldset.querySelector(':scope > legend');
-    if (legend) legend.textContent = 'LLM 多模型设置';
+    if (legend) legend.textContent = 'LLM 多模型设置（主模型 / 视觉模型）';
 
     if (!byId('provider-profile-controls')) {
       const controls = document.createElement('div');
@@ -230,7 +267,7 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
       const nameInput = document.createElement('input');
       nameInput.id = 'provider-profile-name';
       nameInput.className = 'requires-auth';
-      nameInput.placeholder = '例如：DeepSeek 主模型';
+      nameInput.placeholder = '例如：Qwen 视觉模型';
       nameInput.disabled = !currentAccessToken;
       nameWrap.append(nameLabel, nameInput);
 
@@ -240,7 +277,9 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
         ['provider-profile-refresh', '刷新配置列表', loadLlmProfiles],
         ['provider-profile-create', '新建配置', createLlmProfile],
         ['provider-profile-update', '保存修改', updateLlmProfile],
-        ['provider-profile-activate', '设为当前模型', activateLlmProfile],
+        ['provider-profile-activate', '设为主模型', activateLlmProfile],
+        ['provider-profile-activate-vision', '设为视觉模型', activateVisionLlmProfile],
+        ['provider-profile-clear-vision', '视觉跟随主模型', clearVisionLlmProfile],
         ['provider-profile-test', '测试所选配置', testSelectedLlmProfile],
         ['provider-profile-delete', '删除所选配置', deleteSelectedLlmProfile],
       ];
@@ -273,7 +312,7 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
     if (!providerFieldset.querySelector('.provider-preset-note')) {
       const note = document.createElement('p');
       note.className = 'provider-preset-note';
-      note.textContent = '可以同时保存多套模型接口并切换当前模型。Base URL 与 Model 均可修改；API Key 仍只在服务端加密保存，不回传明文。';
+      note.textContent = '可以保存多套模型接口，并分别指定主文本/分析模型与图片/视频视觉模型。视觉模型未单独指定时自动跟随主模型；API Key 仍只在服务端加密保存，不回传明文。';
       providerSelect.insertAdjacentElement('afterend', note);
     }
 
