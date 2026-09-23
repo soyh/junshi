@@ -138,6 +138,20 @@ def delete_vision_llm_provider(
         vision_service.clear(conn, user_id)
 
 
+@router.post(
+    "/vision/test",
+    status_code=status.HTTP_200_OK,
+)
+def test_vision_llm_provider(
+    user_id: str = Depends(get_current_user_id),
+):
+    try:
+        with get_connection() as conn:
+            return vision_service.test_vision_capability(conn, user_id)
+    except LLMProviderConfigError as exc:
+        raise _config_error(exc) from exc
+
+
 @router.get(
     "/profiles",
     response_model=list[LLMProviderProfileResponse],
