@@ -1,0 +1,41 @@
+name: TEST-180 Media Upload Dual Model UI CI
+
+on:
+  push:
+    branches:
+      - test-180-media-upload-dual-model-settings-ui
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: TEST-180 focused
+        run: >-
+          pytest -q
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_179_vision_model_routing.py
+          tests/test_177_media_attachments.py
+          tests/test_178_history_and_llm_profiles.py
+          tests/test_llm_provider_config.py
+          tests/test_provider_runtime_validation.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
