@@ -19,6 +19,8 @@ def test_test180_ui_exposes_visible_media_upload_surface():
     assert "new FormData()" in html
     assert "/api/v1/conversations/${encodeURIComponent(conversationId)}/media" in html
     assert "/api/v1/media/${encodeURIComponent(attachment.id)}/analyze" in html
+    assert "item.message_id ? '已写入会话证据' : '尚未生成会话证据'" in html
+    assert "${item.analysis_status || 'unknown'}" in html
     assert "识别结果已作为媒体证据加入当前会话" in html
     assert "视频当前按关键帧进行视觉分析" in html
 
