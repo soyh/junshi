@@ -12,9 +12,11 @@ from app.services.llm_provider_config import (
 from app.services.openai_chat_provider import OpenAIChatProvider
 
 
+# 64x64 white RGB PNG. Keep the capability probe large enough for providers that
+# reject tiny images, and use the same image_url payload shape as analyze_media().
 _TEST_IMAGE_DATA_URL = (
     "data:image/png;base64,"
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z2S8AAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAXklEQVR4nO3PMQ0AMAzAsPInvYLYYVWKESTzjhsd8KsBrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BbQHKU9LC7/CP1AAAAABJRU5ErkJggg=="
 )
 
 
@@ -169,7 +171,6 @@ class LLMVisionProviderService:
                             "type": "image_url",
                             "image_url": {
                                 "url": _TEST_IMAGE_DATA_URL,
-                                "detail": "low",
                             },
                         },
                     ],
