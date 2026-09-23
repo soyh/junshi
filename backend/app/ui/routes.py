@@ -59,6 +59,10 @@ from app.ui.conversation_session_workspace import (
     CONVERSATION_SESSION_SCRIPT,
     CONVERSATION_SESSION_STYLE,
 )
+from app.ui.dual_model_settings_workspace import (
+    DUAL_MODEL_SETTINGS_SCRIPT,
+    DUAL_MODEL_SETTINGS_STYLE,
+)
 from app.ui.guided_workflow_workspace import (
     GUIDED_WORKFLOW_HTML,
     GUIDED_WORKFLOW_SCRIPT,
@@ -67,6 +71,10 @@ from app.ui.guided_workflow_workspace import (
 from app.ui.lifecycle_v2_workspace import (
     LIFECYCLE_V2_SCRIPT,
     LIFECYCLE_V2_STYLE,
+)
+from app.ui.media_upload_workspace import (
+    MEDIA_UPLOAD_WORKSPACE_SCRIPT,
+    MEDIA_UPLOAD_WORKSPACE_STYLE,
 )
 from app.ui.message_history_window_workspace import MESSAGE_HISTORY_WINDOW_SCRIPT
 from app.ui.multi_provider_settings_workspace import (
@@ -208,11 +216,13 @@ def build_product_shell_html() -> str:
             f"{CONVERSATION_SESSION_STYLE}\n"
             f"{CARD_CLIENT_EXPERIENCE_STYLE}\n"
             f"{CARD_CLIENT_UNIFIED_IMPORT_STYLE}\n"
+            f"{MEDIA_UPLOAD_WORKSPACE_STYLE}\n"
             f"{CARD_CLIENT_COMPACT_SURFACE_STYLE}\n"
             f"{CARD_CLIENT_GENERATION_RECOVERY_STYLE}\n"
             f"{SINGLE_OPEN_INTERACTION_STYLE}\n"
             f"{SETTINGS_TAB_WORKSPACE_STYLE}\n"
             f"{MULTI_PROVIDER_SETTINGS_STYLE}\n"
+            f"{DUAL_MODEL_SETTINGS_STYLE}\n"
             f"{CONVERSATION_CONTROLS_STYLE}\n"
             f"{style_marker}"
         ),
@@ -254,8 +264,10 @@ def build_product_shell_html() -> str:
         f"{SINGLE_OPEN_INTERACTION_SCRIPT}\n\n"
         f"{SETTINGS_TAB_WORKSPACE_SCRIPT}\n\n"
         f"{MULTI_PROVIDER_SETTINGS_SCRIPT}\n\n"
+        f"{DUAL_MODEL_SETTINGS_SCRIPT}\n\n"
         f"{CARD_CLIENT_AUTOMATION_SCRIPT}\n\n"
         f"{CARD_CLIENT_UNIFIED_IMPORT_SCRIPT}\n\n"
+        f"{MEDIA_UPLOAD_WORKSPACE_SCRIPT}\n\n"
         f"{CONVERSATION_SESSION_SCRIPT}\n\n"
         f"{CARD_CLIENT_COMPACT_SURFACE_SCRIPT}\n\n"
         f"{CARD_CLIENT_GENERATION_RECOVERY_SCRIPT}\n\n"
