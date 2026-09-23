@@ -1,10 +1,14 @@
+import json
 from pathlib import Path
 
+import httpx
 from cryptography.fernet import Fernet
 
 from app.config.settings import Settings, get_settings
 from app.core.database import get_connection
 from app.services.llm_provider_config import LLMProviderConfigService
+from app.services.media_attachment import MediaAttachmentService
+from app.services.openai_chat_provider import OpenAICompatibleProvider
 from app.services.vision_llm_provider import LLMVisionProviderService
 from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
 
@@ -132,7 +136,11 @@ def test_vision_selection_falls_back_to_primary_when_unset_or_deleted(client, mo
             conn,
             user_id,
         )
+        selection_count = conn.execute(
+            "SELECT COUNT(*) FROM user_llm_vision_profile_selection"
+        ).fetchone()[0]
     assert fallback_after_delete.model == "primary-model"
+    assert selection_count == 0
 
     cleared = client.delete("/api/v1/settings/llm/vision")
     assert cleared.status_code == 204
@@ -186,6 +194,143 @@ def test_vision_selection_rejects_profile_from_another_user(client, monkeypatch)
     get_settings.cache_clear()
 
 
+def test_vision_capability_test_sends_real_image_request(client, monkeypatch):
+    _enable_llm_encryption(monkeypatch)
+    captured = {}
+
+    _profile(
+        client,
+        name="Primary",
+        model="primary-model",
+        api_key="primary-secret",
+        activate=True,
+    )
+    vision = _profile(
+        client,
+        name="Vision",
+        model="vision-model",
+        api_key="vision-secret",
+    )
+    assert client.put(
+        "/api/v1/settings/llm/vision",
+        json={"profile_id": vision["id"]},
+    ).status_code == 200
+
+    def handler(request: httpx.Request):
+        payload = json.loads(request.content.decode("utf-8"))
+        captured["payload"] = payload
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {"message": {"content": "OK"}}
+                ]
+            },
+            request=request,
+        )
+
+    provider = OpenAICompatibleProvider(
+        api_key="vision-secret",
+        base_url="https://provider.example/v1",
+        model="vision-model",
+        timeout_seconds=5,
+        provider_name="test",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    monkeypatch.setattr(
+        LLMVisionProviderService,
+        "build_provider",
+        lambda self, conn, user_id: provider,
+    )
+
+    response = client.post("/api/v1/settings/llm/vision/test")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["model"] == "vision-model"
+
+    content = captured["payload"]["messages"][0]["content"]
+    assert content[0]["type"] == "text"
+    assert content[1]["type"] == "image_url"
+    assert content[1]["image_url"]["url"].startswith(
+        "data:image/png;base64,"
+    )
+
+    get_settings.cache_clear()
+
+
+def test_media_analysis_uses_vision_resolver(monkeypatch):
+    captured = {}
+
+    class Repository:
+        def get(self, conn, user_id, attachment_id):
+            return {
+                "conversation_id": "conversation-1",
+                "media_type": "image",
+                "sent_at": "2026-09-23T00:00:00+00:00",
+            }
+
+        def mark_completed(
+            self,
+            conn,
+            user_id,
+            attachment_id,
+            analysis_text,
+            evidence_message_id,
+        ):
+            return {"id": attachment_id, "status": "completed"}
+
+        def mark_failed(self, conn, user_id, attachment_id):
+            raise AssertionError("media analysis should not fail")
+
+    class MessageService:
+        def create(
+            self,
+            conn,
+            user_id,
+            conversation_id,
+            sender_type,
+            content,
+            sent_at,
+        ):
+            return {"id": "evidence-1"}
+
+    provider = OpenAICompatibleProvider(
+        api_key="vision-secret",
+        base_url="https://provider.example/v1",
+        model="vision-model",
+        timeout_seconds=5,
+        provider_name="test",
+    )
+
+    service = MediaAttachmentService(
+        repository=Repository(),
+        message_service=MessageService(),
+    )
+    monkeypatch.setattr(
+        service.vision_provider_service,
+        "build_provider",
+        lambda conn, user_id: provider,
+    )
+    monkeypatch.setattr(
+        service,
+        "_analyze_with_provider",
+        lambda actual_provider, row: captured.setdefault(
+            "model",
+            actual_provider.model,
+        ) or "{}",
+    )
+
+    updated, evidence_id = service.analyze(
+        object(),
+        "user-1",
+        "attachment-1",
+    )
+    assert captured["model"] == "vision-model"
+    assert updated["status"] == "completed"
+    assert evidence_id == "evidence-1"
+
+
 def test_test179_ui_exposes_primary_and_vision_roles():
     html = PRODUCT_SHELL_WITH_CONTENT_HTML
     assert "主模型 / 视觉模型" in html
@@ -203,6 +348,7 @@ def test_test179_migration_and_runtime_env_paths_are_stable():
     )
     sql = migration.read_text(encoding="utf-8")
     assert "CREATE TABLE IF NOT EXISTS user_llm_vision_profile_selection" in sql
+    assert "ON DELETE CASCADE" in sql
 
     env_files = Settings.model_config["env_file"]
     assert len(env_files) == 2
