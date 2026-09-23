@@ -100,8 +100,8 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
       title.textContent = item.original_filename || `${item.media_type || 'media'} attachment`;
       const detail = document.createElement('div');
       detail.className = 'client-media-detail';
-      const evidence = item.evidence_message_id ? '已写入会话证据' : '尚未生成会话证据';
-      detail.textContent = `${item.media_type || 'media'} · ${item.status || 'unknown'} · ${evidence}`;
+      const evidence = item.message_id ? '已写入会话证据' : '尚未生成会话证据';
+      detail.textContent = `${item.media_type || 'media'} · ${item.analysis_status || 'unknown'} · ${evidence}`;
       meta.append(title, detail);
 
       const remove = document.createElement('button');
