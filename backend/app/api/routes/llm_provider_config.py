@@ -9,11 +9,16 @@ from app.schemas.llm_provider_config import (
     LLMProviderProfileResponse,
     LLMProviderProfileUpdate,
 )
+from app.schemas.vision_llm_provider import (
+    LLMVisionSelectionResponse,
+    LLMVisionSelectionUpdate,
+)
 from app.services.llm import LLMAnalysisError
 from app.services.llm_provider_config import (
     LLMProviderConfigError,
     LLMProviderConfigService,
 )
+from app.services.vision_llm_provider import LLMVisionProviderService
 
 
 router = APIRouter(
@@ -22,6 +27,7 @@ router = APIRouter(
 )
 
 service = LLMProviderConfigService()
+vision_service = LLMVisionProviderService(service)
 
 
 def _config_error(exc: LLMProviderConfigError) -> HTTPException:
@@ -93,6 +99,43 @@ def delete_llm_provider_config(
 ):
     with get_connection() as conn:
         service.delete(conn, user_id)
+
+
+@router.get(
+    "/vision",
+    response_model=LLMVisionSelectionResponse | None,
+)
+def get_vision_llm_provider(
+    user_id: str = Depends(get_current_user_id),
+):
+    with get_connection() as conn:
+        return vision_service.get(conn, user_id)
+
+
+@router.put(
+    "/vision",
+    response_model=LLMVisionSelectionResponse,
+)
+def put_vision_llm_provider(
+    payload: LLMVisionSelectionUpdate,
+    user_id: str = Depends(get_current_user_id),
+):
+    try:
+        with get_connection() as conn:
+            return vision_service.select(conn, user_id, payload.profile_id)
+    except LLMProviderConfigError as exc:
+        raise _config_error(exc) from exc
+
+
+@router.delete(
+    "/vision",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_vision_llm_provider(
+    user_id: str = Depends(get_current_user_id),
+):
+    with get_connection() as conn:
+        vision_service.clear(conn, user_id)
 
 
 @router.get(
