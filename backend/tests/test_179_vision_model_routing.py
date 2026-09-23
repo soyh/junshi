@@ -36,8 +36,9 @@ def _profile(client, *, name, model, api_key, activate=False):
 
 def test_primary_and_vision_profiles_are_selected_independently(client, monkeypatch):
     _enable_llm_encryption(monkeypatch)
+    user_id = get_settings().local_user_id
 
-    primary = _profile(
+    _profile(
         client,
         name="Primary text",
         model="text-model",
@@ -67,14 +68,15 @@ def test_primary_and_vision_profiles_are_selected_independently(client, monkeypa
     with get_connection() as conn:
         primary_provider = LLMProviderConfigService().build_provider(
             conn,
-            primary["id"] if False else primary.get("user_id", "00000000-0000-0000-0000-000000000001"),
+            user_id,
         )
         vision_provider = LLMVisionProviderService().build_provider(
             conn,
-            "00000000-0000-0000-0000-000000000001",
+            user_id,
         )
 
     assert primary_provider.model == "text-model"
+    assert primary_provider.api_key == "text-secret"
     assert vision_provider.model == "vision-model"
     assert vision_provider.api_key == "vision-secret"
 
@@ -83,6 +85,7 @@ def test_primary_and_vision_profiles_are_selected_independently(client, monkeypa
 
 def test_vision_selection_falls_back_to_primary_when_unset_or_deleted(client, monkeypatch):
     _enable_llm_encryption(monkeypatch)
+    user_id = get_settings().local_user_id
 
     primary = _profile(
         client,
@@ -105,7 +108,7 @@ def test_vision_selection_falls_back_to_primary_when_unset_or_deleted(client, mo
     with get_connection() as conn:
         fallback = LLMVisionProviderService().build_provider(
             conn,
-            "00000000-0000-0000-0000-000000000001",
+            user_id,
         )
     assert fallback.model == "primary-model"
 
@@ -127,7 +130,7 @@ def test_vision_selection_falls_back_to_primary_when_unset_or_deleted(client, mo
     with get_connection() as conn:
         fallback_after_delete = LLMVisionProviderService().build_provider(
             conn,
-            "00000000-0000-0000-0000-000000000001",
+            user_id,
         )
     assert fallback_after_delete.model == "primary-model"
 
