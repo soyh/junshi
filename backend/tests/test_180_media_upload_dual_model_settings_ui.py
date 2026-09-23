@@ -28,13 +28,12 @@ def test_test180_ui_exposes_independent_primary_and_vision_credentials():
 
     assert "主文本 / 分析模型" in html
     assert "视觉 / 图片视频模型" in html
-
-    for role in ("primary", "vision"):
-        assert f"dual-{role}-provider" in html
-        assert f"dual-{role}-base-url" in html
-        assert f"dual-{role}-model" in html
-        assert f"dual-{role}-api-key" in html
-        assert f"dual-{role}-timeout" in html
+    assert "name: `dual-${role}-name`" in html
+    assert "provider: `dual-${role}-provider`" in html
+    assert "baseUrl: `dual-${role}-base-url`" in html
+    assert "model: `dual-${role}-model`" in html
+    assert "apiKey: `dual-${role}-api-key`" in html
+    assert "timeout: `dual-${role}-timeout`" in html
 
     assert "savePrimary.id = 'dual-primary-save'" in html
     assert "testPrimary.id = 'dual-primary-test'" in html
