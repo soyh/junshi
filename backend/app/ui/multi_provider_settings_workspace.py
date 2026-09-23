@@ -201,6 +201,14 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
     providerStatus.textContent = '视觉模型已恢复为跟随主模型。';
   }
 
+  async function testVisionLlmProfile() {
+    const result = await api('/api/v1/settings/llm/vision/test', {
+      method: 'POST',
+    });
+    const label = result && result.status === 'ok' ? 'PASS' : 'FAIL';
+    providerStatus.textContent = `${label} [视觉能力/${result.code || 'unknown'}] ${result.provider || ''} / ${result.model || ''}: ${result.message || ''}`;
+  }
+
   async function testSelectedLlmProfile() {
     if (!selectedLlmProfileId) throw new Error('请先选择模型配置');
     const result = await api(`/api/v1/settings/llm/profiles/${encodeURIComponent(selectedLlmProfileId)}/test`, {
@@ -280,6 +288,7 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
         ['provider-profile-activate', '设为主模型', activateLlmProfile],
         ['provider-profile-activate-vision', '设为视觉模型', activateVisionLlmProfile],
         ['provider-profile-clear-vision', '视觉跟随主模型', clearVisionLlmProfile],
+        ['provider-profile-test-vision', '测试视觉能力', testVisionLlmProfile],
         ['provider-profile-test', '测试所选配置', testSelectedLlmProfile],
         ['provider-profile-delete', '删除所选配置', deleteSelectedLlmProfile],
       ];
@@ -312,7 +321,7 @@ MULTI_PROVIDER_SETTINGS_SCRIPT = r'''
     if (!providerFieldset.querySelector('.provider-preset-note')) {
       const note = document.createElement('p');
       note.className = 'provider-preset-note';
-      note.textContent = '可以保存多套模型接口，并分别指定主文本/分析模型与图片/视频视觉模型。视觉模型未单独指定时自动跟随主模型；API Key 仍只在服务端加密保存，不回传明文。';
+      note.textContent = '可以保存多套模型接口，并分别指定主文本/分析模型与图片/视频视觉模型。视觉模型未单独指定时自动跟随主模型；“测试视觉能力”会发送一张极小测试图验证模型确实支持图片输入；API Key 仍只在服务端加密保存，不回传明文。';
       providerSelect.insertAdjacentElement('afterend', note);
     }
 
