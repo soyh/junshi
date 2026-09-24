@@ -146,8 +146,17 @@ def test_media_analysis_persists_system_evidence_message_with_claim_token():
     claim_token = "claim-180"
 
     class Repository:
-        def get_claimed(self, conn, user_id, attachment_id, actual_claim_token):
+        def get_claimed(
+            self,
+            conn,
+            user_id,
+            attachment_id,
+            actual_claim_token,
+            *,
+            stale_before,
+        ):
             assert actual_claim_token == claim_token
+            assert stale_before
             return {
                 "conversation_id": "conversation-1",
                 "media_type": "image",
@@ -164,8 +173,11 @@ def test_media_analysis_persists_system_evidence_message_with_claim_token():
             actual_claim_token,
             analysis_text,
             evidence_message_id,
+            *,
+            stale_before,
         ):
             assert actual_claim_token == claim_token
+            assert stale_before
             captured["analysis_text"] = analysis_text
             captured["evidence_message_id"] = evidence_message_id
             return {"id": attachment_id, "analysis_status": "completed"}
