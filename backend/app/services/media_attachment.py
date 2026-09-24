@@ -231,7 +231,11 @@ class MediaAttachmentService:
             "interaction_signals, uncertainty. Values may be strings or arrays."
         )
 
-    def _analyze_with_provider(self, provider: OpenAIChatProvider, row: sqlite3.Row | dict) -> str:
+    def _analyze_with_provider(
+        self,
+        provider: OpenAIChatProvider,
+        row: sqlite3.Row | dict,
+    ) -> str:
         if not provider.api_key:
             raise MediaAttachmentError("configured provider API key is missing")
 
@@ -401,40 +405,3 @@ class MediaAttachmentService:
             attachment_id,
             claim_token,
         )
-
-    def analyze(self, conn, user_id: str, attachment_id: str):
-        row = self.repository.get(conn, user_id, attachment_id)
-        if row is None:
-            raise MediaAttachmentError("media attachment not found")
-
-        existing_message_id = self._row_value(row, "message_id")
-        if (
-            self._row_value(row, "analysis_status") == "completed"
-            and existing_message_id
-        ):
-            return row, existing_message_id
-
-        provider = self.vision_provider_service.build_provider(conn, user_id)
-        if not isinstance(provider, OpenAIChatProvider):
-            raise MediaAttachmentError("configured provider does not support media analysis")
-        try:
-            analysis_text = self._analyze_with_provider(provider, row)
-            evidence = self.message_service.create(
-                conn,
-                user_id,
-                row["conversation_id"],
-                "system",
-                f"[媒体证据:{row['media_type']}] {analysis_text}",
-                row["sent_at"],
-            )
-            updated = self.repository.mark_completed(
-                conn,
-                user_id,
-                attachment_id,
-                analysis_text,
-                evidence["id"],
-            )
-            return updated, evidence["id"]
-        except Exception:
-            self.repository.mark_failed(conn, user_id, attachment_id)
-            raise
