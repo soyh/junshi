@@ -39,7 +39,7 @@ def create_message(
 ):
     try:
         with get_connection() as conn:
-            message = service.create(
+            message = service.create_user_managed(
                 conn,
                 user_id,
                 payload.conversation_id,
@@ -96,7 +96,7 @@ def update_message(
 ):
     try:
         with get_connection() as conn:
-            message = service.update(
+            message = service.update_user_managed(
                 conn,
                 user_id,
                 message_id,
@@ -134,7 +134,7 @@ def delete_message(
 ):
     try:
         with get_connection() as conn:
-            service.delete(
+            service.delete_user_managed(
                 conn,
                 user_id,
                 message_id,
