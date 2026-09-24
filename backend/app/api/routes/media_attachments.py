@@ -18,6 +18,18 @@ def _row(row):
     return dict(row) if row is not None else None
 
 
+def _cleanup_unreferenced_blob_best_effort(user_id: str, storage_path: str | None) -> None:
+    if not storage_path:
+        return
+    try:
+        with get_connection() as conn:
+            service.cleanup_unreferenced_blob(conn, user_id, storage_path)
+    except Exception:
+        # Canonical database state already won. A leftover blob is recoverable and
+        # safer than converting a cleanup failure into a misleading API failure.
+        pass
+
+
 @router.post(
     "/conversations/{conversation_id}/media",
     response_model=MediaAttachmentResponse,
@@ -29,18 +41,27 @@ async def upload_media_attachment(
     sent_at: str | None = Form(default=None),
     user_id: str = Depends(get_current_user_id),
 ):
+    row = None
     try:
         content = await file.read()
-        with get_connection() as conn:
-            row = service.create(
-                conn,
-                user_id=user_id,
-                conversation_id=conversation_id,
-                original_filename=file.filename or "upload",
-                mime_type=file.content_type or "application/octet-stream",
-                content=content,
-                sent_at=sent_at,
-            )
+        try:
+            with get_connection() as conn:
+                row = service.create(
+                    conn,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    original_filename=file.filename or "upload",
+                    mime_type=file.content_type or "application/octet-stream",
+                    content=content,
+                    sent_at=sent_at,
+                )
+        except Exception:
+            if row is not None:
+                _cleanup_unreferenced_blob_best_effort(
+                    user_id,
+                    row["storage_path"],
+                )
+            raise
     except ConversationNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Conversation not found") from exc
     except MediaAttachmentError as exc:
@@ -91,8 +112,18 @@ def delete_media_attachment(
     attachment_id: str,
     user_id: str = Depends(get_current_user_id),
 ):
+    cleanup_path = None
     try:
         with get_connection() as conn:
-            service.delete(conn, user_id, attachment_id)
+            cleanup_path = service.delete(
+                conn,
+                user_id,
+                attachment_id,
+                defer_blob_cleanup=True,
+            )
     except MediaAttachmentError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    # This runs only after get_connection() has committed successfully. Re-check
+    # references in a fresh transaction before touching the physical blob.
+    _cleanup_unreferenced_blob_best_effort(user_id, cleanup_path)
