@@ -2,6 +2,7 @@ import json
 
 import httpx
 
+from app.services import media_attachment as media_attachment_module
 from app.services.media_attachment import MediaAttachmentService
 from app.services.openai_chat_provider import OpenAICompatibleProvider
 from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
@@ -44,6 +45,43 @@ def test_test180_ui_exposes_independent_primary_and_vision_credentials():
     assert "follow.id = 'dual-vision-follow-primary'" in html
     assert "两套配置的 Provider、API Key、Base URL、Model、Timeout 可完全不同" in html
     assert "高级：Profile 管理与兼容设置" in html
+
+
+def test_video_ffmpeg_resolver_prefers_system_binary(monkeypatch):
+    monkeypatch.setattr(
+        media_attachment_module.shutil,
+        "which",
+        lambda name: "/usr/bin/ffmpeg" if name == "ffmpeg" else None,
+    )
+
+    def bundled_should_not_run():
+        raise AssertionError("bundled ffmpeg should not be queried")
+
+    monkeypatch.setattr(
+        media_attachment_module.imageio_ffmpeg,
+        "get_ffmpeg_exe",
+        bundled_should_not_run,
+    )
+
+    assert MediaAttachmentService._ffmpeg_executable() == "/usr/bin/ffmpeg"
+
+
+def test_video_ffmpeg_resolver_falls_back_to_bundled_binary(monkeypatch, tmp_path):
+    bundled = tmp_path / "ffmpeg-bundled"
+    bundled.write_bytes(b"bundled")
+
+    monkeypatch.setattr(
+        media_attachment_module.shutil,
+        "which",
+        lambda name: None,
+    )
+    monkeypatch.setattr(
+        media_attachment_module.imageio_ffmpeg,
+        "get_ffmpeg_exe",
+        lambda: str(bundled),
+    )
+
+    assert MediaAttachmentService._ffmpeg_executable() == str(bundled)
 
 
 def test_media_payload_matches_verified_openai_compatible_image_format(tmp_path):
