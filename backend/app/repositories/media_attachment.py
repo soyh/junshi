@@ -156,30 +156,6 @@ class MediaAttachmentRepository:
             (attachment_id, user_id, claim_token),
         ).fetchone()
 
-    def mark_completed(
-        self,
-        conn: sqlite3.Connection,
-        user_id: str,
-        attachment_id: str,
-        analysis_text: str,
-        message_id: str,
-    ) -> sqlite3.Row | None:
-        now = utc_now()
-        conn.execute(
-            """
-            UPDATE media_attachments
-            SET analysis_status = 'completed',
-                analysis_text = ?,
-                message_id = ?,
-                analysis_claim_token = NULL,
-                analysis_claimed_at = NULL,
-                updated_at = ?
-            WHERE id = ? AND user_id = ?
-            """,
-            (analysis_text, message_id, now, attachment_id, user_id),
-        )
-        return self.get(conn, user_id, attachment_id)
-
     def mark_completed_claimed(
         self,
         conn: sqlite3.Connection,
@@ -214,26 +190,6 @@ class MediaAttachmentRepository:
         )
         if cursor.rowcount <= 0:
             return None
-        return self.get(conn, user_id, attachment_id)
-
-    def mark_failed(
-        self,
-        conn: sqlite3.Connection,
-        user_id: str,
-        attachment_id: str,
-    ) -> sqlite3.Row | None:
-        now = utc_now()
-        conn.execute(
-            """
-            UPDATE media_attachments
-            SET analysis_status = 'failed',
-                analysis_claim_token = NULL,
-                analysis_claimed_at = NULL,
-                updated_at = ?
-            WHERE id = ? AND user_id = ?
-            """,
-            (now, attachment_id, user_id),
-        )
         return self.get(conn, user_id, attachment_id)
 
     def mark_failed_claimed(
