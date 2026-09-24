@@ -164,13 +164,18 @@ class MediaAttachmentService:
 
         path = Path(row["storage_path"])
         evidence_message_id = self._row_value(row, "message_id")
+
+        # Remove the attachment link first, in the same transaction, so the
+        # canonical-message immutability guard no longer protects the evidence
+        # that is being intentionally deleted as part of attachment cleanup.
+        self.repository.delete(conn, user_id, attachment_id)
+
         if evidence_message_id:
             try:
                 self.message_service.delete(conn, user_id, evidence_message_id)
             except MessageNotFoundError:
                 pass
 
-        self.repository.delete(conn, user_id, attachment_id)
         storage_path = str(path)
         if defer_blob_cleanup:
             return storage_path
