@@ -1,70 +1,272 @@
 DUAL_MODEL_SETTINGS_STYLE = r'''
+    #dual-model-intro {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 0 0 12px;
+      padding: 15px 17px;
+      border: 1px solid rgba(25, 167, 232, .16);
+      border-radius: 16px;
+      background:
+        radial-gradient(circle at 94% 4%, rgba(82, 205, 250, .22), transparent 14rem),
+        linear-gradient(135deg, rgba(244,252,255,.96), rgba(232,247,255,.82));
+    }
+
+    #dual-model-intro .dual-model-eyebrow {
+      margin: 0 0 4px;
+      color: var(--sky-600, #0787cf);
+      font-size: .69rem;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    #dual-model-intro h3 {
+      margin: 0;
+      color: var(--sky-950, #08233d);
+      font-size: 1.08rem;
+    }
+
+    #dual-model-intro p {
+      max-width: 780px;
+      margin: 6px 0 0;
+      color: var(--muted, #5d7790);
+      font-size: .82rem;
+      line-height: 1.55;
+    }
+
+    #dual-model-intro .dual-model-route-chip {
+      flex: 0 0 auto;
+      padding: 6px 10px;
+      border: 1px solid rgba(25, 167, 232, .20);
+      border-radius: 999px;
+      color: var(--sky-800, #0d4673);
+      background: rgba(255,255,255,.82);
+      font-size: .72rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    #dual-model-status {
+      margin: 0 0 14px !important;
+      padding: 10px 12px !important;
+      border-radius: 12px !important;
+      line-height: 1.5;
+    }
+
     #dual-model-settings {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-      margin-bottom: 14px;
+      gap: 16px;
+      margin-bottom: 16px;
     }
 
     #dual-model-settings .dual-model-card {
+      position: relative;
+      overflow: hidden;
       min-width: 0;
-      padding: 14px;
+      padding: 16px;
+      border: 1px solid rgba(25, 167, 232, .19);
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at 96% 2%, rgba(88, 200, 245, .17), transparent 12rem),
+        linear-gradient(145deg, rgba(255,255,255,.97), rgba(240,250,255,.90));
+      box-shadow: 0 12px 32px rgba(23, 116, 169, .08);
+    }
+
+    #dual-model-settings .dual-model-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--sky-400, #58c8f5), #4f8eff);
+    }
+
+    #dual-model-settings .dual-model-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+
+    #dual-model-settings .dual-model-title-wrap {
+      min-width: 0;
+    }
+
+    #dual-model-settings .dual-model-role-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      padding: 4px 8px;
       border: 1px solid rgba(25, 167, 232, .18);
-      border-radius: 14px;
-      background: rgba(248,252,255,.92);
+      border-radius: 999px;
+      color: var(--sky-700, #0969a8);
+      background: rgba(226,246,255,.74);
+      font-size: .66rem;
+      font-weight: 900;
+      letter-spacing: .08em;
     }
 
     #dual-model-settings h3 {
       margin: 0;
-      color: #26344d;
-      font-size: 1rem;
+      color: var(--sky-950, #08233d);
+      font-size: 1.05rem;
+    }
+
+    #dual-model-settings .dual-model-role-state {
+      flex: 0 0 auto;
+      padding: 5px 8px;
+      border: 1px solid rgba(127,127,127,.18);
+      border-radius: 999px;
+      color: #526279;
+      background: rgba(255,255,255,.82);
+      font-size: .69rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    #dual-model-settings .dual-model-role-state[data-state="active"] {
+      color: #05603a;
+      border-color: rgba(21, 164, 103, .22);
+      background: rgba(224, 250, 239, .88);
+    }
+
+    #dual-model-settings .dual-model-role-state[data-state="linked"] {
+      color: var(--sky-800, #0d4673);
+      border-color: rgba(25, 167, 232, .22);
+      background: rgba(226, 246, 255, .88);
+    }
+
+    #dual-model-settings .dual-model-role-state[data-state="empty"] {
+      color: #805b16;
+      border-color: rgba(207, 151, 45, .20);
+      background: rgba(255, 247, 224, .88);
     }
 
     #dual-model-settings .dual-model-role-note {
-      margin: 5px 0 10px;
-      color: #718096;
-      font-size: .8rem;
-      line-height: 1.5;
+      min-height: 2.6em;
+      margin: 6px 0 13px;
+      color: var(--muted, #5d7790);
+      font-size: .79rem;
+      line-height: 1.55;
+    }
+
+    #dual-model-settings .dual-model-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 12px;
+    }
+
+    #dual-model-settings .dual-model-field {
+      min-width: 0;
+    }
+
+    #dual-model-settings .dual-model-field-name,
+    #dual-model-settings .dual-model-field-baseUrl,
+    #dual-model-settings .dual-model-field-apiKey {
+      grid-column: 1 / -1;
+    }
+
+    #dual-model-settings .dual-model-field label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--sky-900, #0b2f50);
+      font-size: .76rem;
+      font-weight: 800;
+    }
+
+    #dual-model-settings .dual-model-field input,
+    #dual-model-settings .dual-model-field select {
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      margin: 0;
     }
 
     #dual-model-settings .dual-model-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 7px;
-      margin-top: 10px;
+      gap: 8px;
+      margin-top: 13px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(25, 167, 232, .11);
     }
 
-    #dual-model-settings .dual-model-actions button { margin: 0 !important; }
+    #dual-model-settings .dual-model-actions button {
+      margin: 0 !important;
+    }
+
+    #dual-model-settings .dual-model-actions .client-primary-button {
+      color: #fff !important;
+      border-color: transparent !important;
+      background: linear-gradient(135deg, var(--sky-500, #19a7e8), #4d86ef) !important;
+      box-shadow: 0 8px 20px rgba(29, 145, 218, .18) !important;
+    }
 
     #dual-model-settings .dual-model-key-state {
       margin-top: 5px;
-      color: #718096;
-      font-size: .76rem;
-    }
-
-    #dual-model-status {
-      margin: 0 0 12px !important;
+      color: var(--muted, #5d7790);
+      font-size: .72rem;
+      line-height: 1.45;
     }
 
     #provider-advanced-profiles {
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 1px solid rgba(127,127,127,.16);
+      margin-top: 4px;
+      padding: 12px 14px;
+      border: 1px dashed rgba(25, 167, 232, .22);
+      border-radius: 14px;
+      background: rgba(245, 252, 255, .62);
     }
 
     #provider-advanced-profiles > summary {
       cursor: pointer;
-      color: #526279;
-      font-weight: 800;
-      font-size: .82rem;
+      color: var(--sky-800, #0d4673);
+      font-weight: 900;
+      font-size: .8rem;
     }
 
     #provider-advanced-profiles-content {
-      margin-top: 10px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(25, 167, 232, .12);
     }
 
-    @media (max-width: 820px) {
-      #dual-model-settings { grid-template-columns: 1fr; }
+    @media (max-width: 980px) {
+      #dual-model-settings {
+        grid-template-columns: 1fr;
+      }
+
+      #dual-model-settings .dual-model-role-note {
+        min-height: 0;
+      }
+    }
+
+    @media (max-width: 620px) {
+      #dual-model-intro {
+        display: block;
+      }
+
+      #dual-model-intro .dual-model-route-chip {
+        display: inline-block;
+        margin-top: 10px;
+      }
+
+      #dual-model-settings .dual-model-card {
+        padding: 14px 12px 14px 14px;
+      }
+
+      #dual-model-settings .dual-model-fields {
+        grid-template-columns: 1fr;
+      }
+
+      #dual-model-settings .dual-model-field-name,
+      #dual-model-settings .dual-model-field-baseUrl,
+      #dual-model-settings .dual-model-field-apiKey {
+        grid-column: auto;
+      }
     }
 '''
 
@@ -82,7 +284,15 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
       apiKey: `dual-${role}-api-key`,
       timeout: `dual-${role}-timeout`,
       keyState: `dual-${role}-key-state`,
+      state: `dual-${role}-state`,
     };
+  }
+
+  function dualSetRoleState(role, text, state = 'empty') {
+    const node = byId(dualRoleIds(role).state);
+    if (!node) return;
+    node.textContent = text;
+    node.dataset.state = state;
   }
 
   function dualFillProviderOptions(select) {
@@ -162,6 +372,17 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     dualVisionProfileId = vision?.profile_id || null;
     dualFillRole('primary', active || null);
     dualFillRole('vision', vision || null);
+
+    dualSetRoleState(
+      'primary',
+      active ? '当前生效' : '未配置',
+      active ? 'active' : 'empty',
+    );
+    dualSetRoleState(
+      'vision',
+      vision ? '独立视觉' : active ? '跟随主模型' : '未配置',
+      vision ? 'active' : active ? 'linked' : 'empty',
+    );
 
     const status = byId('dual-model-status');
     const primaryText = active
@@ -257,6 +478,7 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
   function dualMakeInput(role, field, labelText, type = 'text') {
     const ids = dualRoleIds(role);
     const wrap = document.createElement('div');
+    wrap.className = `dual-model-field dual-model-field-${field}`;
     const label = document.createElement('label');
     const id = ids[field];
     label.htmlFor = id;
@@ -292,25 +514,45 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     return wrap;
   }
 
-  function dualBuildCard(role, titleText, noteText) {
+  function dualBuildCard(role, roleLabel, titleText, noteText) {
     const card = document.createElement('section');
     card.className = 'dual-model-card';
     card.id = `dual-${role}-card`;
+
+    const header = document.createElement('div');
+    header.className = 'dual-model-card-header';
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'dual-model-title-wrap';
+    const roleTag = document.createElement('span');
+    roleTag.className = 'dual-model-role-label';
+    roleTag.textContent = roleLabel;
     const title = document.createElement('h3');
     title.textContent = titleText;
+    titleWrap.append(roleTag, title);
+
+    const roleState = document.createElement('span');
+    roleState.id = dualRoleIds(role).state;
+    roleState.className = 'dual-model-role-state';
+    roleState.dataset.state = 'empty';
+    roleState.textContent = '等待登录';
+    header.append(titleWrap, roleState);
+
     const note = document.createElement('p');
     note.className = 'dual-model-role-note';
     note.textContent = noteText;
-    card.append(
-      title,
-      note,
+
+    const fields = document.createElement('div');
+    fields.className = 'dual-model-fields';
+    fields.append(
       dualMakeInput(role, 'name', '配置名称'),
-      dualMakeInput(role, 'provider', 'Provider'),
-      dualMakeInput(role, 'baseUrl', 'Base URL'),
-      dualMakeInput(role, 'model', 'Model'),
+      dualMakeInput(role, 'provider', '模型服务'),
+      dualMakeInput(role, 'model', '模型名称'),
+      dualMakeInput(role, 'baseUrl', '接口地址（Base URL）'),
       dualMakeInput(role, 'apiKey', 'API Key', 'password'),
-      dualMakeInput(role, 'timeout', 'Timeout seconds', 'number'),
+      dualMakeInput(role, 'timeout', '超时时间（秒）', 'number'),
     );
+
+    card.append(header, note, fields);
     card.querySelector(`#${dualRoleIds(role).provider}`)?.addEventListener(
       'change',
       () => dualApplyPreset(role),
@@ -325,17 +567,34 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     const legend = providerFieldset.querySelector(':scope > legend');
     if (legend) legend.textContent = 'AI 模型设置';
 
+    const intro = document.createElement('div');
+    intro.id = 'dual-model-intro';
+    const introCopy = document.createElement('div');
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'dual-model-eyebrow';
+    eyebrow.textContent = 'DUAL MODEL ROUTING';
+    const introTitle = document.createElement('h3');
+    introTitle.textContent = '文本推理与视觉理解独立配置';
+    const introNote = document.createElement('p');
+    introNote.textContent = '主文本模型负责分析、策略与回复；视觉模型负责聊天截图、图片和视频关键帧。两者可以使用完全不同的服务商、接口地址、模型和 API Key。';
+    introCopy.append(eyebrow, introTitle, introNote);
+    const routeChip = document.createElement('span');
+    routeChip.className = 'dual-model-route-chip';
+    routeChip.textContent = '文本 / 视觉分流';
+    intro.append(introCopy, routeChip);
+
     const status = document.createElement('div');
     status.id = 'dual-model-status';
-    status.className = 'status';
-    status.textContent = '登录后分别配置主文本模型和视觉模型。';
+    status.className = 'status dual-model-status';
+    status.textContent = '登录后可分别配置主文本模型和视觉模型。';
 
     const grid = document.createElement('div');
     grid.id = 'dual-model-settings';
     const primary = dualBuildCard(
       'primary',
+      'TEXT · 主路由',
       '主文本 / 分析模型',
-      '用于结构化分析、策略、回复生成等文本任务。可使用独立 Provider、API Key、Base URL 和 Model。',
+      '用于结构化分析、策略生成、Recommendation、行动计划与回复建议等文本任务。',
     );
     const primaryActions = document.createElement('div');
     primaryActions.className = 'dual-model-actions';
@@ -356,8 +615,9 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
 
     const vision = dualBuildCard(
       'vision',
+      'VISION · 多模态',
       '视觉 / 图片视频模型',
-      '用于聊天截图、图片和视频关键帧识别。可以与主模型使用完全不同的 Provider、API Key、Base URL 和 Model。',
+      '用于聊天截图、图片与视频关键帧识别。未单独配置时可让视觉任务跟随主文本模型。',
     );
     const visionActions = document.createElement('div');
     visionActions.className = 'dual-model-actions';
@@ -387,18 +647,19 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     const advanced = document.createElement('details');
     advanced.id = 'provider-advanced-profiles';
     const summary = document.createElement('summary');
-    summary.textContent = '高级：Profile 管理与兼容设置';
+    summary.textContent = '高级：Profile 管理、角色切换与兼容设置';
     const advancedContent = document.createElement('div');
     advancedContent.id = 'provider-advanced-profiles-content';
     advanced.append(summary, advancedContent);
 
-    const keep = new Set([legend, status, grid, advanced]);
+    const keep = new Set([legend, intro, status, grid, advanced]);
     Array.from(providerFieldset.children).forEach((child) => {
       if (!keep.has(child) && child !== legend) advancedContent.appendChild(child);
     });
 
-    if (legend) legend.insertAdjacentElement('afterend', status);
-    else providerFieldset.prepend(status);
+    if (legend) legend.insertAdjacentElement('afterend', intro);
+    else providerFieldset.prepend(intro);
+    intro.insertAdjacentElement('afterend', status);
     status.insertAdjacentElement('afterend', grid);
     grid.insertAdjacentElement('afterend', advanced);
 
