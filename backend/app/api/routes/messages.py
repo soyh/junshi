@@ -6,6 +6,7 @@ from app.domain.errors import (
     ConversationNotFoundError,
     InvalidMessageSenderTypeError,
     MessageNotFoundError,
+    ProtectedMessageError,
 )
 from app.schemas.message import (
     MessageCreate,
@@ -109,6 +110,11 @@ def update_message(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Message not found",
         ) from exc
+    except ProtectedMessageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
     except (InvalidMessageSenderTypeError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -137,6 +143,11 @@ def delete_message(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Message not found",
+        ) from exc
+    except ProtectedMessageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
         ) from exc
 
 
