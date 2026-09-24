@@ -647,7 +647,7 @@ DUAL_MODEL_SETTINGS_SCRIPT = r'''
     const advanced = document.createElement('details');
     advanced.id = 'provider-advanced-profiles';
     const summary = document.createElement('summary');
-    summary.textContent = '高级：Profile 管理、角色切换与兼容设置';
+    summary.textContent = '高级：Profile 管理与兼容设置 · 角色切换';
     const advancedContent = document.createElement('div');
     advancedContent.id = 'provider-advanced-profiles-content';
     advanced.append(summary, advancedContent);
