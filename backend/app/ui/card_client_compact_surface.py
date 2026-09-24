@@ -38,33 +38,78 @@ CARD_CLIENT_COMPACT_SURFACE_STYLE = r'''
 
     #client-conversation-tabs {
       display: flex;
-      gap: 8px;
+      gap: 9px;
       min-width: 0;
       overflow-x: auto;
-      padding: 2px 1px 6px;
+      padding: 2px 1px 7px;
       scrollbar-gutter: stable;
     }
 
     .client-conversation-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       flex: 0 0 auto;
-      max-width: 240px;
+      max-width: 300px;
+      min-width: 0;
       margin: 0 !important;
-      padding: 8px 12px !important;
-      border-radius: 999px !important;
-      color: #53627a !important;
-      border: 1px solid rgba(76, 101, 150, .17) !important;
-      background: rgba(247, 251, 255, .92) !important;
-      box-shadow: none !important;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      padding: 8px 10px !important;
+      border-radius: 13px !important;
+      color: #425b72 !important;
+      border: 1px solid rgba(25, 167, 232, .18) !important;
+      background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(238,249,255,.94)) !important;
+      box-shadow: 0 5px 16px rgba(25, 117, 170, .07) !important;
       white-space: nowrap;
     }
 
+    .client-conversation-chip::before {
+      content: "";
+      flex: 0 0 auto;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #a8c6d7;
+      box-shadow: 0 0 0 3px rgba(168, 198, 215, .18);
+    }
+
+    .client-conversation-chip:hover:not(:disabled) {
+      border-color: rgba(25, 167, 232, .38) !important;
+      background: linear-gradient(180deg, #fff, rgba(231,247,255,.98)) !important;
+      box-shadow: 0 8px 20px rgba(25, 117, 170, .11) !important;
+    }
+
     .client-conversation-chip.is-current {
-      color: #ffffff !important;
-      border-color: transparent !important;
-      background: linear-gradient(135deg, #4f46e5, #0891b2) !important;
-      box-shadow: 0 8px 22px rgba(67, 73, 168, .20) !important;
+      color: var(--sky-900, #0b2f50) !important;
+      border-color: rgba(25, 167, 232, .42) !important;
+      background:
+        linear-gradient(135deg, rgba(228,248,255,.98), rgba(241,247,255,.98)) !important;
+      box-shadow:
+        0 8px 22px rgba(25, 139, 197, .12),
+        inset 0 0 0 1px rgba(255,255,255,.78) !important;
+    }
+
+    .client-conversation-chip.is-current::before {
+      background: var(--sky-500, #19a7e8);
+      box-shadow: 0 0 0 3px rgba(25, 167, 232, .16);
+    }
+
+    .client-conversation-chip-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 760;
+    }
+
+    .client-conversation-chip-state {
+      flex: 0 0 auto;
+      padding: 2px 6px;
+      border: 1px solid rgba(25, 167, 232, .18);
+      border-radius: 999px;
+      color: var(--sky-700, #0969a8);
+      background: rgba(224, 246, 255, .82);
+      font-size: .67rem;
+      font-weight: 850;
+      letter-spacing: .04em;
     }
 
     #client-conversation-empty {
@@ -112,7 +157,7 @@ CARD_CLIENT_COMPACT_SURFACE_STYLE = r'''
         align-items: flex-start;
       }
       .client-conversation-chip {
-        max-width: 200px;
+        max-width: 240px;
       }
     }
 '''
@@ -121,7 +166,8 @@ CARD_CLIENT_COMPACT_SURFACE_STYLE = r'''
 CARD_CLIENT_COMPACT_SURFACE_SCRIPT = r'''
   function clientConversationChipLabel(option) {
     const raw = String(option?.dataset?.test166BaseLabel || option?.textContent || '').trim();
-    return raw.replace(/^\d+\s*·\s*/, '') || '未命名会话';
+    const withoutIndex = raw.replace(/^\d+\s*·\s*/, '');
+    return withoutIndex.replace(/\s*·\s*(active|archived)\s*$/i, '').trim() || '未命名会话';
   }
 
   function clientEnsureRuntimeAlert() {
@@ -251,14 +297,29 @@ CARD_CLIENT_COMPACT_SURFACE_SCRIPT = r'''
 
     options.forEach((option) => {
       const button = document.createElement('button');
+      const isCurrent = option.value === selectedConversationId;
+      const labelText = clientConversationChipLabel(option);
       button.type = 'button';
       button.className = 'client-conversation-chip requires-auth';
       button.disabled = !currentAccessToken;
       button.dataset.conversationId = option.value;
-      button.textContent = clientConversationChipLabel(option);
-      button.classList.toggle('is-current', option.value === selectedConversationId);
+      button.classList.toggle('is-current', isCurrent);
       button.setAttribute('role', 'tab');
-      button.setAttribute('aria-selected', option.value === selectedConversationId ? 'true' : 'false');
+      button.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
+      button.title = isCurrent ? `当前会话：${labelText}` : `切换到会话：${labelText}`;
+
+      const label = document.createElement('span');
+      label.className = 'client-conversation-chip-label';
+      label.textContent = labelText;
+      button.appendChild(label);
+
+      if (isCurrent) {
+        const state = document.createElement('span');
+        state.className = 'client-conversation-chip-state';
+        state.textContent = '当前';
+        button.appendChild(state);
+      }
+
       button.addEventListener('click', () => {
         select.value = option.value;
         select.dispatchEvent(new Event('change', { bubbles: true }));
