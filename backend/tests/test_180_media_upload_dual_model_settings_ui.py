@@ -141,11 +141,13 @@ def test_media_payload_matches_verified_openai_compatible_image_format(tmp_path)
     assert "detail" not in content[1]["image_url"]
 
 
-def test_media_analysis_persists_system_evidence_message(monkeypatch):
+def test_media_analysis_persists_system_evidence_message_with_claim_token():
     captured = {}
+    claim_token = "claim-180"
 
     class Repository:
-        def get(self, conn, user_id, attachment_id):
+        def get_claimed(self, conn, user_id, attachment_id, actual_claim_token):
+            assert actual_claim_token == claim_token
             return {
                 "conversation_id": "conversation-1",
                 "media_type": "image",
@@ -154,20 +156,19 @@ def test_media_analysis_persists_system_evidence_message(monkeypatch):
                 "sent_at": "2026-09-24T00:00:00+08:00",
             }
 
-        def mark_completed(
+        def mark_completed_claimed(
             self,
             conn,
             user_id,
             attachment_id,
+            actual_claim_token,
             analysis_text,
             evidence_message_id,
         ):
+            assert actual_claim_token == claim_token
             captured["analysis_text"] = analysis_text
             captured["evidence_message_id"] = evidence_message_id
-            return {"id": attachment_id, "status": "completed"}
-
-        def mark_failed(self, conn, user_id, attachment_id):
-            raise AssertionError("media analysis should not fail")
+            return {"id": attachment_id, "analysis_status": "completed"}
 
     class MessageService:
         def create(
@@ -185,45 +186,30 @@ def test_media_analysis_persists_system_evidence_message(monkeypatch):
             captured["sent_at"] = sent_at
             return {"id": "media-evidence-1"}
 
-    provider = OpenAICompatibleProvider(
-        api_key="vision-secret",
-        base_url="https://provider.example/v1",
-        model="vision-model",
-        timeout_seconds=5,
-        provider_name="test",
-    )
-
     service = MediaAttachmentService(
         repository=Repository(),
         message_service=MessageService(),
     )
-    monkeypatch.setattr(
-        service.vision_provider_service,
-        "build_provider",
-        lambda conn, user_id: provider,
-    )
-    monkeypatch.setattr(
-        service,
-        "_analyze_with_provider",
-        lambda actual_provider, row: json.dumps(
-            {
-                "media_summary": "visible chat",
-                "visible_text": ["hello"],
-                "emotional_signals": [],
-                "interaction_signals": [],
-                "uncertainty": ["speaker identity not inferred"],
-            },
-            ensure_ascii=False,
-        ),
+    analysis_text = json.dumps(
+        {
+            "media_summary": "visible chat",
+            "visible_text": ["hello"],
+            "emotional_signals": [],
+            "interaction_signals": [],
+            "uncertainty": ["speaker identity not inferred"],
+        },
+        ensure_ascii=False,
     )
 
-    updated, evidence_id = service.analyze(
+    updated, evidence_id = service.complete_claimed_analysis(
         object(),
         "user-1",
         "attachment-1",
+        claim_token,
+        analysis_text,
     )
 
-    assert updated["status"] == "completed"
+    assert updated["analysis_status"] == "completed"
     assert evidence_id == "media-evidence-1"
     assert captured["conversation_id"] == "conversation-1"
     assert captured["sender_type"] == "system"
