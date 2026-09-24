@@ -11,7 +11,7 @@ import httpx
 import imageio_ffmpeg
 
 from app.config.settings import get_settings
-from app.domain.errors import ConversationNotFoundError
+from app.domain.errors import ConversationNotFoundError, MessageNotFoundError
 from app.repositories.media_attachment import MediaAttachmentRepository
 from app.services.conversation import ConversationService
 from app.services.llm import LLMAnalysisError
@@ -58,6 +58,13 @@ class MediaAttachmentService:
         if mime_type in _ALLOWED_VIDEOS:
             return "video"
         raise MediaAttachmentError("unsupported media type")
+
+    @staticmethod
+    def _row_value(row, key: str, default=None):
+        try:
+            return row[key]
+        except (KeyError, IndexError, TypeError):
+            return default
 
     def create(
         self,
@@ -109,8 +116,18 @@ class MediaAttachmentService:
         row = self.repository.get(conn, user_id, attachment_id)
         if row is None:
             raise MediaAttachmentError("media attachment not found")
+
         path = Path(row["storage_path"])
+        evidence_message_id = self._row_value(row, "message_id")
+        if evidence_message_id:
+            try:
+                self.message_service.delete(conn, user_id, evidence_message_id)
+            except MessageNotFoundError:
+                pass
+
         self.repository.delete(conn, user_id, attachment_id)
+        if self.repository.count_for_storage_path(conn, user_id, str(path)) > 0:
+            return
         try:
             path.unlink(missing_ok=True)
         except OSError:
@@ -228,6 +245,14 @@ class MediaAttachmentService:
         row = self.repository.get(conn, user_id, attachment_id)
         if row is None:
             raise MediaAttachmentError("media attachment not found")
+
+        existing_message_id = self._row_value(row, "message_id")
+        if (
+            self._row_value(row, "analysis_status") == "completed"
+            and existing_message_id
+        ):
+            return row, existing_message_id
+
         provider = self.vision_provider_service.build_provider(conn, user_id)
         if not isinstance(provider, OpenAIChatProvider):
             raise MediaAttachmentError("configured provider does not support media analysis")
