@@ -75,7 +75,7 @@ jobs:
           Path('/tmp/test189-multi.js').write_text(MULTI_PROVIDER_SETTINGS_SCRIPT, encoding='utf-8')
           Path('/tmp/test189-dual.js').write_text(DUAL_MODEL_SETTINGS_SCRIPT, encoding='utf-8')
           PY
-          npm install --no-save --no-package-lock jsdom@26.1.0
+          npm install --prefix .. --no-save --no-package-lock jsdom@26.1.0
           node ../.github/scripts/test189_dual_model_dom_runtime.mjs \
             /tmp/test189-settings.js \
             /tmp/test189-multi.js \
