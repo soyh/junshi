@@ -1,0 +1,61 @@
+name: TEST-185 Media Analysis Lease Expiry CI
+
+on:
+  push:
+    branches:
+      - test-185-media-analysis-lease-expiry-enforcement
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-185 migration scope
+        run: |
+          changed="$(git -C .. diff --name-only 1fedd63a61215b2838c2660961abe02b0afd4dac..HEAD -- backend/migrations)"
+          printf 'migration changes:\n%s\n' "$changed"
+          test -z "$changed"
+
+      - name: Verify expired leases cannot mutate analysis state
+        run: |
+          grep -n "def _analysis_stale_before(" app/services/media_attachment.py
+          grep -n "stale_before=self._analysis_stale_before()" app/services/media_attachment.py
+          test "$(grep -c "analysis_claimed_at > ?" app/repositories/media_attachment.py)" -eq 3
+          grep -n "def get_claimed(" app/repositories/media_attachment.py
+          grep -n "def mark_completed_claimed(" app/repositories/media_attachment.py
+          grep -n "def mark_failed_claimed(" app/repositories/media_attachment.py
+
+      - name: TEST-185 focused
+        run: >-
+          pytest -q
+          tests/test_185_media_analysis_lease_expiry_enforcement.py
+          tests/test_184_media_analysis_single_entrypoint.py
+          tests/test_183_media_analysis_concurrency_claim.py
+          tests/test_182_media_blob_transaction_integrity.py
+          tests/test_181_media_evidence_lifecycle_integrity.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_179_vision_model_routing.py
+          tests/test_177_media_attachments.py
+          tests/test_messages.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
