@@ -110,6 +110,7 @@ from app.ui.user_presentation_workspace import (
     USER_PRESENTATION_SCRIPT,
     USER_PRESENTATION_STYLE,
 )
+from app.ui.viewport_safe_ui_polish import VIEWPORT_SAFE_UI_POLISH_STYLE
 from app.ui.visual_theme_workspace import (
     VISUAL_THEME_SCRIPT,
     VISUAL_THEME_STYLE,
@@ -224,6 +225,7 @@ def build_product_shell_html() -> str:
             f"{MULTI_PROVIDER_SETTINGS_STYLE}\n"
             f"{DUAL_MODEL_SETTINGS_STYLE}\n"
             f"{CONVERSATION_CONTROLS_STYLE}\n"
+            f"{VIEWPORT_SAFE_UI_POLISH_STYLE}\n"
             f"{style_marker}"
         ),
         1,
