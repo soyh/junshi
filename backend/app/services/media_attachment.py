@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 import httpx
+import imageio_ffmpeg
 
 from app.config.settings import get_settings
 from app.domain.errors import ConversationNotFoundError
@@ -121,10 +122,24 @@ class MediaAttachmentService:
         return f"data:{mime_type};base64,{encoded}"
 
     @staticmethod
+    def _ffmpeg_executable() -> str:
+        system_ffmpeg = shutil.which("ffmpeg")
+        if system_ffmpeg:
+            return system_ffmpeg
+
+        try:
+            bundled_ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        except (RuntimeError, OSError):
+            bundled_ffmpeg = None
+
+        if bundled_ffmpeg and Path(bundled_ffmpeg).is_file():
+            return bundled_ffmpeg
+
+        raise MediaAttachmentError("ffmpeg is required for video analysis")
+
+    @staticmethod
     def _video_frames(path: Path) -> list[Path]:
-        ffmpeg = shutil.which("ffmpeg")
-        if not ffmpeg:
-            raise MediaAttachmentError("ffmpeg is required for video analysis")
+        ffmpeg = MediaAttachmentService._ffmpeg_executable()
         temp_dir = Path(tempfile.mkdtemp(prefix="junshi-media-"))
         pattern = temp_dir / "frame-%02d.jpg"
         command = [
