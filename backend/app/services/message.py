@@ -6,6 +6,7 @@ from app.domain.errors import (
     ConversationNotFoundError,
     InvalidMessageSenderTypeError,
     MessageNotFoundError,
+    ProtectedMessageError,
 )
 from app.repositories.conversation import ConversationRepository
 from app.repositories.message import MessageRepository
@@ -54,6 +55,25 @@ class MessageService:
         if conversation is None:
             raise ConversationNotFoundError(
                 "Conversation not found"
+            )
+
+    def _ensure_mutable(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        message_id: str,
+    ) -> None:
+        getter = getattr(
+            self.repository,
+            "get_linked_media_attachment",
+            None,
+        )
+        if not callable(getter):
+            return
+        linked = getter(conn, user_id, message_id)
+        if linked is not None:
+            raise ProtectedMessageError(
+                "Media evidence messages must be managed through the media attachment"
             )
 
     def create(
@@ -132,6 +152,7 @@ class MessageService:
         fields_set: set[str] | None = None,
     ) -> sqlite3.Row:
         current = self.get(conn, user_id, message_id)
+        self._ensure_mutable(conn, user_id, message_id)
         fields_set = fields_set or set()
         next_sender = sender_type if "sender_type" in fields_set else current["sender_type"]
         next_content = content if "content" in fields_set else current["content"]
@@ -159,6 +180,8 @@ class MessageService:
         user_id: str,
         message_id: str,
     ) -> bool:
+        self.get(conn, user_id, message_id)
+        self._ensure_mutable(conn, user_id, message_id)
         deleted = self.repository.delete(conn, user_id, message_id)
         if not deleted:
             raise MessageNotFoundError("Message not found")
