@@ -7,7 +7,11 @@ from app.schemas.media_attachment import (
     MediaAttachmentAnalysisResponse,
     MediaAttachmentResponse,
 )
-from app.services.media_attachment import MediaAttachmentError, MediaAttachmentService
+from app.services.media_attachment import (
+    MediaAnalysisInProgressError,
+    MediaAttachmentError,
+    MediaAttachmentService,
+)
 
 
 router = APIRouter(tags=["media"])
@@ -27,6 +31,27 @@ def _cleanup_unreferenced_blob_best_effort(user_id: str, storage_path: str | Non
     except Exception:
         # Canonical database state already won. A leftover blob is recoverable and
         # safer than converting a cleanup failure into a misleading API failure.
+        pass
+
+
+def _fail_media_analysis_claim_best_effort(
+    user_id: str,
+    attachment_id: str,
+    claim_token: str | None,
+) -> None:
+    if not claim_token:
+        return
+    try:
+        with get_connection() as conn:
+            service.fail_claimed_analysis(
+                conn,
+                user_id,
+                attachment_id,
+                claim_token,
+            )
+    except Exception:
+        # The original analysis error is more useful to the caller. A claim also
+        # has a bounded lease so a crashed cleanup cannot block retries forever.
         pass
 
 
@@ -93,13 +118,60 @@ def analyze_media_attachment(
     attachment_id: str,
     user_id: str = Depends(get_current_user_id),
 ):
+    claim_token: str | None = None
     try:
         with get_connection() as conn:
-            row, evidence_message_id = service.analyze(conn, user_id, attachment_id)
+            claimed_row, claim_token, existing_message_id = service.claim_analysis(
+                conn,
+                user_id,
+                attachment_id,
+            )
+
+        if existing_message_id:
+            return {
+                "attachment": _row(claimed_row),
+                "evidence_message_id": existing_message_id,
+            }
+
+        if not claim_token:
+            raise MediaAnalysisInProgressError("media analysis claim unavailable")
+
+        try:
+            # Provider configuration is read in a short transaction. The external
+            # vision request itself runs after that transaction has closed.
+            with get_connection() as conn:
+                media_row, provider = service.prepare_claimed_analysis(
+                    conn,
+                    user_id,
+                    attachment_id,
+                    claim_token,
+                )
+
+            analysis_text = service.analyze_claimed_media(provider, media_row)
+
+            with get_connection() as conn:
+                updated, evidence_message_id = service.complete_claimed_analysis(
+                    conn,
+                    user_id,
+                    attachment_id,
+                    claim_token,
+                    analysis_text,
+                )
+        except Exception:
+            _fail_media_analysis_claim_best_effort(
+                user_id,
+                attachment_id,
+                claim_token,
+            )
+            raise
+
+    except MediaAnalysisInProgressError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except MediaAttachmentError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     return {
-        "attachment": _row(row),
+        "attachment": _row(updated),
         "evidence_message_id": evidence_message_id,
     }
 
