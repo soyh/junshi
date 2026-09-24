@@ -272,8 +272,17 @@ def test_media_analysis_uses_vision_resolver(monkeypatch):
     claim_token = "claim-179"
 
     class Repository:
-        def get_claimed(self, conn, user_id, attachment_id, actual_claim_token):
+        def get_claimed(
+            self,
+            conn,
+            user_id,
+            attachment_id,
+            actual_claim_token,
+            *,
+            stale_before,
+        ):
             assert actual_claim_token == claim_token
+            assert stale_before
             return {
                 "id": attachment_id,
                 "conversation_id": "conversation-1",
