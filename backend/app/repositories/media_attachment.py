@@ -81,6 +81,22 @@ class MediaAttachmentRepository:
             (user_id, conversation_id),
         ).fetchall()
 
+    def count_for_storage_path(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        storage_path: str,
+    ) -> int:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS reference_count
+            FROM media_attachments
+            WHERE user_id = ? AND storage_path = ?
+            """,
+            (user_id, storage_path),
+        ).fetchone()
+        return int(row["reference_count"] if row is not None else 0)
+
     def mark_completed(
         self,
         conn: sqlite3.Connection,
