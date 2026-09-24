@@ -1,0 +1,66 @@
+name: TEST-188 Dual Model Settings Tab Mount CI
+
+on:
+  push:
+    branches:
+      - test-188-dual-model-settings-tab-mount
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-188 migration scope
+        run: |
+          changed="$(git -C .. diff --name-only 6c8be9e41c15d53aa526dc954b79dc0db9af4c8c..HEAD -- backend/migrations)"
+          printf 'migration changes:\n%s\n' "$changed"
+          test -z "$changed"
+
+      - name: Verify stable settings mount contract
+        run: |
+          grep -n "existingPanelId = fieldset.id.trim" app/ui/settings_tab_workspace.py
+          grep -n 'const panelId = existingPanelId || `guided-settings-panel-${index}`' app/ui/settings_tab_workspace.py
+          grep -n "fieldset.id = panelId" app/ui/settings_tab_workspace.py
+          grep -n "const providerFieldset = byId('provider')" app/ui/multi_provider_settings_workspace.py
+          grep -n "const providerFieldset = byId('provider')" app/ui/dual_model_settings_workspace.py
+          python - <<'PY'
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+
+          html = PRODUCT_SHELL_WITH_CONTENT_HTML
+          assert 'id="provider"' in html
+          assert "installSharedSettingsTabs();" in html
+          assert "installMultiProviderSettings();" in html
+          assert "installDualModelSettings();" in html
+          assert html.index("installSharedSettingsTabs();") < html.index("installMultiProviderSettings();")
+          assert html.index("installMultiProviderSettings();") < html.index("installDualModelSettings();")
+          print("settings mount contract: PASS")
+          PY
+
+      - name: TEST-188 focused
+        run: >-
+          pytest -q
+          tests/test_188_dual_model_settings_tab_mount.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_179_vision_model_routing.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
