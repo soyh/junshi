@@ -268,7 +268,7 @@ def test_message_list_orders_by_sent_at(client):
     ]
 
 
-def test_message_supports_all_sender_types(client):
+def test_message_supports_user_managed_sender_types(client):
     person_response = client.post(
         "/api/v1/persons",
         json={
@@ -295,7 +295,6 @@ def test_message_supports_all_sender_types(client):
     for sender_type in (
         "user",
         "person",
-        "system",
         "assistant",
     ):
         response = client.post(
@@ -319,7 +318,7 @@ def test_message_supports_all_sender_types(client):
     )
 
     assert list_response.status_code == 200
-    assert len(list_response.json()) == 4
+    assert len(list_response.json()) == 3
 
 
 def test_message_get_missing_returns_404(client):
