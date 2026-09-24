@@ -74,4 +74,5 @@ def test_test189_composed_product_shell_keeps_mount_fix_and_new_ui():
     assert "文本推理与视觉理解独立配置" in html
     assert "主文本 / 分析模型" in html
     assert "视觉 / 图片视频模型" in html
-    assert "高级：Profile 管理、角色切换与兼容设置" in html
+    assert "高级：Profile 管理与兼容设置" in html
+    assert "角色切换" in html
