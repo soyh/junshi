@@ -269,39 +269,17 @@ def test_vision_capability_test_sends_real_image_request(client, monkeypatch):
 
 def test_media_analysis_uses_vision_resolver(monkeypatch):
     captured = {}
+    claim_token = "claim-179"
 
     class Repository:
-        def get(self, conn, user_id, attachment_id):
+        def get_claimed(self, conn, user_id, attachment_id, actual_claim_token):
+            assert actual_claim_token == claim_token
             return {
+                "id": attachment_id,
                 "conversation_id": "conversation-1",
                 "media_type": "image",
                 "sent_at": "2026-09-23T00:00:00+00:00",
             }
-
-        def mark_completed(
-            self,
-            conn,
-            user_id,
-            attachment_id,
-            analysis_text,
-            evidence_message_id,
-        ):
-            return {"id": attachment_id, "status": "completed"}
-
-        def mark_failed(self, conn, user_id, attachment_id):
-            raise AssertionError("media analysis should not fail")
-
-    class MessageService:
-        def create(
-            self,
-            conn,
-            user_id,
-            conversation_id,
-            sender_type,
-            content,
-            sent_at,
-        ):
-            return {"id": "evidence-1"}
 
     provider = OpenAICompatibleProvider(
         api_key="vision-secret",
@@ -311,32 +289,37 @@ def test_media_analysis_uses_vision_resolver(monkeypatch):
         provider_name="test",
     )
 
-    service = MediaAttachmentService(
-        repository=Repository(),
-        message_service=MessageService(),
-    )
+    service = MediaAttachmentService(repository=Repository())
     monkeypatch.setattr(
         service.vision_provider_service,
         "build_provider",
         lambda conn, user_id: provider,
     )
+
+    def analyze_with_provider(actual_provider, row):
+        captured["model"] = actual_provider.model
+        return "{}"
+
     monkeypatch.setattr(
         service,
         "_analyze_with_provider",
-        lambda actual_provider, row: captured.setdefault(
-            "model",
-            actual_provider.model,
-        ) or "{}",
+        analyze_with_provider,
     )
 
-    updated, evidence_id = service.analyze(
+    media_row, resolved_provider = service.prepare_claimed_analysis(
         object(),
         "user-1",
         "attachment-1",
+        claim_token,
     )
+    analysis_text = service.analyze_claimed_media(
+        resolved_provider,
+        media_row,
+    )
+
+    assert resolved_provider is provider
     assert captured["model"] == "vision-model"
-    assert updated["status"] == "completed"
-    assert evidence_id == "evidence-1"
+    assert analysis_text == "{}"
 
 
 def test_test179_ui_exposes_primary_and_vision_roles():
