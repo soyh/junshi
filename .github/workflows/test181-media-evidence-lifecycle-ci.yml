@@ -1,0 +1,61 @@
+name: TEST-181 Media Evidence Lifecycle CI
+
+on:
+  push:
+    branches:
+      - test-181-media-evidence-lifecycle-integrity
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate composed browser JavaScript syntax
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+
+          scripts = re.findall(
+              r"<script>(.*?)</script>",
+              PRODUCT_SHELL_WITH_CONTENT_HTML,
+              flags=re.S,
+          )
+          if not scripts:
+              raise SystemExit("no browser script found")
+          Path("/tmp/test181-app.js").write_text(
+              "\n".join(scripts),
+              encoding="utf-8",
+          )
+          print("browser scripts:", len(scripts))
+          PY
+          node --check /tmp/test181-app.js
+
+      - name: TEST-181 focused
+        run: >-
+          pytest -q
+          tests/test_181_media_evidence_lifecycle_integrity.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_177_media_attachments.py
+          tests/test_messages.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
