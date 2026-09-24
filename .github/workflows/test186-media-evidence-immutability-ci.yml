@@ -1,0 +1,71 @@
+name: TEST-186 Media Evidence Immutability CI
+
+on:
+  push:
+    branches:
+      - test-186-media-evidence-immutability
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-186 migration scope
+        run: |
+          changed="$(git -C .. diff --name-only c5155a61dbffe520eb6abf00b0d76a566a0852db..HEAD -- backend/migrations)"
+          printf 'migration changes:\n%s\n' "$changed"
+          test -z "$changed"
+
+      - name: Verify canonical media evidence mutation guard
+        run: |
+          grep -n "class ProtectedMessageError" app/domain/errors.py
+          grep -n "def get_linked_media_attachment(" app/repositories/message.py
+          grep -n "def _ensure_mutable(" app/services/message.py
+          grep -n "Media evidence messages must be managed through the media attachment" app/services/message.py
+          test "$(grep -c "status.HTTP_409_CONFLICT" app/api/routes/messages.py)" -eq 2
+          python - <<'PY'
+          from pathlib import Path
+
+          text = Path("app/services/media_attachment.py").read_text()
+          start = text.index("    def delete(\n")
+          end = text.index("    @staticmethod\n    def _data_url", start)
+          block = text[start:end]
+          assert block.index("self.repository.delete(") < block.index("self.message_service.delete(")
+          print("attachment unlink-before-evidence-delete: PASS")
+          PY
+
+      - name: TEST-186 focused
+        run: >-
+          pytest -q
+          tests/test_186_media_evidence_immutability.py
+          tests/test_185_media_analysis_lease_expiry_enforcement.py
+          tests/test_184_media_analysis_single_entrypoint.py
+          tests/test_183_media_analysis_concurrency_claim.py
+          tests/test_182_media_blob_transaction_integrity.py
+          tests/test_181_media_evidence_lifecycle_integrity.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_179_vision_model_routing.py
+          tests/test_177_media_attachments.py
+          tests/test_messages.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
