@@ -73,6 +73,13 @@ class MediaAttachmentService:
         except (KeyError, IndexError, TypeError):
             return default
 
+    @staticmethod
+    def _analysis_stale_before() -> str:
+        return (
+            datetime.now(timezone.utc)
+            - timedelta(seconds=_ANALYSIS_CLAIM_TTL_SECONDS)
+        ).isoformat()
+
     def cleanup_unreferenced_blob(
         self,
         conn: sqlite3.Connection,
@@ -339,6 +346,7 @@ class MediaAttachmentService:
             user_id,
             attachment_id,
             claim_token,
+            stale_before=self._analysis_stale_before(),
         )
         if row is None:
             raise MediaAnalysisInProgressError("media analysis claim lost or expired")
@@ -368,6 +376,7 @@ class MediaAttachmentService:
             user_id,
             attachment_id,
             claim_token,
+            stale_before=self._analysis_stale_before(),
         )
         if row is None:
             raise MediaAnalysisInProgressError("media analysis claim lost or expired")
@@ -387,6 +396,7 @@ class MediaAttachmentService:
             claim_token,
             analysis_text,
             evidence["id"],
+            stale_before=self._analysis_stale_before(),
         )
         if updated is None:
             raise MediaAnalysisInProgressError("media analysis claim lost or expired")
@@ -404,4 +414,5 @@ class MediaAttachmentService:
             user_id,
             attachment_id,
             claim_token,
+            stale_before=self._analysis_stale_before(),
         )
