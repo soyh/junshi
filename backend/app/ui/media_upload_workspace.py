@@ -110,10 +110,17 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
       remove.disabled = !currentAccessToken;
       remove.textContent = '删除附件';
       remove.addEventListener('click', async () => {
-        if (!window.confirm(`确定删除附件“${item.original_filename || item.id}”吗？`)) return;
+        if (!window.confirm(`确定删除附件“${item.original_filename || item.id}”及其媒体证据吗？`)) return;
+        const conversationId = selectedConversationId;
         try {
           await api(`/api/v1/media/${encodeURIComponent(item.id)}`, {method: 'DELETE'});
           await clientLoadMedia();
+          if (typeof loadMessages === 'function') await loadMessages(currentMessageWindow || {});
+          const status = byId('client-media-status');
+          if (status) status.textContent = '附件及其关联媒体证据已删除。';
+          window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
+            detail: {source: '媒体证据删除', conversation_id: conversationId},
+          }));
         } catch (error) {
           const status = byId('client-media-status');
           status.textContent = error instanceof Error ? error.message : String(error);
