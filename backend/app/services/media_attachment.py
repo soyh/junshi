@@ -66,6 +66,20 @@ class MediaAttachmentService:
         except (KeyError, IndexError, TypeError):
             return default
 
+    def cleanup_unreferenced_blob(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        storage_path: str,
+    ) -> bool:
+        if self.repository.count_for_storage_path(conn, user_id, storage_path) > 0:
+            return False
+        try:
+            Path(storage_path).unlink(missing_ok=True)
+        except OSError:
+            return False
+        return True
+
     def create(
         self,
         conn: sqlite3.Connection,
@@ -91,28 +105,45 @@ class MediaAttachmentService:
         user_dir = self._storage_root() / user_id / conversation_id
         user_dir.mkdir(parents=True, exist_ok=True)
         path = user_dir / storage_name
+        blob_created = False
         if not path.exists():
             path.write_bytes(content)
+            blob_created = True
 
-        return self.repository.create(
-            conn,
-            user_id=user_id,
-            person_id=conversation["person_id"],
-            conversation_id=conversation_id,
-            media_type=media_type,
-            mime_type=mime_type,
-            original_filename=(Path(original_filename).name or "upload")[:255],
-            storage_path=str(path),
-            sha256=digest,
-            size_bytes=len(content),
-            sent_at=sent_at,
-        )
+        try:
+            return self.repository.create(
+                conn,
+                user_id=user_id,
+                person_id=conversation["person_id"],
+                conversation_id=conversation_id,
+                media_type=media_type,
+                mime_type=mime_type,
+                original_filename=(Path(original_filename).name or "upload")[:255],
+                storage_path=str(path),
+                sha256=digest,
+                size_bytes=len(content),
+                sent_at=sent_at,
+            )
+        except Exception:
+            if blob_created:
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            raise
 
     def list_for_conversation(self, conn, user_id: str, conversation_id: str):
         self.conversation_service.get(conn, user_id, conversation_id)
         return self.repository.list_for_conversation(conn, user_id, conversation_id)
 
-    def delete(self, conn, user_id: str, attachment_id: str) -> None:
+    def delete(
+        self,
+        conn,
+        user_id: str,
+        attachment_id: str,
+        *,
+        defer_blob_cleanup: bool = False,
+    ) -> str | None:
         row = self.repository.get(conn, user_id, attachment_id)
         if row is None:
             raise MediaAttachmentError("media attachment not found")
@@ -126,12 +157,11 @@ class MediaAttachmentService:
                 pass
 
         self.repository.delete(conn, user_id, attachment_id)
-        if self.repository.count_for_storage_path(conn, user_id, str(path)) > 0:
-            return
-        try:
-            path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        storage_path = str(path)
+        if defer_blob_cleanup:
+            return storage_path
+        self.cleanup_unreferenced_blob(conn, user_id, storage_path)
+        return storage_path
 
     @staticmethod
     def _data_url(path: Path, mime_type: str) -> str:
