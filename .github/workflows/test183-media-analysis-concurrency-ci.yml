@@ -31,7 +31,9 @@ jobs:
           test -f migrations/018_media_analysis_claims.sql
           grep -q "analysis_claim_token" migrations/018_media_analysis_claims.sql
           grep -q "analysis_claimed_at" migrations/018_media_analysis_claims.sql
-          test "$(git diff --name-only 02cb2a8ce682e28e727e56897094f30c11ea45e4..HEAD -- migrations | tr '\n' ' ')" = "backend/migrations/018_media_analysis_claims.sql "
+          changed="$(git -C .. diff --name-only 02cb2a8ce682e28e727e56897094f30c11ea45e4..HEAD -- backend/migrations)"
+          printf 'migration changes:\n%s\n' "$changed"
+          test "$changed" = "backend/migrations/018_media_analysis_claims.sql"
 
       - name: TEST-183 focused
         run: >-
