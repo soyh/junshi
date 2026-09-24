@@ -145,6 +145,8 @@ class MediaAttachmentRepository:
         user_id: str,
         attachment_id: str,
         claim_token: str,
+        *,
+        stale_before: str,
     ) -> sqlite3.Row | None:
         return conn.execute(
             """
@@ -152,8 +154,10 @@ class MediaAttachmentRepository:
             WHERE id = ?
               AND user_id = ?
               AND analysis_claim_token = ?
+              AND analysis_claimed_at IS NOT NULL
+              AND analysis_claimed_at > ?
             """,
-            (attachment_id, user_id, claim_token),
+            (attachment_id, user_id, claim_token, stale_before),
         ).fetchone()
 
     def mark_completed_claimed(
@@ -164,6 +168,8 @@ class MediaAttachmentRepository:
         claim_token: str,
         analysis_text: str,
         message_id: str,
+        *,
+        stale_before: str,
     ) -> sqlite3.Row | None:
         now = utc_now()
         cursor = conn.execute(
@@ -178,6 +184,8 @@ class MediaAttachmentRepository:
             WHERE id = ?
               AND user_id = ?
               AND analysis_claim_token = ?
+              AND analysis_claimed_at IS NOT NULL
+              AND analysis_claimed_at > ?
             """,
             (
                 analysis_text,
@@ -186,6 +194,7 @@ class MediaAttachmentRepository:
                 attachment_id,
                 user_id,
                 claim_token,
+                stale_before,
             ),
         )
         if cursor.rowcount <= 0:
@@ -198,6 +207,8 @@ class MediaAttachmentRepository:
         user_id: str,
         attachment_id: str,
         claim_token: str,
+        *,
+        stale_before: str,
     ) -> sqlite3.Row | None:
         now = utc_now()
         cursor = conn.execute(
@@ -210,8 +221,10 @@ class MediaAttachmentRepository:
             WHERE id = ?
               AND user_id = ?
               AND analysis_claim_token = ?
+              AND analysis_claimed_at IS NOT NULL
+              AND analysis_claimed_at > ?
             """,
-            (now, attachment_id, user_id, claim_token),
+            (now, attachment_id, user_id, claim_token, stale_before),
         )
         if cursor.rowcount <= 0:
             return None
