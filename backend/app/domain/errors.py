@@ -34,5 +34,9 @@ class MessageNotFoundError(DomainError):
     """Raised when a message does not exist for the current user."""
 
 
+class ProtectedMessageError(DomainError):
+    """Raised when a managed canonical message cannot be mutated directly."""
+
+
 class InvalidMessageSenderTypeError(DomainError, ValueError):
     """Raised when a message sender type is invalid."""
