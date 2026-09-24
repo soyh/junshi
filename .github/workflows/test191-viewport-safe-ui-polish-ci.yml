@@ -1,0 +1,72 @@
+name: TEST-191 Viewport Safe UI Polish CI
+
+on:
+  push:
+    branches:
+      - test-191-viewport-safe-ui-polish
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-191 migration and dependency scope
+        run: |
+          migrations="$(git -C .. diff --name-only 295fbd89068c30b1401d4584d08826b85f188f6f..HEAD -- backend/migrations)"
+          requirements="$(git -C .. diff --name-only 295fbd89068c30b1401d4584d08826b85f188f6f..HEAD -- backend/requirements.txt)"
+          printf 'migration changes:\n%s\n' "$migrations"
+          printf 'requirements changes:\n%s\n' "$requirements"
+          test -z "$migrations"
+          test -z "$requirements"
+
+      - name: Verify viewport-safe visual contract
+        run: |
+          grep -n 'inset: 0 !important' app/ui/viewport_safe_ui_polish.py
+          grep -n 'right: clamp(10px, 2.2vw, 30px) !important' app/ui/viewport_safe_ui_polish.py
+          grep -n 'client-unified-message-history > summary::before' app/ui/viewport_safe_ui_polish.py
+          grep -n 'client-media-file::file-selector-button' app/ui/viewport_safe_ui_polish.py
+          python - <<'PY'
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+
+          html = PRODUCT_SHELL_WITH_CONTENT_HTML
+          marker = "TEST-191: final viewport-safe customer presentation overrides"
+          assert marker in html
+          assert html.index("width: min(1180px, calc(100vw - 48px)) !important;") < html.index(marker)
+          assert html.index("#dual-model-settings") < html.index(marker)
+          assert "#client-unified-message-history > summary::before" in html
+          assert "#client-media-file::file-selector-button" in html
+          assert "主文本 / 分析模型" in html
+          assert "视觉 / 图片视频模型" in html
+          print("TEST-191 composed visual contract: PASS")
+          PY
+
+      - name: TEST-191 focused
+        run: >-
+          pytest -q
+          tests/test_191_viewport_safe_ui_polish.py
+          tests/test_190_settings_overlay_conversation_polish.py
+          tests/test_189_dual_model_settings_ui_refactor.py
+          tests/test_188_dual_model_settings_tab_mount.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
