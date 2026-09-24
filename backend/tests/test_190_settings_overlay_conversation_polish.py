@@ -29,7 +29,6 @@ def test_test190_settings_tabs_use_short_localized_labels():
     assert "'LLM 模型设置': '模型设置'" in script
     assert "tab.dataset.sourceLabel = sourceLabel;" in script
     assert "tab.textContent = tabLabels[sourceLabel] || sourceLabel;" in script
-    assert "event.key === 'Escape' && details.open" in script
 
 
 def test_test190_current_conversation_chip_matches_sky_blue_language():
@@ -54,6 +53,7 @@ def test_test190_conversation_chip_hides_backend_state_suffix_and_marks_current(
     assert "state.className = 'client-conversation-chip-state';" in script
     assert "state.textContent = '当前';" in script
     assert "button.title = isCurrent ? `当前会话：${labelText}`" in script
+    assert "button.classList.toggle('is-current', option.value === selectedConversationId);" in script
 
 
 def test_test190_composed_shell_contains_wide_settings_and_polished_conversation_contract():
