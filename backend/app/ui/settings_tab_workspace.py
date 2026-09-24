@@ -81,7 +81,7 @@ SETTINGS_TAB_WORKSPACE_STYLE = r'''
 
     #guided-settings-tabs {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
       gap: 8px 10px;
       align-items: stretch;
       width: 100%;
@@ -161,7 +161,7 @@ SETTINGS_TAB_WORKSPACE_STYLE = r'''
 
     @media (max-width: 900px) {
       #guided-settings-tabs {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
       }
     }
 
@@ -290,17 +290,6 @@ SETTINGS_TAB_WORKSPACE_SCRIPT = r'''
 
     settings.replaceChildren(tabs, panelHost);
     activate(0);
-
-    const details = byId('guided-settings');
-    if (details && details.dataset.escapeCloseBound !== 'true') {
-      details.dataset.escapeCloseBound = 'true';
-      document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && details.open) {
-          details.open = false;
-          details.querySelector(':scope > summary')?.focus();
-        }
-      });
-    }
   }
 
   installSharedSettingsTabs();
