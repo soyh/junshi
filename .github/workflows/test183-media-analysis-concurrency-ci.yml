@@ -1,0 +1,48 @@
+name: TEST-183 Media Analysis Concurrency CI
+
+on:
+  push:
+    branches:
+      - test-183-media-analysis-concurrency-claim
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-183 migration scope
+        run: |
+          test -f migrations/018_media_analysis_claims.sql
+          grep -q "analysis_claim_token" migrations/018_media_analysis_claims.sql
+          grep -q "analysis_claimed_at" migrations/018_media_analysis_claims.sql
+          test "$(git diff --name-only 02cb2a8ce682e28e727e56897094f30c11ea45e4..HEAD -- migrations | tr '\n' ' ')" = "backend/migrations/018_media_analysis_claims.sql "
+
+      - name: TEST-183 focused
+        run: >-
+          pytest -q
+          tests/test_183_media_analysis_concurrency_claim.py
+          tests/test_182_media_blob_transaction_integrity.py
+          tests/test_181_media_evidence_lifecycle_integrity.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_177_media_attachments.py
+          tests/test_messages.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
