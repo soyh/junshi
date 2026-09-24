@@ -97,6 +97,65 @@ class MediaAttachmentRepository:
         ).fetchone()
         return int(row["reference_count"] if row is not None else 0)
 
+    def try_claim_analysis(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        attachment_id: str,
+        *,
+        claim_token: str,
+        claimed_at: str,
+        stale_before: str,
+    ) -> sqlite3.Row | None:
+        cursor = conn.execute(
+            """
+            UPDATE media_attachments
+            SET analysis_status = 'pending',
+                analysis_claim_token = ?,
+                analysis_claimed_at = ?,
+                updated_at = ?
+            WHERE id = ?
+              AND user_id = ?
+              AND NOT (
+                  analysis_status = 'completed'
+                  AND message_id IS NOT NULL
+              )
+              AND (
+                  analysis_claim_token IS NULL
+                  OR analysis_claimed_at IS NULL
+                  OR analysis_claimed_at <= ?
+              )
+            """,
+            (
+                claim_token,
+                claimed_at,
+                claimed_at,
+                attachment_id,
+                user_id,
+                stale_before,
+            ),
+        )
+        if cursor.rowcount <= 0:
+            return None
+        return self.get(conn, user_id, attachment_id)
+
+    def get_claimed(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        attachment_id: str,
+        claim_token: str,
+    ) -> sqlite3.Row | None:
+        return conn.execute(
+            """
+            SELECT * FROM media_attachments
+            WHERE id = ?
+              AND user_id = ?
+              AND analysis_claim_token = ?
+            """,
+            (attachment_id, user_id, claim_token),
+        ).fetchone()
+
     def mark_completed(
         self,
         conn: sqlite3.Connection,
@@ -112,11 +171,49 @@ class MediaAttachmentRepository:
             SET analysis_status = 'completed',
                 analysis_text = ?,
                 message_id = ?,
+                analysis_claim_token = NULL,
+                analysis_claimed_at = NULL,
                 updated_at = ?
             WHERE id = ? AND user_id = ?
             """,
             (analysis_text, message_id, now, attachment_id, user_id),
         )
+        return self.get(conn, user_id, attachment_id)
+
+    def mark_completed_claimed(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        attachment_id: str,
+        claim_token: str,
+        analysis_text: str,
+        message_id: str,
+    ) -> sqlite3.Row | None:
+        now = utc_now()
+        cursor = conn.execute(
+            """
+            UPDATE media_attachments
+            SET analysis_status = 'completed',
+                analysis_text = ?,
+                message_id = ?,
+                analysis_claim_token = NULL,
+                analysis_claimed_at = NULL,
+                updated_at = ?
+            WHERE id = ?
+              AND user_id = ?
+              AND analysis_claim_token = ?
+            """,
+            (
+                analysis_text,
+                message_id,
+                now,
+                attachment_id,
+                user_id,
+                claim_token,
+            ),
+        )
+        if cursor.rowcount <= 0:
+            return None
         return self.get(conn, user_id, attachment_id)
 
     def mark_failed(
@@ -129,11 +226,39 @@ class MediaAttachmentRepository:
         conn.execute(
             """
             UPDATE media_attachments
-            SET analysis_status = 'failed', updated_at = ?
+            SET analysis_status = 'failed',
+                analysis_claim_token = NULL,
+                analysis_claimed_at = NULL,
+                updated_at = ?
             WHERE id = ? AND user_id = ?
             """,
             (now, attachment_id, user_id),
         )
+        return self.get(conn, user_id, attachment_id)
+
+    def mark_failed_claimed(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        attachment_id: str,
+        claim_token: str,
+    ) -> sqlite3.Row | None:
+        now = utc_now()
+        cursor = conn.execute(
+            """
+            UPDATE media_attachments
+            SET analysis_status = 'failed',
+                analysis_claim_token = NULL,
+                analysis_claimed_at = NULL,
+                updated_at = ?
+            WHERE id = ?
+              AND user_id = ?
+              AND analysis_claim_token = ?
+            """,
+            (now, attachment_id, user_id, claim_token),
+        )
+        if cursor.rowcount <= 0:
+            return None
         return self.get(conn, user_id, attachment_id)
 
     def delete(
