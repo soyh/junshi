@@ -19,6 +19,19 @@ VALID_MESSAGE_SENDER_TYPES = {
     "assistant",
 }
 
+USER_MANAGED_MESSAGE_SENDER_TYPES = {
+    "user",
+    "person",
+    "assistant",
+}
+
+_RESERVED_SYSTEM_MESSAGE_DETAIL = (
+    "System messages are reserved for internal canonical evidence"
+)
+_INTERNAL_SYSTEM_MESSAGE_DETAIL = (
+    "System messages must be managed through their owning internal workflow"
+)
+
 
 class MessageService:
     def __init__(
@@ -39,6 +52,16 @@ class MessageService:
         if sender_type not in VALID_MESSAGE_SENDER_TYPES:
             raise InvalidMessageSenderTypeError(
                 f"Invalid message sender type: {sender_type}"
+            )
+
+    def _validate_user_managed_sender_type(
+        self,
+        sender_type: str,
+    ) -> None:
+        self._validate_sender_type(sender_type)
+        if sender_type not in USER_MANAGED_MESSAGE_SENDER_TYPES:
+            raise InvalidMessageSenderTypeError(
+                _RESERVED_SYSTEM_MESSAGE_DETAIL
             )
 
     def _validate_conversation(
@@ -76,6 +99,13 @@ class MessageService:
                 "Media evidence messages must be managed through the media attachment"
             )
 
+    @staticmethod
+    def _ensure_user_managed_message(current: sqlite3.Row | dict) -> None:
+        if current["sender_type"] == "system":
+            raise ProtectedMessageError(
+                _INTERNAL_SYSTEM_MESSAGE_DETAIL
+            )
+
     def create(
         self,
         conn: sqlite3.Connection,
@@ -85,9 +115,30 @@ class MessageService:
         content: str,
         sent_at: str | None,
     ) -> sqlite3.Row:
+        """Create a canonical message for trusted internal workflows."""
         self._validate_sender_type(sender_type)
         self._validate_conversation(conn, user_id, conversation_id)
         return self.repository.create(
+            conn,
+            user_id,
+            conversation_id,
+            sender_type,
+            content,
+            sent_at,
+        )
+
+    def create_user_managed(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        conversation_id: str,
+        sender_type: str,
+        content: str,
+        sent_at: str | None,
+    ) -> sqlite3.Row:
+        """Create a message through the user-managed Message API boundary."""
+        self._validate_user_managed_sender_type(sender_type)
+        return self.create(
             conn,
             user_id,
             conversation_id,
@@ -151,6 +202,7 @@ class MessageService:
         sent_at: str | None = None,
         fields_set: set[str] | None = None,
     ) -> sqlite3.Row:
+        """Update a canonical message for trusted internal workflows."""
         current = self.get(conn, user_id, message_id)
         self._ensure_mutable(conn, user_id, message_id)
         fields_set = fields_set or set()
@@ -174,14 +226,58 @@ class MessageService:
             raise MessageNotFoundError("Message not found")
         return updated
 
+    def update_user_managed(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        message_id: str,
+        *,
+        sender_type: str | None = None,
+        content: str | None = None,
+        sent_at: str | None = None,
+        fields_set: set[str] | None = None,
+    ) -> sqlite3.Row:
+        """Update only messages owned by the user-managed Message API."""
+        current = self.get(conn, user_id, message_id)
+        self._ensure_mutable(conn, user_id, message_id)
+        self._ensure_user_managed_message(current)
+        fields_set = fields_set or set()
+        if "sender_type" in fields_set and sender_type is not None:
+            self._validate_user_managed_sender_type(sender_type)
+        return self.update(
+            conn,
+            user_id,
+            message_id,
+            sender_type=sender_type,
+            content=content,
+            sent_at=sent_at,
+            fields_set=fields_set,
+        )
+
     def delete(
         self,
         conn: sqlite3.Connection,
         user_id: str,
         message_id: str,
     ) -> bool:
+        """Delete a canonical message for trusted internal workflows."""
         self.get(conn, user_id, message_id)
         self._ensure_mutable(conn, user_id, message_id)
+        deleted = self.repository.delete(conn, user_id, message_id)
+        if not deleted:
+            raise MessageNotFoundError("Message not found")
+        return True
+
+    def delete_user_managed(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        message_id: str,
+    ) -> bool:
+        """Delete only messages owned by the user-managed Message API."""
+        current = self.get(conn, user_id, message_id)
+        self._ensure_mutable(conn, user_id, message_id)
+        self._ensure_user_managed_message(current)
         deleted = self.repository.delete(conn, user_id, message_id)
         if not deleted:
             raise MessageNotFoundError("Message not found")
