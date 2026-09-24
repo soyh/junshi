@@ -1,9 +1,8 @@
 from app.services.media_attachment import MediaAttachmentService
-from app.services.openai_chat_provider import OpenAICompatibleProvider
 from app.ui.media_upload_workspace import MEDIA_UPLOAD_WORKSPACE_SCRIPT
 
 
-def test_completed_attachment_analysis_is_idempotent(monkeypatch):
+def test_completed_attachment_analysis_is_idempotent():
     class Repository:
         def __init__(self):
             self.row = {
@@ -13,80 +12,40 @@ def test_completed_attachment_analysis_is_idempotent(monkeypatch):
                 "mime_type": "image/png",
                 "storage_path": "/not-used.png",
                 "sent_at": "2026-09-24T00:00:00+08:00",
-                "analysis_status": "pending",
-                "message_id": None,
+                "analysis_status": "completed",
+                "analysis_text": '{"media_summary":"visible chat"}',
+                "message_id": "media-evidence-1",
             }
+            self.get_calls = 0
 
         def get(self, conn, user_id, attachment_id):
+            self.get_calls += 1
             return self.row
 
-        def mark_completed(
-            self,
-            conn,
-            user_id,
-            attachment_id,
-            analysis_text,
-            message_id,
-        ):
-            self.row["analysis_status"] = "completed"
-            self.row["analysis_text"] = analysis_text
-            self.row["message_id"] = message_id
-            return self.row
-
-        def mark_failed(self, conn, user_id, attachment_id):
-            raise AssertionError("successful media analysis must not be marked failed")
-
-    class MessageService:
-        def __init__(self):
-            self.create_calls = 0
-
-        def create(
-            self,
-            conn,
-            user_id,
-            conversation_id,
-            sender_type,
-            content,
-            sent_at,
-        ):
-            self.create_calls += 1
-            return {"id": "media-evidence-1"}
+        def try_claim_analysis(self, *args, **kwargs):
+            raise AssertionError("completed media must not acquire a new claim")
 
     repository = Repository()
-    message_service = MessageService()
-    provider = OpenAICompatibleProvider(
-        api_key="vision-secret",
-        base_url="https://provider.example/v1",
-        model="vision-model",
-        timeout_seconds=5,
-        provider_name="test",
-    )
-    service = MediaAttachmentService(
-        repository=repository,
-        message_service=message_service,
-    )
-    provider_calls = {"count": 0}
+    service = MediaAttachmentService(repository=repository)
 
-    def build_provider(conn, user_id):
-        provider_calls["count"] += 1
-        return provider
-
-    monkeypatch.setattr(service.vision_provider_service, "build_provider", build_provider)
-    monkeypatch.setattr(
-        service,
-        "_analyze_with_provider",
-        lambda actual_provider, row: '{"media_summary":"visible chat"}',
+    first, first_token, first_evidence_id = service.claim_analysis(
+        object(),
+        "user-1",
+        "attachment-1",
     )
-
-    first, first_evidence_id = service.analyze(object(), "user-1", "attachment-1")
-    second, second_evidence_id = service.analyze(object(), "user-1", "attachment-1")
+    second, second_token, second_evidence_id = service.claim_analysis(
+        object(),
+        "user-1",
+        "attachment-1",
+    )
 
     assert first["analysis_status"] == "completed"
     assert second["analysis_status"] == "completed"
+    assert first_token is None
+    assert second_token is None
     assert first_evidence_id == "media-evidence-1"
     assert second_evidence_id == "media-evidence-1"
-    assert message_service.create_calls == 1
-    assert provider_calls["count"] == 1
+    assert repository.get_calls == 2
 
 
 def test_delete_attachment_removes_linked_evidence_but_keeps_shared_blob(tmp_path):
