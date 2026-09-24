@@ -5,6 +5,8 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
+import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -25,8 +27,13 @@ class MediaAttachmentError(ValueError):
     pass
 
 
+class MediaAnalysisInProgressError(MediaAttachmentError):
+    pass
+
+
 _ALLOWED_IMAGES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 _ALLOWED_VIDEOS = {"video/mp4", "video/webm", "video/quicktime"}
+_ANALYSIS_CLAIM_TTL_SECONDS = 10 * 60
 
 
 class MediaAttachmentService:
@@ -224,7 +231,7 @@ class MediaAttachmentService:
             "interaction_signals, uncertainty. Values may be strings or arrays."
         )
 
-    def _analyze_with_provider(self, provider: OpenAIChatProvider, row: sqlite3.Row) -> str:
+    def _analyze_with_provider(self, provider: OpenAIChatProvider, row: sqlite3.Row | dict) -> str:
         if not provider.api_key:
             raise MediaAttachmentError("configured provider API key is missing")
 
@@ -270,6 +277,130 @@ class MediaAttachmentService:
         finally:
             if cleanup_dir is not None:
                 shutil.rmtree(cleanup_dir, ignore_errors=True)
+
+    def claim_analysis(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        attachment_id: str,
+    ) -> tuple[sqlite3.Row, str | None, str | None]:
+        row = self.repository.get(conn, user_id, attachment_id)
+        if row is None:
+            raise MediaAttachmentError("media attachment not found")
+
+        existing_message_id = self._row_value(row, "message_id")
+        if (
+            self._row_value(row, "analysis_status") == "completed"
+            and existing_message_id
+        ):
+            return row, None, existing_message_id
+
+        now = datetime.now(timezone.utc)
+        claimed_at = now.isoformat()
+        stale_before = (
+            now - timedelta(seconds=_ANALYSIS_CLAIM_TTL_SECONDS)
+        ).isoformat()
+        claim_token = str(uuid.uuid4())
+        claimed = self.repository.try_claim_analysis(
+            conn,
+            user_id,
+            attachment_id,
+            claim_token=claim_token,
+            claimed_at=claimed_at,
+            stale_before=stale_before,
+        )
+        if claimed is not None:
+            return claimed, claim_token, None
+
+        latest = self.repository.get(conn, user_id, attachment_id)
+        latest_message_id = self._row_value(latest, "message_id")
+        if (
+            latest is not None
+            and self._row_value(latest, "analysis_status") == "completed"
+            and latest_message_id
+        ):
+            return latest, None, latest_message_id
+
+        raise MediaAnalysisInProgressError("media analysis already in progress")
+
+    def prepare_claimed_analysis(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        attachment_id: str,
+        claim_token: str,
+    ) -> tuple[dict, OpenAIChatProvider]:
+        row = self.repository.get_claimed(
+            conn,
+            user_id,
+            attachment_id,
+            claim_token,
+        )
+        if row is None:
+            raise MediaAnalysisInProgressError("media analysis claim lost or expired")
+
+        provider = self.vision_provider_service.build_provider(conn, user_id)
+        if not isinstance(provider, OpenAIChatProvider):
+            raise MediaAttachmentError("configured provider does not support media analysis")
+        return dict(row), provider
+
+    def analyze_claimed_media(
+        self,
+        provider: OpenAIChatProvider,
+        row: dict,
+    ) -> str:
+        return self._analyze_with_provider(provider, row)
+
+    def complete_claimed_analysis(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        attachment_id: str,
+        claim_token: str,
+        analysis_text: str,
+    ):
+        row = self.repository.get_claimed(
+            conn,
+            user_id,
+            attachment_id,
+            claim_token,
+        )
+        if row is None:
+            raise MediaAnalysisInProgressError("media analysis claim lost or expired")
+
+        evidence = self.message_service.create(
+            conn,
+            user_id,
+            row["conversation_id"],
+            "system",
+            f"[媒体证据:{row['media_type']}] {analysis_text}",
+            row["sent_at"],
+        )
+        updated = self.repository.mark_completed_claimed(
+            conn,
+            user_id,
+            attachment_id,
+            claim_token,
+            analysis_text,
+            evidence["id"],
+        )
+        if updated is None:
+            raise MediaAnalysisInProgressError("media analysis claim lost or expired")
+        return updated, evidence["id"]
+
+    def fail_claimed_analysis(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        attachment_id: str,
+        claim_token: str,
+    ) -> None:
+        self.repository.mark_failed_claimed(
+            conn,
+            user_id,
+            attachment_id,
+            claim_token,
+        )
 
     def analyze(self, conn, user_id: str, attachment_id: str):
         row = self.repository.get(conn, user_id, attachment_id)
