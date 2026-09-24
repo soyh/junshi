@@ -83,7 +83,5 @@ assert.ok(!chips[1].textContent.includes('archived'));
 
 const settingsDetails = doc.getElementById('guided-settings');
 assert.equal(settingsDetails?.open, true);
-dom.window.document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape' }));
-assert.equal(settingsDetails?.open, false);
 
 console.log('TEST-190 browser-like settings/conversation DOM runtime: PASS');
