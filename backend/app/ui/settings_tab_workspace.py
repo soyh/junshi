@@ -114,10 +114,15 @@ SETTINGS_TAB_WORKSPACE_SCRIPT = r'''
       tab.className = 'settings-tab-button';
       tab.id = `guided-settings-tab-${index}`;
       tab.setAttribute('role', 'tab');
-      tab.setAttribute('aria-controls', `guided-settings-panel-${index}`);
+      const existingPanelId = fieldset.id.trim();
+      const panelId = existingPanelId || `guided-settings-panel-${index}`;
+      tab.setAttribute('aria-controls', panelId);
       tab.textContent = summary.textContent.trim() || '设置';
 
-      fieldset.id = `guided-settings-panel-${index}`;
+      // Preserve stable fieldset IDs such as "provider". Later workspace
+      // installers use those IDs as integration mount points after the tab
+      // layout has moved the fieldsets into the shared panel host.
+      fieldset.id = panelId;
       fieldset.setAttribute('role', 'tabpanel');
       fieldset.setAttribute('aria-labelledby', tab.id);
 
