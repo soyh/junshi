@@ -303,7 +303,7 @@ CARD_CLIENT_COMPACT_SURFACE_SCRIPT = r'''
       button.className = 'client-conversation-chip requires-auth';
       button.disabled = !currentAccessToken;
       button.dataset.conversationId = option.value;
-      button.classList.toggle('is-current', isCurrent);
+      button.classList.toggle('is-current', option.value === selectedConversationId);
       button.setAttribute('role', 'tab');
       button.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
       button.title = isCurrent ? `当前会话：${labelText}` : `切换到会话：${labelText}`;
