@@ -127,6 +127,23 @@ class MessageRepository:
             (message_id, user_id),
         ).fetchone()
 
+    def get_linked_media_attachment(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        message_id: str,
+    ) -> sqlite3.Row | None:
+        return conn.execute(
+            """
+            SELECT id, analysis_status
+            FROM media_attachments
+            WHERE user_id = ?
+              AND message_id = ?
+            LIMIT 1
+            """,
+            (user_id, message_id),
+        ).fetchone()
+
     def update(
         self,
         conn: sqlite3.Connection,
