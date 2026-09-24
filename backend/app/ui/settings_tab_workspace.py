@@ -15,6 +15,36 @@ SETTINGS_TAB_WORKSPACE_STYLE = r'''
       font-size: .95rem;
     }
 
+    /* TEST-190: the customer shell keeps the settings trigger in the top-right,
+       but the opened workspace must no longer inherit that narrow host width. */
+    #client-settings-host #guided-settings[open] {
+      position: relative;
+      z-index: 80;
+      width: auto !important;
+      padding: 0 !important;
+      background: transparent !important;
+    }
+
+    #client-settings-host #guided-settings[open]::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 79;
+      pointer-events: none;
+      background: rgba(228, 242, 252, .28);
+      backdrop-filter: blur(2px);
+    }
+
+    #client-settings-host #guided-settings[open] > summary {
+      position: relative;
+      z-index: 82;
+      margin-bottom: 0;
+      border-color: rgba(25, 167, 232, .34) !important;
+      color: var(--sky-800, #075985) !important;
+      background: rgba(246, 252, 255, .96) !important;
+      box-shadow: 0 10px 28px rgba(28, 124, 176, .14) !important;
+    }
+
     #guided-settings-content.settings-tab-workspace {
       display: block !important;
       width: 100% !important;
@@ -24,9 +54,34 @@ SETTINGS_TAB_WORKSPACE_STYLE = r'''
       padding: 0 !important;
     }
 
+    #client-settings-host #guided-settings[open] #guided-settings-content.settings-tab-workspace {
+      position: fixed !important;
+      top: clamp(82px, 10vh, 112px) !important;
+      left: 50% !important;
+      right: auto !important;
+      z-index: 81;
+      width: min(1180px, calc(100vw - 48px)) !important;
+      max-width: calc(100vw - 48px) !important;
+      max-height: calc(100vh - 132px) !important;
+      margin: 0 !important;
+      padding: 14px !important;
+      box-sizing: border-box;
+      overflow: hidden !important;
+      transform: translateX(-50%) !important;
+      border: 1px solid rgba(25, 167, 232, .22) !important;
+      border-radius: 22px !important;
+      background:
+        radial-gradient(circle at 88% 0%, rgba(88, 200, 245, .18), transparent 22rem),
+        rgba(247, 252, 255, .985) !important;
+      box-shadow:
+        0 30px 90px rgba(31, 91, 132, .24),
+        inset 0 1px 0 rgba(255, 255, 255, .96) !important;
+      backdrop-filter: blur(24px);
+    }
+
     #guided-settings-tabs {
       display: grid;
-      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 8px 10px;
       align-items: stretch;
       width: 100%;
@@ -41,6 +96,7 @@ SETTINGS_TAB_WORKSPACE_STYLE = r'''
     #guided-settings-tabs .settings-tab-button {
       min-width: 0;
       width: 100%;
+      margin: 0 !important;
       padding: 10px 12px;
       border: 1px solid rgba(25, 167, 232, .18);
       border-radius: 11px;
@@ -80,6 +136,10 @@ SETTINGS_TAB_WORKSPACE_STYLE = r'''
       box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
     }
 
+    #client-settings-host #guided-settings-panel-host {
+      max-height: calc(100vh - 236px);
+    }
+
     #guided-settings-panel-host > fieldset {
       width: 100% !important;
       max-width: none !important;
@@ -101,13 +161,26 @@ SETTINGS_TAB_WORKSPACE_STYLE = r'''
 
     @media (max-width: 900px) {
       #guided-settings-tabs {
-        grid-template-columns: repeat(2, minmax(150px, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
     @media (max-width: 620px) {
       #guided-settings[open] {
         padding: 12px;
+      }
+
+      #client-settings-host #guided-settings[open] {
+        padding: 0 !important;
+      }
+
+      #client-settings-host #guided-settings[open] #guided-settings-content.settings-tab-workspace {
+        top: 68px !important;
+        width: calc(100vw - 18px) !important;
+        max-width: calc(100vw - 18px) !important;
+        max-height: calc(100vh - 78px) !important;
+        padding: 10px !important;
+        border-radius: 17px !important;
       }
 
       #guided-settings-tabs {
@@ -117,12 +190,16 @@ SETTINGS_TAB_WORKSPACE_STYLE = r'''
       }
 
       #guided-settings-tabs .settings-tab-button {
-        flex: 0 0 155px;
+        flex: 0 0 132px;
       }
 
       #guided-settings-panel-host {
         padding: 12px;
         max-height: none;
+      }
+
+      #client-settings-host #guided-settings-panel-host {
+        max-height: calc(100vh - 172px);
       }
     }
 '''
@@ -149,6 +226,13 @@ SETTINGS_TAB_WORKSPACE_SCRIPT = r'''
     const panelHost = document.createElement('div');
     panelHost.id = 'guided-settings-panel-host';
 
+    const tabLabels = {
+      '账号登录': '账号登录',
+      'Session management': '登录会话',
+      'Account Security': '账号安全',
+      'LLM 模型设置': '模型设置',
+    };
+
     const entries = legacyPanels.map((details, index) => {
       const summary = details.querySelector(':scope > summary');
       const fieldset = details.querySelector(':scope > fieldset');
@@ -162,7 +246,10 @@ SETTINGS_TAB_WORKSPACE_SCRIPT = r'''
       const existingPanelId = fieldset.id.trim();
       const panelId = existingPanelId || `guided-settings-panel-${index}`;
       tab.setAttribute('aria-controls', panelId);
-      tab.textContent = summary.textContent.trim() || '设置';
+      const sourceLabel = summary.textContent.trim() || '设置';
+      tab.dataset.sourceLabel = sourceLabel;
+      tab.textContent = tabLabels[sourceLabel] || sourceLabel;
+      tab.title = tab.textContent;
 
       // Preserve stable fieldset IDs such as "provider". Later workspace
       // installers use those IDs as integration mount points after the tab
@@ -203,6 +290,17 @@ SETTINGS_TAB_WORKSPACE_SCRIPT = r'''
 
     settings.replaceChildren(tabs, panelHost);
     activate(0);
+
+    const details = byId('guided-settings');
+    if (details && details.dataset.escapeCloseBound !== 'true') {
+      details.dataset.escapeCloseBound = 'true';
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && details.open) {
+          details.open = false;
+          details.querySelector(':scope > summary')?.focus();
+        }
+      });
+    }
   }
 
   installSharedSettingsTabs();
