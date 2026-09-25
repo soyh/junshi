@@ -1,0 +1,84 @@
+name: TEST-195 Media Chat Message Import CI
+
+on:
+  push:
+    branches:
+      - test-195-media-chat-message-import
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-195 migration and dependency scope
+        run: |
+          migrations="$(git -C .. diff --name-only 3b3af79ceb871f36ae38a4e543a4b1c9a2a6cfe7..HEAD -- backend/migrations)"
+          requirements="$(git -C .. diff --name-only 3b3af79ceb871f36ae38a4e543a4b1c9a2a6cfe7..HEAD -- backend/requirements.txt)"
+          printf 'migration changes:\n%s\n' "$migrations"
+          printf 'requirements changes:\n%s\n' "$requirements"
+          test -z "$migrations"
+          test -z "$requirements"
+
+      - name: Verify recognized chat import contract
+        run: |
+          grep -n 'conversation_messages' app/services/media_attachment.py
+          grep -n "right-aligned/current-account" app/services/media_attachment.py
+          grep -n "sender_type 'user'" app/services/media_attachment.py
+          grep -n "left-aligned/other-participant" app/services/media_attachment.py
+          grep -n "sender_type 'person'" app/services/media_attachment.py
+          grep -n '_conversation_messages_from_analysis' app/services/media_attachment.py
+          grep -n '_evidence_analysis_text' app/services/media_attachment.py
+          grep -n 'max_tokens.*4000' app/services/media_attachment.py
+          grep -n '右侧/当前账号写入为“我（user）”' app/ui/media_upload_workspace.py
+          grep -n '聊天截图中可靠识别出的消息已加入当前会话记录' app/ui/media_upload_workspace.py
+          python - <<'PY'
+          from app.services.media_attachment import MediaAttachmentService
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+
+          prompt = MediaAttachmentService._safe_media_prompt()
+          html = PRODUCT_SHELL_WITH_CONTENT_HTML
+          assert 'conversation_messages' in prompt
+          assert "sender_type 'user'" in prompt
+          assert "sender_type 'person'" in prompt
+          assert '右侧/当前账号写入为“我（user）”' in html
+          assert '左侧/对方写入为“对方（person）”' in html
+          assert '聊天截图中可靠识别出的消息已加入当前会话记录' in html
+          assert "sentAtInput.type = 'datetime-local';" in html
+          print('TEST-195 source contract: PASS')
+          PY
+
+      - name: TEST-195 focused
+        run: >-
+          pytest -q
+          tests/test_195_media_chat_message_import.py
+          tests/test_194_media_evidence_datetime_local.py
+          tests/test_187_reserved_system_message_boundary.py
+          tests/test_186_media_evidence_immutability.py
+          tests/test_185_media_analysis_lease_expiry_enforcement.py
+          tests/test_184_media_analysis_single_entrypoint.py
+          tests/test_183_media_analysis_concurrency_claim.py
+          tests/test_182_media_blob_transaction_integrity.py
+          tests/test_181_media_evidence_lifecycle_integrity.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
