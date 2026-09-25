@@ -3,6 +3,7 @@ import sqlite3
 from app.domain.errors import PersonNotFoundError
 from app.repositories.analysis import AnalysisRepository
 from app.services.learning_strategy_context import LearningStrategyContextService
+from app.services.reference_context import ReferenceContextService
 
 
 class AnalysisService:
@@ -10,9 +11,11 @@ class AnalysisService:
         self,
         repository: AnalysisRepository | None = None,
         learning_strategy_service: LearningStrategyContextService | None = None,
+        reference_context_service: ReferenceContextService | None = None,
     ):
         self.repository = repository or AnalysisRepository()
         self.learning_strategy_service = learning_strategy_service or LearningStrategyContextService()
+        self.reference_context_service = reference_context_service or ReferenceContextService()
 
     def get_context(
         self,
@@ -37,6 +40,11 @@ class AnalysisService:
             user_id,
             person["id"],
         )
+        model_references = self.reference_context_service.build_context(
+            conn,
+            user_id,
+            conversation_id,
+        )
 
         return {
             "conversation": dict(conversation),
@@ -47,4 +55,5 @@ class AnalysisService:
             "unknowns": [],
             "recommendations": [],
             "learning_strategy": learning_strategy,
+            "model_references": model_references,
         }
