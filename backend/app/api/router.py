@@ -32,6 +32,7 @@ from app.api.routes.messages import (
     conversation_messages_router,
     router as messages_router,
 )
+from app.api.routes.model_references import router as model_references_router
 from app.api.routes.person_profiles import router as person_profiles_router
 from app.api.routes.persons import router as persons_router
 from app.api.routes.recommendation import router as recommendation_router
@@ -90,6 +91,7 @@ api_router.include_router(learning_strategy_router)
 api_router.include_router(learning_strategy_synthesis_router)
 api_router.include_router(llm_provider_config_router)
 api_router.include_router(llm_provider_ui_router)
+api_router.include_router(model_references_router)
 api_router.include_router(strategy_decision_router)
 api_router.include_router(strategy_decision_synthesis_router)
 api_router.include_router(strategy_decision_confirmation_router)
