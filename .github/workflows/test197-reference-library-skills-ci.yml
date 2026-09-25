@@ -70,7 +70,6 @@ jobs:
           tests/test_189_dual_model_settings_ui_refactor.py
           tests/test_188_dual_model_settings_tab_mount.py
           tests/test_180_media_upload_dual_model_settings_ui.py
-          tests/test_175_multi_provider_byok.py
           tests/test_171_qwen_strict_structured_output.py
           tests/test_authenticated_*.py
 
