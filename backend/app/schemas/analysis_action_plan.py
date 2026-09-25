@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import ConfigDict
 
 from app.schemas.action_plan import ActionPlanConstraints, ActionPlanContextResponse
+from app.schemas.reference_context import ModelReferenceContextResponse
 from app.schemas.structured_analysis import StructuredAnalysis
 
 
@@ -17,3 +18,4 @@ class AnalysisActionPlanContextResponse(ActionPlanContextResponse):
     action_constraints: AnalysisActionPlanConstraints
     structured_analysis: StructuredAnalysis
     action_plan_inputs: dict[str, Any]
+    model_references: ModelReferenceContextResponse
