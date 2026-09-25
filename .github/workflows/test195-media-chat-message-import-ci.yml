@@ -43,7 +43,7 @@ jobs:
           grep -n "right-aligned/current-account" app/services/media_attachment.py
           grep -n "sender_type 'user'" app/services/media_attachment.py
           grep -n "left-aligned/other-participant" app/services/media_attachment.py
-          grep -n "sender_type 'person'" app/services/media_attachment.py
+          grep -n "'person'. Never use system or assistant" app/services/media_attachment.py
           grep -n '_conversation_messages_from_analysis' app/services/media_attachment.py
           grep -n '_evidence_analysis_text' app/services/media_attachment.py
           grep -n 'max_tokens.*4000' app/services/media_attachment.py
