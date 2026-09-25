@@ -22,11 +22,11 @@ def attach_model_reference_context(
     """
 
     if not hasattr(conn, "execute"):
-        return dict(context)
+        return context
 
     try:
         return service.attach_context(conn, user_id, context)  # type: ignore[arg-type]
     except sqlite3.OperationalError as exc:
         if "no such table: model_reference_assets" in str(exc).lower():
-            return dict(context)
+            return context
         raise
