@@ -2,7 +2,11 @@ import io
 import zipfile
 
 from app.core.database import get_connection
+from app.services.analysis_action_plan import AnalysisActionPlanService
 from app.services.analysis_llm import AnalysisLLMService
+from app.services.analysis_recommendation import AnalysisRecommendationService
+from app.services.analysis_strategy import AnalysisStrategyService
+from app.services.model_reference import ModelReferenceService
 from app.services.openai_chat_provider import OpenAIChatProvider
 from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
 
@@ -307,3 +311,137 @@ def test_reference_asset_delete_removes_only_reference_asset(client):
     )
     assert deleted.status_code == 204
     assert client.get("/api/v1/model-references", headers=_headers(USER_A)).json() == []
+
+
+class _FakeStructuredAnalysis:
+    def model_dump(self, mode="json"):
+        return {
+            "summary": "summary",
+            "observed_facts": [],
+            "inferences": [],
+            "unknowns": [],
+            "hypotheses": [],
+            "emotional_signals": [],
+            "relationship_signals": [],
+            "risk_signals": [],
+            "intent_signals": [],
+            "evidence_links": [],
+            "analysis_constraints": [],
+        }
+
+
+class _RecordingAnalysisLLM:
+    def __init__(self):
+        self.model_reference_service = ModelReferenceService()
+        self.recorded_contexts = []
+        self.analysis_service = self
+
+    @staticmethod
+    def get_context(conn, user_id, conversation_id):
+        return {
+            "conversation": {"id": conversation_id},
+            "person": {"id": "person-197"},
+            "relationship": None,
+            "messages": [],
+            "evidence": [],
+            "learning_strategy": {"candidates": []},
+        }
+
+    def analyze_context(self, context, *, provider=None):
+        self.recorded_contexts.append(context)
+        return _FakeStructuredAnalysis()
+
+
+class _FakeStrategyDecision:
+    @staticmethod
+    def get_context(conn, user_id, person_id, *, structured_analysis=None):
+        return {
+            "person": {"id": person_id},
+            "relationship": None,
+            "current_state": {},
+            "evidence": [],
+            "candidates": [],
+            "decision_inputs": {},
+            "strategy_constraints": {},
+        }
+
+
+class _FakeCandidateService:
+    @staticmethod
+    def build_candidates(analysis):
+        return []
+
+
+class _FakeRecommendationService:
+    @staticmethod
+    def produce_recommendations(candidates, evidence):
+        return []
+
+
+class _FakeAnalysisRecommendation:
+    @staticmethod
+    def build_context(
+        conn,
+        user_id,
+        conversation_id,
+        *,
+        provider=None,
+        structured_analysis=None,
+    ):
+        return {"recommendations": [], "evidence": []}
+
+
+class _FakeActionPlanService:
+    @staticmethod
+    def get_context(conn, user_id, person_id):
+        return {
+            "person": {"id": person_id},
+            "relationship": None,
+            "recommendations": [],
+            "action_plan": [],
+            "action_constraints": {},
+        }
+
+
+def test_reference_context_propagates_to_strategy_recommendation_and_action_plan(client):
+    uploaded = _upload(
+        client,
+        user_id=USER_A,
+        filename="shared.skill.md",
+        content="# Shared Skill\nAlways distinguish observations from hypotheses.".encode("utf-8"),
+        asset_type="skill",
+    )
+    assert uploaded.status_code == 201
+
+    with get_connection() as conn:
+        strategy_llm = _RecordingAnalysisLLM()
+        strategy = AnalysisStrategyService(
+            analysis_llm_service=strategy_llm,
+            strategy_decision_service=_FakeStrategyDecision(),
+        )
+        strategy.build_strategy_context(conn, USER_A, "conversation-strategy")
+
+        recommendation_llm = _RecordingAnalysisLLM()
+        recommendation = AnalysisRecommendationService(
+            analysis_llm_service=recommendation_llm,
+            strategy_decision_service=_FakeStrategyDecision(),
+            candidate_service=_FakeCandidateService(),
+            recommendation_service=_FakeRecommendationService(),
+        )
+        recommendation.build_context(conn, USER_A, "conversation-recommendation")
+
+        action_llm = _RecordingAnalysisLLM()
+        action_plan = AnalysisActionPlanService(
+            analysis_llm_service=action_llm,
+            analysis_recommendation_service=_FakeAnalysisRecommendation(),
+            action_plan_service=_FakeActionPlanService(),
+        )
+        action_plan.build_context(conn, USER_A, "conversation-action-plan")
+
+    for recorder in (strategy_llm, recommendation_llm, action_llm):
+        assert len(recorder.recorded_contexts) == 1
+        references = recorder.recorded_contexts[0]["model_references"]
+        assert references["enabled_count"] == 1
+        assert references["skill_count"] == 1
+        assert references["items"][0]["asset_type"] == "skill"
+        assert "distinguish observations from hypotheses" in references["items"][0]["content"]
