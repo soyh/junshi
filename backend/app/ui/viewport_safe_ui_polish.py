@@ -294,6 +294,40 @@ VIEWPORT_SAFE_UI_POLISH_STYLE = r'''
       box-shadow: 0 5px 14px rgba(25, 117, 170, .06) !important;
     }
 
+    /* TEST-193: settings navigation and its active operation page must occupy
+       two explicit, non-overlapping rows. Automatic grid placement is not
+       allowed to place the panel host beside or on top of the navigation. */
+    #client-settings-host #guided-settings[open] #guided-settings-content.settings-tab-workspace {
+      grid-template-columns: minmax(0, 1fr) !important;
+      grid-template-rows: max-content minmax(0, 1fr) !important;
+      column-gap: 0 !important;
+      row-gap: 14px !important;
+      align-items: stretch !important;
+      align-content: stretch !important;
+    }
+
+    #client-settings-host #guided-settings-tabs {
+      grid-column: 1 / -1 !important;
+      grid-row: 1 !important;
+      align-self: start !important;
+      justify-self: stretch !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: none !important;
+      margin: 0 !important;
+    }
+
+    #client-settings-host #guided-settings-panel-host {
+      grid-column: 1 / -1 !important;
+      grid-row: 2 !important;
+      align-self: stretch !important;
+      justify-self: stretch !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: none !important;
+      margin: 0 !important;
+    }
+
     @media (max-width: 980px) {
       #client-settings-host #guided-settings[open] #guided-settings-content.settings-tab-workspace {
         left: 12px !important;
@@ -319,6 +353,7 @@ VIEWPORT_SAFE_UI_POLISH_STYLE = r'''
         bottom: 7px !important;
         padding: 9px !important;
         border-radius: 16px !important;
+        row-gap: 10px !important;
       }
 
       #client-conversation-tabs {
