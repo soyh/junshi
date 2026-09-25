@@ -23,6 +23,17 @@ _WEEKDAY_INDEX = {
 
 _DAY_PERIODS_PM = {"下午", "傍晚", "晚上", "夜里", "夜间"}
 _DAY_PERIODS_AM = {"凌晨", "早上", "早晨", "上午"}
+_AMBIGUOUS_TIME_HINTS = (
+    "可能",
+    "大概",
+    "大约",
+    "约莫",
+    "疑似",
+    "好像",
+    "似乎",
+    "maybe",
+    "approx",
+)
 
 
 class TimedMediaAttachmentService(MediaAttachmentService):
@@ -153,6 +164,10 @@ class TimedMediaAttachmentService(MediaAttachmentService):
             return None
 
         raw = str(text).strip().replace("：", ":")
+        lowered = raw.lower()
+        if any(hint in lowered for hint in _AMBIGUOUS_TIME_HINTS):
+            return None
+
         target_date = current.date()
         date_found = False
 
