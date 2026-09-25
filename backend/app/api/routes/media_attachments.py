@@ -10,12 +10,12 @@ from app.schemas.media_attachment import (
 from app.services.media_attachment import (
     MediaAnalysisInProgressError,
     MediaAttachmentError,
-    MediaAttachmentService,
 )
+from app.services.media_chat_time import TimedMediaAttachmentService
 
 
 router = APIRouter(tags=["media"])
-service = MediaAttachmentService()
+service = TimedMediaAttachmentService()
 
 
 def _row(row):
