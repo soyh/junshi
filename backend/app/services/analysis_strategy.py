@@ -31,9 +31,14 @@ class AnalysisStrategyService:
             analysis_context,
             provider=provider,
         )
-        return self.strategy_decision_service.get_context(
+        result = self.strategy_decision_service.get_context(
             conn,
             user_id,
             person_id,
             structured_analysis=structured_analysis,
         )
+        result["model_references"] = analysis_context.get(
+            "model_references",
+            {"items": []},
+        )
+        return result
