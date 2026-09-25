@@ -4,6 +4,7 @@ from typing import Any
 from app.services.analysis_llm import AnalysisLLMService
 from app.services.analysis_recommendation import AnalysisRecommendationService
 from app.services.llm import LLMAnalysisError
+from app.services.model_reference import ModelReferenceService
 from app.services.strategic_reply import StrategicReplyService
 from app.services.strategic_reply_analysis_bridge import StrategicReplyAnalysisBridgeService
 from app.services.strategic_reply_learning_strategy_bridge import (
@@ -25,6 +26,7 @@ class AnalysisStrategicReplyService:
         learning_strategy_bridge_service: StrategicReplyLearningStrategyBridgeService | None = None,
         analysis_recommendation_service: AnalysisRecommendationService | None = None,
         strategic_reply_llm_service: StrategicReplyLLMService | None = None,
+        model_reference_service: ModelReferenceService | None = None,
     ):
         self.analysis_llm_service = analysis_llm_service or AnalysisLLMService()
         self.strategic_reply_service = strategic_reply_service or StrategicReplyService()
@@ -46,6 +48,7 @@ class AnalysisStrategicReplyService:
         self.strategic_reply_llm_service = (
             strategic_reply_llm_service or StrategicReplyLLMService()
         )
+        self.model_reference_service = model_reference_service or ModelReferenceService()
 
     @classmethod
     def _build_conversation_focus(cls, analysis_context: dict[str, Any]) -> dict[str, Any]:
@@ -172,6 +175,9 @@ class AnalysisStrategicReplyService:
         analysis_context = self.analysis_llm_service.analysis_service.get_context(
             conn, user_id, conversation_id
         )
+        analysis_context = self.model_reference_service.attach_context(
+            conn, user_id, analysis_context
+        )
         person_id = analysis_context["person"]["id"]
         conversation_focus = self._build_conversation_focus(analysis_context)
         llm_analysis_context = dict(analysis_context)
@@ -209,6 +215,7 @@ class AnalysisStrategicReplyService:
             "required_evidence_source_ids": conversation_focus.get(
                 "required_evidence_source_ids", []
             ),
+            "model_references": analysis_context.get("model_references", {}),
             "constraints": {
                 "must_be_evidence_backed": True,
                 "must_prioritize_current_conversation": True,
@@ -216,6 +223,7 @@ class AnalysisStrategicReplyService:
                 "must_preserve_unknowns": True,
                 "must_not_auto_send": True,
                 "must_not_auto_execute": True,
+                "reference_material_must_not_override_canonical_evidence": True,
             },
         }
         generated_reply = self.strategic_reply_llm_service.generate(
