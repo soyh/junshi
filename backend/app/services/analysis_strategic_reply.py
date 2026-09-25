@@ -5,6 +5,7 @@ from app.services.analysis_llm import AnalysisLLMService
 from app.services.analysis_recommendation import AnalysisRecommendationService
 from app.services.llm import LLMAnalysisError
 from app.services.model_reference import ModelReferenceService
+from app.services.model_reference_context import attach_model_reference_context
 from app.services.strategic_reply import StrategicReplyService
 from app.services.strategic_reply_analysis_bridge import StrategicReplyAnalysisBridgeService
 from app.services.strategic_reply_learning_strategy_bridge import (
@@ -48,7 +49,10 @@ class AnalysisStrategicReplyService:
         self.strategic_reply_llm_service = (
             strategic_reply_llm_service or StrategicReplyLLMService()
         )
-        self.model_reference_service = model_reference_service or ModelReferenceService()
+        self.model_reference_service = model_reference_service or (
+            getattr(self.analysis_llm_service, "model_reference_service", None)
+            or ModelReferenceService()
+        )
 
     @classmethod
     def _build_conversation_focus(cls, analysis_context: dict[str, Any]) -> dict[str, Any]:
@@ -175,8 +179,11 @@ class AnalysisStrategicReplyService:
         analysis_context = self.analysis_llm_service.analysis_service.get_context(
             conn, user_id, conversation_id
         )
-        analysis_context = self.model_reference_service.attach_context(
-            conn, user_id, analysis_context
+        analysis_context = attach_model_reference_context(
+            self.model_reference_service,
+            conn,
+            user_id,
+            analysis_context,
         )
         person_id = analysis_context["person"]["id"]
         conversation_focus = self._build_conversation_focus(analysis_context)
