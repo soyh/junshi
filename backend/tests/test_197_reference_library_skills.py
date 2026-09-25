@@ -55,13 +55,13 @@ def _skill_zip() -> bytes:
 
 
 def _docx_bytes() -> bytes:
-    xml = b'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    xml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
     <w:p><w:r><w:t>第一条文档规则</w:t></w:r></w:p>
     <w:p><w:r><w:t>第二条文档参考</w:t></w:r></w:p>
   </w:body>
-</w:document>'''
+</w:document>'''.encode("utf-8")
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("word/document.xml", xml)
