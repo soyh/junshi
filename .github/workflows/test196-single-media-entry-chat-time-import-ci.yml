@@ -1,0 +1,109 @@
+name: TEST-196 Single Media Entry Chat Time Import CI
+
+on:
+  push:
+    branches:
+      - test-196-single-media-entry-chat-time-import
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-196 migration and dependency scope
+        run: |
+          migrations="$(git -C .. diff --name-only e7acbe18ed9082b0ae0faf32304fdff40fe0f183..HEAD -- backend/migrations)"
+          requirements="$(git -C .. diff --name-only e7acbe18ed9082b0ae0faf32304fdff40fe0f183..HEAD -- backend/requirements.txt)"
+          printf 'migration changes:\n%s\n' "$migrations"
+          printf 'requirements changes:\n%s\n' "$requirements"
+          test -z "$migrations"
+          test -z "$requirements"
+
+      - name: Verify single media entrypoint contract
+        run: |
+          ! grep -n "card.id = 'client-media-card'" app/ui/conversation_controls_workspace.py
+          ! grep -n "function clientUploadAndAnalyzeMedia" app/ui/conversation_controls_workspace.py
+          grep -n "card.id = 'client-media-import-card'" app/ui/media_upload_workspace.py
+          grep -n "fileInput.id = 'client-media-file'" app/ui/media_upload_workspace.py
+          grep -n "sentAtInput.id = 'client-media-sent-at'" app/ui/media_upload_workspace.py
+          python - <<'PY'
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+
+          html = PRODUCT_SHELL_WITH_CONTENT_HTML
+          assert "card.id = 'client-media-import-card';" in html
+          assert "card.id = 'client-media-card';" not in html
+          assert html.count("fileInput.id = 'client-media-file';") == 1
+          assert html.count("sentAtInput.id = 'client-media-sent-at';") == 1
+          assert html.count("list.id = 'client-media-list';") == 1
+          print('TEST-196 single media entrypoint contract: PASS')
+          PY
+
+      - name: Verify screenshot time extraction contract
+        run: |
+          grep -n 'class TimedMediaAttachmentService' app/services/media_chat_time.py
+          grep -n 'time_markers' app/services/media_chat_time.py
+          grep -n 'before_message_index' app/services/media_chat_time.py
+          grep -n 'Exclude phone status-bar clocks' app/services/media_chat_time.py
+          grep -n '_resolved_message_sent_ats' app/services/media_chat_time.py
+          grep -n 'TimedMediaAttachmentService' app/api/routes/media_attachments.py
+          python - <<'PY'
+          import json
+          from app.services.media_chat_time import TimedMediaAttachmentService
+
+          analysis = json.dumps({
+              'conversation_messages': [
+                  {'sender_type': 'person', 'content': 'a'},
+                  {'sender_type': 'user', 'content': 'b'},
+              ],
+              'time_markers': [
+                  {'before_message_index': 0, 'text': '9月23日 13:42'},
+              ],
+          }, ensure_ascii=False)
+          assert TimedMediaAttachmentService._resolved_message_sent_ats(
+              analysis,
+              '2026-09-24T16:30:20+08:00',
+          ) == [
+              '2026-09-23T13:42:00+08:00',
+              '2026-09-23T13:42:01+08:00',
+          ]
+          print('TEST-196 screenshot time extraction contract: PASS')
+          PY
+
+      - name: TEST-196 focused
+        run: >-
+          pytest -q
+          tests/test_196_single_media_entry_chat_time_import.py
+          tests/test_195_media_chat_message_import.py
+          tests/test_194_media_evidence_datetime_local.py
+          tests/test_187_reserved_system_message_boundary.py
+          tests/test_186_media_evidence_immutability.py
+          tests/test_185_media_analysis_lease_expiry_enforcement.py
+          tests/test_184_media_analysis_single_entrypoint.py
+          tests/test_183_media_analysis_concurrency_claim.py
+          tests/test_182_media_blob_transaction_integrity.py
+          tests/test_181_media_evidence_lifecycle_integrity.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_177_conversation_controls.py
+          tests/test_177_media_attachments.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
