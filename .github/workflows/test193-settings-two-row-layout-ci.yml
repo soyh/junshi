@@ -1,0 +1,75 @@
+name: TEST-193 Settings Two Row Layout CI
+
+on:
+  push:
+    branches:
+      - test-193-settings-two-row-layout
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-193 migration and dependency scope
+        run: |
+          migrations="$(git -C .. diff --name-only 818fc0319bb153fd9bf3ff15deacd47977a17449..HEAD -- backend/migrations)"
+          requirements="$(git -C .. diff --name-only 818fc0319bb153fd9bf3ff15deacd47977a17449..HEAD -- backend/requirements.txt)"
+          printf 'migration changes:\n%s\n' "$migrations"
+          printf 'requirements changes:\n%s\n' "$requirements"
+          test -z "$migrations"
+          test -z "$requirements"
+
+      - name: Verify strict two-row settings contract
+        run: |
+          grep -n 'TEST-193: settings navigation and its active operation page' app/ui/viewport_safe_ui_polish.py
+          grep -n 'grid-template-columns: minmax(0, 1fr) !important' app/ui/viewport_safe_ui_polish.py
+          grep -n 'grid-template-rows: max-content minmax(0, 1fr) !important' app/ui/viewport_safe_ui_polish.py
+          grep -n '#client-settings-host #guided-settings-tabs' app/ui/viewport_safe_ui_polish.py
+          grep -n '#client-settings-host #guided-settings-panel-host' app/ui/viewport_safe_ui_polish.py
+          python - <<'PY'
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+
+          html = PRODUCT_SHELL_WITH_CONTENT_HTML
+          assert "TEST-193: settings navigation and its active operation page" in html
+          assert "grid-template-columns: minmax(0, 1fr) !important;" in html
+          assert "grid-template-rows: max-content minmax(0, 1fr) !important;" in html
+          assert "#client-settings-host #guided-settings-tabs" in html
+          assert "#client-settings-host #guided-settings-panel-host" in html
+          assert "TEST-192: every settings tab owns one normal-flow panel" in html
+          assert "#client-unified-message-history > summary::before" in html
+          assert "#client-media-file::file-selector-button" in html
+          print("TEST-193 strict two-row settings contract: PASS")
+          PY
+
+      - name: TEST-193 focused
+        run: >-
+          pytest -q
+          tests/test_193_settings_two_row_layout.py
+          tests/test_192_settings_panel_isolation.py
+          tests/test_191_viewport_safe_ui_polish.py
+          tests/test_190_settings_overlay_conversation_polish.py
+          tests/test_189_dual_model_settings_ui_refactor.py
+          tests/test_188_dual_model_settings_tab_mount.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
