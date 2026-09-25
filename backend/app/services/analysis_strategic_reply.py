@@ -83,6 +83,10 @@ class AnalysisStrategicReplyService:
             "latest_incoming_message": latest_incoming_message,
             "reply_target_message": reply_target_message,
             "required_evidence_source_ids": required_evidence_source_ids,
+            "model_references": analysis_context.get(
+                "model_references",
+                {"items": []},
+            ),
             "recency_rule": (
                 "Prefer newer messages in the selected conversation when they conflict "
                 "with older history. A reply target from sender_type=person is the "
@@ -205,6 +209,7 @@ class AnalysisStrategicReplyService:
             "evidence": evidence,
             "unknowns": recommendation_context.get("unknowns", []),
             "recommendations": recommendations,
+            "model_references": analysis_context.get("model_references", {"items": []}),
             "conversation_focus": conversation_focus,
             "required_evidence_source_ids": conversation_focus.get(
                 "required_evidence_source_ids", []
