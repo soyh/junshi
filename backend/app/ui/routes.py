@@ -86,6 +86,10 @@ from app.ui.product_management_workspace import (
     PRODUCT_MANAGEMENT_SCRIPT,
 )
 from app.ui.product_shell import PRODUCT_SHELL_HTML
+from app.ui.reference_context_workspace import (
+    REFERENCE_CONTEXT_SCRIPT,
+    REFERENCE_CONTEXT_STYLE,
+)
 from app.ui.relationship_evidence_workspace import (
     RELATIONSHIP_EVIDENCE_HTML,
     RELATIONSHIP_EVIDENCE_SCRIPT,
@@ -224,6 +228,7 @@ def build_product_shell_html() -> str:
             f"{SETTINGS_TAB_WORKSPACE_STYLE}\n"
             f"{MULTI_PROVIDER_SETTINGS_STYLE}\n"
             f"{DUAL_MODEL_SETTINGS_STYLE}\n"
+            f"{REFERENCE_CONTEXT_STYLE}\n"
             f"{CONVERSATION_CONTROLS_STYLE}\n"
             f"{VIEWPORT_SAFE_UI_POLISH_STYLE}\n"
             f"{style_marker}"
@@ -267,6 +272,7 @@ def build_product_shell_html() -> str:
         f"{SETTINGS_TAB_WORKSPACE_SCRIPT}\n\n"
         f"{MULTI_PROVIDER_SETTINGS_SCRIPT}\n\n"
         f"{DUAL_MODEL_SETTINGS_SCRIPT}\n\n"
+        f"{REFERENCE_CONTEXT_SCRIPT}\n\n"
         f"{CARD_CLIENT_AUTOMATION_SCRIPT}\n\n"
         f"{CARD_CLIENT_UNIFIED_IMPORT_SCRIPT}\n\n"
         f"{MEDIA_UPLOAD_WORKSPACE_SCRIPT}\n\n"
