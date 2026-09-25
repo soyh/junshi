@@ -3,6 +3,8 @@ import sqlite3
 from app.services.action_plan import ActionPlanService
 from app.services.analysis_llm import AnalysisLLMService
 from app.services.analysis_recommendation import AnalysisRecommendationService
+from app.services.model_reference import ModelReferenceService
+from app.services.model_reference_context import attach_model_reference_context
 
 
 class AnalysisActionPlanService:
@@ -19,6 +21,10 @@ class AnalysisActionPlanService:
         self.analysis_recommendation_service = (
             analysis_recommendation_service or AnalysisRecommendationService()
         )
+        self.model_reference_service = (
+            getattr(self.analysis_llm_service, "model_reference_service", None)
+            or ModelReferenceService()
+        )
 
     def build_context(
         self,
@@ -31,8 +37,11 @@ class AnalysisActionPlanService:
         analysis_context = self.analysis_llm_service.analysis_service.get_context(
             conn, user_id, conversation_id
         )
-        analysis_context = self.analysis_llm_service.model_reference_service.attach_context(
-            conn, user_id, analysis_context
+        analysis_context = attach_model_reference_context(
+            self.model_reference_service,
+            conn,
+            user_id,
+            analysis_context,
         )
         person_id = analysis_context["person"]["id"]
         structured_analysis = self.analysis_llm_service.analyze_context(
