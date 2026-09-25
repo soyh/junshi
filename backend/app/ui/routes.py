@@ -77,6 +77,10 @@ from app.ui.media_upload_workspace import (
     MEDIA_UPLOAD_WORKSPACE_STYLE,
 )
 from app.ui.message_history_window_workspace import MESSAGE_HISTORY_WINDOW_SCRIPT
+from app.ui.model_reference_workspace import (
+    MODEL_REFERENCE_WORKSPACE_SCRIPT,
+    MODEL_REFERENCE_WORKSPACE_STYLE,
+)
 from app.ui.multi_provider_settings_workspace import (
     MULTI_PROVIDER_SETTINGS_SCRIPT,
     MULTI_PROVIDER_SETTINGS_STYLE,
@@ -224,6 +228,7 @@ def build_product_shell_html() -> str:
             f"{SETTINGS_TAB_WORKSPACE_STYLE}\n"
             f"{MULTI_PROVIDER_SETTINGS_STYLE}\n"
             f"{DUAL_MODEL_SETTINGS_STYLE}\n"
+            f"{MODEL_REFERENCE_WORKSPACE_STYLE}\n"
             f"{CONVERSATION_CONTROLS_STYLE}\n"
             f"{VIEWPORT_SAFE_UI_POLISH_STYLE}\n"
             f"{style_marker}"
@@ -267,6 +272,7 @@ def build_product_shell_html() -> str:
         f"{SETTINGS_TAB_WORKSPACE_SCRIPT}\n\n"
         f"{MULTI_PROVIDER_SETTINGS_SCRIPT}\n\n"
         f"{DUAL_MODEL_SETTINGS_SCRIPT}\n\n"
+        f"{MODEL_REFERENCE_WORKSPACE_SCRIPT}\n\n"
         f"{CARD_CLIENT_AUTOMATION_SCRIPT}\n\n"
         f"{CARD_CLIENT_UNIFIED_IMPORT_SCRIPT}\n\n"
         f"{MEDIA_UPLOAD_WORKSPACE_SCRIPT}\n\n"
