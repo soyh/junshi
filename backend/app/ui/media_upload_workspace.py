@@ -188,7 +188,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
           await clientLoadMedia();
           if (typeof loadMessages === 'function') await loadMessages(currentMessageWindow || {});
           const status = byId('client-media-status');
-          if (status) status.textContent = '附件及其关联媒体证据已删除；已导入的聊天消息仍保留在会话记录中。';
+          if (status) status.textContent = '附件及其关联媒体证据已删除。已导入的聊天消息仍保留在会话记录中。';
           window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
             detail: {source: '媒体证据删除', conversation_id: conversationId},
           }));
@@ -249,7 +249,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
     clientResetMediaSentAtToNow();
     await clientLoadMedia();
     if (typeof loadMessages === 'function') await loadMessages(currentMessageWindow || {});
-    status.textContent = `已完成 ${completed} 个附件的上传与视觉识别；聊天截图中可靠识别出的消息已加入当前会话记录，视觉线索已保留为媒体证据。`;
+    status.textContent = `已完成 ${completed} 个附件的上传与视觉识别；识别结果已作为媒体证据加入当前会话；聊天截图中可靠识别出的消息已加入当前会话记录。`;
     window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
       detail: {source: '媒体证据与聊天记录', conversation_id: conversationId},
     }));
