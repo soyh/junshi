@@ -4,6 +4,7 @@ from app.schemas.structured_analysis import StructuredAnalysis
 from app.services.analysis import AnalysisService
 from app.services.llm import LLMAnalysisService, LLMProvider
 from app.services.model_reference import ModelReferenceService
+from app.services.model_reference_context import attach_model_reference_context
 
 
 class AnalysisLLMService:
@@ -28,7 +29,12 @@ class AnalysisLLMService:
         provider: LLMProvider | None = None,
     ) -> StructuredAnalysis:
         context = self.analysis_service.get_context(conn, user_id, conversation_id)
-        context = self.model_reference_service.attach_context(conn, user_id, context)
+        context = attach_model_reference_context(
+            self.model_reference_service,
+            conn,
+            user_id,
+            context,
+        )
         return self.analyze_context(context, provider=provider)
 
     def analyze_context(
