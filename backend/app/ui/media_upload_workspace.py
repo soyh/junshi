@@ -181,14 +181,14 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
       remove.disabled = !currentAccessToken;
       remove.textContent = '删除附件';
       remove.addEventListener('click', async () => {
-        if (!window.confirm(`确定删除附件“${item.original_filename || item.id}”及其媒体证据吗？`)) return;
+        if (!window.confirm(`确定删除附件“${item.original_filename || item.id}”及其媒体证据吗？已导入的聊天消息会保留。`)) return;
         const conversationId = selectedConversationId;
         try {
           await api(`/api/v1/media/${encodeURIComponent(item.id)}`, {method: 'DELETE'});
           await clientLoadMedia();
           if (typeof loadMessages === 'function') await loadMessages(currentMessageWindow || {});
           const status = byId('client-media-status');
-          if (status) status.textContent = '附件及其关联媒体证据已删除。';
+          if (status) status.textContent = '附件及其关联媒体证据已删除；已导入的聊天消息仍保留在会话记录中。';
           window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
             detail: {source: '媒体证据删除', conversation_id: conversationId},
           }));
@@ -240,7 +240,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
         {method: 'POST', body: form},
       );
 
-      status.textContent = `正在使用视觉模型识别 ${index + 1}/${files.length}：${file.name}`;
+      status.textContent = `正在使用视觉模型识别并导入聊天记录 ${index + 1}/${files.length}：${file.name}`;
       await api(`/api/v1/media/${encodeURIComponent(attachment.id)}/analyze`, {method: 'POST'});
       completed += 1;
     }
@@ -249,9 +249,9 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
     clientResetMediaSentAtToNow();
     await clientLoadMedia();
     if (typeof loadMessages === 'function') await loadMessages(currentMessageWindow || {});
-    status.textContent = `已完成 ${completed} 个附件的上传与视觉识别；识别结果已作为媒体证据加入当前会话。`;
+    status.textContent = `已完成 ${completed} 个附件的上传与视觉识别；聊天截图中可靠识别出的消息已加入当前会话记录，视觉线索已保留为媒体证据。`;
     window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
-      detail: {source: '媒体证据', conversation_id: conversationId},
+      detail: {source: '媒体证据与聊天记录', conversation_id: conversationId},
     }));
   }
 
@@ -269,7 +269,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
 
     const note = document.createElement('p');
     note.className = 'client-media-note';
-    note.textContent = '可一次选择多张聊天截图、普通图片或视频。系统使用独立视觉模型识别可见文字、表情和互动线索；结果作为“媒体证据”写入当前会话。不会自动猜测截图中无法可靠确定的发言人或发送时间。视频当前按关键帧进行视觉分析。';
+    note.textContent = '可一次选择多张聊天截图、普通图片或视频。对于一对一聊天截图，系统会按画面顺序识别消息：右侧/当前账号写入为“我（user）”，左侧/对方写入为“对方（person）”，并直接加入当前会话记录；无法可靠判断归属的内容不会猜测。图片、表情和互动线索仍作为媒体证据保留。视频当前按关键帧进行视觉分析。';
 
     const controls = document.createElement('div');
     controls.id = 'client-media-controls';
@@ -296,7 +296,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
     sentAtInput.type = 'datetime-local';
     sentAtInput.step = '1';
     sentAtInput.value = clientCurrentLocalDateTimeValue();
-    sentAtInput.title = '默认使用当前本地时间，可直接修改日期或时分秒。';
+    sentAtInput.title = '默认使用当前本地时间，可直接修改日期或时分秒。聊天截图内若没有可靠逐条时间，识别出的消息会从这个时间开始按画面顺序排列。';
     sentAtInput.autocomplete = 'off';
     sentAtInput.className = 'requires-auth';
     sentAtInput.disabled = !currentAccessToken;
@@ -323,7 +323,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
     const status = document.createElement('div');
     status.id = 'client-media-status';
     status.className = 'status';
-    status.textContent = '选择会话后，可以上传聊天截图、图片或视频。';
+    status.textContent = '选择会话后，可以上传聊天截图、图片或视频；聊天截图识别出的可靠消息会直接加入当前会话记录。';
 
     const list = document.createElement('div');
     list.id = 'client-media-list';
