@@ -35,6 +35,7 @@ from app.api.routes.messages import (
 from app.api.routes.person_profiles import router as person_profiles_router
 from app.api.routes.persons import router as persons_router
 from app.api.routes.recommendation import router as recommendation_router
+from app.api.routes.reference_context import router as reference_context_router
 from app.api.routes.relationships import router as relationships_router
 from app.api.routes.relationship_state import router as relationship_state_router
 from app.api.routes.strategic_reply import router as strategic_reply_router
@@ -106,6 +107,7 @@ api_router.include_router(interactions_router)
 api_router.include_router(messages_router)
 api_router.include_router(conversation_messages_router)
 api_router.include_router(media_attachments_router)
+api_router.include_router(reference_context_router)
 api_router.include_router(conversations_router)
 api_router.include_router(timeline_router)
 api_router.include_router(text_imports_router)
