@@ -44,6 +44,9 @@ jobs:
           grep -n 'MAX_CONTEXT_CHARS' app/services/model_reference.py
           grep -n 'must never trigger code execution' app/services/model_reference.py
           grep -n 'model_references' app/services/analysis_strategic_reply.py
+          grep -n 'model_reference_service.attach_context' app/services/analysis_strategy.py
+          grep -n 'model_reference_service.attach_context' app/services/analysis_recommendation.py
+          grep -n 'model_reference_service.attach_context' app/services/analysis_action_plan.py
           grep -n 'model_references' app/services/openai_chat_provider.py
           grep -n 'model-reference-library' app/ui/model_reference_workspace.py
           grep -n 'multiple = true' app/ui/model_reference_workspace.py
@@ -70,7 +73,6 @@ jobs:
           tests/test_189_dual_model_settings_ui_refactor.py
           tests/test_188_dual_model_settings_tab_mount.py
           tests/test_180_media_upload_dual_model_settings_ui.py
-          tests/test_171_qwen_strict_structured_output.py
           tests/test_authenticated_*.py
 
       - name: Full suite
