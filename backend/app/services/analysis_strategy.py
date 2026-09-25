@@ -26,6 +26,9 @@ class AnalysisStrategyService:
         analysis_context = self.analysis_llm_service.analysis_service.get_context(
             conn, user_id, conversation_id
         )
+        analysis_context = self.analysis_llm_service.model_reference_service.attach_context(
+            conn, user_id, analysis_context
+        )
         person_id = analysis_context["person"]["id"]
         structured_analysis = self.analysis_llm_service.analyze_context(
             analysis_context,
