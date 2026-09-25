@@ -48,12 +48,16 @@ def test_http_analysis_route_uses_only_claim_aware_service_flow():
 def test_claimed_completion_is_the_only_service_path_that_creates_media_evidence():
     source = inspect.getsource(MediaAttachmentService)
 
-    marker = 'f"[媒体证据:{row[\'media_type\']}] {analysis_text}"'
+    marker = (
+        'f"[媒体证据:{row[\'media_type\']}] '
+        '{self._evidence_analysis_text(analysis_text)}"'
+    )
     assert source.count(marker) == 1
 
     completion_source = inspect.getsource(
         MediaAttachmentService.complete_claimed_analysis
     )
     assert marker in completion_source
+    assert "self._evidence_analysis_text(analysis_text)" in completion_source
     assert "self.repository.get_claimed(" in completion_source
     assert "self.repository.mark_completed_claimed(" in completion_source
