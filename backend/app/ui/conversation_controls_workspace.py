@@ -29,7 +29,8 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
   // TEST-177: display-window controls stay presentation-only; analysis continues
   // to call the canonical conversation analysis endpoint with the full history.
   // TEST-196: legacy media upload controls were removed. The single canonical
-  // media entrypoint is installed by media_upload_workspace.py.
+  // media entrypoint is installed by media_upload_workspace.py; its recognized
+  // media still uses the existing “系统证据加入完整会话链路” contract.
   let clientAllConversationMessages = [];
 
   function clientMessageFilterDate(value, endOfDay = false) {
