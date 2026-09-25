@@ -1,0 +1,78 @@
+name: TEST-197 Reference Library Skills CI
+
+on:
+  push:
+    branches:
+      - test-197-reference-library-skills
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-197 migration and dependency scope
+        run: |
+          echo 'migration changes:'
+          git -C .. diff --name-only e5d9008c45ee0c45d21bccdb72c998dbfbec5e3b..HEAD -- backend/migrations
+          test "$(git -C .. diff --name-only e5d9008c45ee0c45d21bccdb72c998dbfbec5e3b..HEAD -- backend/migrations)" = "backend/migrations/019_model_reference_assets.sql"
+          echo 'requirements changes:'
+          git -C .. diff --name-only e5d9008c45ee0c45d21bccdb72c998dbfbec5e3b..HEAD -- backend/requirements.txt
+          grep -n '^pypdf==6.1.1$' requirements.txt
+
+      - name: Verify reference library static contract
+        run: |
+          grep -n 'CREATE TABLE IF NOT EXISTS model_reference_assets' migrations/019_model_reference_assets.sql
+          grep -n 'class ModelReferenceService' app/services/model_reference.py
+          grep -n 'MAX_CONTEXT_CHARS' app/services/model_reference.py
+          grep -n 'must never trigger code execution' app/services/model_reference.py
+          grep -n 'model_references' app/services/analysis_strategic_reply.py
+          grep -n 'model_references' app/services/openai_chat_provider.py
+          grep -n 'model-reference-library' app/ui/model_reference_workspace.py
+          grep -n 'multiple = true' app/ui/model_reference_workspace.py
+          grep -n 'MODEL_REFERENCE_WORKSPACE_SCRIPT' app/ui/routes.py
+          python - <<'PY'
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+
+          html = PRODUCT_SHELL_WITH_CONTENT_HTML
+          assert '参考资料 / Skills' in html
+          assert 'model-reference-library' in html
+          assert 'model-reference-files' in html
+          assert 'model-reference-upload-type' in html
+          assert '/api/v1/model-references' in html
+          print('TEST-197 reference library UI contract: PASS')
+          PY
+
+      - name: TEST-197 focused
+        run: >-
+          pytest -q
+          tests/test_197_reference_library_skills.py
+          tests/test_196_single_media_entry_chat_time_import.py
+          tests/test_195_media_chat_message_import.py
+          tests/test_194_media_evidence_datetime_local.py
+          tests/test_189_dual_model_settings_ui_refactor.py
+          tests/test_188_dual_model_settings_tab_mount.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_175_multi_provider_byok.py
+          tests/test_171_qwen_strict_structured_output.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
