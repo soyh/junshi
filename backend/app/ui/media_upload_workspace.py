@@ -103,7 +103,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
 
   function clientLocalDateTimeToIsoWithOffset(value) {
     const match = String(value || '').trim().match(
-      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/,
+      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/,
     );
     if (!match) throw new Error('证据时间无效，请重新选择日期和时间');
 
@@ -113,7 +113,16 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
     const hour = Number(match[4]);
     const minute = Number(match[5]);
     const second = Number(match[6] || '0');
-    const localDate = new Date(year, month - 1, day, hour, minute, second, 0);
+    const millisecond = Number((match[7] || '0').padEnd(3, '0'));
+    const localDate = new Date(
+      year,
+      month - 1,
+      day,
+      hour,
+      minute,
+      second,
+      millisecond,
+    );
 
     if (
       Number.isNaN(localDate.getTime())
@@ -123,6 +132,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
       || localDate.getHours() !== hour
       || localDate.getMinutes() !== minute
       || localDate.getSeconds() !== second
+      || localDate.getMilliseconds() !== millisecond
     ) {
       throw new Error('证据时间无效，请重新选择日期和时间');
     }
