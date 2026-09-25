@@ -34,6 +34,7 @@ class MediaAnalysisInProgressError(MediaAttachmentError):
 _ALLOWED_IMAGES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 _ALLOWED_VIDEOS = {"video/mp4", "video/webm", "video/quicktime"}
 _ANALYSIS_CLAIM_TTL_SECONDS = 10 * 60
+_MAX_EXTRACTED_CHAT_MESSAGES = 200
 
 
 class MediaAttachmentService:
@@ -165,9 +166,10 @@ class MediaAttachmentService:
         path = Path(row["storage_path"])
         evidence_message_id = self._row_value(row, "message_id")
 
-        # Remove the attachment link first, in the same transaction, so the
-        # canonical-message immutability guard no longer protects the evidence
-        # that is being intentionally deleted as part of attachment cleanup.
+        # Extracted user/person chat messages are canonical conversation records
+        # once imported. Deleting the source attachment intentionally does not
+        # delete those records. Only the attachment-owned system evidence follows
+        # the attachment lifecycle.
         self.repository.delete(conn, user_id, attachment_id)
 
         if evidence_message_id:
@@ -236,12 +238,83 @@ class MediaAttachmentService:
     def _safe_media_prompt() -> str:
         return (
             "Analyze this media as conversation evidence for a relationship-advice system. "
-            "Describe only visible evidence. Distinguish observations from inference. "
+            "Describe only visible evidence and distinguish observations from inference. "
             "Pay attention to visible text, emoji/sticker meaning, facial expression, body language, "
             "scene/context, and interaction tone when supported. Do not identify unknown people. "
-            "Return concise JSON with keys: media_summary, visible_text, emotional_signals, "
-            "interaction_signals, uncertainty. Values may be strings or arrays."
+            "If this is a one-to-one chat screenshot, transcribe every visible chat bubble in visual "
+            "top-to-bottom order into conversation_messages. Treat right-aligned/current-account "
+            "bubbles as sender_type 'user' and left-aligned/other-participant bubbles as sender_type "
+            "'person'. Never use system or assistant in conversation_messages. Exclude app chrome, "
+            "page titles, standalone time separators, recall/status notices, and other non-chat UI. "
+            "For a sticker or image bubble without ordinary text, use a concise visible-only marker "
+            "such as '[表情包：笑]' or '[图片：猫]' instead of inventing dialogue. If bubble ownership "
+            "is ambiguous, omit that bubble rather than guessing. Each conversation_messages item must "
+            "contain sender_type and content; timestamp_text may contain only the raw visible time label "
+            "or null. For non-chat media, conversation_messages must be an empty array. Return one JSON "
+            "object with keys: media_summary, visible_text, emotional_signals, interaction_signals, "
+            "uncertainty, conversation_messages."
         )
+
+    @staticmethod
+    def _conversation_messages_from_analysis(analysis_text: str) -> list[dict[str, str]]:
+        try:
+            parsed = json.loads(analysis_text)
+        except (TypeError, ValueError):
+            return []
+        if not isinstance(parsed, dict):
+            return []
+
+        raw_messages = parsed.get("conversation_messages")
+        if not isinstance(raw_messages, list):
+            return []
+
+        messages: list[dict[str, str]] = []
+        for item in raw_messages[:_MAX_EXTRACTED_CHAT_MESSAGES]:
+            if not isinstance(item, dict):
+                continue
+            sender_type = item.get("sender_type")
+            content = item.get("content")
+            if sender_type not in {"user", "person"}:
+                continue
+            if not isinstance(content, str):
+                continue
+            normalized_content = content.strip()
+            if not normalized_content:
+                continue
+            messages.append(
+                {
+                    "sender_type": sender_type,
+                    "content": normalized_content[:4000],
+                }
+            )
+        return messages
+
+    @staticmethod
+    def _evidence_analysis_text(analysis_text: str) -> str:
+        try:
+            parsed = json.loads(analysis_text)
+        except (TypeError, ValueError):
+            return analysis_text
+        if not isinstance(parsed, dict):
+            return analysis_text
+        evidence = dict(parsed)
+        evidence.pop("conversation_messages", None)
+        return json.dumps(evidence, ensure_ascii=False, sort_keys=True)
+
+    @staticmethod
+    def _message_sent_at(anchor: str | None, ordinal: int) -> str:
+        parsed: datetime | None = None
+        if anchor:
+            candidate = anchor[:-1] + "+00:00" if anchor.endswith("Z") else anchor
+            try:
+                parsed = datetime.fromisoformat(candidate)
+            except ValueError:
+                parsed = None
+        if parsed is None:
+            parsed = datetime.now(timezone.utc)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return (parsed + timedelta(seconds=ordinal)).isoformat()
 
     def _analyze_with_provider(
         self,
@@ -271,7 +344,7 @@ class MediaAttachmentService:
             "model": provider.model,
             "messages": [{"role": "user", "content": content}],
             "response_format": {"type": "json_object"},
-            "max_tokens": 900,
+            "max_tokens": 4000,
         }
         headers = {
             "Authorization": f"Bearer {provider.api_key}",
@@ -386,12 +459,24 @@ class MediaAttachmentService:
         if row is None:
             raise MediaAnalysisInProgressError("media analysis claim lost or expired")
 
+        extracted_messages = self._conversation_messages_from_analysis(analysis_text)
+        anchor_sent_at = self._message_sent_at(row["sent_at"], 0)
+        for ordinal, item in enumerate(extracted_messages):
+            self.message_service.create(
+                conn,
+                user_id,
+                row["conversation_id"],
+                item["sender_type"],
+                item["content"],
+                self._message_sent_at(anchor_sent_at, ordinal),
+            )
+
         evidence = self.message_service.create(
             conn,
             user_id,
             row["conversation_id"],
             "system",
-            f"[媒体证据:{row['media_type']}] {analysis_text}",
+            f"[媒体证据:{row['media_type']}] {self._evidence_analysis_text(analysis_text)}",
             row["sent_at"],
         )
         updated = self.repository.mark_completed_claimed(
