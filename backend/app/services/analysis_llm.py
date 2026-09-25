@@ -3,6 +3,7 @@ import sqlite3
 from app.schemas.structured_analysis import StructuredAnalysis
 from app.services.analysis import AnalysisService
 from app.services.llm import LLMAnalysisService, LLMProvider
+from app.services.model_reference import ModelReferenceService
 
 
 class AnalysisLLMService:
@@ -12,9 +13,11 @@ class AnalysisLLMService:
         self,
         analysis_service: AnalysisService | None = None,
         llm_service: LLMAnalysisService | None = None,
+        model_reference_service: ModelReferenceService | None = None,
     ):
         self.analysis_service = analysis_service or AnalysisService()
         self.llm_service = llm_service
+        self.model_reference_service = model_reference_service or ModelReferenceService()
 
     def analyze(
         self,
@@ -25,6 +28,7 @@ class AnalysisLLMService:
         provider: LLMProvider | None = None,
     ) -> StructuredAnalysis:
         context = self.analysis_service.get_context(conn, user_id, conversation_id)
+        context = self.model_reference_service.attach_context(conn, user_id, context)
         return self.analyze_context(context, provider=provider)
 
     def analyze_context(
