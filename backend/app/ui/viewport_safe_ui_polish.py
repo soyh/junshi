@@ -59,17 +59,86 @@ VIEWPORT_SAFE_UI_POLISH_STYLE = r'''
     }
 
     #guided-settings-tabs {
+      position: relative !important;
+      z-index: 4 !important;
       min-width: 0 !important;
       max-width: 100% !important;
     }
 
     #client-settings-host #guided-settings-panel-host {
+      position: relative !important;
+      z-index: 1 !important;
+      isolation: isolate !important;
       min-width: 0 !important;
       min-height: 0 !important;
       max-width: 100% !important;
       max-height: none !important;
       overflow-x: hidden !important;
       overflow-y: auto !important;
+    }
+
+    /* TEST-192: every settings tab owns one normal-flow panel. Legacy workspace
+       rules are not allowed to keep absolute/fixed coordinates after the
+       fieldset has been moved into the shared panel host. */
+    #client-settings-host #guided-settings-panel-host > fieldset {
+      position: static !important;
+      inset: auto !important;
+      top: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      left: auto !important;
+      float: none !important;
+      clear: both !important;
+      grid-column: auto !important;
+      grid-row: auto !important;
+      grid-area: auto !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: visible !important;
+      transform: none !important;
+      translate: none !important;
+      z-index: auto !important;
+      box-sizing: border-box !important;
+      border: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+
+    #client-settings-host #guided-settings-panel-host > fieldset[hidden] {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    #client-settings-host #guided-settings-panel-host > fieldset:not([hidden]) {
+      display: block !important;
+      visibility: visible !important;
+      pointer-events: auto !important;
+    }
+
+    #client-settings-host #guided-settings-panel-host > fieldset > legend {
+      display: none !important;
+    }
+
+    #client-settings-host #guided-settings-panel-host .workspace-grid,
+    #client-settings-host #guided-settings-panel-host .workspace-card,
+    #client-settings-host #guided-settings-panel-host .status,
+    #client-settings-host #guided-settings-panel-host input,
+    #client-settings-host #guided-settings-panel-host select,
+    #client-settings-host #guided-settings-panel-host textarea {
+      min-width: 0 !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    #client-settings-host #guided-settings-panel-host .workspace-grid {
+      width: 100% !important;
     }
 
     #guided-settings-panel-host > fieldset,
@@ -230,6 +299,10 @@ VIEWPORT_SAFE_UI_POLISH_STYLE = r'''
         left: 12px !important;
         right: 12px !important;
         bottom: 12px !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host .workspace-grid {
+        grid-template-columns: 1fr !important;
       }
     }
 
