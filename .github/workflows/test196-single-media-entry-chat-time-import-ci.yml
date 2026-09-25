@@ -6,6 +6,7 @@ on:
       - test-196-single-media-entry-chat-time-import
   workflow_dispatch:
 
+# TEST-196: single media surface + visible chat time extraction.
 jobs:
   test:
     runs-on: ubuntu-24.04
