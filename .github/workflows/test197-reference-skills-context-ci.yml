@@ -1,0 +1,97 @@
+name: TEST-197 Reference Skills Context CI
+
+on:
+  push:
+    branches:
+      - test-197-reference-skills-context
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-197 migration and dependency scope
+        run: |
+          base=e5d9008c45ee0c45d21bccdb72c998dbfbec5e3b
+          migrations="$(git -C .. diff --name-only "$base"..HEAD -- backend/migrations)"
+          requirements="$(git -C .. diff --name-only "$base"..HEAD -- backend/requirements.txt)"
+          printf 'migration changes:\n%s\n' "$migrations"
+          printf 'requirements changes:\n%s\n' "$requirements"
+          test "$migrations" = "backend/migrations/019_model_references.sql"
+          test -z "$requirements"
+          ! git -C .. diff --name-only "$base"..HEAD -- backend/migrations/001_initial.sql backend/migrations/002_interactions.sql backend/migrations/003_conversations_messages.sql backend/migrations/004_action_feedback.sql backend/migrations/005_action_outcomes.sql backend/migrations/006_memory_updates.sql backend/migrations/007_action_executions.sql backend/migrations/008_action_plan_snapshots.sql backend/migrations/009_action_outcome_idempotency.sql backend/migrations/010_user_llm_provider_configs.sql backend/migrations/011_auth_sessions.sql backend/migrations/012_user_credentials.sql backend/migrations/013_auth_login_throttle.sql backend/migrations/014_user_llm_profiles.sql backend/migrations/015_user_llm_profile_active.sql backend/migrations/016_media_attachments.sql backend/migrations/017_user_vision_llm_config.sql backend/migrations/018_media_analysis_claims.sql | grep -q .
+
+      - name: Verify reference persistence and API contract
+        run: |
+          grep -n 'CREATE TABLE IF NOT EXISTS model_references' migrations/019_model_references.sql
+          grep -n 'conversation_model_reference_overrides' migrations/019_model_references.sql
+          grep -n 'class ReferenceContextService' app/services/reference_context.py
+          grep -n 'MAX_TOTAL_MODEL_CHARS' app/services/reference_context.py
+          grep -n 'SKILL.md' app/services/reference_context.py
+          grep -n '/references' app/api/routes/reference_context.py
+          grep -n 'reference_context_router' app/api/router.py
+
+      - name: Verify model reference prompt precedence
+        run: |
+          grep -n 'lower-priority user-provided context' app/services/openai_chat_provider.py
+          grep -n 'user isolation' app/services/openai_chat_provider.py
+          grep -n 'canonical evidence' app/services/openai_chat_provider.py
+          grep -n 'model_references' app/services/analysis.py
+          grep -n 'model_references' app/services/analysis_strategy.py
+          grep -n 'model_references' app/services/analysis_recommendation.py
+          grep -n 'model_references' app/services/analysis_action_plan.py
+          grep -n 'model_references' app/services/analysis_strategic_reply.py
+
+      - name: Verify reference settings UI contract
+        run: |
+          grep -n 'REFERENCE_CONTEXT_STYLE' app/ui/reference_context_workspace.py
+          grep -n 'files.multiple = true' app/ui/reference_context_workspace.py
+          grep -n '当前会话启用' app/ui/reference_context_workspace.py
+          grep -n '当前会话禁用' app/ui/reference_context_workspace.py
+          grep -n 'REFERENCE_CONTEXT_SCRIPT' app/ui/routes.py
+          python - <<'PY'
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+          html = PRODUCT_SHELL_WITH_CONTENT_HTML
+          assert '参考资料 / Skills' in html
+          assert 'reference-context-settings' in html
+          assert 'files.multiple = true' in html
+          assert '可同时启用多个文档、多个 Skill，或混合参考' in html
+          print('TEST-197 reference settings UI contract: PASS')
+          PY
+
+      - name: TEST-197 focused
+        run: >-
+          pytest -q
+          tests/test_197_reference_skills_context.py
+          tests/test_196_single_media_entry_chat_time_import.py
+          tests/test_195_media_chat_message_import.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_175_multi_provider_byok.py
+          tests/test_165_qwen37_nonthinking_analysis.py
+          tests/test_analysis_llm.py
+          tests/test_analysis_strategy.py
+          tests/test_analysis_recommendation.py
+          tests/test_analysis_strategic_reply.py
+          tests/test_analysis_action_plan.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
