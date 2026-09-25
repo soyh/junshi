@@ -24,6 +24,10 @@ MEDIA_UPLOAD_WORKSPACE_STYLE = r'''
       align-items: end;
     }
 
+    #client-media-sent-at {
+      min-height: 42px;
+    }
+
     #client-media-actions {
       display: flex;
       flex-wrap: wrap;
@@ -78,6 +82,63 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
       throw error;
     }
     return data;
+  }
+
+  function clientPadDateTimePart(value) {
+    return String(value).padStart(2, '0');
+  }
+
+  function clientCurrentLocalDateTimeValue(now = new Date()) {
+    if (!(now instanceof Date) || Number.isNaN(now.getTime())) return '';
+    return [
+      now.getFullYear(),
+      clientPadDateTimePart(now.getMonth() + 1),
+      clientPadDateTimePart(now.getDate()),
+    ].join('-') + 'T' + [
+      clientPadDateTimePart(now.getHours()),
+      clientPadDateTimePart(now.getMinutes()),
+      clientPadDateTimePart(now.getSeconds()),
+    ].join(':');
+  }
+
+  function clientLocalDateTimeToIsoWithOffset(value) {
+    const match = String(value || '').trim().match(
+      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/,
+    );
+    if (!match) throw new Error('证据时间无效，请重新选择日期和时间');
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6] || '0');
+    const localDate = new Date(year, month - 1, day, hour, minute, second, 0);
+
+    if (
+      Number.isNaN(localDate.getTime())
+      || localDate.getFullYear() !== year
+      || localDate.getMonth() !== month - 1
+      || localDate.getDate() !== day
+      || localDate.getHours() !== hour
+      || localDate.getMinutes() !== minute
+      || localDate.getSeconds() !== second
+    ) {
+      throw new Error('证据时间无效，请重新选择日期和时间');
+    }
+
+    const offsetMinutes = -localDate.getTimezoneOffset();
+    const sign = offsetMinutes >= 0 ? '+' : '-';
+    const absoluteOffset = Math.abs(offsetMinutes);
+    const offsetHours = clientPadDateTimePart(Math.floor(absoluteOffset / 60));
+    const offsetRemainder = clientPadDateTimePart(absoluteOffset % 60);
+
+    return `${clientCurrentLocalDateTimeValue(localDate)}${sign}${offsetHours}:${offsetRemainder}`;
+  }
+
+  function clientResetMediaSentAtToNow() {
+    const sentAtInput = byId('client-media-sent-at');
+    if (sentAtInput) sentAtInput.value = clientCurrentLocalDateTimeValue();
   }
 
   function clientRenderMedia(items) {
@@ -153,6 +214,8 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
     const files = Array.from(input?.files || []);
     if (files.length === 0) throw new Error('请选择聊天截图、图片或视频');
 
+    const localSentAt = sentAtInput?.value?.trim();
+    const sentAt = localSentAt ? clientLocalDateTimeToIsoWithOffset(localSentAt) : null;
     const conversationId = selectedConversationId;
     let completed = 0;
     for (let index = 0; index < files.length; index += 1) {
@@ -160,7 +223,6 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
       status.textContent = `正在上传 ${index + 1}/${files.length}：${file.name}`;
       const form = new FormData();
       form.append('file', file, file.name);
-      const sentAt = sentAtInput?.value?.trim();
       if (sentAt) form.append('sent_at', sentAt);
 
       const attachment = await clientMediaApi(
@@ -174,7 +236,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
     }
 
     input.value = '';
-    if (sentAtInput) sentAtInput.value = '';
+    clientResetMediaSentAtToNow();
     await clientLoadMedia();
     if (typeof loadMessages === 'function') await loadMessages(currentMessageWindow || {});
     status.textContent = `已完成 ${completed} 个附件的上传与视觉识别；识别结果已作为媒体证据加入当前会话。`;
@@ -218,10 +280,13 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
     const sentAtWrap = document.createElement('div');
     const sentAtLabel = document.createElement('label');
     sentAtLabel.htmlFor = 'client-media-sent-at';
-    sentAtLabel.textContent = '证据时间（可选 ISO 8601）';
+    sentAtLabel.textContent = '证据时间（默认当前本地时间）';
     const sentAtInput = document.createElement('input');
     sentAtInput.id = 'client-media-sent-at';
-    sentAtInput.placeholder = '2026-09-24T00:00:00+08:00';
+    sentAtInput.type = 'datetime-local';
+    sentAtInput.step = '1';
+    sentAtInput.value = clientCurrentLocalDateTimeValue();
+    sentAtInput.title = '默认使用当前本地时间，可直接修改日期或时分秒。';
     sentAtInput.autocomplete = 'off';
     sentAtInput.className = 'requires-auth';
     sentAtInput.disabled = !currentAccessToken;
