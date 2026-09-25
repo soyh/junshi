@@ -1,0 +1,77 @@
+name: TEST-192 Settings Panel Isolation CI
+
+on:
+  push:
+    branches:
+      - test-192-settings-panel-isolation
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-192 migration and dependency scope
+        run: |
+          migrations="$(git -C .. diff --name-only 7f54da45d84e570c658ad3f0d063320787259968..HEAD -- backend/migrations)"
+          requirements="$(git -C .. diff --name-only 7f54da45d84e570c658ad3f0d063320787259968..HEAD -- backend/requirements.txt)"
+          printf 'migration changes:\n%s\n' "$migrations"
+          printf 'requirements changes:\n%s\n' "$requirements"
+          test -z "$migrations"
+          test -z "$requirements"
+
+      - name: Verify settings panel isolation contract
+        run: |
+          grep -n 'TEST-192: every settings tab owns one normal-flow panel' app/ui/viewport_safe_ui_polish.py
+          grep -n '#client-settings-host #guided-settings-panel-host > fieldset' app/ui/viewport_safe_ui_polish.py
+          grep -n 'position: static !important' app/ui/viewport_safe_ui_polish.py
+          grep -n 'inset: auto !important' app/ui/viewport_safe_ui_polish.py
+          grep -n 'fieldset\[hidden\]' app/ui/viewport_safe_ui_polish.py
+          grep -n 'fieldset:not(\[hidden\])' app/ui/viewport_safe_ui_polish.py
+          python - <<'PY'
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+
+          html = PRODUCT_SHELL_WITH_CONTENT_HTML
+          assert "TEST-192: every settings tab owns one normal-flow panel" in html
+          assert "position: static !important;" in html
+          assert "inset: auto !important;" in html
+          assert "#client-settings-host #guided-settings-panel-host > fieldset[hidden]" in html
+          assert "#client-settings-host #guided-settings-panel-host > fieldset:not([hidden])" in html
+          assert "installSharedSettingsTabs();" in html
+          assert "installMultiProviderSettings();" in html
+          assert "installDualModelSettings();" in html
+          assert "#client-unified-message-history > summary::before" in html
+          assert "#client-media-file::file-selector-button" in html
+          print("TEST-192 composed settings isolation contract: PASS")
+          PY
+
+      - name: TEST-192 focused
+        run: >-
+          pytest -q
+          tests/test_192_settings_panel_isolation.py
+          tests/test_191_viewport_safe_ui_polish.py
+          tests/test_190_settings_overlay_conversation_polish.py
+          tests/test_189_dual_model_settings_ui_refactor.py
+          tests/test_188_dual_model_settings_tab_mount.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q
