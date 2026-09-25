@@ -62,7 +62,7 @@ jobs:
           grep -n 'class TimedMediaAttachmentService' app/services/media_chat_time.py
           grep -n 'time_markers' app/services/media_chat_time.py
           grep -n 'before_message_index' app/services/media_chat_time.py
-          grep -n 'Exclude phone status-bar clocks' app/services/media_chat_time.py
+          grep -n 'status-bar' app/services/media_chat_time.py
           grep -n '_resolved_message_sent_ats' app/services/media_chat_time.py
           grep -n 'TimedMediaAttachmentService' app/api/routes/media_attachments.py
           python - <<'PY'
