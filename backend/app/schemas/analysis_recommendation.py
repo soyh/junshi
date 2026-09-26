@@ -8,4 +8,5 @@ from app.schemas.structured_analysis import StructuredAnalysis
 class AnalysisRecommendationContextResponse(RecommendationContextResponse):
     structured_analysis: StructuredAnalysis
     recommendation_constraints: dict[str, Any]
-    model_references: ModelReferenceContextResponse
+    # Legacy analysis contexts may not carry reference metadata.
+    model_references: ModelReferenceContextResponse | None = None

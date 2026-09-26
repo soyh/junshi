@@ -71,10 +71,7 @@ class AnalysisActionPlanService:
         result["recommendations"] = recommendations
         result["action_plan"] = action_plan
         result["learning_strategy"] = analysis_context["learning_strategy"]
-        result["model_references"] = analysis_context.get(
-            "model_references",
-            {"items": []},
-        )
+        result["model_references"] = analysis_context.get("model_references")
         result["structured_analysis"] = analysis
         result["action_plan_inputs"] = {
             "summary": analysis["summary"],

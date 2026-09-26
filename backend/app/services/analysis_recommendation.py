@@ -74,7 +74,7 @@ class AnalysisRecommendationService:
                 "strategy_decision_learning": strategy_context.get("decision_inputs", {}),
                 "constraints": strategy_context["strategy_constraints"],
             },
-            "model_references": analysis_context.get("model_references", {"items": []}),
+            "model_references": analysis_context.get("model_references"),
             "structured_analysis": analysis,
             "recommendation_constraints": {
                 "must_be_evidence_backed": True,

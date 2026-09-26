@@ -37,8 +37,5 @@ class AnalysisStrategyService:
             person_id,
             structured_analysis=structured_analysis,
         )
-        result["model_references"] = analysis_context.get(
-            "model_references",
-            {"items": []},
-        )
+        result["model_references"] = analysis_context.get("model_references")
         return result

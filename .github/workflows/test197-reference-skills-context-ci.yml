@@ -81,6 +81,14 @@ jobs:
         run: >-
           pytest -q
           tests/test_197_reference_skills_context.py
+          tests/test_197_reference_response_compatibility.py
+          tests/test_analysis_action_plan_route.py
+          tests/test_analysis_strategic_reply_route.py
+          tests/test_analysis_strategy_route.py
+          tests/test_authenticated_action_plan_workspace.py
+          tests/test_authenticated_action_reanalysis_workspace.py
+          tests/test_authenticated_strategic_reply_workspace.py
+          tests/test_authenticated_strategy_recommendation_workspace.py
           tests/test_196_single_media_entry_chat_time_import.py
           tests/test_195_media_chat_message_import.py
           tests/test_180_media_upload_dual_model_settings_ui.py

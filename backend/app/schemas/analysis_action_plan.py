@@ -18,4 +18,5 @@ class AnalysisActionPlanContextResponse(ActionPlanContextResponse):
     action_constraints: AnalysisActionPlanConstraints
     structured_analysis: StructuredAnalysis
     action_plan_inputs: dict[str, Any]
-    model_references: ModelReferenceContextResponse
+    # Legacy analysis contexts may not carry reference metadata.
+    model_references: ModelReferenceContextResponse | None = None
