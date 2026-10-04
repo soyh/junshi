@@ -12,7 +12,7 @@ text = '# 完整内容\n' + '正文\n' * 1000 + '<script>window.injected=true</s
 with sync_playwright() as p:
     browser = p.chromium.launch()
     page = browser.new_page(viewport={'width': 1280, 'height': 900})
-    page.route('**/api/v1/references**', lambda route: route.fulfill(
+    page.route('**/api/v1/**', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps(
             {'id': '0', 'content': text} if route.request.url.endswith('/content') else items)))
     page.route('http://reference.test/', lambda route: route.fulfill(body='<html><body></body></html>', content_type='text/html'))
