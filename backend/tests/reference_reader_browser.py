@@ -25,7 +25,12 @@ with sync_playwright() as p:
     page.locator('#reference-search').fill('original-0.md')
     assert page.locator('.reference-row:visible').count() == 1
     page.locator('.reference-reader summary').first.click()
-    page.wait_for_function("document.querySelector('.reference-fulltext').textContent.includes('<script>')")
+    try:
+        page.wait_for_function("document.querySelector('.reference-fulltext').textContent.includes('<script>')", timeout=5000)
+    except Exception:
+        print('READER DEBUG', page.locator('.reference-reader').first.evaluate('(e)=>e.outerHTML'), flush=True)
+        print('PAGE URL', page.url, flush=True)
+        raise
     assert page.locator('.reference-fulltext').first.text_content() == text
     assert page.evaluate('window.injected') is None
     page.locator('.reference-reader summary').first.click()
