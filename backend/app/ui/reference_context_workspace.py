@@ -1,5 +1,7 @@
 REFERENCE_CONTEXT_STYLE = r'''
     #reference-context-settings {
+      grid-column: 1 / -1;
+      min-width: 0;
       margin-top: 18px;
       padding: 16px;
       border: 1px solid rgba(25, 167, 232, .20);
@@ -42,8 +44,46 @@ REFERENCE_CONTEXT_STYLE = r'''
 
     #reference-list {
       display: grid;
+      align-content: start;
       gap: 10px;
       margin-top: 12px;
+      min-height: 360px;
+      height: 60vh;
+      max-height: 80vh;
+      overflow: auto;
+      resize: vertical;
+      padding: 4px 8px 12px 0;
+      white-space: normal;
+    }
+
+    #reference-list .reference-row[hidden] { display: none !important; }
+    #reference-list .reference-head { flex-wrap: wrap; }
+    #reference-list .reference-row { min-width: 0; }
+    #reference-list .reference-filename { overflow-wrap: anywhere; color: #475569; }
+    #reference-list .reference-reader summary { cursor: pointer; padding: 10px 0; font-weight: 700; }
+    #reference-list .reference-fulltext {
+      box-sizing: border-box;
+      width: 100%;
+      height: 45vh;
+      min-height: 200px;
+      max-height: 70vh;
+      overflow: auto;
+      resize: vertical;
+      padding: 16px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #fff;
+      color: #1e293b;
+      font: 14px/1.8 system-ui, sans-serif;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    #reference-search { box-sizing: border-box; width: 100%; margin-top: 8px; }
+    #reference-filter-count { margin: 8px 0; color: #475569; }
+    @media (max-width: 600px) {
+      #reference-context-settings { padding: 10px; }
+      #reference-list { min-height: 260px; height: 55vh; }
+      #reference-list .reference-fulltext { padding: 10px; }
     }
 
     #reference-list .reference-row {
@@ -82,10 +122,10 @@ REFERENCE_CONTEXT_STYLE = r'''
     }
 
     #reference-list .reference-preview {
-      max-height: 4.8em;
-      overflow: hidden;
+      max-height: 10em;
+      overflow: auto;
       color: #64748b;
-      font-size: .78rem;
+      font-size: .9rem;
       line-height: 1.55;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
@@ -120,6 +160,20 @@ REFERENCE_CONTEXT_STYLE = r'''
 
 
 REFERENCE_CONTEXT_SCRIPT = r'''
+  function clientFilterReferences() {
+    const query = (byId('reference-search')?.value || '').trim().toLocaleLowerCase();
+    const rows = Array.from(byId('reference-list')?.querySelectorAll('.reference-row') || []);
+    let visible = 0;
+    rows.forEach((row) => {
+      row.hidden = !row.dataset.searchText.includes(query);
+      if (!row.hidden) visible += 1;
+    });
+    const count = byId('reference-filter-count');
+    if (count) count.textContent = rows.length
+      ? `显示 ${visible} / ${rows.length} 个文件${visible ? '' : '，没有匹配的文件'}`
+      : '暂无文件';
+  }
+
   async function clientReferenceApi(path, options = {}) {
     const headers = new Headers(options.headers || {});
     headers.set('Authorization', `Bearer ${requireToken()}`);
@@ -158,6 +212,7 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     list.replaceChildren();
     if (!Array.isArray(items) || !items.length) {
       list.textContent = '还没有参考资料或 Skill。';
+      clientFilterReferences();
       return;
     }
 
@@ -165,6 +220,7 @@ REFERENCE_CONTEXT_SCRIPT = r'''
       const row = document.createElement('div');
       row.className = 'reference-row';
       row.dataset.referenceId = item.id;
+      row.dataset.searchText = [item.name, item.original_filename, item.description].filter(Boolean).join(' ').toLocaleLowerCase();
 
       const head = document.createElement('div');
       head.className = 'reference-head';
@@ -179,6 +235,38 @@ REFERENCE_CONTEXT_SCRIPT = r'''
       const preview = document.createElement('div');
       preview.className = 'reference-preview';
       preview.textContent = item.content_preview || '(无预览)';
+
+      const filename = document.createElement('div');
+      filename.className = 'reference-filename';
+      filename.textContent = `${item.original_filename || item.name} · ${item.content_chars || 0} 字符`;
+      const reader = document.createElement('details');
+      reader.className = 'reference-reader';
+      const summary = document.createElement('summary');
+      summary.textContent = '展开全文';
+      const fulltext = document.createElement('pre');
+      fulltext.className = 'reference-fulltext';
+      fulltext.tabIndex = 0;
+      fulltext.setAttribute('aria-label', `${item.name} 全文`);
+      let readSequence = 0;
+      reader.append(summary, fulltext);
+      reader.addEventListener('toggle', async () => {
+        const sequence = ++readSequence;
+        summary.textContent = reader.open ? '收起全文' : '展开全文';
+        fulltext.textContent = '';
+        if (!reader.open) return;
+        const token = currentAccessToken;
+        fulltext.textContent = '正在加载全文…';
+        try {
+          const data = await clientReferenceApi(`/api/v1/references/${encodeURIComponent(item.id)}/content`);
+          if (sequence === readSequence && reader.open && row.isConnected && token === currentAccessToken) {
+            fulltext.textContent = data.content || '(内容为空)';
+          }
+        } catch (error) {
+          if (sequence === readSequence && reader.open && row.isConnected && token === currentAccessToken) {
+            fulltext.textContent = `加载失败：${error instanceof Error ? error.message : String(error)}。请收起后重新展开。`;
+          }
+        }
+      });
 
       const meta = document.createElement('div');
       meta.className = 'reference-meta-grid';
@@ -304,9 +392,10 @@ REFERENCE_CONTEXT_SCRIPT = r'''
         }
       });
 
-      row.append(head, preview, meta, detail);
+      row.append(head, filename, preview, reader, meta, detail);
       list.appendChild(row);
     });
+    clientFilterReferences();
   }
 
   async function clientLoadReferences() {
@@ -462,10 +551,24 @@ REFERENCE_CONTEXT_SCRIPT = r'''
 
     const list = document.createElement('div');
     list.id = 'reference-list';
-    list.className = 'status';
+    list.setAttribute('role', 'region');
+    list.setAttribute('aria-label', '已上传的参考资料');
+    list.tabIndex = 0;
     list.textContent = '还没有参考资料或 Skill。';
 
-    section.append(heading, note, grid, actions, status, list);
+    const searchLabel = document.createElement('label');
+    searchLabel.htmlFor = 'reference-search';
+    searchLabel.textContent = '查找已上传文件';
+    const search = document.createElement('input');
+    search.id = 'reference-search';
+    search.type = 'search';
+    search.placeholder = '输入文件名或说明';
+    search.addEventListener('input', clientFilterReferences);
+    const count = document.createElement('div');
+    count.id = 'reference-filter-count';
+    count.setAttribute('aria-live', 'polite');
+    count.textContent = '暂无文件';
+    section.append(heading, note, grid, actions, status, searchLabel, search, count, list);
     provider.appendChild(section);
 
     upload.addEventListener('click', async () => {

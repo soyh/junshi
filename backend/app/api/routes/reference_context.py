@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
@@ -20,6 +20,20 @@ from app.services.reference_context import (
 
 router = APIRouter(tags=["model-references"])
 service = ReferenceContextService()
+
+
+@router.get("/references/{reference_id}/content", response_model=dict[str, str])
+def get_model_reference_content(
+    reference_id: str,
+    response: Response,
+    user_id: str = Depends(get_current_user_id),
+):
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        with get_connection() as conn:
+            return service.get_content(conn, user_id, reference_id)
+    except ReferenceContextError as exc:
+        raise _not_found_or_unprocessable(exc) from exc
 
 
 def _not_found_or_unprocessable(exc: ReferenceContextError) -> HTTPException:

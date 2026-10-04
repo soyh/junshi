@@ -237,6 +237,10 @@ class ReferenceContextService:
             raise ReferenceNotFoundError("Reference not found")
         return row
 
+    def get_content(self, conn: sqlite3.Connection, user_id: str, reference_id: str) -> dict[str, str]:
+        row = self._get_raw(conn, user_id, reference_id)
+        return {"id": row["id"], "content": row["content"] or ""}
+
     @staticmethod
     def _to_public_item(
         row: sqlite3.Row,
