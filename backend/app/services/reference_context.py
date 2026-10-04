@@ -259,7 +259,7 @@ class ReferenceContextService:
             elif scope == "global":
                 self.update(conn, user_id, reference_id, {"enabled_by_default": action == "enable"})
             elif action == "inherit":
-                self.clear_conversation_override(conn, user_id, conversation_id, reference_id)
+                self.clear_conversation_override(conn, user_id=user_id, conversation_id=conversation_id, reference_id=reference_id)
             else:
                 previous = conn.execute(
                     "SELECT priority FROM conversation_model_reference_overrides "
