@@ -56,6 +56,15 @@ REFERENCE_CONTEXT_STYLE = r'''
       white-space: normal;
     }
 
+    #reference-batch-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+    #reference-batch-toolbar button { margin: 0 !important; }
+    #reference-batch-toolbar select { width: auto; max-width: 100%; }
+    #reference-list .reference-select { flex: 0 0 auto; width: auto; margin: 0; }
+    #reference-list .reference-title { flex: 1; }
+    #reference-list .reference-head { justify-content: flex-start; }
+    #reference-list .reference-item-settings summary { cursor: pointer; padding: 8px 0; }
+    #reference-list .reference-item-settings[open] { padding-bottom: 8px; }
+    #reference-selected-count { margin: 8px 0; }
     #reference-list .reference-row[hidden] { display: none !important; }
     #reference-list .reference-head { flex-wrap: wrap; }
     #reference-list .reference-row { min-width: 0; }
@@ -160,18 +169,80 @@ REFERENCE_CONTEXT_STYLE = r'''
 
 
 REFERENCE_CONTEXT_SCRIPT = r'''
+  let referenceBatchBusy = false;
+
   function clientFilterReferences() {
     const query = (byId('reference-search')?.value || '').trim().toLocaleLowerCase();
     const rows = Array.from(byId('reference-list')?.querySelectorAll('.reference-row') || []);
     let visible = 0;
     rows.forEach((row) => {
-      row.hidden = !row.dataset.searchText.includes(query);
+      const type = byId('reference-type-filter')?.value || 'all';
+      row.hidden = !row.dataset.searchText.includes(query) || (type !== 'all' && row.dataset.referenceType !== type);
       if (!row.hidden) visible += 1;
     });
     const count = byId('reference-filter-count');
     if (count) count.textContent = rows.length
       ? `显示 ${visible} / ${rows.length} 个文件${visible ? '' : '，没有匹配的文件'}`
       : '暂无文件';
+    clientReferenceSelectionChanged();
+  }
+
+  function clientReferenceSelectionChanged() {
+    const selected = Array.from(document.querySelectorAll('#reference-list .reference-select:checked'));
+    const hidden = selected.filter((input) => input.closest('.reference-row').hidden).length;
+    const count = byId('reference-selected-count');
+    if (count) count.textContent = `已选 ${selected.length} 项${hidden ? `（其中 ${hidden} 项不在当前筛选中）` : ''}`;
+    document.querySelectorAll('[data-reference-batch]').forEach((button) => {
+      button.disabled = referenceBatchBusy || !currentAccessToken || !selected.length;
+    });
+  }
+
+  function clientReferenceSelectVisible(mode) {
+    document.querySelectorAll('#reference-list .reference-row').forEach((row) => {
+      const input = row.querySelector('.reference-select');
+      if (mode === 'clear') input.checked = false;
+      else if (!row.hidden) input.checked = mode === 'all' ? true : !input.checked;
+    });
+    clientReferenceSelectionChanged();
+  }
+
+  async function clientReferenceBatch(action) {
+    if (referenceBatchBusy) return;
+    const ids = Array.from(document.querySelectorAll('#reference-list .reference-select:checked'))
+      .map((input) => input.closest('.reference-row').dataset.referenceId);
+    if (!ids.length) return;
+    const scope = action === 'delete' ? 'global' : byId('reference-batch-scope').value;
+    const conversation = selectedConversationId;
+    const token = currentAccessToken;
+    const status = byId('reference-status');
+    if (scope === 'conversation' && !conversation) {
+      status.textContent = '请先选择会话。'; return;
+    }
+    if (action === 'inherit' && scope !== 'conversation') {
+      status.textContent = '恢复跟随全局仅适用于当前会话。'; return;
+    }
+    if (ids.length > 500) { status.textContent = '每次最多操作 500 项，请缩小选择范围。'; return; }
+    if (action === 'delete' && !window.confirm(`确定永久删除选中的 ${ids.length} 个文档 / Skill？包含当前筛选隐藏的选中项；删除后所有会话都无法再使用这些资料。`)) return;
+    referenceBatchBusy = true;
+    const controls = Array.from(document.querySelectorAll('#reference-context-settings input, #reference-context-settings select, #reference-context-settings button, #conversation-select'));
+    const previous = controls.map((control) => control.disabled);
+    controls.forEach((control) => { control.disabled = true; });
+    status.textContent = `正在处理 ${ids.length} 项…`;
+    try {
+      const result = await clientReferenceApi('/api/v1/references/batch', {
+        method: 'POST',
+        body: JSON.stringify({reference_ids: ids, action, scope, conversation_id: scope === 'conversation' ? conversation : null}),
+      });
+      if (token !== currentAccessToken || conversation !== selectedConversationId) return;
+      await clientLoadReferences();
+      status.textContent = `已完成 ${result.updated_count} 项批量操作。下一次分析或回复使用更新后的设置。`;
+    } catch (error) {
+      if (token === currentAccessToken) status.textContent = `批量操作未确认成功：${error instanceof Error ? error.message : String(error)}。可刷新核对状态。`;
+    } finally {
+      referenceBatchBusy = false;
+      controls.forEach((control, index) => { control.disabled = token === currentAccessToken ? previous[index] : true; });
+      clientReferenceSelectionChanged();
+    }
   }
 
   async function clientReferenceApi(path, options = {}) {
@@ -220,21 +291,25 @@ REFERENCE_CONTEXT_SCRIPT = r'''
       const row = document.createElement('div');
       row.className = 'reference-row';
       row.dataset.referenceId = item.id;
+      row.dataset.referenceType = item.reference_type;
       row.dataset.searchText = [item.name, item.original_filename, item.description].filter(Boolean).join(' ').toLocaleLowerCase();
 
       const head = document.createElement('div');
       head.className = 'reference-head';
       const title = document.createElement('div');
       title.className = 'reference-title';
-      title.textContent = item.name;
+      title.textContent = item.original_filename || item.name;
+      title.title = item.name;
+      const select = document.createElement('input');
+      select.type = 'checkbox';
+      select.className = 'reference-select requires-auth';
+      select.disabled = !currentAccessToken;
+      select.setAttribute('aria-label', `选择 ${item.original_filename || item.name}`);
+      select.addEventListener('change', clientReferenceSelectionChanged);
       const badge = document.createElement('span');
       badge.className = 'reference-badge';
       badge.textContent = item.reference_type === 'skill' ? 'SKILL · 方法约束' : 'DOCUMENT · 参考资料';
-      head.append(title, badge);
-
-      const preview = document.createElement('div');
-      preview.className = 'reference-preview';
-      preview.textContent = item.content_preview || '(无预览)';
+      head.append(select, title);
 
       const filename = document.createElement('div');
       filename.className = 'reference-filename';
@@ -392,7 +467,12 @@ REFERENCE_CONTEXT_SCRIPT = r'''
         }
       });
 
-      row.append(head, filename, preview, reader, meta, detail);
+      const settings = document.createElement('details');
+      settings.className = 'reference-item-settings';
+      const settingsSummary = document.createElement('summary');
+      settingsSummary.textContent = '设置';
+      settings.append(settingsSummary, badge, filename, meta, detail);
+      row.append(head, reader, settings);
       list.appendChild(row);
     });
     clientFilterReferences();
@@ -405,8 +485,16 @@ REFERENCE_CONTEXT_SCRIPT = r'''
       if (status) status.textContent = '登录后可以管理参考资料与 Skills。';
       return [];
     }
+    const token = currentAccessToken;
+    const conversation = selectedConversationId;
     const items = await clientReferenceApi(`/api/v1/references${clientReferenceConversationQuery()}`);
+    if (token !== currentAccessToken || conversation !== selectedConversationId) return [];
     clientRenderReferences(items);
+    const scope = byId('reference-batch-scope');
+    if (scope) {
+      scope.querySelector('option[value="conversation"]').disabled = !selectedConversationId;
+      if (!selectedConversationId) scope.value = 'global';
+    }
     const enabled = items.filter((item) => item.effective_enabled).length;
     if (status) {
       status.textContent = selectedConversationId
@@ -568,7 +656,41 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     count.id = 'reference-filter-count';
     count.setAttribute('aria-live', 'polite');
     count.textContent = '暂无文件';
-    section.append(heading, note, grid, actions, status, searchLabel, search, count, list);
+    const typeFilter = document.createElement('select');
+    typeFilter.id = 'reference-type-filter';
+    typeFilter.setAttribute('aria-label', '文件类型筛选');
+    [['all', '全部类型'], ['document', '只看文档'], ['skill', '只看 Skill']].forEach(([value, label]) => {
+      const option = document.createElement('option'); option.value = value; option.textContent = label; typeFilter.append(option);
+    });
+    typeFilter.addEventListener('change', clientFilterReferences);
+    const toolbar = document.createElement('div');
+    toolbar.id = 'reference-batch-toolbar';
+    [['all', '全选当前结果'], ['invert', '反选当前结果'], ['clear', '清空全部选择']].forEach(([mode, label]) => {
+      const button = document.createElement('button');
+      button.type = 'button'; button.id = `reference-select-${mode}`; button.textContent = label;
+      button.addEventListener('click', () => clientReferenceSelectVisible(mode));
+      toolbar.append(button);
+    });
+    const scopeLabel = document.createElement('label');
+    scopeLabel.htmlFor = 'reference-batch-scope'; scopeLabel.textContent = '启用 / 禁用作用范围';
+    const scope = document.createElement('select');
+    scope.id = 'reference-batch-scope';
+    [['conversation', '当前会话'], ['global', '全局默认']].forEach(([value, label]) => {
+      const option = document.createElement('option'); option.value = value; option.textContent = label;
+      option.disabled = value === 'conversation' && !selectedConversationId; scope.append(option);
+    });
+    scope.value = selectedConversationId ? 'conversation' : 'global';
+    toolbar.append(scopeLabel, scope);
+    [['enable', '批量启用'], ['disable', '批量禁用'], ['inherit', '恢复跟随全局'], ['delete', '删除选中资料']].forEach(([action, label]) => {
+      const button = document.createElement('button'); button.type = 'button';
+      button.id = `reference-batch-${action}`; button.dataset.referenceBatch = action;
+      button.textContent = label; button.disabled = true;
+      button.addEventListener('click', () => clientReferenceBatch(action)); toolbar.append(button);
+    });
+    const selectedCount = document.createElement('div');
+    selectedCount.id = 'reference-selected-count'; selectedCount.setAttribute('aria-live', 'polite');
+    selectedCount.textContent = '已选 0 项';
+    section.append(heading, note, grid, actions, status, searchLabel, search, typeFilter, count, toolbar, selectedCount, list);
     provider.appendChild(section);
 
     upload.addEventListener('click', async () => {

@@ -237,6 +237,42 @@ class ReferenceContextService:
             raise ReferenceNotFoundError("Reference not found")
         return row
 
+    def batch_update(
+        self, conn: sqlite3.Connection, user_id: str, reference_ids: list[str],
+        action: str, scope: str, conversation_id: str | None = None,
+    ) -> int:
+        ids = list(dict.fromkeys(reference_ids))
+        if scope == "conversation":
+            if not conversation_id:
+                raise ReferenceContextError("conversation_id is required")
+            self._ensure_conversation(conn, user_id, conversation_id)
+        if action == "inherit" and scope != "conversation":
+            raise ReferenceContextError("inherit requires conversation scope")
+        if action == "delete" and scope != "global":
+            raise ReferenceContextError("delete requires global scope")
+        # Validate the entire selection before changing any row.
+        for reference_id in ids:
+            self._get_raw(conn, user_id, reference_id)
+        for reference_id in ids:
+            if action == "delete":
+                self.delete(conn, user_id, reference_id)
+            elif scope == "global":
+                self.update(conn, user_id, reference_id, {"enabled_by_default": action == "enable"})
+            elif action == "inherit":
+                self.clear_conversation_override(conn, user_id, conversation_id, reference_id)
+            else:
+                previous = conn.execute(
+                    "SELECT priority FROM conversation_model_reference_overrides "
+                    "WHERE user_id = ? AND conversation_id = ? AND reference_id = ?",
+                    (user_id, conversation_id, reference_id),
+                ).fetchone()
+                self.set_conversation_override(
+                    conn, user_id=user_id, conversation_id=conversation_id,
+                    reference_id=reference_id, enabled=action == "enable",
+                    priority=previous["priority"] if previous else None,
+                )
+        return len(ids)
+
     def get_content(self, conn: sqlite3.Connection, user_id: str, reference_id: str) -> dict[str, str]:
         row = self._get_raw(conn, user_id, reference_id)
         return {"id": row["id"], "content": row["content"] or ""}

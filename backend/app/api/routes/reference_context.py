@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
 from app.schemas.reference_context import (
+    ReferenceBatchUpdate,
     ConversationReferenceOverrideUpdate,
     ModelReferenceContextResponse,
     ModelReferenceResponse,
@@ -20,6 +21,22 @@ from app.services.reference_context import (
 
 router = APIRouter(tags=["model-references"])
 service = ReferenceContextService()
+
+
+@router.post("/references/batch", response_model=dict[str, int])
+def batch_update_model_references(
+    payload: ReferenceBatchUpdate,
+    user_id: str = Depends(get_current_user_id),
+):
+    try:
+        with get_connection() as conn:
+            count = service.batch_update(
+                conn, user_id, payload.reference_ids, payload.action,
+                payload.scope, payload.conversation_id,
+            )
+        return {"updated_count": count}
+    except ReferenceContextError as exc:
+        raise _not_found_or_unprocessable(exc) from exc
 
 
 @router.get("/references/{reference_id}/content", response_model=dict[str, str])

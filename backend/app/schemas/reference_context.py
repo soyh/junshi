@@ -46,3 +46,10 @@ class ModelReferenceContextResponse(BaseModel):
     count: int
     policy: dict[str, str]
     items: list[dict]
+
+
+class ReferenceBatchUpdate(BaseModel):
+    reference_ids: list[str] = Field(min_length=1, max_length=500)
+    action: Literal["enable", "disable", "inherit", "delete"]
+    scope: Literal["global", "conversation"] = "global"
+    conversation_id: str | None = None
