@@ -60,6 +60,7 @@ def test_test202_final_override_is_composed_after_verified_settings_layers():
 
     assert style.index("TEST-193: settings navigation") < style.index("TEST-202: settings navigation")
     assert "TEST-202: settings navigation stays visible and touch-friendly on phones" in html
+    assert html.index("#dual-model-settings .dual-model-actions {") < html.index("TEST-202: settings navigation")
     assert "installSharedSettingsTabs();" in html
     assert "installMultiProviderSettings();" in html
     assert "installDualModelSettings();" in html
