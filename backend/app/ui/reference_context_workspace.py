@@ -808,7 +808,7 @@ REFERENCE_CONTEXT_SCRIPT = r'''
       const option = document.createElement('option'); option.value = value; option.textContent = label;
       option.disabled = value === 'conversation' && !selectedConversationId; scope.append(option);
     });
-    scope.value = selectedConversationId ? 'conversation' : 'global';
+    scope.value = 'global';
     toolbar.append(scopeLabel, scope);
     [['enable', '批量启用'], ['disable', '批量禁用'], ['inherit', '恢复跟随全局'], ['delete', '删除选中资料']].forEach(([action, label]) => {
       const button = document.createElement('button'); button.type = 'button';

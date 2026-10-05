@@ -68,6 +68,8 @@ with sync_playwright() as p:
     page.locator('#reference-select-invert').click()
     assert page.locator('.reference-select:checked').count() == 2
     assert '1 项不在当前筛选' in page.locator('#reference-selected-count').text_content()
+    assert page.locator('#reference-batch-scope').input_value() == 'global'
+    page.locator('#reference-batch-scope').select_option('conversation')
     page.locator('#reference-batch-disable').click()
     page.wait_for_function("document.querySelector('#reference-status').textContent.includes('已完成 2')")
     payload = json.loads(next(data for method, url, data in requests if url.endswith('/batch')))
