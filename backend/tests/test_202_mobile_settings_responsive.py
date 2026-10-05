@@ -65,4 +65,5 @@ def test_test202_final_override_is_composed_after_verified_settings_layers():
     assert "installMultiProviderSettings();" in html
     assert "installDualModelSettings();" in html
     assert 'id="account-security"' in html
-    assert 'id="dual-model-settings"' in html
+    assert 'id="provider"' in html
+    assert "dual-model-settings" in html
