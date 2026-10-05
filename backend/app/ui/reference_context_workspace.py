@@ -295,16 +295,18 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     const beforeUnload = event => { if (dirty() || saving) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload);
     const authWatch = window.setInterval(() => {
-      if (token !== currentAccessToken) { input.value = ''; dialog.close(); }
+      if (token !== currentAccessToken) closeEditor();
     }, 500);
-    dialog.addEventListener('close', () => {
+    const cleanupEditor = () => {
       window.clearInterval(authWatch); window.removeEventListener('beforeunload', beforeUnload);
       input.value = ''; dialog.remove();
-    }, {once: true});
+    };
+    const closeEditor = () => { dialog.close(); cleanupEditor(); };
+    dialog.addEventListener('close', cleanupEditor, {once: true});
     const requestClose = () => {
       if (saving) { status.textContent = '正在保存，请等待结果。'; return; }
       if (dirty() && !window.confirm('存在未保存修改，确定放弃并关闭？')) return;
-      dialog.close();
+      closeEditor();
     };
     close.addEventListener('click', requestClose);
     dialog.addEventListener('cancel', event => { event.preventDefault(); requestClose(); });
