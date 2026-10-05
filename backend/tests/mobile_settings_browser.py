@@ -55,6 +55,7 @@ with sync_playwright() as p:
         "getComputedStyle(document.querySelector('#guided-settings-tabs')).gridTemplateColumns"
         ".trim().split(/\\s+/).length === 2"
     )
+    assert panel_host.evaluate("el => getComputedStyle(el).overflowY") == "auto"
     assert_no_horizontal_overflow(page)
 
     account_tab = tabs.get_by_role("tab", name="账号安全")
@@ -111,8 +112,9 @@ with sync_playwright() as p:
     page.wait_for_timeout(100)
     assert page.evaluate(
         "(() => { const host=document.querySelector('#guided-settings-panel-host'); "
-        "const last=host.querySelector('#dual-model-settings .dual-model-actions button:last-child'); "
-        "if (!last) return false; const h=host.getBoundingClientRect(); const b=last.getBoundingClientRect(); "
+        "const buttons=host.querySelectorAll('#dual-model-settings .dual-model-actions button'); "
+        "const last=buttons[buttons.length - 1]; if (!last) return false; "
+        "const h=host.getBoundingClientRect(); const b=last.getBoundingClientRect(); "
         "return b.bottom <= h.bottom + 3 && b.top >= h.top - 3; })()"
     )
     assert_no_horizontal_overflow(page)
