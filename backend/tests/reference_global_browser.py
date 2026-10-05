@@ -146,6 +146,7 @@ with sync_playwright() as p:
     page.locator('#reference-preview-selection').click()
     page.wait_for_function("document.querySelector('#reference-retrieval-preview').textContent.includes('无需选择会话')")
     page.locator('#reference-create-guide').click()
+    page.locator('#reference-editor-input').wait_for(state='visible')
     page.wait_for_function("!document.querySelector('#reference-editor-input').disabled")
     assert 'original-24.md' in page.locator('#reference-editor-input').input_value()
     assert page.locator('#reference-editor-save').is_enabled()
