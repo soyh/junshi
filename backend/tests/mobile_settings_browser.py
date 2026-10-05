@@ -106,17 +106,19 @@ with sync_playwright() as p:
         assert_inside(button, panel_host)
         assert button.bounding_box()["height"] >= 43
 
-    page.evaluate(
-        "const host=document.querySelector('#guided-settings-panel-host'); host.scrollTop=host.scrollHeight"
-    )
+    last_action = model_grid.locator(".dual-model-actions button").last
+    initial_scroll_top = panel_host.evaluate("el => el.scrollTop")
+    last_action.scroll_into_view_if_needed()
     page.wait_for_timeout(100)
-    assert page.evaluate(
-        "(() => { const host=document.querySelector('#guided-settings-panel-host'); "
-        "const buttons=host.querySelectorAll('#dual-model-settings .dual-model-actions button'); "
-        "const last=buttons[buttons.length - 1]; if (!last) return false; "
-        "const h=host.getBoundingClientRect(); const b=last.getBoundingClientRect(); "
-        "return b.bottom <= h.bottom + 3 && b.top >= h.top - 3; })()"
-    )
+    final_scroll_top = panel_host.evaluate("el => el.scrollTop")
+    assert final_scroll_top >= initial_scroll_top
+    assert_inside(last_action, panel_host)
+    last_box = last_action.bounding_box()
+    host_box = panel_host.bounding_box()
+    assert last_box is not None and host_box is not None
+    assert last_box["y"] >= host_box["y"] - 3
+    assert last_box["y"] + last_box["height"] <= host_box["y"] + host_box["height"] + 3
+
     assert_no_horizontal_overflow(page)
     page.screenshot(path=str(ARTIFACT_DIR / "test202-model-settings-mobile.png"), full_page=True)
 
