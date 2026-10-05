@@ -1,0 +1,36 @@
+name: TEST-200 Reference Catalog Retrieval CI
+on:
+  push:
+    branches: [test-200-reference-catalog-retrieval]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Protect migrations and dependencies
+        run: |
+          test -z "$(git diff --name-only a3b1341126cf0ae656b6fbe8f2dca76b3eccf4a6 HEAD -- migrations requirements.txt)"
+      - name: Focused
+        run: pytest -q tests/test_200_reference_catalog.py tests/test_199_reference_batch.py tests/test_198_reference_library_reader.py tests/test_197_reference_skills_context.py tests/test_197_reference_response_compatibility.py
+      - name: Full suite
+        run: pytest -q
+      - name: Browser acceptance
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/reference_catalog_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reference-catalog-screenshots
+          path: /tmp/reference-catalog-*.png

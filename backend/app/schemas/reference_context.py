@@ -48,6 +48,11 @@ class ModelReferenceContextResponse(BaseModel):
     items: list[dict]
 
 
+class ReferenceRetrievalContextResponse(ModelReferenceContextResponse):
+    catalog: list[dict] = Field(default_factory=list)
+    retrieval: dict = Field(default_factory=dict)
+
+
 class ReferenceBatchUpdate(BaseModel):
     reference_ids: list[str] = Field(min_length=1, max_length=500)
     action: Literal["enable", "disable", "inherit", "delete"]

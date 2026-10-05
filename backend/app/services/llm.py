@@ -23,6 +23,23 @@ class LLMAnalysisError(RuntimeError):
     pass
 
 
+class LLMRequestError(LLMAnalysisError):
+    """Allowlisted public diagnostics; never include provider response bodies."""
+    MESSAGES = {
+        "timeout": "模型请求超时，请稍后重试或减少本次参考资料。",
+        "context_limit": "模型上下文长度超限，请减少聊天范围或按模型容量调整输入预算。",
+        "local_budget": "超过本地输入预算；参考资料已缩减，聊天或分析上下文本身仍过长。",
+        "auth": "模型鉴权失败，请检查 API 密钥和模型访问权限。",
+        "rate_limit": "供应商限流或额度不足，请检查账户后重试。",
+        "upstream": "供应商未完成请求，请稍后重试。",
+        "network": "模型网络连接失败，请检查供应商地址和网络。",
+    }
+
+    def __init__(self, category: str):
+        self.category = category if category in self.MESSAGES else "upstream"
+        super().__init__(self.MESSAGES[self.category])
+
+
 _ANALYSIS_ITEM_LIST_FIELDS = (
     "observed_facts",
     "inferences",

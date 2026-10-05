@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,6 +36,8 @@ class Settings(BaseSettings):
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     qwen_model: str = "qwen-plus"
     qwen_timeout_seconds: float = 60.0
+    llm_input_budget_tokens: int = Field(default=32768, ge=4096, le=1000000)
+    llm_output_max_tokens: int = Field(default=4096, ge=256, le=32768)
     llm_config_encryption_key: str | None = None
 
     # Load deployment secrets deterministically instead of depending on the

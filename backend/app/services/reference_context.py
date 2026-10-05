@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
 
+from app.services.reference_retrieval import retrieve
+
 
 class ReferenceContextError(RuntimeError):
     pass
@@ -533,32 +535,23 @@ class ReferenceContextService:
             raise
 
         enabled = [item for item in listed if item["effective_enabled"]]
-        model_items: list[dict[str, Any]] = []
-        remaining = self.MAX_TOTAL_MODEL_CHARS
+        library = []
         for item in enabled:
-            if remaining <= 0:
-                break
             row = self._get_raw(conn, user_id, item["id"])
-            full_content = row["content"] or ""
-            allowed = min(self.MAX_ITEM_MODEL_CHARS, remaining)
-            content = full_content[:allowed]
-            truncated = len(content) < len(full_content)
-            model_items.append(
-                {
-                    "reference_id": item["id"],
-                    "name": item["name"],
-                    "type": item["reference_type"],
-                    "priority": item["effective_priority"],
-                    "description": item["description"],
-                    "content": content,
-                    "truncated": truncated,
-                }
-            )
-            remaining -= len(content)
-
+            library.append({
+                "reference_id": item["id"], "name": item["name"],
+                "original_filename": item["original_filename"],
+                "type": item["reference_type"], "priority": item["effective_priority"],
+                "description": item["description"], "content": row["content"] or "",
+            })
+        recent = conn.execute(
+            "SELECT content FROM messages WHERE user_id = ? AND conversation_id = ? "
+            "ORDER BY sent_at DESC, created_at DESC, id DESC LIMIT 8",
+            (user_id, conversation_id),
+        ).fetchall()
+        query = "\n".join(str(row["content"] or "")[-600:] for row in reversed(recent))
+        selected = retrieve(library, query)
         return {
-            "conversation_id": conversation_id,
-            "count": len(model_items),
-            "policy": policy,
-            "items": model_items,
+            "conversation_id": conversation_id, "policy": policy,
+            "count": len(selected["items"]), **selected,
         }

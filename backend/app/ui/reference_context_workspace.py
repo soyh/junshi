@@ -504,6 +504,23 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     return items;
   }
 
+  async function clientPreviewReferenceSelection() {
+    if (!selectedConversationId) throw new Error('请先选择会话，再预览目录匹配。');
+    const token = currentAccessToken;
+    const conversation = selectedConversationId;
+    const data = await clientReferenceApi(`/api/v1/conversations/${encodeURIComponent(conversation)}/references/context`);
+    if (token !== currentAccessToken || conversation !== selectedConversationId) return;
+    const report = data.retrieval || {};
+    const lines = [
+      `本地预选：启用 ${report.enabled_count || 0} 项，候选目录 ${report.candidate_count || 0} 项，识别导读 ${report.guide_count || 0} 项。`,
+      '分析时模型还会从候选目录选文档；这里只预览本地检索结果，不表示模型已读取。',
+      ...(data.items || []).map(item => `${item.name}${item.truncated ? '（相关片段 / 已截取）' : ''}`),
+      `未进入候选目录：${report.omitted_from_catalog || 0} 项。`,
+      ...(report.warnings || []).map(w => `${w.filename}：${w.reason === 'ambiguous' ? '同名文件有歧义，请重命名并更新目录' : '未匹配到已启用文件，请检查上传名称及会话启用状态'}`),
+    ];
+    byId('reference-retrieval-preview').textContent = lines.join('\n');
+  }
+
   async function clientUploadReferences() {
     const input = byId('reference-files');
     const files = Array.from(input?.files || []);
@@ -690,7 +707,19 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     const selectedCount = document.createElement('div');
     selectedCount.id = 'reference-selected-count'; selectedCount.setAttribute('aria-live', 'polite');
     selectedCount.textContent = '已选 0 项';
-    section.append(heading, note, grid, actions, status, searchLabel, search, typeFilter, count, toolbar, selectedCount, list);
+    const previewButton = document.createElement('button');
+    previewButton.id = 'reference-preview-selection'; previewButton.type = 'button';
+    previewButton.textContent = '预览目录匹配与候选资料';
+    previewButton.className = 'requires-auth'; previewButton.disabled = !currentAccessToken;
+    previewButton.addEventListener('click', () => clientPreviewReferenceSelection().catch(error => {
+      byId('reference-retrieval-preview').textContent = error.message;
+    }));
+    const preview = document.createElement('div');
+    preview.id = 'reference-retrieval-preview'; preview.style.whiteSpace = 'pre-wrap';
+    preview.style.overflowWrap = 'anywhere'; preview.setAttribute('aria-live', 'polite');
+    const guideHelp = document.createElement('p');
+    guideHelp.textContent = '支持上传 Markdown 导读目录：用反引号或 Markdown 链接列出文件名和适用主题，并同时上传、启用对应文件。分析按需选取片段，不会把所有正文一次性发送。Skill 也受长度预算约束。';
+    section.append(heading, note, guideHelp, grid, actions, status, searchLabel, search, typeFilter, count, toolbar, selectedCount, previewButton, preview, list);
     provider.appendChild(section);
 
     upload.addEventListener('click', async () => {

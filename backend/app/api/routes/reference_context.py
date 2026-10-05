@@ -7,7 +7,7 @@ from app.core.database import get_connection
 from app.schemas.reference_context import (
     ReferenceBatchUpdate,
     ConversationReferenceOverrideUpdate,
-    ModelReferenceContextResponse,
+    ReferenceRetrievalContextResponse,
     ModelReferenceResponse,
     ModelReferenceUpdate,
 )
@@ -198,7 +198,7 @@ def clear_conversation_reference_override(
 
 @router.get(
     "/conversations/{conversation_id}/references/context",
-    response_model=ModelReferenceContextResponse,
+    response_model=ReferenceRetrievalContextResponse,
 )
 def get_conversation_reference_context(
     conversation_id: str,
