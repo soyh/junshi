@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import sqlite3
 import uuid
 import zipfile
@@ -17,6 +18,10 @@ class ReferenceContextError(RuntimeError):
 
 
 class ReferenceNotFoundError(ReferenceContextError):
+    pass
+
+
+class ReferenceEditConflict(ReferenceContextError):
     pass
 
 
@@ -278,6 +283,36 @@ class ReferenceContextService:
     def get_content(self, conn: sqlite3.Connection, user_id: str, reference_id: str) -> dict[str, str]:
         row = self._get_raw(conn, user_id, reference_id)
         return {"id": row["id"], "content": row["content"] or ""}
+
+    @staticmethod
+    def _content_revision(content: str) -> str:
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    def get_editor(self, conn: sqlite3.Connection, user_id: str, reference_id: str) -> dict[str, str]:
+        row = self._get_raw(conn, user_id, reference_id)
+        suffix = Path(row["original_filename"] or row["name"]).suffix.lower()
+        if suffix not in self.TEXT_EXTENSIONS:
+            raise ReferenceContextError("在线编辑支持 Markdown、TXT 和其他纯文本资料；DOCX/ZIP 请重新上传。")
+        content = row["content"] or ""
+        return {"id": row["id"], "content": content, "revision": self._content_revision(content)}
+
+    def update_content(self, conn: sqlite3.Connection, user_id: str, reference_id: str,
+                       content: str, expected_revision: str) -> dict[str, str]:
+        current = self.get_editor(conn, user_id, reference_id)
+        if not content.strip():
+            raise ReferenceContextError("文档内容不能为空。")
+        if len(content.encode("utf-8")) > self.MAX_FILE_BYTES:
+            raise ReferenceContextError("保存内容超过 512 KiB，请缩短文档。")
+        if current["revision"] != expected_revision:
+            raise ReferenceEditConflict("文件已在其他窗口更新，未覆盖。请复制你的草稿后重新打开编辑器。")
+        changed = conn.execute(
+            "UPDATE model_references SET content = ?, updated_at = ? "
+            "WHERE id = ? AND user_id = ? AND content = ?",
+            (content, self._now(), reference_id, user_id, current["content"]),
+        ).rowcount
+        if changed != 1:
+            raise ReferenceEditConflict("保存时文件发生变化，未覆盖。请保留草稿并重新打开编辑器。")
+        return {"id": reference_id, "content": content, "revision": self._content_revision(content)}
 
     @staticmethod
     def _to_public_item(

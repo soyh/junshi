@@ -6,6 +6,7 @@ from app.core.context import get_current_user_id
 from app.core.database import get_connection
 from app.schemas.reference_context import (
     ReferenceBatchUpdate,
+    ReferenceContentUpdate,
     ConversationReferenceOverrideUpdate,
     ReferenceRetrievalContextResponse,
     ModelReferenceResponse,
@@ -13,6 +14,7 @@ from app.schemas.reference_context import (
 )
 from app.services.reference_context import (
     ReferenceContextError,
+    ReferenceEditConflict,
     ReferenceContextService,
     ReferenceNotFoundError,
     UnsupportedReferenceFileError,
@@ -54,9 +56,33 @@ def get_model_reference_content(
 
 
 def _not_found_or_unprocessable(exc: ReferenceContextError) -> HTTPException:
+    if isinstance(exc, ReferenceEditConflict):
+        return HTTPException(status_code=409, detail=str(exc))
     if isinstance(exc, ReferenceNotFoundError) or str(exc) == "Conversation not found":
         return HTTPException(status_code=404, detail=str(exc))
     return HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/references/{reference_id}/editor", response_model=dict[str, str])
+def get_reference_editor(reference_id: str, response: Response,
+                         user_id: str = Depends(get_current_user_id)):
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        with get_connection() as conn:
+            return service.get_editor(conn, user_id, reference_id)
+    except ReferenceContextError as exc:
+        raise _not_found_or_unprocessable(exc) from exc
+
+
+@router.put("/references/{reference_id}/content", response_model=dict[str, str])
+def update_reference_content(reference_id: str, payload: ReferenceContentUpdate,
+                             response: Response, user_id: str = Depends(get_current_user_id)):
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        with get_connection() as conn:
+            return service.update_content(conn, user_id, reference_id, payload.content, payload.expected_revision)
+    except ReferenceContextError as exc:
+        raise _not_found_or_unprocessable(exc) from exc
 
 
 @router.post(

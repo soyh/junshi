@@ -21,7 +21,7 @@ jobs:
         run: |
           test -z "$(git diff --name-only a3b1341126cf0ae656b6fbe8f2dca76b3eccf4a6 HEAD -- migrations requirements.txt)"
       - name: Focused
-        run: pytest -q tests/test_200_reference_catalog.py tests/test_199_reference_batch.py tests/test_198_reference_library_reader.py tests/test_197_reference_skills_context.py tests/test_197_reference_response_compatibility.py
+        run: pytest -q tests/test_200_reference_catalog.py tests/test_200_reference_editor.py tests/test_199_reference_batch.py tests/test_198_reference_library_reader.py tests/test_197_reference_skills_context.py tests/test_197_reference_response_compatibility.py
       - name: Full suite
         run: pytest -q
       - name: Browser acceptance

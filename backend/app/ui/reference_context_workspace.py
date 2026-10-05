@@ -158,6 +158,13 @@ REFERENCE_CONTEXT_STYLE = r'''
     #reference-list .reference-inline-check input { width: auto; }
     #reference-list button { margin: 0 !important; }
 
+    #reference-editor { width: min(900px, 92vw); max-height: 90vh; box-sizing: border-box; border-radius: 12px; padding: 20px; overflow: auto; }
+    #reference-editor::backdrop { background: rgba(0, 0, 0, .45); }
+    #reference-editor h3 { overflow-wrap: anywhere; }
+    #reference-editor-input { width: 100%; min-height: 45vh; max-height: 65vh; box-sizing: border-box; resize: vertical; font-family: monospace; white-space: pre-wrap; }
+    #reference-editor-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+    #reference-editor-status { white-space: pre-wrap; overflow-wrap: anywhere; }
+
     @media (max-width: 820px) {
       #reference-upload-grid,
       #reference-list .reference-meta-grid {
@@ -265,6 +272,80 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     return data;
   }
 
+  async function clientOpenReferenceEditor(item) {
+    if (byId('reference-editor')) return;
+    const token = currentAccessToken;
+    if (!token) throw new Error('请先登录。');
+    const dialog = document.createElement('dialog');
+    dialog.id = 'reference-editor'; dialog.setAttribute('aria-labelledby', 'reference-editor-title');
+    const title = document.createElement('h3'); title.id = 'reference-editor-title';
+    title.textContent = `编辑：${item.original_filename || item.name}`;
+    const note = document.createElement('p');
+    note.textContent = '保存会更新这份资料，所有启用它的会话将使用新内容。目录中请填写已上传文件的准确名称。关闭前请保存；此处不自动保存草稿。';
+    const input = document.createElement('textarea'); input.id = 'reference-editor-input';
+    input.setAttribute('aria-label', '参考资料正文'); input.disabled = true;
+    const status = document.createElement('p'); status.id = 'reference-editor-status'; status.setAttribute('aria-live', 'polite');
+    status.textContent = '正在加载可编辑内容…';
+    const actions = document.createElement('div'); actions.id = 'reference-editor-actions';
+    const save = document.createElement('button'); save.id = 'reference-editor-save'; save.type = 'button'; save.textContent = '保存内容'; save.disabled = true;
+    const close = document.createElement('button'); close.id = 'reference-editor-close'; close.type = 'button'; close.textContent = '关闭';
+    actions.append(save, close); dialog.append(title, note, input, status, actions); document.body.appendChild(dialog);
+    let original = '', revision = '', loaded = false, saving = false;
+    const dirty = () => loaded && input.value !== original;
+    const beforeUnload = event => { if (dirty() || saving) { event.preventDefault(); event.returnValue = ''; } };
+    window.addEventListener('beforeunload', beforeUnload);
+    const authWatch = window.setInterval(() => {
+      if (token !== currentAccessToken) { input.value = ''; dialog.close(); }
+    }, 500);
+    dialog.addEventListener('close', () => {
+      window.clearInterval(authWatch); window.removeEventListener('beforeunload', beforeUnload);
+      input.value = ''; dialog.remove();
+    }, {once: true});
+    const requestClose = () => {
+      if (saving) { status.textContent = '正在保存，请等待结果。'; return; }
+      if (dirty() && !window.confirm('存在未保存修改，确定放弃并关闭？')) return;
+      dialog.close();
+    };
+    close.addEventListener('click', requestClose);
+    dialog.addEventListener('cancel', event => { event.preventDefault(); requestClose(); });
+    input.addEventListener('input', () => {
+      save.disabled = !dirty() || saving;
+      status.textContent = dirty() ? '有未保存修改。' : '内容未修改。';
+    });
+    save.addEventListener('click', async () => {
+      if (saving || !dirty() || token !== currentAccessToken) return;
+      const content = input.value;
+      if (!content.trim()) { status.textContent = '文档内容不能为空。'; return; }
+      if (new TextEncoder().encode(content).length > 512 * 1024) { status.textContent = '保存内容超过 512 KiB，请缩短文档。'; return; }
+      saving = true; save.disabled = true; input.disabled = true; close.disabled = true;
+      status.textContent = '正在保存…';
+      try {
+        const data = await clientReferenceApi(`/api/v1/references/${encodeURIComponent(item.id)}/content`, {
+          method: 'PUT', body: JSON.stringify({content, expected_revision: revision}),
+        });
+        if (token !== currentAccessToken || !dialog.isConnected) return;
+        original = data.content; revision = data.revision; input.value = original;
+        status.textContent = '保存成功。下一次目录预览和分析将使用新内容。';
+        try { await clientLoadReferences(); } catch (_) { status.textContent += ' 列表刷新失败，请稍后刷新。'; }
+      } catch (error) {
+        if (token === currentAccessToken && dialog.isConnected) status.textContent = `保存未完成：${error.message}。草稿仍保留在编辑框中。`;
+      } finally {
+        if (dialog.isConnected && token === currentAccessToken) {
+          saving = false; input.disabled = false; close.disabled = false; save.disabled = !dirty();
+        }
+      }
+    });
+    dialog.showModal();
+    try {
+      const data = await clientReferenceApi(`/api/v1/references/${encodeURIComponent(item.id)}/editor`);
+      if (token !== currentAccessToken || !dialog.isConnected) return;
+      original = data.content; revision = data.revision; input.value = original; loaded = true;
+      input.disabled = false; status.textContent = '内容已加载，修改后点击保存。'; input.focus();
+    } catch (error) {
+      if (token === currentAccessToken && dialog.isConnected) status.textContent = `加载失败：${error.message}`;
+    }
+  }
+
   function clientReferenceConversationQuery() {
     return selectedConversationId
       ? `?conversation_id=${encodeURIComponent(selectedConversationId)}`
@@ -281,6 +362,8 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     const list = byId('reference-list');
     if (!list) return;
     list.replaceChildren();
+    const retrievalPreview = byId('reference-retrieval-preview');
+    if (retrievalPreview) retrievalPreview.textContent = '';
     if (!Array.isArray(items) || !items.length) {
       list.textContent = '还没有参考资料或 Skill。';
       clientFilterReferences();
@@ -324,6 +407,15 @@ REFERENCE_CONTEXT_SCRIPT = r'''
       fulltext.setAttribute('aria-label', `${item.name} 全文`);
       let readSequence = 0;
       reader.append(summary, fulltext);
+      if (/\.(md|markdown|txt|json|csv|yaml|yml|skill)$/i.test(item.original_filename || item.name)) {
+        const edit = document.createElement('button'); edit.type = 'button';
+        edit.className = 'reference-edit-content requires-auth'; edit.textContent = '编辑内容 / 目录';
+        edit.disabled = !currentAccessToken;
+        edit.addEventListener('click', () => clientOpenReferenceEditor(item).catch(error => {
+          byId('reference-status').textContent = error.message;
+        }));
+        reader.appendChild(edit);
+      }
       reader.addEventListener('toggle', async () => {
         const sequence = ++readSequence;
         summary.textContent = reader.open ? '收起全文' : '展开全文';

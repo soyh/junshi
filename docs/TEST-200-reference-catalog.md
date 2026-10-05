@@ -17,6 +17,12 @@
 
 点击“预览目录匹配与候选资料”查看本地预选、目录缺失文件和候选数量。这是本地预览，不是模型实际阅读记录。
 
+### 在线编辑目录
+
+展开全文后点击“编辑内容 / 目录”，可以编辑 Markdown、TXT、Skill 等纯文本资料。添加新文档后，在目录编辑框补充文件名及适用主题，点击“保存内容”；下一次预览和分析立即读取新内容，不需要删除重传，也不需要重启。保存保持文件 ID、文件类型、优先级和会话覆盖设置。
+
+保存修改的是当前用户的这份资料，所有启用它的会话都将使用新版。编辑窗口支持未保存提示、关闭/离开确认及并发版本检查；遇到 HTTP 409 不覆盖其他窗口的新版本，本地草稿仍保留，可先复制再重新打开。草稿不自动持久化，浏览器崩溃或退出登录后不能恢复。DOCX/ZIP 原文件暂不支持在线改写。
+
 ## 请求过程与边界
 
 1. 从当前会话最近 8 条消息构造最多 2400 字符的检索问题。
@@ -37,7 +43,7 @@
 
 ## 验证
 
-专项：`pytest -q tests/test_200_reference_catalog.py tests/test_199_reference_batch.py tests/test_198_reference_library_reader.py tests/test_197_reference_skills_context.py tests/test_197_reference_response_compatibility.py`
+专项：`pytest -q tests/test_200_reference_catalog.py tests/test_200_reference_editor.py tests/test_199_reference_batch.py tests/test_198_reference_library_reader.py tests/test_197_reference_skills_context.py tests/test_197_reference_response_compatibility.py`
 
 全量：`pytest -q`
 

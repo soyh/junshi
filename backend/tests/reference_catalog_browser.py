@@ -9,13 +9,23 @@ items = [dict(id=str(i), name=f'参考文件 {i} 很长的完整文件名.md',
     reference_type='document', enabled_by_default=True, priority=100,
     effective_enabled=True, effective_priority=100) for i in range(25)]
 text = '# 完整内容\n' + '正文\n' * 1000 + '<script>window.injected=true</script>'
+editor_state = {'content': text, 'revision': 'a' * 64}
 with sync_playwright() as p:
     browser = p.chromium.launch()
     page = browser.new_page(viewport={'width': 1280, 'height': 900})
     requests = []
     def handle(route):
         requests.append((route.request.method, route.request.url, route.request.post_data))
-        if route.request.url.endswith('/references/context'):
+        if route.request.url.endswith('/editor'):
+            result = {'id': '0', **editor_state}
+        elif route.request.url.endswith('/content') and route.request.method == 'PUT':
+            payload = route.request.post_data_json
+            if payload['expected_revision'] != editor_state['revision']:
+                route.fulfill(status=409, content_type='application/json', body=json.dumps({'detail': '文件已在其他窗口更新，未覆盖。'}))
+                return
+            editor_state.update(content=payload['content'], revision='b' * 64)
+            result = {'id': '0', **editor_state}
+        elif route.request.url.endswith('/references/context'):
             result = {'items': [{'name': '冲突指南.md', 'truncated': True}],
                       'retrieval': {'enabled_count': 25, 'candidate_count': 24, 'guide_count': 1,
                                     'omitted_from_catalog': 1,
@@ -26,7 +36,7 @@ with sync_playwright() as p:
                 items[:] = [x for x in items if x['id'] not in payload['reference_ids']]
             result = {'updated_count': len(payload['reference_ids'])}
         else:
-            result = {'id': '0', 'content': text} if route.request.url.endswith('/content') else items
+            result = {'id': '0', 'content': editor_state['content']} if route.request.url.endswith('/content') else items
         route.fulfill(content_type='application/json', body=json.dumps(result))
     page.route('**/api/v1/**', handle)
     page.route('http://reference.test/', lambda route: route.fulfill(body='<html><body></body></html>', content_type='text/html'))
@@ -89,9 +99,42 @@ with sync_playwright() as p:
     assert '没有匹配' in page.locator('#reference-filter-count').text_content()
     page.locator('#reference-search').fill('')
     assert page.locator('.reference-row:visible').count() == 25
+    # Editing is available only after expansion; draft cancellation is explicit.
+    page.locator('.reference-reader summary').first.click()
+    page.locator('.reference-edit-content').first.click()
+    page.wait_for_function("!document.querySelector('#reference-editor-input').disabled")
+    assert page.locator('#reference-editor-input').input_value() == text
+    updated = '# 主题指南\n- 冲突与修复：`冲突.md`\n<script>window.injected=true</script>'
+    page.locator('#reference-editor-input').fill(updated)
+    page.once('dialog', lambda dialog: dialog.dismiss())
+    page.locator('#reference-editor-close').click()
+    assert page.locator('#reference-editor').is_visible()
+    page.locator('#reference-editor-save').click()
+    page.wait_for_function("document.querySelector('#reference-editor-status').textContent.includes('保存成功')")
+    assert editor_state['content'] == updated
+    assert page.locator('#reference-editor-input').input_value() == updated
+    assert page.evaluate('window.injected') is None
+    assert page.locator('#reference-editor-save').is_disabled()
+    # Concurrent update must retain the unsaved local draft after a conflict.
+    editor_state.update(content='external update', revision='c' * 64)
+    page.locator('#reference-editor-input').fill('local unsaved draft')
+    page.locator('#reference-editor-save').click()
+    page.wait_for_function("document.querySelector('#reference-editor-status').textContent.includes('未覆盖')")
+    assert page.locator('#reference-editor-input').input_value() == 'local unsaved draft'
+    assert editor_state['content'] == 'external update'
+    page.once('dialog', lambda dialog: dialog.accept())
+    page.locator('#reference-editor-close').click()
+    assert page.locator('#reference-editor').count() == 0
     page.screenshot(path='/tmp/reference-catalog-desktop.png')
     page.set_viewport_size({'width': 390, 'height': 844})
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+    page.locator('.reference-reader summary').first.click()
+    page.locator('.reference-edit-content').first.click()
+    page.wait_for_function("!document.querySelector('#reference-editor-input').disabled")
+    assert page.locator('#reference-editor-input').input_value() == 'external update'
+    assert page.locator('#reference-editor').bounding_box()['width'] <= 390
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
     page.screenshot(path='/tmp/reference-catalog-mobile.png')
+    page.locator('#reference-editor-close').click()
     browser.close()
-print('Reference catalog preview, safe rendering, batch regression, desktop/mobile: PASS')
+print('Reference catalog, online editing, conflict/draft protection, batch regression, desktop/mobile: PASS')

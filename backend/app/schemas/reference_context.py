@@ -58,3 +58,8 @@ class ReferenceBatchUpdate(BaseModel):
     action: Literal["enable", "disable", "inherit", "delete"]
     scope: Literal["global", "conversation"] = "global"
     conversation_id: str | None = None
+
+
+class ReferenceContentUpdate(BaseModel):
+    content: str = Field(min_length=1, max_length=524288)
+    expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")

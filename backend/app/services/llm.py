@@ -37,7 +37,9 @@ class LLMRequestError(LLMAnalysisError):
 
     def __init__(self, category: str):
         self.category = category if category in self.MESSAGES else "upstream"
-        super().__init__(self.MESSAGES[self.category])
+        # Keep the established transport-error prefix for existing callers while
+        # the API exposes the typed, allowlisted diagnosis.
+        super().__init__("provider request failed: " + self.MESSAGES[self.category])
 
 
 _ANALYSIS_ITEM_LIST_FIELDS = (
