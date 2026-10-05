@@ -356,6 +356,157 @@ VIEWPORT_SAFE_UI_POLISH_STYLE = r'''
         row-gap: 10px !important;
       }
 
+      /* TEST-202: settings navigation stays visible and touch-friendly on phones. */
+      #client-settings-host #guided-settings-tabs {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 7px !important;
+        overflow-x: visible !important;
+        overflow-y: visible !important;
+        padding: 4px !important;
+        scrollbar-gutter: auto !important;
+      }
+
+      #client-settings-host #guided-settings-tabs .settings-tab-button {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 42px !important;
+        flex: none !important;
+        padding: 8px 7px !important;
+        color: var(--sky-800, #075985) !important;
+        background: rgba(255, 255, 255, .88) !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        line-height: 1.25 !important;
+        text-align: center !important;
+      }
+
+      #client-settings-host #guided-settings-tabs .settings-tab-button[aria-selected="true"] {
+        color: #fff !important;
+        border-color: transparent !important;
+        background: linear-gradient(135deg, var(--sky-500, #19a7e8), var(--sky-700, #0877b9)) !important;
+        box-shadow: 0 6px 16px rgba(25, 167, 232, .20) !important;
+      }
+
+      /* The second row is the only scrolling surface so bottom actions remain reachable. */
+      #client-settings-host #guided-settings-panel-host {
+        min-height: 0 !important;
+        max-height: none !important;
+        padding: 11px 10px calc(18px + env(safe-area-inset-bottom)) !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain !important;
+        scrollbar-gutter: auto !important;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      #client-settings-host #guided-settings-panel-host .workspace-grid,
+      #client-settings-host #guided-settings-panel-host #dual-model-settings,
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-fields,
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-actions {
+        grid-template-columns: minmax(0, 1fr) !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host .workspace-card,
+      #client-settings-host #guided-settings-panel-host #dual-model-intro,
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-card,
+      #client-settings-host #guided-settings-panel-host #provider-advanced-profiles {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Account Security: remove desktop card pressure and make controls easy to tap. */
+      #client-settings-host #guided-settings-panel-host #account-security .workspace-grid {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 10px !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #account-security .workspace-card {
+        padding: 13px 12px !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #account-security .workspace-card h2 {
+        margin-top: 0 !important;
+        margin-bottom: 10px !important;
+        font-size: 1rem !important;
+        line-height: 1.3 !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #account-security input,
+      #client-settings-host #guided-settings-panel-host #account-security select,
+      #client-settings-host #guided-settings-panel-host #account-security button {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #account-security input,
+      #client-settings-host #guided-settings-panel-host #account-security button {
+        min-height: 44px !important;
+      }
+
+      /* Model Settings: stack headings, fields, and actions instead of preserving desktop rows. */
+      #client-settings-host #guided-settings-panel-host #dual-model-intro {
+        display: block !important;
+        padding: 13px 12px !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #dual-model-intro .dual-model-route-chip {
+        display: inline-flex !important;
+        max-width: 100% !important;
+        margin-top: 9px !important;
+        white-space: normal !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #dual-model-settings {
+        display: grid !important;
+        gap: 11px !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-card {
+        padding: 13px 11px 13px 13px !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-card-header {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-role-state {
+        white-space: normal !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-fields {
+        display: grid !important;
+        gap: 9px !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-field-name,
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-field-baseUrl,
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-field-apiKey {
+        grid-column: auto !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-actions {
+        display: grid !important;
+        gap: 8px !important;
+      }
+
+      #client-settings-host #guided-settings-panel-host #dual-model-settings .dual-model-actions button {
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 44px !important;
+        margin: 0 !important;
+      }
+
       #client-conversation-tabs {
         grid-template-columns: 1fr !important;
       }
