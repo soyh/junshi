@@ -49,6 +49,7 @@ class ModelReferenceContextResponse(BaseModel):
 
 
 class ReferenceRetrievalContextResponse(ModelReferenceContextResponse):
+    conversation_id: str | None = None
     catalog: list[dict] = Field(default_factory=list)
     retrieval: dict = Field(default_factory=dict)
 
@@ -63,3 +64,8 @@ class ReferenceBatchUpdate(BaseModel):
 class ReferenceContentUpdate(BaseModel):
     content: str = Field(min_length=1, max_length=524288)
     expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ReferenceGuideCreate(BaseModel):
+    name: str = Field(default="主题指南.md", min_length=1, max_length=160)
+    content: str = Field(min_length=1, max_length=524288)

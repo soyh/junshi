@@ -280,8 +280,11 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     dialog.id = 'reference-editor'; dialog.setAttribute('aria-labelledby', 'reference-editor-title');
     const title = document.createElement('h3'); title.id = 'reference-editor-title';
     title.textContent = `编辑：${item.original_filename || item.name}`;
+    const nameInput = document.createElement('input'); nameInput.id = 'reference-editor-name';
+    nameInput.setAttribute('aria-label', '主题指南文件名'); nameInput.maxLength = 160;
+    nameInput.value = item.original_filename || item.name; nameInput.hidden = Boolean(item.id);
     const note = document.createElement('p');
-    note.textContent = '保存会更新这份资料，所有启用它的会话将使用新内容。目录中请填写已上传文件的准确名称。关闭前请保存；此处不自动保存草稿。';
+    note.textContent = '新建指南保存后全局默认启用，无需选择会话。保存会更新这份资料，所有启用它的会话将使用新内容。目录中请填写已上传文件的准确名称。关闭前请保存；此处不自动保存草稿。';
     const input = document.createElement('textarea'); input.id = 'reference-editor-input';
     input.setAttribute('aria-label', '参考资料正文'); input.disabled = true;
     const status = document.createElement('p'); status.id = 'reference-editor-status'; status.setAttribute('aria-live', 'polite');
@@ -289,9 +292,9 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     const actions = document.createElement('div'); actions.id = 'reference-editor-actions';
     const save = document.createElement('button'); save.id = 'reference-editor-save'; save.type = 'button'; save.textContent = '保存内容'; save.disabled = true;
     const close = document.createElement('button'); close.id = 'reference-editor-close'; close.type = 'button'; close.textContent = '关闭';
-    actions.append(save, close); dialog.append(title, note, input, status, actions); document.body.appendChild(dialog);
+    actions.append(save, close); dialog.append(title, nameInput, note, input, status, actions); document.body.appendChild(dialog);
     let original = '', revision = '', loaded = false, saving = false;
-    const dirty = () => loaded && input.value !== original;
+    const dirty = () => loaded && (!item.id || input.value !== original);
     const beforeUnload = event => { if (dirty() || saving) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload);
     const authWatch = window.setInterval(() => {
@@ -322,10 +325,13 @@ REFERENCE_CONTEXT_SCRIPT = r'''
       saving = true; save.disabled = true; input.disabled = true; close.disabled = true;
       status.textContent = '正在保存…';
       try {
-        const data = await clientReferenceApi(`/api/v1/references/${encodeURIComponent(item.id)}/content`, {
-          method: 'PUT', body: JSON.stringify({content, expected_revision: revision}),
+        const creating = !item.id;
+        const data = await clientReferenceApi(creating ? '/api/v1/references/guide' : `/api/v1/references/${encodeURIComponent(item.id)}/content`, {
+          method: creating ? 'POST' : 'PUT',
+          body: JSON.stringify(creating ? {name: nameInput.value.trim(), content} : {content, expected_revision: revision}),
         });
         if (token !== currentAccessToken || !dialog.isConnected) return;
+        item.id = data.id; nameInput.hidden = true;
         original = data.content; revision = data.revision; input.value = original;
         status.textContent = '保存成功。下一次目录预览和分析将使用新内容。';
         try { await clientLoadReferences(); } catch (_) { status.textContent += ' 列表刷新失败，请稍后刷新。'; }
@@ -339,10 +345,12 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     });
     dialog.showModal();
     try {
-      const data = await clientReferenceApi(`/api/v1/references/${encodeURIComponent(item.id)}/editor`);
+      const data = item.id
+        ? await clientReferenceApi(`/api/v1/references/${encodeURIComponent(item.id)}/editor`)
+        : {content: item.initial_content || '# 主题指南\n', revision: ''};
       if (token !== currentAccessToken || !dialog.isConnected) return;
       original = data.content; revision = data.revision; input.value = original; loaded = true;
-      input.disabled = false; status.textContent = '内容已加载，修改后点击保存。'; input.focus();
+      input.disabled = false; save.disabled = !dirty(); status.textContent = item.id ? '内容已加载，修改后点击保存。' : '新建草稿尚未保存；保存后全局默认启用。'; input.focus();
     } catch (error) {
       if (token === currentAccessToken && dialog.isConnected) status.textContent = `加载失败：${error.message}`;
     }
@@ -598,14 +606,24 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     return items;
   }
 
-  async function clientPreviewReferenceSelection() {
-    if (!selectedConversationId) throw new Error('请先选择会话，再预览目录匹配。');
+  async function clientCreateGlobalGuide() {
+    const token = currentAccessToken;
+    const items = await clientReferenceApi('/api/v1/references');
+    if (token !== currentAccessToken) return;
+    const names = items.filter(item => item.enabled_by_default).map(item => item.original_filename || item.name);
+    const content = '# 主题指南\n\n请把“待补充主题”改为文件的适用场景。\n\n' + names.map(name => `- 待补充主题：\`${name}\``).join('\n') + '\n';
+    await clientOpenReferenceEditor({name: '主题指南.md', original_filename: '主题指南.md', initial_content: content});
+  }
+
+  async function clientPreviewReferenceSelection(scope = 'global') {
+    if (scope === 'conversation' && !selectedConversationId) throw new Error('请先选择会话，或使用全局目录预览。');
     const token = currentAccessToken;
     const conversation = selectedConversationId;
-    const data = await clientReferenceApi(`/api/v1/conversations/${encodeURIComponent(conversation)}/references/context`);
+    const data = await clientReferenceApi(scope === 'global' ? '/api/v1/references/catalog' : `/api/v1/conversations/${encodeURIComponent(conversation)}/references/context`);
     if (token !== currentAccessToken || conversation !== selectedConversationId) return;
     const report = data.retrieval || {};
     const lines = [
+      scope === 'global' ? '全局目录检查：无需选择会话；各会话默认继承，已有单独设置优先。' : '当前会话目录检查：包含会话级覆盖。',
       `本地预选：启用 ${report.enabled_count || 0} 项，候选目录 ${report.candidate_count || 0} 项，识别导读 ${report.guide_count || 0} 项。`,
       '分析时模型还会从候选目录选文档；这里只预览本地检索结果，不表示模型已读取。',
       ...(data.items || []).map(item => `${item.name}${item.truncated ? '（相关片段 / 已截取）' : ''}`),
@@ -803,17 +821,20 @@ REFERENCE_CONTEXT_SCRIPT = r'''
     selectedCount.textContent = '已选 0 项';
     const previewButton = document.createElement('button');
     previewButton.id = 'reference-preview-selection'; previewButton.type = 'button';
-    previewButton.textContent = '预览目录匹配与候选资料';
+    previewButton.textContent = '预览全局目录与候选资料';
     previewButton.className = 'requires-auth'; previewButton.disabled = !currentAccessToken;
     previewButton.addEventListener('click', () => clientPreviewReferenceSelection().catch(error => {
       byId('reference-retrieval-preview').textContent = error.message;
     }));
+    const createGuide = document.createElement('button'); createGuide.id = 'reference-create-guide'; createGuide.type = 'button';
+    createGuide.textContent = '新建全局主题指南'; createGuide.className = 'requires-auth'; createGuide.disabled = !currentAccessToken;
+    createGuide.addEventListener('click', () => clientCreateGlobalGuide().catch(error => { byId('reference-retrieval-preview').textContent = error.message; }));
     const preview = document.createElement('div');
     preview.id = 'reference-retrieval-preview'; preview.style.whiteSpace = 'pre-wrap';
     preview.style.overflowWrap = 'anywhere'; preview.setAttribute('aria-live', 'polite');
     const guideHelp = document.createElement('p');
     guideHelp.textContent = '支持上传 Markdown 导读目录：用反引号或 Markdown 链接列出文件名和适用主题，并同时上传、启用对应文件。分析按需选取片段，不会把所有正文一次性发送。Skill 也受长度预算约束。';
-    section.append(heading, note, guideHelp, grid, actions, status, searchLabel, search, typeFilter, count, toolbar, selectedCount, previewButton, preview, list);
+    section.append(heading, note, guideHelp, grid, actions, status, searchLabel, search, typeFilter, count, toolbar, selectedCount, createGuide, previewButton, preview, list);
     provider.appendChild(section);
 
     upload.addEventListener('click', async () => {

@@ -7,6 +7,7 @@ from app.core.database import get_connection
 from app.schemas.reference_context import (
     ReferenceBatchUpdate,
     ReferenceContentUpdate,
+    ReferenceGuideCreate,
     ConversationReferenceOverrideUpdate,
     ReferenceRetrievalContextResponse,
     ModelReferenceResponse,
@@ -23,6 +24,37 @@ from app.services.reference_context import (
 
 router = APIRouter(tags=["model-references"])
 service = ReferenceContextService()
+
+
+@router.get("/references/catalog", response_model=ReferenceRetrievalContextResponse)
+def get_global_reference_catalog(response: Response, user_id: str = Depends(get_current_user_id)):
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        with get_connection() as conn:
+            return service.build_context(conn, user_id)
+    except ReferenceContextError as exc:
+        raise _not_found_or_unprocessable(exc) from exc
+
+
+@router.post("/references/guide", response_model=dict[str, str], status_code=201)
+def create_global_reference_guide(payload: ReferenceGuideCreate, response: Response,
+                                  user_id: str = Depends(get_current_user_id)):
+    response.headers["Cache-Control"] = "no-store"
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="请填写主题指南文件名。")
+    if not name.lower().endswith(".md"):
+        name += ".md"
+    if "/" in name or "\\" in name or not payload.content.strip():
+        raise HTTPException(status_code=422, detail="请填写有效的 Markdown 文件名和非空内容。")
+    try:
+        with get_connection() as conn:
+            item = service.create(conn, user_id=user_id, filename=name, mime_type="text/markdown",
+                                  content=payload.content.encode("utf-8"), requested_type="document",
+                                  name=name, enabled_by_default=True, priority=10)
+            return service.get_editor(conn, user_id, item["id"])
+    except ReferenceContextError as exc:
+        raise _not_found_or_unprocessable(exc) from exc
 
 
 @router.post("/references/batch", response_model=dict[str, int])

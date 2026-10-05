@@ -541,7 +541,7 @@ class ReferenceContextService:
         self,
         conn: sqlite3.Connection,
         user_id: str,
-        conversation_id: str,
+        conversation_id: str | None = None,
     ) -> dict[str, Any]:
         policy = {
             "system_precedence": (
@@ -583,7 +583,7 @@ class ReferenceContextService:
             "SELECT content FROM messages WHERE user_id = ? AND conversation_id = ? "
             "ORDER BY sent_at DESC, created_at DESC, id DESC LIMIT 8",
             (user_id, conversation_id),
-        ).fetchall()
+        ).fetchall() if conversation_id is not None else []
         query = "\n".join(str(row["content"] or "")[-600:] for row in reversed(recent))
         selected = retrieve(library, query)
         return {
