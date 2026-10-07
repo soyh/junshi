@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
+from app.ui.named_chat_import import NAMED_CHAT_STYLE, NAMED_CHAT_SCRIPT
 
 from app.ui.account_security_workspace import (
     ACCOUNT_SECURITY_HTML,
@@ -231,6 +232,7 @@ def build_product_shell_html() -> str:
             f"{REFERENCE_CONTEXT_STYLE}\n"
             f"{CONVERSATION_CONTROLS_STYLE}\n"
             f"{VIEWPORT_SAFE_UI_POLISH_STYLE}\n"
+            f"{NAMED_CHAT_STYLE}\n"
             f"{style_marker}"
         ),
         1,
@@ -282,6 +284,7 @@ def build_product_shell_html() -> str:
         f"{CONVERSATION_CONTENT_SCRIPT}\n\n"
         f"{CONVERSATION_CONTROLS_SCRIPT}\n\n"
         f"{MESSAGE_HISTORY_WINDOW_SCRIPT}\n\n"
+        f"{NAMED_CHAT_SCRIPT}\n\n"
         f"{RELATIONSHIP_EVIDENCE_SCRIPT}\n\n"
         f"{PRODUCT_MANAGEMENT_SCRIPT}\n\n"
         f"{ACCOUNT_SECURITY_SCRIPT}\n\n"

@@ -6,6 +6,7 @@ from app.repositories.message import MessageRepository
 from app.repositories.person import PersonRepository
 from app.schemas.text_import import TextImportCandidate
 from app.services.text_import_parser import parse_text, validate_candidates
+from app.services.named_chat_parser import named_candidates
 
 
 class TextImportService:
@@ -30,6 +31,10 @@ class TextImportService:
         title: str | None,
         auto_sort_by_sent_at: bool = False,
         conversation_id: str | None = None,
+        source_format: str = "pipe",
+        self_name: str | None = None,
+        other_name: str | None = None,
+        utc_offset: str = "+08:00",
     ) -> tuple[sqlite3.Row, list[sqlite3.Row], list[TextImportCandidate]]:
         person = self.person_repository.get(conn, user_id, person_id)
         if person is None:
@@ -49,7 +54,8 @@ class TextImportService:
             conversation = None
 
         candidates = validate_candidates(
-            parse_text(text),
+            (named_candidates(text, self_name, other_name, utc_offset)
+             if source_format == "named_chat" else parse_text(text)),
             auto_sort_by_sent_at=auto_sort_by_sent_at,
         )
 
