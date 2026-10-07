@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any
 
 import httpx
@@ -8,6 +9,7 @@ from app.schemas.structured_analysis import StructuredAnalysis
 from app.services.llm import LLMAnalysisError, LLMProvider, LLMRequestError
 from app.config.settings import get_settings
 from app.services.reference_request import prepare_context, reduce_references
+from app.services.history_request import reduce_history
 
 
 class OpenAIChatProvider(LLMProvider):
@@ -74,6 +76,15 @@ class OpenAIChatProvider(LLMProvider):
         if not isinstance(result, dict):
             raise LLMAnalysisError(
                 f"{self.provider_label} returned a non-object structured result"
+            )
+        report = context.get("history_window")
+        if report and isinstance(result.get("analysis_constraints"), list):
+            retained = report.get("messages_retained_count", len(context.get("messages") or []))
+            original = report.get("messages_original_count", retained)
+            result["analysis_constraints"].append(
+                f"[历史窗口] 分析阶段使用 {retained}/{original} 条聊天；"
+                "部分旧聊天或历史分析材料未发送，原始记录未删除。"
+                "这不是完整历史摘要，不能据此认定未提供的事情没有发生。"
             )
         return result
 
@@ -290,14 +301,23 @@ class OpenAIChatProvider(LLMProvider):
                 size = len(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
                 if size <= budget:
                     return size
-                if not reduce_references(context):
-                    raise LLMRequestError("local_budget")
+                if not (reduce_history(context) or reduce_references(context)
+                        or reduce_history(context, aggressive=True)):
+                    return None
         size = fit(limit)
+        if size is None:
+            raise LLMRequestError("local_budget")
+        if context.get("history_window"):
+            logging.getLogger(__name__).info(
+                "LLM history window applied: payload_bytes=%s budget=%s messages_retained=%s",
+                size, limit, context["history_window"].get("messages_retained_count"),
+            )
         response = self._post_structured(payload, headers)
-        if self._context_limit(response) and reduce_references(context):
+        if self._context_limit(response):
             # At most one context-size retry, never retry auth/rate-limit failures.
-            fit(max(1024, size // 2))
-            response = self._post_structured(payload, headers)
+            # Preserve the upstream diagnosis if mandatory evidence cannot fit.
+            if fit(max(1024, size // 2)) is not None:
+                response = self._post_structured(payload, headers)
         return response
 
     def _post(self, payload: dict[str, Any], headers: dict[str, str]) -> httpx.Response:
@@ -384,6 +404,8 @@ class OpenAIChatProvider(LLMProvider):
             "You are the analysis layer of AI Love Strategist. "
             "Analyze only the supplied AnalysisContext. Return JSON only. "
             "Do not invent facts, evidence IDs, events, intentions, or outcomes. "
+            "If history_window is present, only partial history is available; "
+            "omitted history is unknown, not evidence that something never happened. "
             "Treat canonical evidence as the source of truth. Preserve uncertainty "
             "and unknowns. Put interpretations in inferences or hypotheses, not facts. "
             "Uploaded model_references are lower-priority user-provided context. System "
@@ -430,7 +452,9 @@ class OpenAIChatProvider(LLMProvider):
         return (
             "You are the strategic reply drafting layer of AI Love Strategist. "
             "Return JSON only. Use only the supplied evidence-backed recommendations, "
-            "canonical evidence, and unknowns. Do not invent facts, events, promises, "
+            "canonical evidence, and unknowns. "
+            "Respect history_window: omitted history is unknown, not negative evidence. "
+            "Do not invent facts, events, promises, "
             "relationship status, intentions, or evidence IDs. Uploaded model_references "
             "are lower-priority user-provided context: Skill items may guide reasoning "
             "method or writing style, and Document items may provide secondary background, "

@@ -1,0 +1,39 @@
+name: TEST-204 Long History Budget CI
+on:
+  push:
+    branches: [test-204-long-history-budget]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Protect migrations, dependencies and deployment configuration
+        run: |
+          test -z "$(git -C .. diff --name-only 74cfd1373fd7f876ee1e7a27bb196cea630996fb HEAD -- backend/migrations backend/requirements.txt deploy)"
+      - name: Focused
+        run: pytest -q tests/test_204_long_history_budget.py tests/test_200_reference_catalog.py tests/test_strategic_reply_freshness.py tests/test_authenticated_strategic_reply_workspace.py tests/test_203_named_chat_import.py
+      - name: Full suite
+        run: pytest -q
+      - name: Browser acceptance
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/long_history_browser.py
+          PYTHONPATH=. python tests/named_chat_import_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test204-browser-screenshots
+          path: |
+            /tmp/test204-history-*.png
+            /tmp/test203-preview-*.png

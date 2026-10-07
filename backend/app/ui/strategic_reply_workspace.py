@@ -85,6 +85,13 @@ STRATEGIC_REPLY_SCRIPT = r'''
     const evidence = data && Array.isArray(data.evidence) ? data.evidence : [];
     evidenceRow.textContent = `Evidence items: ${evidence.length}`;
     strategicReplyContext.append(summary, stateRow, evidenceRow);
+    const analysisConstraints = Array.isArray(analysis.analysis_constraints) ? analysis.analysis_constraints : [];
+    analysisConstraints.filter(item => typeof item === 'string' && item.startsWith('[历史窗口]')).forEach(item => {
+      const notice = document.createElement('div');
+      notice.className = 'session-row';
+      notice.textContent = item;
+      strategicReplyContext.appendChild(notice);
+    });
 
     strategicReplyRecommendations.replaceChildren();
     const recommendations = data && Array.isArray(data.recommendations) ? data.recommendations : [];
