@@ -420,7 +420,7 @@ PRODUCT_MANAGEMENT_SCRIPT = r'''
       manageMessageDetail.textContent = 'Select a message.';
       return;
     }
-    manageMessageDetail.textContent = `${item.sent_at} · ${item.sender_type}\n${item.content}`;
+    manageMessageDetail.textContent = `${chinaTimeText(item.sent_at)} · ${item.sender_type}\n${item.content}`;
   }
 
   async function loadManagedMessages() {
@@ -435,7 +435,7 @@ PRODUCT_MANAGEMENT_SCRIPT = r'''
     renderEntitySelect(
       'manage-message-select',
       managedMessageItems,
-      (item) => `${item.sent_at} · ${item.sender_type} · ${String(item.content).slice(0, 48)}`,
+      (item) => `${chinaTimeText(item.sent_at)} · ${item.sender_type} · ${String(item.content).slice(0, 48)}`,
       'No message selected',
       selectedManagedMessageId,
     );

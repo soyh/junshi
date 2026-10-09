@@ -32,6 +32,8 @@ def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
         return "LLM analysis failed: " + LLMRequestError.MESSAGES[exc.category]
     raw_message = str(exc)
     message = raw_message.lower()
+    if "invalid strategic reply" in message or "no usable strategic reply draft" in message:
+        return "LLM analysis failed: 模型未返回有效回复草稿，请重新生成；本次未生成可用建议。"
     marker = "invalid structured analysis fields="
     if marker in message:
         raw_fields = raw_message.split("fields=", 1)[1]

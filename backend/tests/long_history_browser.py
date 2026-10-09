@@ -1,3 +1,4 @@
+from app.ui.china_time import CHINA_TIME_SCRIPT
 """Exercise the real reply renderer's coverage notice on desktop and mobile."""
 import os
 from pathlib import Path
@@ -13,7 +14,7 @@ with sync_playwright() as p:
         page.set_content('<meta name="viewport" content="width=device-width, initial-scale=1">'
             '<style>body{font:16px sans-serif;margin:12px}fieldset{min-width:0}'
             'textarea{max-width:100%}.session-row{overflow-wrap:anywhere}</style>' + STRATEGIC_REPLY_HTML)
-        page.add_script_tag(content='const byId=id=>document.getElementById(id);' +
+        page.add_script_tag(content=CHINA_TIME_SCRIPT + 'const byId=id=>document.getElementById(id);' +
             STRATEGIC_REPLY_SCRIPT.split('  async function loadStrategicReply()')[0])
         notice = '[历史窗口] 分析阶段使用 8/150 条聊天；原始记录未删除。<img src=x onerror="window.injected=true">'
         page.evaluate('data => renderStrategicReply(data)', {

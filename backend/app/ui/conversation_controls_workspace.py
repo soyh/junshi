@@ -35,11 +35,10 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
 
   function clientMessageFilterDate(value, endOfDay = false) {
     if (!value) return null;
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return null;
-    if (endOfDay && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      parsed.setHours(23, 59, 59, 999);
-    }
+    const text = /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? value + (endOfDay ? 'T23:59:59.999' : 'T00:00:00') : value;
+    let parsed;
+    try { parsed = new Date(chinaTimeIso(text)); } catch (_) { return null; }
     return parsed;
   }
 
@@ -169,19 +168,21 @@ CONVERSATION_CONTROLS_SCRIPT = r'''
       const fromWrap = document.createElement('div');
       const fromLabel = document.createElement('label');
       fromLabel.htmlFor = 'client-message-from';
-      fromLabel.textContent = '显示起始时间';
+      fromLabel.textContent = '显示起始时间（北京时间）';
       const from = document.createElement('input');
       from.id = 'client-message-from';
-      from.type = 'datetime-local';
+      from.type = 'text';
+      from.placeholder = '2026年09月26日 00:00:00';
       fromWrap.append(fromLabel, from);
 
       const toWrap = document.createElement('div');
       const toLabel = document.createElement('label');
       toLabel.htmlFor = 'client-message-to';
-      toLabel.textContent = '显示结束时间';
+      toLabel.textContent = '显示结束时间（北京时间）';
       const to = document.createElement('input');
       to.id = 'client-message-to';
-      to.type = 'datetime-local';
+      to.type = 'text';
+      to.placeholder = '2026年09月26日 23:59:59';
       toWrap.append(toLabel, to);
 
       const actions = document.createElement('div');

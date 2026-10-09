@@ -272,21 +272,50 @@ LIFECYCLE_V2_SCRIPT = r'''
     if (selectedRelationshipId) await loadSelectedRelationshipManagement();
   }
 
+  let lifecyclePendingEvidence = null;
+  function lifecycleDrainPendingEvidence() {
+    const pending = lifecyclePendingEvidence;
+    lifecyclePendingEvidence = null;
+    if (pending && pending.conversation === selectedConversationId && pending.person === selectedPersonId
+        && pending.token === currentAccessToken) {
+      queueMicrotask(() => {
+        if (pending.conversation === selectedConversationId && pending.person === selectedPersonId
+            && pending.token === currentAccessToken) lifecycleAfterEvidenceChanged(pending.source);
+      });
+    }
+  }
+
   async function lifecycleAfterEvidenceChanged(source = '消息') {
-    if (lifecycleAutomationBusy || !selectedConversationId) return;
+    if (!selectedConversationId) return;
+    if (lifecycleAutomationBusy) {
+      lifecyclePendingEvidence = { source, conversation: selectedConversationId,
+        person: selectedPersonId, token: currentAccessToken };
+      return;
+    }
+    const conversation = selectedConversationId;
+    const person = selectedPersonId;
+    const token = currentAccessToken;
+    const isCurrent = () => conversation === selectedConversationId && person === selectedPersonId
+      && token === currentAccessToken;
     lifecycleAutomationBusy = true;
     lifecycleAutomationStatus.textContent = `${source}已保存。正在自动刷新 AI 回复与行动计划…`;
     try {
       await loadStrategicReply();
+      if (!isCurrent() || lifecyclePendingEvidence) return;
       lifecycleAutomationStatus.textContent = 'AI 回复已刷新，正在更新行动计划…';
       await generateActionPlan();
+      if (!isCurrent() || lifecyclePendingEvidence) return;
       await loadSavedActionPlan();
+      if (!isCurrent() || lifecyclePendingEvidence) return;
       await loadActionDecisionContext();
+      if (!isCurrent() || lifecyclePendingEvidence) return;
       lifecycleAutomationStatus.textContent = '自动跟进完成：AI 回复与行动计划已更新。发送回复、确认行动和现实执行仍由你决定。';
     } catch (error) {
+      if (!isCurrent() || error?.superseded) return;
       lifecycleAutomationStatus.textContent = `自动跟进未完全完成：${error instanceof Error ? error.message : String(error)}`;
     } finally {
       lifecycleAutomationBusy = false;
+      lifecycleDrainPendingEvidence();
     }
   }
 
@@ -326,10 +355,14 @@ LIFECYCLE_V2_SCRIPT = r'''
       lifecycleAutomationStatus.textContent = `自动复盘未完全完成：${error instanceof Error ? error.message : String(error)}`;
     } finally {
       lifecycleAutomationBusy = false;
+      lifecycleDrainPendingEvidence();
     }
   }
 
-  window.addEventListener('junshi:evidence-changed', (event) => lifecycleAfterEvidenceChanged(event.detail?.source || '证据'));
+  window.addEventListener('junshi:evidence-changed', (event) => {
+    if (event.detail?.conversation_id && event.detail.conversation_id !== selectedConversationId) return;
+    lifecycleAfterEvidenceChanged(event.detail?.source || '证据');
+  });
   window.addEventListener('junshi:decision-recorded', (event) => lifecycleAfterDecisionRecorded(event.detail));
   window.addEventListener('junshi:execution-recorded', () => lifecycleAfterExecutionRecorded());
   window.addEventListener('junshi:outcome-recorded', () => lifecycleAfterOutcomeRecorded());

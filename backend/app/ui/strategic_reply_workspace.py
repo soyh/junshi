@@ -37,8 +37,10 @@ STRATEGIC_REPLY_SCRIPT = r'''
   const strategicReplyConstraints = byId('strategic-reply-constraints');
   const strategicReplyLearning = byId('strategic-reply-learning');
   let generatedStrategicReplyDraft = '';
+  let strategicReplyRevision = 0;
 
   function resetStrategicReply(message = 'Select a conversation first.') {
+    strategicReplyRevision += 1;
     strategicReplyStatus.textContent = message;
     generatedStrategicReplyDraft = '';
     strategicReplyDraft.value = '';
@@ -85,6 +87,14 @@ STRATEGIC_REPLY_SCRIPT = r'''
     const evidence = data && Array.isArray(data.evidence) ? data.evidence : [];
     evidenceRow.textContent = `Evidence items: ${evidence.length}`;
     strategicReplyContext.append(summary, stateRow, evidenceRow);
+    const focus = data?.reply_inputs?.conversation_focus;
+    const target = focus?.reply_target_message || focus?.latest_human_message;
+    if (target && typeof target.content === 'string') {
+      const targetRow = document.createElement('div');
+      targetRow.className = 'session-row';
+      targetRow.textContent = `本次依据的最新消息（${chinaTimeText(target.sent_at)}）：${target.content.slice(0, 300)}`;
+      strategicReplyContext.appendChild(targetRow);
+    }
     const analysisConstraints = Array.isArray(analysis.analysis_constraints) ? analysis.analysis_constraints : [];
     analysisConstraints.filter(item => typeof item === 'string' && item.startsWith('[历史窗口]')).forEach(item => {
       const notice = document.createElement('div');
@@ -124,10 +134,26 @@ STRATEGIC_REPLY_SCRIPT = r'''
 
   async function loadStrategicReply() {
     if (!selectedConversationId) throw new Error('Select a conversation first');
+    const conversation = selectedConversationId;
+    const person = selectedPersonId;
+    const token = currentAccessToken;
+    resetStrategicReply();
+    const revision = strategicReplyRevision;
     strategicReplyStatus.textContent = 'Generating strategic reply draft...';
-    const data = await api(
-      `/api/v1/conversations/${encodeURIComponent(selectedConversationId)}/strategic-reply/context`
-    );
+    const isCurrent = () => revision === strategicReplyRevision && conversation === selectedConversationId
+      && person === selectedPersonId && token === currentAccessToken;
+    const stale = () => Object.assign(new Error('消息或会话已变化，已忽略过期回复。'), { superseded: true });
+    let data;
+    try {
+      data = await api(`/api/v1/conversations/${encodeURIComponent(conversation)}/strategic-reply/context`);
+    } catch (error) {
+      if (!isCurrent()) throw stale();
+      throw error;
+    }
+    if (!isCurrent()) throw stale();
+    if (!data || typeof data.draft !== 'string' || !data.draft.replace(/[\s\u200b-\u200f\ufeff]/g, '')) {
+      throw new Error('模型未返回有效回复草稿，请重新生成。');
+    }
     renderStrategicReply(data);
     strategicReplyStatus.textContent = 'Reply draft generated. Review or edit it before copying. Nothing was sent, saved as a message, confirmed, or executed.';
   }
@@ -166,7 +192,14 @@ STRATEGIC_REPLY_SCRIPT = r'''
     resetStrategicReply();
   };
 
-  bind('load-strategic-reply', loadStrategicReply, strategicReplyStatus);
+  bind('load-strategic-reply', async () => {
+    try { await loadStrategicReply(); }
+    catch (error) { if (!error?.superseded) throw error; }
+  }, strategicReplyStatus);
+  window.addEventListener('junshi:evidence-changed', (event) => {
+    if (event.detail?.conversation_id && event.detail.conversation_id !== selectedConversationId) return;
+    resetStrategicReply('消息已更新，正在等待最新回复建议。');
+  }, {capture: true});
   bind('copy-strategic-reply', copyStrategicReply, strategicReplyStatus);
   bind('restore-strategic-reply', restoreStrategicReply, strategicReplyStatus);
   bind('prepare-strategic-reply-message', prepareStrategicReplyMessageRecord, strategicReplyStatus);

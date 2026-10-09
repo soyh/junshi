@@ -51,10 +51,8 @@ NAMED_CHAT_SCRIPT = r'''
       const row = document.createElement('article');
       const title = document.createElement('strong');
       const role = message.sender_name === me ? '我' : message.sender_name === other ? '对方' : '未分配';
-      const time = message.time_precision === 'minute'
-        ? message.sent_at.slice(0, 16).replace('T', ' ')
-        : message.sent_at.slice(0, 19).replace('T', ' ');
-      title.textContent = `${message.sender_name}（${role}） · ${time} UTC${namedChatPreview.utc_offset}`;
+      const time = chinaTimeText(message.sent_at, message.time_precision);
+      title.textContent = `${message.sender_name}（${role}） · ${time} · 原记录 UTC${namedChatPreview.utc_offset}`;
       const content = document.createElement('pre');
       content.textContent = message.content;
       row.append(title, content);

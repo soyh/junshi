@@ -4,11 +4,9 @@ MESSAGE_HISTORY_WINDOW_SCRIPT = r'''
   // remains complete because analysis services still use MessageService.list().
   function historyWindowIso(value, endOfDay = false) {
     if (!value) return null;
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) throw new Error('时间格式无效');
-    if (endOfDay && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      parsed.setHours(23, 59, 59, 999);
-    }
+    const text = /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? value + (endOfDay ? 'T23:59:59.999' : 'T00:00:00') : value;
+    const parsed = new Date(chinaTimeIso(text));
     return parsed.toISOString();
   }
 

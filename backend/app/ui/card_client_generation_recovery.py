@@ -35,6 +35,11 @@ CARD_CLIENT_GENERATION_RECOVERY_SCRIPT = r'''
     }
 
     clientReplyRecoveryBusy = true;
+    const conversation = selectedConversationId;
+    const person = selectedPersonId;
+    const token = currentAccessToken;
+    const isCurrent = () => conversation === selectedConversationId && person === selectedPersonId
+      && token === currentAccessToken;
     if (button) button.disabled = true;
     if (status) {
       status.textContent = automatic
@@ -44,14 +49,20 @@ CARD_CLIENT_GENERATION_RECOVERY_SCRIPT = r'''
 
     try {
       await loadStrategicReply();
+      if (!isCurrent()) return false;
+      const revision = strategicReplyRevision;
       if (button) button.textContent = '重新生成回复';
       if (status) status.textContent = '回复建议已生成，正在刷新下一步行动…';
       try {
         await generateActionPlan();
+        if (!isCurrent() || revision !== strategicReplyRevision) return false;
         await loadSavedActionPlan();
+        if (!isCurrent() || revision !== strategicReplyRevision) return false;
         await loadActionDecisionContext();
+        if (!isCurrent() || revision !== strategicReplyRevision) return false;
         if (status) status.textContent = '回复建议和下一步行动已刷新。';
       } catch (actionError) {
+        if (!isCurrent() || revision !== strategicReplyRevision) return false;
         if (status) {
           status.textContent = `回复建议已生成，但行动计划刷新失败：${actionError instanceof Error ? actionError.message : String(actionError)}`;
         }
@@ -63,6 +74,7 @@ CARD_CLIENT_GENERATION_RECOVERY_SCRIPT = r'''
       }
       return true;
     } catch (error) {
+      if (!isCurrent() || error?.superseded) return false;
       const message = error instanceof Error ? error.message : String(error);
       if (status) status.textContent = `生成失败：${message}`;
       const alert = clientEnsureRuntimeAlert();
@@ -129,8 +141,15 @@ CARD_CLIENT_GENERATION_RECOVERY_SCRIPT = r'''
       const key = `${selectedConversationId}:${text}`;
       if (key === clientAutoReplyRecoveryKey) return;
       clientAutoReplyRecoveryKey = key;
+      const conversation = selectedConversationId;
+      const person = selectedPersonId;
+      const token = currentAccessToken;
+      const revision = strategicReplyRevision;
       window.setTimeout(() => {
-        if (selectedConversationId) clientRunReplyRecovery({ automatic: true });
+        if (conversation === selectedConversationId && person === selectedPersonId
+            && token === currentAccessToken && revision === strategicReplyRevision) {
+          clientRunReplyRecovery({ automatic: true });
+        }
       }, 450);
     };
     maybeRecover();

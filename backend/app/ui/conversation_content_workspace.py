@@ -14,8 +14,8 @@ CONVERSATION_CONTENT_HTML = r'''
           <option value="system">system</option>
           <option value="assistant">assistant</option>
         </select>
-        <label for="message-sent-at">Sent at (optional ISO 8601)</label>
-        <input id="message-sent-at" class="requires-auth" autocomplete="off" placeholder="2026-09-18T12:00:00+00:00" disabled>
+        <label for="message-sent-at">发送时间（北京时间，24小时制；可选）</label>
+        <input id="message-sent-at" class="requires-auth" autocomplete="off" placeholder="2026年09月26日 20:00:00" disabled>
         <label for="message-content">Content</label>
         <textarea id="message-content" class="requires-auth" disabled></textarea>
         <button id="load-messages" class="requires-auth" type="button" disabled>Refresh latest 100</button>
@@ -62,14 +62,16 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     const nextContent = window.prompt('修改消息内容', item.content);
     if (nextContent === null) return;
     if (!nextContent.trim()) throw new Error('Message content cannot be empty');
-    const nextSentAt = window.prompt('修改发送时间（ISO 8601）', item.sent_at);
+    const displayedSentAt = chinaTimeText(item.sent_at);
+    const nextSentAt = window.prompt('修改发送时间（北京时间，24小时制）', displayedSentAt);
     if (nextSentAt === null) return;
     const updated = await api(`/api/v1/messages/${encodeURIComponent(item.id)}`, {
       method: 'PATCH',
-      body: JSON.stringify({content: nextContent, sent_at: nextSentAt}),
+      body: JSON.stringify({content: nextContent,
+        sent_at: nextSentAt === displayedSentAt ? item.sent_at : chinaTimeIso(nextSentAt)}),
     });
     await loadMessages(currentMessageWindow);
-    messagesStatus.textContent = `Updated message at ${updated.sent_at}.`;
+    messagesStatus.textContent = `Updated message at ${chinaTimeText(updated.sent_at)}.`;
     window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
       detail: {source: '历史消息修改', conversation_id: selectedConversationId},
     }));
@@ -99,7 +101,7 @@ CONVERSATION_CONTENT_SCRIPT = r'''
       const body = document.createElement('div');
       const actions = document.createElement('div');
       actions.className = 'client-controls-actions';
-      meta.textContent = `${item.sent_at} · ${item.sender_type}`;
+      meta.textContent = `${chinaTimeText(item.sent_at)} · ${item.sender_type}`;
       body.textContent = item.content;
 
       const edit = document.createElement('button');
@@ -188,7 +190,7 @@ CONVERSATION_CONTENT_SCRIPT = r'''
       sender_type: byId('message-sender').value,
       content,
     };
-    if (sentAt) payload.sent_at = sentAt;
+    if (sentAt) payload.sent_at = chinaTimeIso(sentAt);
     const created = await api('/api/v1/messages', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -196,7 +198,7 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     byId('message-content').value = '';
     byId('message-sent-at').value = '';
     await loadMessages(currentMessageWindow);
-    messagesStatus.textContent = `Added ${created.sender_type} message at ${created.sent_at}.`;
+    messagesStatus.textContent = `Added ${created.sender_type} message at ${chinaTimeText(created.sent_at)}.`;
     window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
       detail: { source: '新消息', conversation_id: selectedConversationId },
     }));

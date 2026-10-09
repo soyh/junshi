@@ -296,4 +296,4 @@ def test_test195_media_ui_explains_chat_messages_are_imported_into_current_conve
     assert "无法可靠判断归属的内容不会猜测" in html
     assert "聊天截图中可靠识别出的消息已加入当前会话记录" in html
     assert "已导入的聊天消息会保留" in html
-    assert "sentAtInput.type = 'datetime-local';" in html
+    assert "sentAtInput.type = 'text';" in html

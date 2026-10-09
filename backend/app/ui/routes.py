@@ -1,3 +1,4 @@
+from app.ui.china_time import CHINA_TIME_SCRIPT
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 from app.ui.named_chat_import import NAMED_CHAT_STYLE, NAMED_CHAT_SCRIPT
@@ -265,6 +266,7 @@ def build_product_shell_html() -> str:
     # Function declarations from the later fragments are hoisted inside the
     # same IIFE, while keeping each verified fragment's suffix contract clean.
     workspace_script = (
+        f"{CHINA_TIME_SCRIPT}\n\n"
         f"{GUIDED_WORKFLOW_SCRIPT}\n\n"
         f"{VISUAL_THEME_SCRIPT}\n\n"
         f"{USER_PRESENTATION_SCRIPT}\n\n"

@@ -1,3 +1,4 @@
+from app.ui.china_time import CHINA_TIME_SCRIPT
 """Browser acceptance using the real parser and UI, with all HTTP mocked."""
 import json
 import os
@@ -51,7 +52,7 @@ with sync_playwright() as p:
             '<div id="client-unified-import-status"></div></section>'
             '<select id="conversation-select"><option value="c1">c1</option><option value="c2">c2</option></select>'
             '<select id="person-select"></select>')
-        page.add_script_tag(content=r'''
+        page.add_script_tag(content=CHINA_TIME_SCRIPT + r'''
             const byId=id=>document.getElementById(id);
             let currentAccessToken='test', selectedConversationId='c1', selectedPersonId='p1';
             let currentMessageWindow=50;

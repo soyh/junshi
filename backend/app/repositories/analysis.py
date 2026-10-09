@@ -37,7 +37,7 @@ class AnalysisRepository:
             FROM messages
             WHERE conversation_id = ?
               AND user_id = ?
-            ORDER BY sent_at ASC, created_at ASC
+            ORDER BY julianday(sent_at) ASC, created_at ASC, rowid ASC
             """,
             (conversation_id, user_id),
         ).fetchall()

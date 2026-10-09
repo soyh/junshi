@@ -166,7 +166,7 @@ CARD_CLIENT_UNIFIED_IMPORT_SCRIPT = r'''
     if (sender) senderWrap.appendChild(sender);
 
     const sentAtWrap = document.createElement('div');
-    if (sentAtLabel) sentAtLabel.textContent = '发送时间（可选，仅普通文本）';
+    if (sentAtLabel) sentAtLabel.textContent = '发送时间（北京时间，24小时制；可选）';
     if (sentAtLabel) sentAtWrap.appendChild(sentAtLabel);
     if (sentAt) sentAtWrap.appendChild(sentAt);
 

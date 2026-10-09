@@ -148,7 +148,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
 
   function clientResetMediaSentAtToNow() {
     const sentAtInput = byId('client-media-sent-at');
-    if (sentAtInput) sentAtInput.value = clientCurrentLocalDateTimeValue();
+    if (sentAtInput) sentAtInput.value = chinaTimeInputNow();
   }
 
   function clientRenderMedia(items) {
@@ -225,7 +225,7 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
     if (files.length === 0) throw new Error('请选择聊天截图、图片或视频');
 
     const localSentAt = sentAtInput?.value?.trim();
-    const sentAt = localSentAt ? clientLocalDateTimeToIsoWithOffset(localSentAt) : null;
+    const sentAt = localSentAt ? chinaTimeIso(localSentAt) : null;
     const conversationId = selectedConversationId;
     let completed = 0;
     for (let index = 0; index < files.length; index += 1) {
@@ -290,13 +290,14 @@ MEDIA_UPLOAD_WORKSPACE_SCRIPT = r'''
     const sentAtWrap = document.createElement('div');
     const sentAtLabel = document.createElement('label');
     sentAtLabel.htmlFor = 'client-media-sent-at';
-    sentAtLabel.textContent = '证据时间（默认当前本地时间）';
+    sentAtLabel.textContent = '证据时间（北京时间，24小时制）';
     const sentAtInput = document.createElement('input');
     sentAtInput.id = 'client-media-sent-at';
-    sentAtInput.type = 'datetime-local';
+    sentAtInput.type = 'text';
+    sentAtInput.placeholder = '2026年09月26日 20:00:00';
     sentAtInput.step = '1';
-    sentAtInput.value = clientCurrentLocalDateTimeValue();
-    sentAtInput.title = '默认使用当前本地时间，可直接修改日期或时分秒。聊天截图内若没有可靠逐条时间，识别出的消息会从这个时间开始按画面顺序排列。';
+    sentAtInput.value = chinaTimeInputNow();
+    sentAtInput.title = '默认使用当前北京时间，按 YYYY年MM月DD日 HH:mm:ss 修改，采用24小时制。聊天截图内若没有可靠逐条时间，识别出的消息会从这个时间开始按画面顺序排列。';
     sentAtInput.autocomplete = 'off';
     sentAtInput.className = 'requires-auth';
     sentAtInput.disabled = !currentAccessToken;

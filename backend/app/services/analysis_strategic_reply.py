@@ -224,6 +224,8 @@ class AnalysisStrategicReplyService:
             generation_context,
             provider=provider,
         )
+        if generated_reply is None:
+            raise LLMAnalysisError("no usable strategic reply draft")
         reply_candidates = [generated_reply] if generated_reply is not None else []
 
         reply_context = self.strategic_reply_service.build_context_from_recommendation_context(
@@ -231,6 +233,8 @@ class AnalysisStrategicReplyService:
             reply_candidates=reply_candidates,
             derived=True,
         )
+        if not isinstance(reply_context.get("draft"), str) or not reply_context["draft"].strip():
+            raise LLMAnalysisError("no usable strategic reply draft")
 
         learning_context = self.learning_strategy_bridge_service.get_context(
             conn, user_id, person_id
@@ -240,7 +244,13 @@ class AnalysisStrategicReplyService:
             {"candidates": []},
         )
 
-        return self.analysis_bridge_service.build_context(
+        result = self.analysis_bridge_service.build_context(
             reply_context,
             structured_analysis,
         )
+        result.setdefault("reply_inputs", {})["conversation_focus"] = {
+            "conversation_id": conversation_id,
+            "latest_human_message": conversation_focus.get("latest_human_message"),
+            "reply_target_message": conversation_focus.get("reply_target_message"),
+        }
+        return result
