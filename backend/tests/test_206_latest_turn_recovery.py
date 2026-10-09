@@ -16,8 +16,11 @@ from tests.test_strategic_reply import create_relationship
     ('analysis_once', 2, 1, 200),
     ('draft_once', 1, 2, 200),
     ('both_once', 2, 2, 200),
-    ('analysis_always', 2, 0, 502),
-    ('draft_always', 1, 2, 502),
+    # TEST-207 explicitly raises the authorized correction budget to three.
+    ('analysis_third', 4, 1, 200),
+    ('draft_third', 1, 4, 200),
+    ('analysis_always', 4, 0, 502),
+    ('draft_always', 1, 4, 502),
     ('invalid_id', 1, 1, 502),
     ('network', 1, 0, 502),
 ])
@@ -51,7 +54,8 @@ def test_qwen_latest_turn_recovery(client, monkeypatch, mode, analysis_calls, dr
         if mode == 'network':
             raise httpx.ConnectError('fake transport failure', request=request)
         attempt = len(calls[stage])
-        stale = mode == stage + '_always' or (mode in (stage + '_once', 'both_once') and attempt == 1)
+        stale = (mode == stage + '_always' or (mode in (stage + '_once', 'both_once') and attempt == 1)
+                 or (mode == stage + '_third' and attempt < 4))
         if stage == 'analysis':
             result = {key: [] for key in [
                 'observed_facts', 'inferences', 'unknowns', 'hypotheses',
@@ -86,14 +90,15 @@ def test_qwen_latest_turn_recovery(client, monkeypatch, mode, analysis_calls, dr
     for stage in calls:
         if calls[stage]:
             assert 'latest_turn_correction' not in calls[stage][0]
-        if len(calls[stage]) == 2:
-            assert calls[stage][1]['latest_turn_correction']['stage'] == stage
+        for attempt, context in enumerate(calls[stage][1:],start=1):
+            assert context['latest_turn_correction']['stage'] == stage
+            assert context['latest_turn_correction']['attempt'] == attempt
     if status == 200:
         assert response.json()['draft'] == '刚忙完，你呢？'
         assert response.json()['reply_inputs']['conversation_focus']['reply_target_message']['id'] == latest
     elif mode.endswith('_always'):
         detail = response.json()['detail']
-        assert '已自动纠正一次' in detail
+        assert '已自动纠正 3 次' in detail
         assert ('分析阶段' if mode == 'analysis_always' else '回复阶段') in detail
         assert latest not in detail and '你在干嘛呐' not in detail
     else:

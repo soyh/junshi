@@ -72,6 +72,8 @@ api_router.include_router(auth_account_router)
 api_router.include_router(auth_account_ui_router)
 api_router.include_router(auth_session_router)
 api_router.include_router(persons_router)
+from app.api.routes.person_memory import router as person_memory_router
+api_router.include_router(person_memory_router)
 api_router.include_router(person_profiles_router)
 api_router.include_router(relationships_router)
 api_router.include_router(relationship_state_router)

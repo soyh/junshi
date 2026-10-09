@@ -89,7 +89,7 @@ CARD_CLIENT_UNIFIED_IMPORT_STYLE = r'''
 
 CARD_CLIENT_UNIFIED_IMPORT_SCRIPT = r'''
   function clientUnifiedLooksLikeStructuredImport(text) {
-    const allowedSenders = new Set(['user', 'person', 'system', 'assistant']);
+    const allowedSenders = new Set(['user', 'person', 'system', 'assistant', '我', '对方']);
     const lines = String(text || '')
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -175,8 +175,14 @@ CARD_CLIENT_UNIFIED_IMPORT_SCRIPT = r'''
     if (textLabel) textLabel.textContent = '会话内容';
     if (textLabel) textWrap.appendChild(textLabel);
     if (text) {
-      text.placeholder = '直接粘贴一条消息，或粘贴多条：\n2026-09-21T12:00:00+00:00 | user | 第一条\n2026-09-21T12:01:00+00:00 | person | 第二条';
+      text.placeholder = '直接粘贴一条消息，或粘贴多条北京时间记录。格式示例见下方。';
       textWrap.appendChild(text);
+      const help = document.createElement('details');
+      const title = document.createElement('summary'); title.textContent = '查看批量导入示例（北京时间）';
+      const example = document.createElement('pre');
+      example.style.whiteSpace = 'pre-wrap';
+      example.textContent = '2026年09月26日 10:40:00 | 我 | 早早早\n2026年09月26日 10:41:00 | 对方 | 早呀\n\n批量记录使用各自的时间，不受上方单条发送时间影响。';
+      help.append(title,example); textWrap.appendChild(help);
     }
     controls.append(senderWrap, sentAtWrap, textWrap);
 

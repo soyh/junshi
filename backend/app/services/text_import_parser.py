@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from app.schemas.text_import import TextImportCandidate
 
@@ -26,11 +26,23 @@ def parse_text(text: str) -> list[TextImportCandidate]:
                 f"Invalid import format at line {line_number}"
             )
 
+        timestamp = match.group("sent_at").strip()
+        if '年' in timestamp:
+            try:
+                parsed = datetime.strptime(timestamp, '%Y年%m月%d日 %H:%M:%S')
+            except ValueError:
+                try:
+                    parsed = datetime.strptime(timestamp, '%Y年%m月%d日 %H:%M')
+                except ValueError as exc:
+                    raise ValueError(f'Invalid timestamp at line {line_number}') from exc
+            timestamp = parsed.replace(tzinfo=timezone(timedelta(hours=8))).isoformat()
+        sender = match.group("sender_type").strip()
+        sender = {'我':'user','对方':'person'}.get(sender,sender)
         candidates.append(
             TextImportCandidate(
                 line_number=line_number,
-                sent_at=match.group("sent_at").strip(),
-                sender_type=match.group("sender_type").strip(),
+                sent_at=timestamp,
+                sender_type=sender,
                 content=match.group("content").strip(),
             )
         )

@@ -55,7 +55,7 @@ CONVERSATION_CONTENT_SCRIPT = r'''
       ? 'Ready to import messages into the selected conversation.'
       : 'Select a conversation before importing.';
     byId('message-content').value = '';
-    byId('message-sent-at').value = '';
+    byId('message-sent-at').value = chinaTimeInputNow();
   }
 
   async function editHistoryMessage(item) {
@@ -196,7 +196,7 @@ CONVERSATION_CONTENT_SCRIPT = r'''
       body: JSON.stringify(payload),
     });
     byId('message-content').value = '';
-    byId('message-sent-at').value = '';
+    byId('message-sent-at').value = chinaTimeInputNow();
     await loadMessages(currentMessageWindow);
     messagesStatus.textContent = `Added ${created.sender_type} message at ${chinaTimeText(created.sent_at)}.`;
     window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {

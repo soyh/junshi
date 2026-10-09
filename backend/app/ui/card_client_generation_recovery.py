@@ -139,7 +139,7 @@ CARD_CLIENT_GENERATION_RECOVERY_SCRIPT = r'''
       if (!/自动跟进未完全完成/i.test(text)) return;
       // The backend already used its bounded freshness correction. Do not
       // automatically restart the entire paid pipeline after exhaustion.
-      if (text.includes('已自动纠正一次')) return;
+      if (text.includes('已自动纠正')) return;
       if (!selectedConversationId || clientReplyRecoveryBusy) return;
       const key = `${selectedConversationId}:${text}`;
       if (key === clientAutoReplyRecoveryKey) return;

@@ -30,7 +30,7 @@ def _build_provider(conn, user_id: str):
 def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
     if isinstance(exc, LatestTurnError) and exc.exhausted:
         stage = "分析阶段未形成基于最新消息的建议" if exc.stage == "analysis" else "回复阶段未正确引用最新消息"
-        return f"LLM analysis failed: {stage}；已自动纠正一次，仍未通过校验。请稍后重试或切换模型。"
+        return f"LLM analysis failed: {stage}；已自动纠正 {exc.corrections} 次，仍未通过校验。请稍后重试或切换模型。"
     if isinstance(exc, LLMRequestError):
         return "LLM analysis failed: " + LLMRequestError.MESSAGES[exc.category]
     raw_message = str(exc)

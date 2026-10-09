@@ -38,6 +38,7 @@ STRATEGIC_REPLY_SCRIPT = r'''
   const strategicReplyLearning = byId('strategic-reply-learning');
   let generatedStrategicReplyDraft = '';
   let strategicReplyRevision = 0;
+  let strategicReplyInFlight = null;
 
   function resetStrategicReply(message = 'Select a conversation first.') {
     strategicReplyRevision += 1;
@@ -133,13 +134,26 @@ STRATEGIC_REPLY_SCRIPT = r'''
   }
 
   async function loadStrategicReply() {
+    const existing = strategicReplyInFlight;
+    if (existing && existing.conversation === selectedConversationId
+        && existing.person === selectedPersonId && existing.token === currentAccessToken
+        && existing.revision === strategicReplyRevision) return existing.promise;
+    const promise = generateCurrentStrategicReply();
+    const pending = {promise,conversation:selectedConversationId,person:selectedPersonId,
+                     token:currentAccessToken,revision:strategicReplyRevision};
+    strategicReplyInFlight = pending;
+    try {return await promise;}
+    finally {if(strategicReplyInFlight===pending)strategicReplyInFlight=null;}
+  }
+
+  async function generateCurrentStrategicReply() {
     if (!selectedConversationId) throw new Error('Select a conversation first');
     const conversation = selectedConversationId;
     const person = selectedPersonId;
     const token = currentAccessToken;
     resetStrategicReply();
     const revision = strategicReplyRevision;
-    strategicReplyStatus.textContent = 'Generating strategic reply draft...';
+    strategicReplyStatus.textContent = '正在分析并生成回复；如遗漏最新消息，每个阶段最多自动纠正 3 次。';
     const isCurrent = () => revision === strategicReplyRevision && conversation === selectedConversationId
       && person === selectedPersonId && token === currentAccessToken;
     const stale = () => Object.assign(new Error('消息或会话已变化，已忽略过期回复。'), { superseded: true });
@@ -155,6 +169,12 @@ STRATEGIC_REPLY_SCRIPT = r'''
       throw new Error('模型未返回有效回复草稿，请重新生成。');
     }
     renderStrategicReply(data);
+    const timings=data?.reply_inputs?.timings;
+    if(timings && Number.isFinite(timings.total_seconds)){
+      const duration=document.createElement('div');
+      duration.textContent=`本次生成耗时 ${timings.total_seconds.toFixed(1)} 秒；分析 ${timings.analysis_attempts} 次，回复 ${timings.draft_attempts} 次。`;
+      strategicReplyContext.appendChild(duration);
+    }
     strategicReplyStatus.textContent = 'Reply draft generated. Review or edit it before copying. Nothing was sent, saved as a message, confirmed, or executed.';
   }
 
@@ -180,7 +200,7 @@ STRATEGIC_REPLY_SCRIPT = r'''
     if (!draft) throw new Error('Generate or enter the actual sent reply before preparing a message record');
     byId('message-sender').value = 'user';
     byId('message-content').value = draft;
-    byId('message-sent-at').value = '';
+    byId('message-sent-at').value = chinaTimeInputNow();
     byId('messages-status').textContent = 'Strategic Reply text prepared in the Message form only. Verify the exact text actually sent and Sent at, then click Add message. Nothing has been saved or sent yet.';
     byId('message-content').focus();
     strategicReplyStatus.textContent = 'Prepared the existing Message composer only. Add message remains a separate explicit action; nothing has been saved or sent.';

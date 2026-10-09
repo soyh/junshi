@@ -46,10 +46,12 @@ class AnalysisService:
             conversation_id,
         )
 
-        return {
+        from app.services.person_memory import context_memory
+        memory, retained = context_memory(conn, user_id, person['id'], [dict(m) for m in messages])
+        result = {
             "conversation": dict(conversation),
             "person": dict(person),
-            "messages": [dict(message) for message in messages],
+            "messages": retained,
             "facts": [],
             "inferences": [],
             "unknowns": [],
@@ -57,3 +59,6 @@ class AnalysisService:
             "learning_strategy": learning_strategy,
             "model_references": model_references,
         }
+        if memory:
+            result['person_memory'] = memory
+        return result

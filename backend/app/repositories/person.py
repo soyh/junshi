@@ -119,7 +119,13 @@ class PersonRepository:
             ),
         )
 
-        return self.get(conn, user_id, person_id)
+        updated = self.get(conn, user_id, person_id)
+        before = {key: existing[key] for key in ('name','nickname','notes')}
+        after = {key: updated[key] for key in ('name','nickname','notes')}
+        if before != after:
+            from app.services.person_memory import record_event
+            record_event(conn,user_id,person_id,'user','updated','用户手动提交人物资料修改。',before,after)
+        return updated
 
     def delete(
         self,

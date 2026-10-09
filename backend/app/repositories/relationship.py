@@ -149,7 +149,15 @@ class RelationshipRepository:
             ),
         )
 
-        return self.get(conn, user_id, relationship_id)
+        updated = self.get(conn, user_id, relationship_id)
+        fields = ('status','stage','long_term_goal','current_goal','notes')
+        before = {key: existing[key] for key in fields}
+        after = {key: updated[key] for key in fields}
+        if before != after:
+            from app.services.person_memory import record_event
+            record_event(conn,user_id,existing['person_id'],'user','updated',
+                         '用户手动提交关系资料修改。',before,after)
+        return updated
 
     def delete(
         self,

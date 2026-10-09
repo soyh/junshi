@@ -25,6 +25,7 @@ with sync_playwright() as p:
             function launch() { loadStrategicReply().then(()=>results.push('ok')).catch(e=>results.push(e.superseded?'stale':'error')); }
         ''' + STRATEGIC_REPLY_SCRIPT)
         page.evaluate('launch()')
+        page.evaluate('resetStrategicReply()')
         page.evaluate('launch()')
         page.evaluate("requests[1].resolve({draft:'最新建议'})")
         page.wait_for_function("document.getElementById('strategic-reply-draft').value==='最新建议'")

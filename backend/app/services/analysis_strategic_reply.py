@@ -1,5 +1,6 @@
 import sqlite3
 from copy import deepcopy
+from time import perf_counter
 from typing import Any
 
 from app.services.analysis_llm import AnalysisLLMService
@@ -17,6 +18,7 @@ class AnalysisStrategicReplyService:
     """Orchestrate AnalysisContext → Recommendation → evidence-backed reply draft."""
 
     RECENT_MESSAGE_LIMIT = 8
+    MAX_CORRECTIONS = 3
 
     def __init__(
         self,
@@ -169,6 +171,9 @@ class AnalysisStrategicReplyService:
         *,
         provider=None,
     ) -> dict:
+        started = perf_counter()
+        timings = {"analysis_seconds": 0.0, "draft_seconds": 0.0,
+                   "analysis_attempts": 0, "draft_attempts": 0}
         analysis_context = self.analysis_llm_service.analysis_service.get_context(
             conn, user_id, conversation_id
         )
@@ -177,7 +182,9 @@ class AnalysisStrategicReplyService:
         llm_analysis_context = dict(analysis_context)
         llm_analysis_context["conversation_focus"] = conversation_focus
 
-        for attempt in range(2):
+        for attempt in range(self.MAX_CORRECTIONS + 1):
+            phase_started = perf_counter()
+            timings["analysis_attempts"] += 1
             structured_analysis = self.analysis_llm_service.analyze_context(
                 llm_analysis_context, provider=provider,
             )
@@ -185,6 +192,7 @@ class AnalysisStrategicReplyService:
                 conn, user_id, conversation_id, provider=provider,
                 structured_analysis=structured_analysis,
             )
+            timings["analysis_seconds"] += perf_counter() - phase_started
             try:
                 recommendations = self._fresh_recommendations(
                     list(recommendation_context.get("recommendations", []) or []),
@@ -192,11 +200,11 @@ class AnalysisStrategicReplyService:
                 )
                 break
             except LatestTurnError:
-                if attempt:
-                    raise LatestTurnError("analysis", exhausted=True) from None
+                if attempt == self.MAX_CORRECTIONS:
+                    raise LatestTurnError("analysis", exhausted=True, corrections=attempt) from None
                 llm_analysis_context = deepcopy(llm_analysis_context)
                 llm_analysis_context["latest_turn_correction"] = {
-                    "stage": "analysis", "attempt": 1,
+                    "stage": "analysis", "attempt": attempt + 1,
                     "reason": "No usable hypothesis supported by the latest reply target survived validation.",
                     "instruction": "Re-analyze the actual latest reply target. Include a useful response hypothesis in hypotheses with its exact canonical message ID in evidence_source_ids. Merely mentioning it in summary or observed_facts is insufficient. Do not attach an ID to an unrelated hypothesis or invent missing facts.",
                 }
@@ -208,6 +216,7 @@ class AnalysisStrategicReplyService:
         )
 
         generation_context = {
+            "person_memory": analysis_context.get("person_memory"),
             "current_state": recommendation_context.get("current_state", {}),
             "evidence": evidence,
             "unknowns": recommendation_context.get("unknowns", []),
@@ -226,18 +235,22 @@ class AnalysisStrategicReplyService:
                 "must_not_auto_execute": True,
             },
         }
-        for attempt in range(2):
+        for attempt in range(self.MAX_CORRECTIONS + 1):
+            phase_started = perf_counter()
+            timings["draft_attempts"] += 1
             try:
                 generated_reply = self.strategic_reply_llm_service.generate(
                     generation_context, provider=provider,
                 )
+                timings["draft_seconds"] += perf_counter() - phase_started
                 break
             except LatestTurnError:
-                if attempt:
-                    raise LatestTurnError("draft", exhausted=True) from None
+                timings["draft_seconds"] += perf_counter() - phase_started
+                if attempt == self.MAX_CORRECTIONS:
+                    raise LatestTurnError("draft", exhausted=True, corrections=attempt) from None
                 generation_context = deepcopy(generation_context)
                 generation_context["latest_turn_correction"] = {
-                    "stage": "draft", "attempt": 1,
+                    "stage": "draft", "attempt": attempt + 1,
                     "reason": "The draft omitted mandatory latest-turn provenance.",
                     "instruction": "Generate a new reply that answers reply_target_message. Select supporting recommendation IDs and cite its exact canonical message ID in evidence_source_ids. Do not merely relabel the previous draft or invent facts.",
                 }
@@ -270,4 +283,6 @@ class AnalysisStrategicReplyService:
             "latest_human_message": conversation_focus.get("latest_human_message"),
             "reply_target_message": conversation_focus.get("reply_target_message"),
         }
+        timings["total_seconds"] = perf_counter() - started
+        result["reply_inputs"]["timings"] = timings
         return result
