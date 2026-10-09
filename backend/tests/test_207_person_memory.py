@@ -224,3 +224,19 @@ def test_progress_is_scoped_and_does_not_generate_or_expose_messages(client):
     assert client.get(url).json()=={'stage':'analysis','attempt':3,'max_corrections':3}
     assert client.get(url,headers={'X-User-ID':'other-progress-user'}).status_code==404
     assert client.get(url.replace(rid,str(uuid4()))).json()=={'stage':'pending'}
+
+
+def test_memory_json_object_transport_receives_explicit_schema(client):
+    import httpx,json
+    from app.services.qwen_provider import QwenProvider
+    proposal=MemoryProvider().summarize_person({'messages':[{'id':'m'}]})
+    def handle(request):
+        data=json.loads(request.content)
+        assert data['response_format']=={'type':'json_object'}
+        assert 'Required JSON schema:' in data['messages'][0]['content']
+        for field in ['description','inferences','relationship_stage','evidence_source_ids']:
+            assert field in data['messages'][0]['content']
+        return httpx.Response(200,json={'choices':[{'message':{'content':json.dumps(proposal)}}]})
+    with httpx.Client(transport=httpx.MockTransport(handle)) as transport:
+        provider=QwenProvider(api_key='synthetic',model='qwen-plus',client=transport)
+        assert provider.summarize_person({'messages':[{'id':'m'}]})==proposal

@@ -68,5 +68,23 @@ with sync_playwright() as p:
         assert '你在干嘛呐' in page.locator('#strategic-reply-context').inner_text()
         assert page.evaluate('requests.length') == 6
         page.close()
+    page=browser.new_page()
+    page.route('**/*',lambda route:route.fulfill(content_type='text/html',body=STRATEGIC_REPLY_HTML+
+        '<select id="person-select"></select><select id="conversation-select"></select>'))
+    page.goto('http://localhost/app')
+    page.add_script_tag(content=CHINA_TIME_SCRIPT+'''
+      const byId=id=>document.getElementById(id);
+      let selectedConversationId='c1',selectedPersonId='p1',currentAccessToken='t1';
+      function resetWorkspace(){} function bind(){}
+      async function api(url){
+        if(url.includes('/progress/'))return {stage:'analysis',attempt:3,max_corrections:3};
+        return new Promise(resolve=>window.finishReply=resolve);
+      }
+    '''+STRATEGIC_REPLY_SCRIPT)
+    page.evaluate('void loadStrategicReply()')
+    page.wait_for_function("document.getElementById('strategic-reply-status').textContent.includes('自动纠正第 2/3 次')")
+    page.evaluate("finishReply({draft:'根据最新消息生成的回复'})")
+    page.wait_for_function("document.getElementById('strategic-reply-draft').value==='根据最新消息生成的回复'")
+    page.close()
     browser.close()
 print('TEST-205 reply ordering, blank rejection, scope and pending evidence: PASS')
