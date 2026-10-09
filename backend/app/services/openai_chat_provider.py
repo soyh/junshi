@@ -437,13 +437,37 @@ class OpenAIChatProvider(LLMProvider):
         )
 
     @staticmethod
+    def _latest_turn_requirement(context: dict[str, Any], stage: str) -> str:
+        focus = context.get("conversation_focus") or {}
+        required = focus.get("required_evidence_source_ids") or []
+        if not required:
+            return ""
+        instruction = (
+            "Include at least one useful latest-turn response hypothesis in hypotheses, "
+            "with its exact message ID in evidence_source_ids. A mention only in summary, "
+            "observed_facts or evidence_links cannot produce a reply recommendation. "
+            if stage == "analysis" else
+            "Answer reply_target_message directly, select a supplied supporting recommendation, "
+            "and include its exact latest-message ID in evidence_source_ids. "
+        )
+        correction = context.get("latest_turn_correction")
+        return (
+            "Latest-turn requirement: " + instruction
+            + "Mandatory canonical message IDs: " + json.dumps(required, ensure_ascii=False) + ". "
+            + "Never attach a required ID to unrelated content or invent current facts. "
+            + ("The preceding attempt failed this check. Reconsider the latest message and generate a corrected result. "
+               if correction else "")
+        )
+
+    @staticmethod
     def _user_prompt(context: dict[str, Any]) -> str:
         return (
             "Analyze the following AnalysisContext and output the required JSON object. "
             "Apply conversation_focus before older context when it is present. "
             "When model_references is present, apply enabled items in stable priority "
             "order while preserving each reference_id/name/type boundary and the system "
-            "precedence rules. Do not add markdown fences or explanatory text.\n\n"
+            "precedence rules. Do not add markdown fences or explanatory text. "
+            + OpenAIChatProvider._latest_turn_requirement(context, "analysis") + "\n\n"
             + json.dumps(context, ensure_ascii=False, sort_keys=True, default=str)
         )
 
@@ -484,7 +508,8 @@ class OpenAIChatProvider(LLMProvider):
             "required JSON object. The current conversation focus is authoritative for "
             "what needs a reply now. Apply enabled model_references only within the "
             "system-defined reference semantics and priority order. Do not add markdown "
-            "fences or explanatory text.\n\n"
+            "fences or explanatory text. "
+            + OpenAIChatProvider._latest_turn_requirement(context, "draft") + "\n\n"
             + json.dumps(context, ensure_ascii=False, sort_keys=True, default=str)
         )
 

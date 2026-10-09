@@ -1,9 +1,10 @@
 import sqlite3
+from copy import deepcopy
 from typing import Any
 
 from app.services.analysis_llm import AnalysisLLMService
 from app.services.analysis_recommendation import AnalysisRecommendationService
-from app.services.llm import LLMAnalysisError
+from app.services.llm import LLMAnalysisError, LatestTurnError
 from app.services.strategic_reply import StrategicReplyService
 from app.services.strategic_reply_analysis_bridge import StrategicReplyAnalysisBridgeService
 from app.services.strategic_reply_learning_strategy_bridge import (
@@ -115,9 +116,7 @@ class AnalysisStrategicReplyService:
             )
         ]
         if not fresh:
-            raise LLMAnalysisError(
-                "LLM provider returned no fresh recommendation for current reply target"
-            )
+            raise LatestTurnError("analysis")
         return fresh
 
     @classmethod
@@ -178,22 +177,29 @@ class AnalysisStrategicReplyService:
         llm_analysis_context = dict(analysis_context)
         llm_analysis_context["conversation_focus"] = conversation_focus
 
-        structured_analysis = self.analysis_llm_service.analyze_context(
-            llm_analysis_context,
-            provider=provider,
-        )
-
-        recommendation_context = self.analysis_recommendation_service.build_context(
-            conn,
-            user_id,
-            conversation_id,
-            provider=provider,
-            structured_analysis=structured_analysis,
-        )
-        recommendations = self._fresh_recommendations(
-            list(recommendation_context.get("recommendations", []) or []),
-            conversation_focus,
-        )
+        for attempt in range(2):
+            structured_analysis = self.analysis_llm_service.analyze_context(
+                llm_analysis_context, provider=provider,
+            )
+            recommendation_context = self.analysis_recommendation_service.build_context(
+                conn, user_id, conversation_id, provider=provider,
+                structured_analysis=structured_analysis,
+            )
+            try:
+                recommendations = self._fresh_recommendations(
+                    list(recommendation_context.get("recommendations", []) or []),
+                    conversation_focus,
+                )
+                break
+            except LatestTurnError:
+                if attempt:
+                    raise LatestTurnError("analysis", exhausted=True) from None
+                llm_analysis_context = deepcopy(llm_analysis_context)
+                llm_analysis_context["latest_turn_correction"] = {
+                    "stage": "analysis", "attempt": 1,
+                    "reason": "No usable hypothesis supported by the latest reply target survived validation.",
+                    "instruction": "Re-analyze the actual latest reply target. Include a useful response hypothesis in hypotheses with its exact canonical message ID in evidence_source_ids. Merely mentioning it in summary or observed_facts is insufficient. Do not attach an ID to an unrelated hypothesis or invent missing facts.",
+                }
         evidence = self._focused_evidence(
             recommendation_context,
             analysis_context,
@@ -220,10 +226,21 @@ class AnalysisStrategicReplyService:
                 "must_not_auto_execute": True,
             },
         }
-        generated_reply = self.strategic_reply_llm_service.generate(
-            generation_context,
-            provider=provider,
-        )
+        for attempt in range(2):
+            try:
+                generated_reply = self.strategic_reply_llm_service.generate(
+                    generation_context, provider=provider,
+                )
+                break
+            except LatestTurnError:
+                if attempt:
+                    raise LatestTurnError("draft", exhausted=True) from None
+                generation_context = deepcopy(generation_context)
+                generation_context["latest_turn_correction"] = {
+                    "stage": "draft", "attempt": 1,
+                    "reason": "The draft omitted mandatory latest-turn provenance.",
+                    "instruction": "Generate a new reply that answers reply_target_message. Select supporting recommendation IDs and cite its exact canonical message ID in evidence_source_ids. Do not merely relabel the previous draft or invent facts.",
+                }
         if generated_reply is None:
             raise LLMAnalysisError("no usable strategic reply draft")
         reply_candidates = [generated_reply] if generated_reply is not None else []

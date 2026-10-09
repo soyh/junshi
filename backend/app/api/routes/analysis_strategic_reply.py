@@ -4,7 +4,7 @@ from app.core.context import get_current_user_id
 from app.core.database import get_connection
 from app.schemas.analysis_strategic_reply import AnalysisStrategicReplyContextResponse
 from app.services.analysis_strategic_reply import AnalysisStrategicReplyService
-from app.services.llm import LLMAnalysisError, LLMRequestError
+from app.services.llm import LLMAnalysisError, LLMRequestError, LatestTurnError
 from app.services.llm_provider_config import (
     LLMProviderConfigError,
     LLMProviderConfigService,
@@ -28,6 +28,9 @@ def _build_provider(conn, user_id: str):
 
 
 def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
+    if isinstance(exc, LatestTurnError) and exc.exhausted:
+        stage = "分析阶段未形成基于最新消息的建议" if exc.stage == "analysis" else "回复阶段未正确引用最新消息"
+        return f"LLM analysis failed: {stage}；已自动纠正一次，仍未通过校验。请稍后重试或切换模型。"
     if isinstance(exc, LLMRequestError):
         return "LLM analysis failed: " + LLMRequestError.MESSAGES[exc.category]
     raw_message = str(exc)

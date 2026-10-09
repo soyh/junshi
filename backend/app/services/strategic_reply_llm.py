@@ -1,7 +1,7 @@
 from typing import Any
 
 from app.schemas.strategic_reply_generation import StrategicReplyGeneration
-from app.services.llm import LLMAnalysisError, LLMProvider
+from app.services.llm import LLMAnalysisError, LLMProvider, LatestTurnError
 
 
 class StrategicReplyLLMService:
@@ -77,8 +77,6 @@ class StrategicReplyLLMService:
         if required_evidence_ids and not required_evidence_ids.intersection(
             candidate.evidence_source_ids
         ):
-            raise LLMAnalysisError(
-                "LLM provider returned stale strategic reply provenance"
-            )
+            raise LatestTurnError("draft")
 
         return candidate.model_dump(mode="json")

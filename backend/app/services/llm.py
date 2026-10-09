@@ -23,6 +23,18 @@ class LLMAnalysisError(RuntimeError):
     pass
 
 
+class LatestTurnError(LLMAnalysisError):
+    """Typed freshness failure, without provider text or conversation contents."""
+
+    def __init__(self, stage: str, *, exhausted: bool = False):
+        self.stage = stage
+        self.exhausted = exhausted
+        super().__init__(
+            "LLM provider returned no fresh recommendation for current reply target"
+            if stage == "analysis" else "LLM provider returned stale strategic reply provenance"
+        )
+
+
 class LLMRequestError(LLMAnalysisError):
     """Allowlisted public diagnostics; never include provider response bodies."""
     MESSAGES = {
