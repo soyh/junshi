@@ -130,3 +130,47 @@ def test_chinese_batch_examples_parse_to_beijing_without_touching_iso():
     assert rows[0].sent_at=='2026-09-26T10:40:00+08:00'
     assert parse_text('2026-09-26T20:00:00Z | person | hello')[0].sent_at.endswith('Z')
     with pytest.raises(ValueError):parse_text('2026年02月30日 10:40 | 我 | 错误日期')
+
+
+def test_additive_migration_preserves_existing_schema_and_data(tmp_path):
+    import sqlite3
+    from pathlib import Path
+    folder=Path(__file__).parents[1]/'migrations'
+    with sqlite3.connect(tmp_path/'migration.sqlite3') as conn:
+        conn.execute('PRAGMA foreign_keys=ON')
+        for path in sorted(folder.glob('*.sql')):
+            if path.name.startswith('020_'):continue
+            conn.executescript(path.read_text(encoding='utf-8'))
+        conn.execute("INSERT INTO users(id) VALUES ('migration-user')")
+        conn.execute("INSERT INTO persons(id,user_id,name,notes) VALUES ('migration-person','migration-user','保留人物','保留备注')")
+        conn.commit()
+        before=conn.execute("SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name").fetchall()
+        person=conn.execute('SELECT * FROM persons').fetchall()
+        sql=(folder/'020_person_memory_audit.sql').read_text(encoding='utf-8')
+        conn.executescript(sql);conn.executescript(sql)
+        after=conn.execute("SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name").fetchall()
+        assert all(row in after for row in before)
+        assert conn.execute('SELECT * FROM persons').fetchall()==person
+        assert conn.execute('PRAGMA integrity_check').fetchone()==('ok',)
+        assert conn.execute('PRAGMA foreign_key_check').fetchall()==[]
+
+
+def test_reference_selection_is_reused_but_changed_library_invalidates_it(monkeypatch):
+    from app.services.qwen_provider import QwenProvider
+    calls=[]
+    provider=QwenProvider(api_key='test')
+    def select(catalog,query):
+        calls.append((deepcopy(catalog),query))
+        return ['a']
+    monkeypatch.setattr(provider,'_select_reference_ids',select)
+    refs={'items':[], 'candidates':[{'reference_id':'a','type':'document','name':'a.md','content':'v1'}],
+          'catalog':[{'reference_id':'a','name':'a.md'}], 'retrieval':{'query':'latest topic'}}
+    context={'model_references':refs,'messages':[{'id':'current'}]}
+    first=provider._prepare_context(context)
+    second=provider._prepare_context(context)
+    assert len(calls)==1
+    assert first==second and second['messages']==[{'id':'current'}]
+    refs['candidates'][0]['content']='v2'
+    third=provider._prepare_context(context)
+    assert len(calls)==2 and third['model_references']['items'][0]['content']=='v2'
+    assert context['model_references'] is refs and 'candidates' in refs

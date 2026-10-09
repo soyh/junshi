@@ -21,7 +21,8 @@ def test_unified_import_reuses_verified_single_and_batch_paths():
     assert "await importTextBatch()" in CARD_CLIENT_UNIFIED_IMPORT_SCRIPT
     assert "byId('message-content').value = text.trim()" in CARD_CLIENT_UNIFIED_IMPORT_SCRIPT
     assert 'await createMessage()' in CARD_CLIENT_UNIFIED_IMPORT_SCRIPT
-    assert "new Set(['user', 'person', 'system', 'assistant'])" in CARD_CLIENT_UNIFIED_IMPORT_SCRIPT
+    # TEST-207's displayed Beijing examples explicitly support Chinese aliases.
+    assert "new Set(['user', 'person', 'system', 'assistant', '我', '对方'])" in CARD_CLIENT_UNIFIED_IMPORT_SCRIPT
 
 
 def test_unified_import_keeps_current_conversation_scope_and_automation_boundary():

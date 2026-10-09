@@ -24,6 +24,12 @@ with sync_playwright() as p:
             function api(url) {return new Promise((resolve,reject)=>requests.push({url,resolve,reject}));}
             function launch() { loadStrategicReply().then(()=>results.push('ok')).catch(e=>results.push(e.superseded?'stale':'error')); }
         ''' + STRATEGIC_REPLY_SCRIPT)
+        # Repeated clicks with no evidence change share the pending request.
+        page.evaluate('launch(); launch()')
+        assert page.evaluate('requests.length') == 1
+        page.evaluate("requests[0].resolve({draft:'同一请求'})")
+        page.wait_for_function('results.length===2')
+        page.evaluate('requests=[];results=[]')
         page.evaluate('launch()')
         page.evaluate('resetStrategicReply()')
         page.evaluate('launch()')
