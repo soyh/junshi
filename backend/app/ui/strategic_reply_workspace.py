@@ -157,12 +157,29 @@ STRATEGIC_REPLY_SCRIPT = r'''
     const isCurrent = () => revision === strategicReplyRevision && conversation === selectedConversationId
       && person === selectedPersonId && token === currentAccessToken;
     const stale = () => Object.assign(new Error('消息或会话已变化，已忽略过期回复。'), { superseded: true });
+    const requestId = globalThis.crypto?.randomUUID?.();
+    let progressTimer=null, finished=false;
+    const pollProgress=async()=>{
+      if(finished || !isCurrent() || !requestId)return;
+      try{
+        const progress=await api(`/api/v1/conversations/${encodeURIComponent(conversation)}/strategic-reply/progress/${requestId}`);
+        if(!finished && isCurrent() && ['analysis','draft'].includes(progress.stage)){
+          const stage=progress.stage==='analysis'?'分析聊天':'生成回复';
+          strategicReplyStatus.textContent=progress.attempt>1?`正在${stage}，自动纠正第 ${progress.attempt-1}/3 次…`:`正在${stage}…`;
+        }
+      }catch(_){} // Progress failure must never fail the actual generation.
+      if(!finished && isCurrent())progressTimer=setTimeout(pollProgress,2000);
+    };
+    if(requestId)progressTimer=setTimeout(pollProgress,2000);
     let data;
+    const replyPath = `/api/v1/conversations/${encodeURIComponent(conversation)}/strategic-reply/context`;
     try {
-      data = await api(`/api/v1/conversations/${encodeURIComponent(conversation)}/strategic-reply/context`);
+      data = await api(replyPath + (requestId?'?request_id='+requestId:''));
     } catch (error) {
       if (!isCurrent()) throw stale();
       throw error;
+    } finally {
+      finished=true;clearTimeout(progressTimer);
     }
     if (!isCurrent()) throw stale();
     if (!data || typeof data.draft !== 'string' || !data.draft.replace(/[\s\u200b-\u200f\ufeff]/g, '')) {

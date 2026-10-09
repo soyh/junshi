@@ -170,6 +170,7 @@ class AnalysisStrategicReplyService:
         conversation_id: str,
         *,
         provider=None,
+        progress=None,
     ) -> dict:
         started = perf_counter()
         timings = {"analysis_seconds": 0.0, "draft_seconds": 0.0,
@@ -183,6 +184,7 @@ class AnalysisStrategicReplyService:
         llm_analysis_context["conversation_focus"] = conversation_focus
 
         for attempt in range(self.MAX_CORRECTIONS + 1):
+            if progress: progress('analysis', attempt + 1)
             phase_started = perf_counter()
             timings["analysis_attempts"] += 1
             structured_analysis = self.analysis_llm_service.analyze_context(
@@ -236,6 +238,7 @@ class AnalysisStrategicReplyService:
             },
         }
         for attempt in range(self.MAX_CORRECTIONS + 1):
+            if progress: progress('draft', attempt + 1)
             phase_started = perf_counter()
             timings["draft_attempts"] += 1
             try:

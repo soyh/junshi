@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
 
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
@@ -74,16 +75,25 @@ def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
 )
 def get_analysis_strategic_reply_context(
     conversation_id: str,
+    request_id: UUID | None = None,
     user_id: str = Depends(get_current_user_id),
 ):
+    from app.services.reply_progress import publish
+    progress = (lambda stage, attempt=0: publish(user_id,conversation_id,str(request_id),stage,attempt)) if request_id else None
+    completed = False
     try:
         with get_connection() as conn:
-            return service.build_context(
+            kwargs = {'progress': progress} if progress else {}
+            result = service.build_context(
                 conn,
                 user_id,
                 conversation_id,
                 provider=_build_provider(conn, user_id),
+                **kwargs,
             )
+            if progress: progress('complete')
+            completed = True
+            return result
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -99,3 +109,16 @@ def get_analysis_strategic_reply_context(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=_safe_llm_failure_detail(exc),
         ) from exc
+    finally:
+        if progress and not completed:
+            progress('failed')
+
+
+@router.get('/progress/{request_id}')
+def get_reply_progress(conversation_id: str, request_id: UUID,
+                       user_id: str = Depends(get_current_user_id)):
+    from app.services.reply_progress import read
+    with get_connection() as conn:
+        if not conn.execute('SELECT 1 FROM conversations WHERE id=? AND user_id=?',(conversation_id,user_id)).fetchone():
+            raise HTTPException(404,'Conversation not found')
+    return read(user_id,conversation_id,str(request_id))

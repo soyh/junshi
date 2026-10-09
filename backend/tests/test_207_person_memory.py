@@ -45,13 +45,15 @@ def test_incremental_memory_compresses_only_covered_history_and_audits(client):
     assert memory.refresh_memory(LOCAL_USER_ID,c['person_id'],provider,max_batches=1)['status']=='partial'
     s=state(client,c)
     assert (s['covered_count'],s['total_count'])==(32,36)
-    assert s['events'][0]['reason'] and s['events'][0]['before']['relationship']['status']!=s['events'][0]['after']['relationship']['status']
+    assert s['events'][0]['reason'] and s['events'][0]['after']['relationship_update_deferred']
+    assert s['events'][0]['before']['relationship']['status']==s['events'][0]['after']['relationship']['status']
     with get_connection() as conn:
         context=AnalysisService().get_context(conn,LOCAL_USER_ID,c['id'])
     assert len(context['messages'])==16
     assert context['messages'][-1]['id']==rows[-1]['id']
     assert context['person_memory']['summary']['constraints']==['不要替用户承诺见面']
     assert memory.refresh_memory(LOCAL_USER_ID,c['person_id'],provider)['status']=='current'
+    assert state(client,c)['events'][0]['after']['relationship']['status']=='互动积极'
     assert len(provider.calls[1]['messages'])==4
     assert provider.calls[1]['previous_summary']['description']
     count=len(provider.calls)
@@ -174,3 +176,51 @@ def test_reference_selection_is_reused_but_changed_library_invalidates_it(monkey
     third=provider._prepare_context(context)
     assert len(calls)==2 and third['model_references']['items'][0]['content']=='v2'
     assert context['model_references'] is refs and 'candidates' in refs
+
+
+def test_memory_retains_human_target_when_recent_records_are_system_evidence(client):
+    c,rows=setup_history(client)
+    from app.repositories.message import MessageRepository
+    # System evidence is created internally by media analysis, never by the
+    # public user-message endpoint (which correctly forbids this sender).
+    with get_connection() as conn:
+        for n in range(20):
+            MessageRepository().create(conn,LOCAL_USER_ID,c['id'],'system',
+                '图片分析摘要',f'2026-09-27T10:{n:02}:00+08:00')
+    memory.refresh_memory(LOCAL_USER_ID,c['person_id'],MemoryProvider())
+    with get_connection() as conn:
+        context=AnalysisService().get_context(conn,LOCAL_USER_ID,c['id'])
+    assert rows[-1]['id'] in {m['id'] for m in context['messages']}
+
+
+def test_summary_size_and_empty_relationship_fields_are_rejected():
+    from app.schemas.person_memory import PersonMemoryProposal
+    from pydantic import ValidationError
+    proposal=MemoryProvider().summarize_person({'messages':[{'id':'m'}]})
+    proposal['relationship_stage']='   '
+    with pytest.raises(ValidationError):PersonMemoryProposal.model_validate(proposal)
+    proposal['relationship_stage']=None
+    proposal['facts']=['长'*500]*30
+    with pytest.raises(ValidationError):PersonMemoryProposal.model_validate(proposal)
+
+
+def test_failed_status_does_not_depend_on_audit_pagination(client):
+    c,_=setup_history(client)
+    with get_connection() as conn:
+        memory.record_event(conn,LOCAL_USER_ID,c['person_id'],'ai','updated','旧记录',{}, {})
+        memory.record_event(conn,LOCAL_USER_ID,c['person_id'],'ai','failed','最新失败',{}, {})
+        data=memory.read_memory(conn,LOCAL_USER_ID,c['person_id'],limit=1,offset=1)
+    assert data['events'][0]['outcome']=='updated'
+    assert data['latest_outcome']=='failed'
+
+
+def test_progress_is_scoped_and_does_not_generate_or_expose_messages(client):
+    from uuid import uuid4
+    from app.services.reply_progress import publish
+    c,_=setup_history(client)
+    rid=str(uuid4())
+    publish(LOCAL_USER_ID,c['id'],rid,'analysis',3)
+    url=f"/api/v1/conversations/{c['id']}/strategic-reply/progress/{rid}"
+    assert client.get(url).json()=={'stage':'analysis','attempt':3,'max_corrections':3}
+    assert client.get(url,headers={'X-User-ID':'other-progress-user'}).status_code==404
+    assert client.get(url.replace(rid,str(uuid4()))).json()=={'stage':'pending'}

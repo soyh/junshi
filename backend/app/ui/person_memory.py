@@ -18,7 +18,7 @@ PERSON_MEMORY_SCRIPT = r'''
     memoryStatus.textContent=(data.stale?'原记录已变更，旧摘要已停用。':'')+`已分析 ${data.covered_count}/${data.total_count} 条聊天。`+(data.running?'后台正在更新…':'');
     memorySummaryBody.replaceChildren();
     memoryLine(memorySummaryBody,data.summary.description || '尚未建立摘要。');
-    for(const [key,label] of [['facts','长期事实'],['constraints','约定与边界'],['unknowns','待确认事项']]){
+    for(const [key,label] of [['facts','长期事实'],['inferences','分析推断'],['constraints','约定与边界'],['unknowns','待确认事项']]){
       for(const text of data.summary[key] || [])memoryLine(memorySummaryBody,`${label}：${text}`);
     }
     memoryEvents.replaceChildren();
@@ -32,11 +32,28 @@ PERSON_MEMORY_SCRIPT = r'''
         if(before?.[key]!==after?.[key] && (before?.[key]!==undefined || after?.[key]!==undefined))memoryLine(row,`${label}：${before?.[key] ?? '未设置'} → ${after?.[key] ?? '未设置'}`);
       }
       if(event.after.from)memoryLine(row,`分析范围：${chinaTimeText(event.after.from)} — ${chinaTimeText(event.after.to)}`);
+      if(event.after.relationship_update_deferred)memoryLine(row,'较新聊天仍在分析中，关系状态将在全部处理后更新。');
       if(event.before.summary)memoryLine(row,`修改前摘要：${event.before.summary.description || '无'}`);
       if(event.after.summary)memoryLine(row,`修改后摘要：${event.after.summary.description || '无'}`);
-      if(event.after.summary)for(const [key,label] of [['facts','事实'],['constraints','约束'],['unknowns','不确定事项']]){
+      if(event.after.summary)for(const [key,label] of [['facts','事实'],['inferences','推断'],['constraints','约束'],['unknowns','不确定事项']]){
         memoryLine(row,`原${label}：${(event.before.summary?.[key] || []).join('；') || '无'}`);
         memoryLine(row,`新${label}：${(event.after.summary[key] || []).join('；') || '无'}`);
+      }
+      if(event.evidence?.length){
+        const sources=document.createElement('details'),sourceTitle=document.createElement('summary');
+        sourceTitle.textContent=`查看关联聊天依据（${event.evidence.length} 条）`;sources.append(sourceTitle);
+        const person=selectedPersonId,token=currentAccessToken;
+        let loaded=false;
+        sources.addEventListener('toggle',async()=>{
+          if(!sources.open || loaded)return;loaded=true;
+          for(const id of event.evidence){
+            try{
+              const message=await api(`/api/v1/messages/${encodeURIComponent(id)}`);
+              if(person!==selectedPersonId || token!==currentAccessToken)return;
+              memoryLine(sources,`${chinaTimeText(message.sent_at)} · ${message.sender_type==='person'?'对方':'我'}：${message.content}`);
+            }catch(_){if(person===selectedPersonId && token===currentAccessToken)memoryLine(sources,'这条依据已删除或暂时无法读取。');}
+          }
+        });row.appendChild(sources);
       }
       memoryEvents.appendChild(row);
     }
@@ -49,7 +66,7 @@ PERSON_MEMORY_SCRIPT = r'''
     try{
       const data=await api(`/api/v1/persons/${encodeURIComponent(person)}/memory?offset=${personMemoryOffset}`);
       if(!current())return;memoryRender(data);
-      const failed=!data.running && data.events[0]?.outcome==='failed';
+      const failed=!data.running && data.latest_outcome==='failed';
       if(continueUpdate && !failed && !data.running && (data.stale || data.covered_count<data.total_count)){
         await api(`/api/v1/persons/${encodeURIComponent(person)}/memory/refresh`,{method:'POST'});
         if(!current())return;

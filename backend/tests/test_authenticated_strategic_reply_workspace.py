@@ -192,7 +192,9 @@ def test_strategic_reply_prepares_existing_message_composer_without_persisting(c
 
     assert "byId('message-sender').value = 'user';" in fragment
     assert "byId('message-content').value = draft;" in fragment
-    assert "byId('message-sent-at').value = '';" in fragment
+    # TEST-207 user requirement: preparing a message now supplies a real Beijing
+    # timestamp; persistence still requires the separate explicit Add action.
+    assert "byId('message-sent-at').value = chinaTimeInputNow();" in fragment
     assert "then click Add message" in fragment
     assert "Add message remains a separate explicit action" in fragment
     assert "api(" not in fragment

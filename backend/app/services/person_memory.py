@@ -53,6 +53,10 @@ def snapshot(conn, user_id, person_id):
 
 def read_memory(conn, user_id, person_id, *, limit=20, offset=0):
     s = snapshot(conn, user_id, person_id)
+    latest = conn.execute(
+        'SELECT outcome FROM person_update_events WHERE user_id=? AND person_id=? ORDER BY created_at DESC,id DESC LIMIT 1',
+        (user_id, person_id),
+    ).fetchone()
     events = []
     for row in conn.execute(
         "SELECT * FROM person_update_events WHERE user_id=? AND person_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?",
@@ -66,7 +70,8 @@ def read_memory(conn, user_id, person_id, *, limit=20, offset=0):
             "covered_count": 0 if s['stale'] else len(s['coverage']), "total_count": len(s['messages']),
             "updated_at": s['updated_at'], "revision": s['revision'], "events": events,
             "has_more": conn.execute("SELECT COUNT(*) FROM person_update_events WHERE user_id=? AND person_id=?", (user_id,person_id)).fetchone()[0] > offset + len(events),
-            "running": (user_id, person_id) in _running}
+            "running": (user_id, person_id) in _running,
+            "latest_outcome": latest['outcome'] if latest else None}
 
 
 def context_memory(conn, user_id, person_id, messages):
@@ -74,6 +79,10 @@ def context_memory(conn, user_id, person_id, messages):
     if s['stale'] or not s['summary']:
         return None, messages
     recent = {m['id'] for m in messages[-16:]}
+    for senders in ({'user', 'person'}, {'person'}):
+        latest = next((m for m in reversed(messages) if m.get('sender_type') in senders), None)
+        if latest:
+            recent.add(latest['id'])
     retained = [m for m in messages if m['id'] in recent or m['id'] not in s['coverage']]
     return {"derived": True, "summary": s['summary'], "updated_at": s['updated_at'],
             "covered_count": len(s['coverage']), "original_message_count": len(messages),
@@ -115,7 +124,7 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
             ids = {m['id'] for m in batch}
             if not set(proposal.evidence_source_ids).issubset(ids):
                 raise ValueError("invalid memory provenance")
-            summary = proposal.model_dump(include={'description', 'facts', 'constraints', 'unknowns'})
+            summary = proposal.model_dump(include={'description', 'facts', 'inferences', 'constraints', 'unknowns'})
             coverage.update({m['id']: s['hashes'][m['id']] for m in batch})
             with get_connection() as conn:
                 # Acquire the write reservation only after the network call.
@@ -127,7 +136,10 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
                     return {"status": "superseded"}
                 before = {"summary": s['summary'], "relationship": s['relationship']}
                 rel = s['relationship']
-                if proposal.relationship_status is not None or proposal.relationship_stage is not None:
+                # Never publish an old-history batch's relationship as today's
+                # state while newer unprocessed messages are still pending.
+                complete = len(coverage) == len(s['messages'])
+                if complete and (proposal.relationship_status is not None or proposal.relationship_stage is not None):
                     if rel is None:
                         from app.repositories.relationship import RelationshipRepository
                         rel = dict(RelationshipRepository().create(conn,user_id,person_id,'unknown','unknown',None,None,None))
@@ -139,7 +151,8 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
                 record_event(conn,user_id,person_id,'ai','updated',
                              ('原始记录已变更，本批重新建立摘要。' if s['stale'] else '')+proposal.reason,before,
                              {"summary":summary,"relationship":rel,"covered_count":len(coverage),
-                              "total_count":len(s['messages']),"from":batch[0]['sent_at'],"to":batch[-1]['sent_at']},proposal.evidence_source_ids)
+                              "total_count":len(s['messages']),"relationship_update_deferred":not complete,
+                              "from":batch[0]['sent_at'],"to":batch[-1]['sent_at']},proposal.evidence_source_ids)
         return {"status": "partial"}
     except Exception:
         # Never persist provider bodies, credentials or arbitrary exception text.
