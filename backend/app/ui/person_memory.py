@@ -27,7 +27,45 @@ PERSON_MEMORY_SCRIPT = r'''
   const memoryDrawer=document.createElement('details');memoryDrawer.id='person-memory-details';
   const memoryDrawerTitle=document.createElement('summary');memoryDrawerTitle.textContent='展开档案与更新记录';
   const memoryPages=document.createElement('div');memoryPages.className='memory-pages';memoryPages.append(memoryOlder,memoryLatest);
-  memoryDrawer.append(memoryDrawerTitle,memorySummary,memoryEvents,memoryPages);
+  const profileDetails=document.createElement('details');
+  const profileTitle=document.createElement('summary');profileTitle.textContent='查看完整档案条目与依据';
+  const profileBody=document.createElement('div');profileBody.className='memory-events';
+  const profileMore=document.createElement('button');profileMore.type='button';profileMore.textContent='加载更多档案条目';
+  let profileOffset=0,profileLoaded=false,profileBusy=false;
+  async function profileLoad(){
+    if(profileBusy || !selectedPersonId)return;
+    const person=selectedPersonId,epoch=personMemoryEpoch;profileBusy=true;profileMore.disabled=true;
+    try{
+      const data=await api(`/api/v1/persons/${encodeURIComponent(person)}/memory/profile?offset=${profileOffset}`);
+      if(person!==selectedPersonId || epoch!==personMemoryEpoch)return;
+      if(!profileLoaded){profileBody.replaceChildren();memoryLine(profileBody,'所有人物采用相同规则；回复时仅选取预算内的相关条目，不发送完整档案。');}
+      if(data.stale)memoryLine(profileBody,'原聊天已修改，以下旧条目暂不用于回复，等待重建。');
+      const labels={facts:'事实',preferences:'偏好',events:'重要事件',constraints:'约定与边界',unknowns:'待确认',inferences:'推断'};
+      for(const item of data.items || []){
+        const row=document.createElement('details'),title=document.createElement('summary');
+        title.textContent=`${labels[item.kind] || item.kind} · ${item.active?'有效':'已被修订'}：${item.text}`;
+        row.append(title);
+        if(item.legacy)memoryLine(row,'来自升级前的摘要；原始更新记录仍可查询，未补造逐条依据。');
+        if(item.revision_reason)memoryLine(row,`修订原因：${item.revision_reason}`);
+        let read=false;
+        row.addEventListener('toggle',async()=>{
+          if(!row.open || read)return;read=true;
+          for(const id of item.evidence || []){
+            try{const m=await api(`/api/v1/messages/${encodeURIComponent(id)}`);
+              if(person!==selectedPersonId || epoch!==personMemoryEpoch)return;
+              memoryLine(row,`${chinaTimeText(m.sent_at)} · ${m.sender_type==='person'?'对方':'我'}：${m.content}`);
+            }catch(_){if(person===selectedPersonId && epoch===personMemoryEpoch)memoryLine(row,'依据已删除或暂时无法读取。');}
+          }
+        });profileBody.append(row);
+      }
+      profileOffset+=(data.items || []).length;profileLoaded=true;profileMore.hidden=!data.has_more;
+    }catch(_){if(person===selectedPersonId)memoryLine(profileBody,'档案条目读取失败，请重试。');}
+    finally{profileBusy=false;profileMore.disabled=false;}
+  }
+  profileDetails.append(profileTitle,profileBody,profileMore);
+  profileDetails.addEventListener('toggle',()=>{if(profileDetails.open && !profileLoaded)profileLoad();});
+  profileMore.addEventListener('click',profileLoad);
+  memoryDrawer.append(memoryDrawerTitle,memorySummary,profileDetails,memoryEvents,memoryPages);
   memoryHost.append(memoryHeader,memoryStatus,memoryDrawer);
   (byId('client-person-stage') || byId('person-select').parentElement).appendChild(memoryHost);
   function memoryLine(host,text){const p=document.createElement('p');p.textContent=text;host.appendChild(p);}
@@ -39,8 +77,9 @@ PERSON_MEMORY_SCRIPT = r'''
     memoryRefresh.disabled=Boolean(data.running);
     memoryRefresh.textContent=data.running?'正在后台分析…':failed?'重试未完成部分':'分析并更新人物档案';
     memorySummaryBody.replaceChildren();
+    if(data.context_budget_bytes)memoryLine(memorySummaryBody,`回复用精简档案：${data.context_bytes}/${data.context_budget_bytes} 字节；未选入 ${data.omitted_entry_count} 条，完整条目仍保留。所有人物使用相同预算规则。`);
     memoryLine(memorySummaryBody,data.summary.description || '尚未建立摘要。');
-    for(const [key,label] of [['facts','长期事实'],['inferences','分析推断'],['constraints','约定与边界'],['unknowns','待确认事项']]){
+    for(const [key,label] of [['facts','长期事实'],['preferences','偏好'],['events','重要事件'],['inferences','分析推断'],['constraints','约定与边界'],['unknowns','待确认事项']]){
       for(const text of data.summary[key] || [])memoryLine(memorySummaryBody,`${label}：${text}`);
     }
     const opened=new Set(Array.from(memoryEvents.children).filter(row=>row.open).map(row=>row.dataset.key));
@@ -52,6 +91,9 @@ PERSON_MEMORY_SCRIPT = r'''
       title.textContent=`${chinaTimeText(event.created_at)} · ${event.source==='ai'?'AI 分析':'手动修改'} · ${outcomes[event.outcome] || event.outcome}`;
       row.append(title); memoryLine(row,`原因：${event.reason}`);
       if(event.after.error_code)memoryLine(row,`错误类别：${event.after.error_code}；本批已尝试 ${event.after.attempts || 1} 次。`);
+      for(const change of event.after.profile_changes || []){
+        memoryLine(row,`档案条目：${change.before?.text || '新增'} → ${change.after?.text || ''}${change.after?.active===false?'（已被修订）':''}`);
+      }
       const before=event.before.relationship || event.before, after=event.after.relationship || event.after;
       for(const [key,label] of [['status','关系状态'],['stage','关系阶段'],['name','姓名'],['nickname','昵称'],['notes','备注'],['current_goal','当前目标'],['long_term_goal','长期目标']]){
         if(before?.[key]!==after?.[key] && (before?.[key]!==undefined || after?.[key]!==undefined))memoryLine(row,`${label}：${before?.[key] ?? '未设置'} → ${after?.[key] ?? '未设置'}`);
@@ -92,12 +134,13 @@ PERSON_MEMORY_SCRIPT = r'''
       const data=await api(`/api/v1/persons/${encodeURIComponent(person)}/memory?offset=${personMemoryOffset}`);
       if(!current())return;memoryRender(data);
       const failed=!data.running && data.latest_outcome==='failed';
-      if(continueUpdate && !failed && !data.running && (data.stale || data.covered_count<data.total_count)){
+      const needsProfile=data.consolidated===false && data.covered_count===data.total_count && Object.keys(data.summary).length>0;
+      if(continueUpdate && !failed && !data.running && (data.stale || data.covered_count<data.total_count || needsProfile)){
         await api(`/api/v1/persons/${encodeURIComponent(person)}/memory/refresh`,{method:'POST'});
         if(!current())return;
         memoryStatus.textContent+=' 已安排后台更新，回复生成无需等待。';
       }
-      if(continueUpdate && !failed && (data.running || data.stale || data.covered_count<data.total_count)){
+      if(continueUpdate && !failed && (data.running || data.stale || data.covered_count<data.total_count || needsProfile)){
         clearTimeout(personMemoryTimer);personMemoryTimer=setTimeout(()=>{if(current())memoryLoad(true)},4000);
       }
     }catch(error){if(current())memoryStatus.textContent=`档案更新记录读取失败：${error.message}`;}
@@ -115,6 +158,7 @@ PERSON_MEMORY_SCRIPT = r'''
   memoryLatest.addEventListener('click',()=>{personMemoryOffset=0;memoryLoad();});
   byId('person-select').addEventListener('change',()=>{
     personMemoryEpoch++;clearTimeout(personMemoryTimer);personMemoryOffset=0;memoryEvents.replaceChildren();memorySummaryBody.replaceChildren();memoryDrawer.open=false;
+    profileOffset=0;profileLoaded=false;profileDetails.open=false;profileBody.replaceChildren();
     memoryStatus.textContent='正在读取人物档案…';queueMicrotask(()=>memoryLoad(true));
   });
   window.addEventListener('junshi:evidence-changed',event=>{

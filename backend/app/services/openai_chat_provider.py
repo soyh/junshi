@@ -166,6 +166,13 @@ class OpenAIChatProvider(LLMProvider):
             raise LLMAnalysisError("API key is not configured")
         system = (
             "Update this person's compact longitudinal memory from previous_summary and the supplied new messages. "
+            "All persons have the SAME profile policy; never classify persons by importance. "
+            "description is a concise combined overview (target 300-600 Chinese characters, fewer when sufficient). "
+            "The facts/preferences/events/constraints/unknowns/inferences lists contain incremental new or corrected items from this batch; "
+            "unchanged previous entries are retained by the server. Preserve subject, negation, time, conditions and uncertainty. "
+            "Do not restate old items with cosmetic paraphrases. If new explicit evidence contradicts an entry in previous_entries, "
+            "supply its exact id in superseded_entry_ids AND a corrected replacement in the same list, with the correction explained in reason. "
+            "Never supersede boundaries from silence, absence, or to meet a length budget. Omission does not delete an entry. "
             "Return only JSON matching the provided schema. Preserve important past facts, preferences, explicit boundaries, "
             "agreements and unresolved issues; put interpretations in inferences and unresolved uncertainty in unknowns. "
             "facts must contain only explicitly supported facts. Do not invent facts or intentions. "

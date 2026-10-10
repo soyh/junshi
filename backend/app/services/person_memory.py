@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from app.core.database import get_connection
 from app.schemas.person_memory import PersonMemoryProposal
 from app.services.memory_errors import diagnose, correction_hint, MemoryProvenanceError
+from app.services import compact_profile, reply_priority
 
 _guard = threading.Lock()
 _running = set()
@@ -55,6 +56,8 @@ def snapshot(conn, user_id, person_id):
 
 def read_memory(conn, user_id, person_id, *, limit=20, offset=0):
     s = snapshot(conn, user_id, person_id)
+    from app.config.settings import get_settings
+    preview=compact_profile.project(s['summary'],s['messages'],get_settings().llm_input_budget_tokens) if s['summary'] and not s['stale'] else None
     latest = conn.execute(
         'SELECT outcome FROM person_update_events WHERE user_id=? AND person_id=? ORDER BY created_at DESC,id DESC LIMIT 1',
         (user_id, person_id),
@@ -68,7 +71,12 @@ def read_memory(conn, user_id, person_id, *, limit=20, offset=0):
         for key in ('before', 'after', 'evidence'):
             event[key] = json.loads(event.pop(key + '_json'))
         events.append(event)
-    return {"summary": {} if s['stale'] else s['summary'], "stale": s['stale'],
+    return {"summary": (preview or {}).get('summary',{}), "stale": s['stale'],
+            "context_budget_bytes":min(4096,get_settings().llm_input_budget_tokens//10),
+            "context_bytes":compact_profile.size(preview) if preview else 0,
+            "omitted_entry_count":(preview or {}).get('omitted_count',len(compact_profile.entries(s['summary']))),
+            "profile_entry_count":len(compact_profile.entries(s['summary'])),
+            "consolidated":bool(s['summary'].get('_consolidated')),
             "covered_count": 0 if s['stale'] else len(s['coverage']), "total_count": len(s['messages']),
             "updated_at": s['updated_at'], "revision": s['revision'], "events": events,
             "has_more": conn.execute("SELECT COUNT(*) FROM person_update_events WHERE user_id=? AND person_id=?", (user_id,person_id)).fetchone()[0] > offset + len(events),
@@ -86,9 +94,10 @@ def context_memory(conn, user_id, person_id, messages):
         if latest:
             recent.add(latest['id'])
     retained = [m for m in messages if m['id'] in recent or m['id'] not in s['coverage']]
-    return {"derived": True, "summary": s['summary'], "updated_at": s['updated_at'],
-            "covered_count": len(s['coverage']), "original_message_count": len(messages),
-            "rule": "This is a derived historical summary, not canonical evidence. New messages override outdated interpretations; preserve uncertainty and explicit boundaries."}, retained
+    from app.config.settings import get_settings
+    projected=compact_profile.project(s['summary'],messages,get_settings().llm_input_budget_tokens,
+        updated_at=s['updated_at'],covered_count=len(s['coverage']),original_message_count=len(messages))
+    return projected, retained if projected else messages
 
 
 def refresh_memory(user_id, person_id, provider, *, max_batches=4):
@@ -100,6 +109,8 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
     attempts = 0
     try:
         for _ in range(max_batches):
+            if reply_priority.busy(user_id):
+                return {'status':'paused_for_reply'}
             with get_connection() as conn:
                 s = snapshot(conn, user_id, person_id)
             coverage = {} if s['stale'] else s['coverage'].copy()
@@ -112,23 +123,45 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
                         if current['revision']==s['revision'] and current['hashes']==s['hashes']:
                             conn.execute("UPDATE person_memories SET summary_json='{}',coverage_json='{}',revision=revision+1,updated_at=? WHERE person_id=? AND user_id=?",(now(),person_id,user_id))
                             record_event(conn,user_id,person_id,'ai','invalidated','原聊天已全部删除，清除失效摘要。',{'summary':s['summary']},{'summary':{}})
+                elif s['summary'] and '_profile' not in s['summary']:
+                    with get_connection() as conn:
+                        conn.execute('BEGIN IMMEDIATE')
+                        current=snapshot(conn,user_id,person_id)
+                        if current['revision']==s['revision'] and current['hashes']==s['hashes']:
+                            converted={**s['summary'],'_profile':compact_profile.entries(s['summary']),
+                                       '_profile_version':1,'_consolidated':True}
+                            conn.execute('UPDATE person_memories SET summary_json=?,revision=revision+1,updated_at=? WHERE person_id=? AND user_id=?',
+                                         (dump(converted),now(),person_id,user_id))
+                            record_event(conn,user_id,person_id,'system','updated','将已有摘要整理为统一档案条目，保留原文；未重新调用模型。',
+                                         {'summary':s['summary']},{'summary':s['summary'],'legacy_conversion':True})
                 return {"status": "current"}
             batch = []
             from app.config.settings import get_settings
-            byte_limit = max(1000,min(48000,get_settings().llm_input_budget_tokens-len(dump(s['summary']).encode())-8000))
+            prior={} if s['stale'] else s['summary']
+            compact=compact_profile.project(prior,remaining[:32],get_settings().llm_input_budget_tokens)
+            previous={} if not prior else (compact or {}).get('summary',{})
+            byte_limit = max(1000,min(48000,get_settings().llm_input_budget_tokens-len(dump(previous).encode())-12000))
             for message in remaining[:32]:
                 if batch and len(dump(batch + [message]).encode()) > byte_limit:
                     break
                 batch.append(message)
             payload = {"person": s['person'], "relationship": s['relationship'],
-                       "previous_summary": {} if s['stale'] else s['summary'], "messages": batch,
+                       "previous_summary": previous, "messages": batch,
                        "remaining_message_count": len(remaining)-len(batch)}
+            # Only send revision targets that fit the same bounded prior view.
+            selected={text for kind in compact_profile.KINDS for text in previous.get(kind,[])}
+            payload['previous_entries']=[{'id':r['id'],'kind':r['kind'],'text':r['text']}
+                for r in compact_profile.entries(prior) if r['active'] and r['text'] in selected]
             # A correction never advances coverage or writes partial model output.
             for attempt in range(4):
                 attempts = attempt + 1
+                if reply_priority.busy(user_id):
+                    return {'status':'paused_for_reply'}
                 try:
                     proposal = PersonMemoryProposal.model_validate(provider.summarize_person(payload))
                     if not set(proposal.evidence_source_ids).issubset({m['id'] for m in batch}):
+                        raise MemoryProvenanceError()
+                    if not set(proposal.superseded_entry_ids).issubset({row['id'] for row in payload['previous_entries']}):
                         raise MemoryProvenanceError()
                     break
                 except Exception as error:
@@ -145,8 +178,8 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
             ids = {m['id'] for m in batch}
             if not set(proposal.evidence_source_ids).issubset(ids):
                 raise MemoryProvenanceError()
-            summary = proposal.model_dump(include={'description', 'facts', 'inferences', 'constraints', 'unknowns'})
             coverage.update({m['id']: s['hashes'][m['id']] for m in batch})
+            summary,profile_changes=compact_profile.merge(prior,proposal,proposal.evidence_source_ids,len(coverage)==len(s['messages']))
             with get_connection() as conn:
                 # Acquire the write reservation only after the network call.
                 conn.execute('BEGIN IMMEDIATE')
@@ -155,7 +188,7 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
                         or current['relationship'] != s['relationship'] or current['person'] != s['person']):
                     record_event(conn,user_id,person_id,'ai','discarded','分析期间原始资料发生变化，本次结果未应用。',{}, {})
                     return {"status": "superseded"}
-                before = {"summary": s['summary'], "relationship": s['relationship']}
+                before = {"summary": compact_profile.public_summary(s['summary']), "relationship": s['relationship']}
                 rel = s['relationship']
                 # Never publish an old-history batch's relationship as today's
                 # state while newer unprocessed messages are still pending.
@@ -171,7 +204,8 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
                     person_id,user_id,s['revision']+1,dump(summary),dump(coverage),now()))
                 record_event(conn,user_id,person_id,'ai','updated',
                              ('原始记录已变更，本批重新建立摘要。' if s['stale'] else '')+proposal.reason,before,
-                             {"summary":summary,"relationship":rel,"covered_count":len(coverage),
+                             {"summary":compact_profile.public_summary(summary),"profile_changes":profile_changes,
+                              "relationship":rel,"covered_count":len(coverage),
                               "total_count":len(s['messages']),"relationship_update_deferred":not complete,
                               "attempts": attempts,
                               "from":batch[0]['sent_at'],"to":batch[-1]['sent_at']},proposal.evidence_source_ids)

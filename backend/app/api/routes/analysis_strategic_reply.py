@@ -81,6 +81,8 @@ def get_analysis_strategic_reply_context(
     from app.services.reply_progress import publish
     progress = (lambda stage, attempt=0: publish(user_id,conversation_id,str(request_id),stage,attempt)) if request_id else None
     completed = False
+    from app.services import reply_priority
+    reply_priority.enter(user_id)
     try:
         with get_connection() as conn:
             kwargs = {'progress': progress} if progress else {}
@@ -110,6 +112,7 @@ def get_analysis_strategic_reply_context(
             detail=_safe_llm_failure_detail(exc),
         ) from exc
     finally:
+        reply_priority.leave(user_id)
         if progress and not completed:
             progress('failed')
 
