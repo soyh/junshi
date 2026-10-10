@@ -29,7 +29,10 @@ with sync_playwright() as p:
           let selectedPersonId='p1',selectedConversationId='c1',currentAccessToken='test';
           function clearSession(){}
           window.paths=[];
-          async function api(path){paths.push(path);return {summary:{description:'内部摘要'},covered_count:1,total_count:1,
+          async function api(path){paths.push(path);
+            if(path.includes('/memory/profile'))return {items:[{id:'entry',kind:'constraints',text:'本周不见面，下周待确认。',active:true,legacy:true,evidence:[]}],total:1,has_more:false};
+            return {summary:{description:'内部摘要'},covered_count:1,total_count:1,
+            context_budget_bytes:4096,context_bytes:600,omitted_entry_count:2,
             stale:false,running:false,has_more:false,events:[{created_at:'2026-09-26T20:00:00Z',source:'ai',outcome:'updated',
             reason:'<img src=x onerror="window.injected=true">证据支持状态变化',before:{relationship:{status:'unknown'}},
             after:{relationship:{status:'互动积极'},summary:{description:'新摘要'}}}]};}
@@ -40,7 +43,10 @@ with sync_playwright() as p:
         assert not page.locator('#person-memory-details').evaluate('(e)=>e.open')
         assert page.locator('#person-memory-panel').bounding_box()['height'] < 250
         page.get_by_text('展开档案与更新记录',exact=True).click()
+        page.get_by_text('查看完整档案条目与依据',exact=True).click()
+        page.get_by_text('约定与边界 · 有效：本周不见面，下周待确认。',exact=True).wait_for()
         page.get_by_text('查看内部人物摘要',exact=True).click()
+        assert page.get_by_text('所有人物使用相同预算规则。',exact=False).is_visible()
         assert page.get_by_text('内部摘要',exact=True).is_visible()
         page.get_by_text('2026年09月27日 04:00:00（北京时间） · AI 分析 · 已更新',exact=True).click()
         assert page.get_by_text('关系状态：unknown → 互动积极',exact=True).is_visible()
