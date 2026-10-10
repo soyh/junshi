@@ -165,5 +165,5 @@ PERSON_MEMORY_SCRIPT = r'''
     if(!event.detail?.conversation_id || event.detail.conversation_id===selectedConversationId)memoryStart();
   });
   const memoryBaseClearSession=clearSession;
-  clearSession=function(message){personMemoryEpoch++;clearTimeout(personMemoryTimer);memoryEvents.replaceChildren();memorySummaryBody.replaceChildren();memoryStatus.textContent='请先登录并选择人物。';memoryBaseClearSession(message);};
+  clearSession=function(message){personMemoryEpoch++;clearTimeout(personMemoryTimer);memoryEvents.replaceChildren();memorySummaryBody.replaceChildren();profileBody.replaceChildren();profileOffset=0;profileLoaded=false;profileDetails.open=false;memoryDrawer.open=false;memoryHeading.textContent='人物长期档案与更新记录';memoryStatus.textContent='请先登录并选择人物。';memoryBaseClearSession(message);};
 '''

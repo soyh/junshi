@@ -58,6 +58,8 @@ with sync_playwright() as p:
         page.evaluate("selectedPersonId='p2'")
         page.locator('#person-select').dispatch_event('change')
         page.wait_for_function("paths.some(x=>x.includes('/persons/p2/memory'))")
+        page.evaluate('clearSession()')
+        assert '本周不见面，下周待确认。' not in page.locator('#person-memory-panel').inner_text()
         page.close()
     browser.close()
 print('TEST-207 desktop/mobile calendar and memory audit UI: PASS')
