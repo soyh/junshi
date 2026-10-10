@@ -194,7 +194,8 @@ class OpenAIChatProvider(LLMProvider):
         except httpx.HTTPError as exc:
             raise self._safe_request_error(exc) from None
         except (KeyError,IndexError,TypeError,ValueError):
-            raise LLMAnalysisError("invalid person memory response") from None
+            from app.services.memory_errors import MemoryResponseError
+            raise MemoryResponseError() from None
 
     def analyze_media(
         self,

@@ -3,10 +3,12 @@ import hashlib
 import json
 import threading
 import uuid
+import logging
 from datetime import datetime, timezone
 
 from app.core.database import get_connection
 from app.schemas.person_memory import PersonMemoryProposal
+from app.services.memory_errors import diagnose, correction_hint, MemoryProvenanceError
 
 _guard = threading.Lock()
 _running = set()
@@ -95,6 +97,7 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
         if key in _running:
             return {"status": "running"}
         _running.add(key)
+    attempts = 0
     try:
         for _ in range(max_batches):
             with get_connection() as conn:
@@ -120,10 +123,28 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
             payload = {"person": s['person'], "relationship": s['relationship'],
                        "previous_summary": {} if s['stale'] else s['summary'], "messages": batch,
                        "remaining_message_count": len(remaining)-len(batch)}
-            proposal = PersonMemoryProposal.model_validate(provider.summarize_person(payload))
+            # A correction never advances coverage or writes partial model output.
+            for attempt in range(4):
+                attempts = attempt + 1
+                try:
+                    proposal = PersonMemoryProposal.model_validate(provider.summarize_person(payload))
+                    if not set(proposal.evidence_source_ids).issubset({m['id'] for m in batch}):
+                        raise MemoryProvenanceError()
+                    break
+                except Exception as error:
+                    code, _, retryable = diagnose(error)
+                    if not retryable or attempt == 3:
+                        raise
+                    if code in {'local_budget','context_limit'}:
+                        if len(batch) <= 1:
+                            raise
+                        batch = batch[:max(1,len(batch)//2)]
+                        payload['messages'] = batch
+                        payload['remaining_message_count'] = len(remaining)-len(batch)
+                    payload['correction'] = correction_hint(error)
             ids = {m['id'] for m in batch}
             if not set(proposal.evidence_source_ids).issubset(ids):
-                raise ValueError("invalid memory provenance")
+                raise MemoryProvenanceError()
             summary = proposal.model_dump(include={'description', 'facts', 'inferences', 'constraints', 'unknowns'})
             coverage.update({m['id']: s['hashes'][m['id']] for m in batch})
             with get_connection() as conn:
@@ -152,13 +173,18 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
                              ('原始记录已变更，本批重新建立摘要。' if s['stale'] else '')+proposal.reason,before,
                              {"summary":summary,"relationship":rel,"covered_count":len(coverage),
                               "total_count":len(s['messages']),"relationship_update_deferred":not complete,
+                              "attempts": attempts,
                               "from":batch[0]['sent_at'],"to":batch[-1]['sent_at']},proposal.evidence_source_ids)
         return {"status": "partial"}
-    except Exception:
+    except Exception as error:
         # Never persist provider bodies, credentials or arbitrary exception text.
+        code, reason, _ = diagnose(error)
+        logging.getLogger(__name__).warning('person_memory_failed category=%s attempts=%s', code, attempts)
         with get_connection() as conn:
             if conn.execute('SELECT 1 FROM persons WHERE id=? AND user_id=?',(person_id,user_id)).fetchone():
-                record_event(conn,user_id,person_id,'ai','failed','档案分析未完成：模型请求或结果校验失败；本批变更未应用。',{}, {})
+                record_event(conn,user_id,person_id,'ai','failed',
+                             f'档案分析未完成：{reason} 本批变更未应用，已完成进度保留。',{},
+                             {'error_code':code,'attempts':attempts})
         return {"status": "failed"}
     finally:
         with _guard:

@@ -37,12 +37,18 @@ with sync_playwright() as p:
         page.locator('#person-select').dispatch_event('change')
         page.wait_for_function('paths.length===1')
         assert page.get_by_text('已分析 1/1 条聊天。',exact=False).is_visible()
+        assert not page.locator('#person-memory-details').evaluate('(e)=>e.open')
+        assert page.locator('#person-memory-panel').bounding_box()['height'] < 250
+        page.get_by_text('展开档案与更新记录',exact=True).click()
         page.get_by_text('查看内部人物摘要',exact=True).click()
         assert page.get_by_text('内部摘要',exact=True).is_visible()
         page.get_by_text('2026年09月27日 04:00:00（北京时间） · AI 分析 · 已更新',exact=True).click()
         assert page.get_by_text('关系状态：unknown → 互动积极',exact=True).is_visible()
         assert page.locator('#person-memory-panel img').count()==0
         assert not page.evaluate('Boolean(window.injected)')
+        page.evaluate('memoryLoad()')
+        assert page.get_by_text('关系状态：unknown → 互动积极',exact=True).is_visible()
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         page.evaluate("selectedPersonId='p2'")
         page.locator('#person-select').dispatch_event('change')
         page.wait_for_function("paths.some(x=>x.includes('/persons/p2/memory'))")

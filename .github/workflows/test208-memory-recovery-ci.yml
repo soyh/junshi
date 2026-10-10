@@ -1,0 +1,32 @@
+name: TEST-208 Memory Recovery and Compact UI
+on:
+  push:
+    branches: [test-208-memory-recovery-ui]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Preserve migrations and runtime
+        run: test -z "$(git -C .. diff --name-only 03bb73321464a423028fb4707a2bd9f041e95697 HEAD -- backend/migrations backend/requirements.txt deploy)"
+      - name: Focused
+        run: pytest -q tests/test_208_memory_recovery.py tests/test_207_person_memory.py tests/test_206_latest_turn_recovery.py tests/test_qwen_provider.py
+      - name: Full suite
+        run: pytest -q
+      - name: Browser acceptance
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/person_memory_calendar_browser.py
+          PYTHONPATH=. python tests/reply_freshness_browser.py
+          PYTHONPATH=. python tests/named_chat_import_browser.py
