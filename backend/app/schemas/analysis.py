@@ -1,34 +1,14 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
-class AnalysisPerson(BaseModel):
-    id: str
-    name: str
-    nickname: str | None
-    notes: str | None
-
-
-class AnalysisConversation(BaseModel):
-    id: str
-    person_id: str
-    relationship_id: str | None
-    title: str | None
-    status: str
-
-
-class AnalysisMessage(BaseModel):
-    id: str
-    conversation_id: str
-    sender_type: str
-    content: str
-    sent_at: str
-
-
 class AnalysisContextResponse(BaseModel):
-    conversation: AnalysisConversation
-    person: AnalysisPerson
-    messages: list[AnalysisMessage]
-    facts: list[str]
-    inferences: list[str]
-    unknowns: list[str]
-    recommendations: list[str]
+    conversation: dict[str, Any]
+    person: dict[str, Any]
+    messages: list[dict[str, Any]]
+    facts: list[Any]
+    inferences: list[Any]
+    unknowns: list[Any]
+    recommendations: list[Any]
+    learning_strategy: dict[str, Any]

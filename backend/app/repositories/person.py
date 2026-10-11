@@ -1,0 +1,150 @@
+import sqlite3
+import uuid
+from datetime import datetime, timezone
+
+from app.core.sentinels import UNSET
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class PersonRepository:
+    def create(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        name: str,
+        nickname: str | None,
+        notes: str | None,
+    ) -> sqlite3.Row:
+        person_id = str(uuid.uuid4())
+        now = utc_now()
+
+        conn.execute(
+            """
+            INSERT INTO persons (
+                id,
+                user_id,
+                name,
+                nickname,
+                notes,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                person_id,
+                user_id,
+                name,
+                nickname,
+                notes,
+                now,
+                now,
+            ),
+        )
+
+        return conn.execute(
+            "SELECT * FROM persons WHERE id = ? AND user_id = ?",
+            (person_id, user_id),
+        ).fetchone()
+
+    def list(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+    ) -> list[sqlite3.Row]:
+        return conn.execute(
+            """
+            SELECT *
+            FROM persons
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
+    def get(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+    ) -> sqlite3.Row | None:
+        return conn.execute(
+            """
+            SELECT *
+            FROM persons
+            WHERE id = ?
+              AND user_id = ?
+            """,
+            (person_id, user_id),
+        ).fetchone()
+
+    def update(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+        name=UNSET,
+        nickname=UNSET,
+        notes=UNSET,
+    ) -> sqlite3.Row | None:
+        existing = self.get(conn, user_id, person_id)
+
+        if existing is None:
+            return None
+
+        new_name = existing["name"] if name is UNSET or name is None else name
+        new_nickname = existing["nickname"] if nickname is UNSET else nickname
+        new_notes = existing["notes"] if notes is UNSET else notes
+
+        conn.execute(
+            """
+            UPDATE persons
+            SET name = ?,
+                nickname = ?,
+                notes = ?,
+                updated_at = ?
+            WHERE id = ?
+              AND user_id = ?
+            """,
+            (
+                new_name,
+                new_nickname,
+                new_notes,
+                utc_now(),
+                person_id,
+                user_id,
+            ),
+        )
+
+        updated = self.get(conn, user_id, person_id)
+        before = {key: existing[key] for key in ('name','nickname','notes')}
+        after = {key: updated[key] for key in ('name','nickname','notes')}
+        if before != after:
+            from app.services.person_memory import record_event
+            record_event(conn,user_id,person_id,'user','updated','用户手动提交人物资料修改。',before,after)
+        return updated
+
+    def delete(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+    ) -> bool:
+        if self.get(conn, user_id, person_id) is None:
+            return False
+        # This historical table has no foreign key; all other person-owned
+        # tables cascade through persons/conversations in the same transaction.
+        conn.execute("DELETE FROM action_plan_snapshots WHERE user_id=? AND person_id=?", (user_id, person_id))
+        cursor = conn.execute(
+            """
+            DELETE FROM persons
+            WHERE id = ?
+              AND user_id = ?
+            """,
+            (person_id, user_id),
+        )
+
+        return cursor.rowcount > 0

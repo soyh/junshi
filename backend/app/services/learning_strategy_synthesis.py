@@ -22,6 +22,7 @@ class LearningStrategySynthesisService:
             recommendation_id = item["recommendation_id"]
             grouped[recommendation_id] = {
                 "recommendation_id": recommendation_id,
+                "learning_status": item["learning_status"],
                 "observed_outcome_count": item["observed_outcome_count"],
                 "outcome_counts": item["outcome_counts"],
                 "unknown_outcome_count": item["unknown_outcome_count"],
@@ -29,11 +30,8 @@ class LearningStrategySynthesisService:
                 "synthesis_status": "source_backed_candidate"
                 if item["observed_outcome_count"] > 0
                 else "outcome_unknown",
-                "unknowns": [
-                    "recommendation_quality",
-                    "success",
-                    "relationship_impact",
-                ],
+                "unknowns": list(item["unknowns"]),
+                "source": dict(item["source"]),
             }
 
         for update in context["learning_inputs"]["memory_updates"]:
@@ -50,7 +48,6 @@ class LearningStrategySynthesisService:
             "relationship": context["relationship"],
             "strategy_constraints": {
                 **context["strategy_constraints"],
-                "must_preserve_unknowns": True,
                 "must_not_turn_learning_into_fact": True,
                 "must_not_rank_recommendations": True,
             },

@@ -1,0 +1,36 @@
+name: TEST-199 Reference Library Reader CI
+on:
+  push:
+    branches: [test-199-reference-batch-compact]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Protect migrations and dependencies
+        run: |
+          test -z "$(git diff --name-only 4a414002cd632941cad74446d23216dc4d6fa1ed HEAD -- migrations requirements.txt)"
+      - name: Focused
+        run: pytest -q tests/test_199_reference_batch.py tests/test_198_reference_library_reader.py tests/test_197_reference_skills_context.py tests/test_197_reference_response_compatibility.py
+      - name: Full suite
+        run: pytest -q
+      - name: Browser acceptance
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/reference_batch_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reference-reader-screenshots
+          path: /tmp/reference-reader-*.png

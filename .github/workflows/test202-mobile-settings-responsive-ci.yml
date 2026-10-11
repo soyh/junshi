@@ -1,0 +1,36 @@
+name: TEST-202 Mobile Settings Responsive CI
+on:
+  push:
+    branches: [test-202-mobile-settings-responsive]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Protect migrations and dependencies
+        run: |
+          test -z "$(git diff --name-only 2067123bd1d9dbcfcb4acca725f31dea36313b03 HEAD -- migrations requirements.txt)"
+      - name: Focused
+        run: pytest -q tests/test_202_mobile_settings_responsive.py tests/test_193_settings_two_row_layout.py tests/test_191_viewport_safe_ui_polish.py tests/test_authenticated_account_security_workspace.py
+      - name: Full suite
+        run: pytest -q
+      - name: Browser acceptance
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/mobile_settings_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test202-mobile-settings-screenshots
+          path: /tmp/test202-*-mobile.png

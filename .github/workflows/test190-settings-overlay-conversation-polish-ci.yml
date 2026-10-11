@@ -1,0 +1,89 @@
+name: TEST-190 Settings Overlay Conversation Polish CI
+
+on:
+  push:
+    branches:
+      - test-190-settings-overlay-conversation-polish
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-190 migration scope
+        run: |
+          changed="$(git -C .. diff --name-only bc4faad3ea64da24c4fbb7dadf60724e338793f1..HEAD -- backend/migrations)"
+          printf 'migration changes:\n%s\n' "$changed"
+          test -z "$changed"
+
+      - name: Verify frontend polish contract
+        run: |
+          grep -n 'width: min(1180px, calc(100vw - 48px))' app/ui/settings_tab_workspace.py
+          grep -n "'Session management': '登录会话'" app/ui/settings_tab_workspace.py
+          grep -n "'Account Security': '账号安全'" app/ui/settings_tab_workspace.py
+          grep -n 'client-conversation-chip-state' app/ui/card_client_compact_surface.py
+          grep -n "state.textContent = '当前'" app/ui/card_client_compact_surface.py
+          python - <<'PY'
+          from app.ui.routes import PRODUCT_SHELL_WITH_CONTENT_HTML
+
+          html = PRODUCT_SHELL_WITH_CONTENT_HTML
+          assert "width: min(1180px, calc(100vw - 48px)) !important;" in html
+          assert "'Session management': '登录会话'" in html
+          assert "'Account Security': '账号安全'" in html
+          assert ".client-conversation-chip-state" in html
+          assert "state.textContent = '当前';" in html
+          assert "主文本 / 分析模型" in html
+          assert "视觉 / 图片视频模型" in html
+          print("TEST-190 composed frontend contract: PASS")
+          PY
+
+      - name: Browser-like settings and conversation DOM runtime
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from app.ui.card_client_compact_surface import CARD_CLIENT_COMPACT_SURFACE_SCRIPT
+          from app.ui.settings_tab_workspace import SETTINGS_TAB_WORKSPACE_SCRIPT
+
+          Path('/tmp/test190-settings.js').write_text(SETTINGS_TAB_WORKSPACE_SCRIPT, encoding='utf-8')
+          Path('/tmp/test190-compact.js').write_text(CARD_CLIENT_COMPACT_SURFACE_SCRIPT, encoding='utf-8')
+          PY
+          npm install --prefix .. --no-save --no-package-lock jsdom@26.1.0
+          node ../.github/scripts/test190_settings_conversation_dom_runtime.mjs \
+            /tmp/test190-settings.js \
+            /tmp/test190-compact.js
+
+      - name: TEST-190 focused
+        run: >-
+          pytest -q
+          tests/test_190_settings_overlay_conversation_polish.py
+          tests/test_189_dual_model_settings_ui_refactor.py
+          tests/test_188_dual_model_settings_tab_mount.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_179_vision_model_routing.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q

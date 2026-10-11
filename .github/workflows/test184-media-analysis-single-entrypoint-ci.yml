@@ -1,0 +1,60 @@
+name: TEST-184 Media Analysis Single Entrypoint CI
+
+on:
+  push:
+    branches:
+      - test-184-media-analysis-single-entrypoint
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-184 migration scope
+        run: |
+          changed="$(git -C .. diff --name-only 56101f0671f2476183579497815bbdddb4079690..HEAD -- backend/migrations)"
+          printf 'migration changes:\n%s\n' "$changed"
+          test -z "$changed"
+
+      - name: Verify legacy analysis bypass removed
+        run: |
+          ! grep -n "def analyze(self, conn, user_id" app/services/media_attachment.py
+          ! grep -n "def mark_completed(" app/repositories/media_attachment.py
+          ! grep -n "def mark_failed(" app/repositories/media_attachment.py
+          grep -n "def claim_analysis(" app/services/media_attachment.py
+          grep -n "def complete_claimed_analysis(" app/services/media_attachment.py
+          grep -n "def mark_completed_claimed(" app/repositories/media_attachment.py
+          grep -n "def mark_failed_claimed(" app/repositories/media_attachment.py
+
+      - name: TEST-184 focused
+        run: >-
+          pytest -q
+          tests/test_184_media_analysis_single_entrypoint.py
+          tests/test_183_media_analysis_concurrency_claim.py
+          tests/test_182_media_blob_transaction_integrity.py
+          tests/test_181_media_evidence_lifecycle_integrity.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_177_media_attachments.py
+          tests/test_messages.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q

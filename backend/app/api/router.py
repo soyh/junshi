@@ -1,0 +1,116 @@
+from fastapi import APIRouter
+
+from app.api.routes.action_decision import router as action_decision_router
+from app.api.routes.action_execution import router as action_execution_router
+from app.api.routes.action_feedback import router as action_feedback_router
+from app.api.routes.action_feedback_learning import router as action_feedback_learning_router
+from app.api.routes.action_feedback_learning_synthesis import router as action_feedback_learning_synthesis_router
+from app.api.routes.action_outcome import router as action_outcome_router
+from app.api.routes.action_plan import router as action_plan_router
+from app.api.routes.analysis import router as analysis_router
+from app.api.routes.analysis_action_plan import router as analysis_action_plan_router
+from app.api.routes.analysis_recommendation import router as analysis_recommendation_router
+from app.api.routes.analysis_strategy import router as analysis_strategy_router
+from app.api.routes.analysis_strategic_reply import router as analysis_strategic_reply_router
+from app.api.routes.analysis_structured import router as analysis_structured_router
+from app.api.routes.auth_account import router as auth_account_router
+from app.api.routes.auth_account_ui import router as auth_account_ui_router
+from app.api.routes.auth_session import router as auth_session_router
+from app.api.routes.conversations import router as conversations_router
+from app.api.routes.evidence import router as evidence_router
+from app.api.routes.interactions import router as interactions_router
+from app.api.routes.learning_strategy import router as learning_strategy_router
+from app.api.routes.learning_strategy_synthesis import router as learning_strategy_synthesis_router
+from app.api.routes.llm_provider_config import router as llm_provider_config_router
+from app.api.routes.llm_provider_ui import router as llm_provider_ui_router
+from app.api.routes.media_attachments import router as media_attachments_router
+from app.api.routes.memory_learning_synthesis import router as memory_learning_synthesis_router
+from app.api.routes.memory_persistence import router as memory_persistence_router
+from app.api.routes.memory_synthesis import router as memory_synthesis_router
+from app.api.routes.memory_update import router as memory_update_router
+from app.api.routes.messages import (
+    conversation_messages_router,
+    router as messages_router,
+)
+from app.api.routes.person_profiles import router as person_profiles_router
+from app.api.routes.persons import router as persons_router
+from app.api.routes.recommendation import router as recommendation_router
+from app.api.routes.reference_context import router as reference_context_router
+from app.api.routes.relationships import router as relationships_router
+from app.api.routes.relationship_state import router as relationship_state_router
+from app.api.routes.strategic_reply import router as strategic_reply_router
+from app.api.routes.strategy_decision import router as strategy_decision_router
+from app.api.routes.strategy_decision_confirmation import router as strategy_decision_confirmation_router
+from app.api.routes.strategy_decision_confirmation_synthesis import router as strategy_decision_confirmation_synthesis_router
+from app.api.routes.strategy_decision_execution import router as strategy_decision_execution_router
+from app.api.routes.strategy_decision_execution_synthesis import router as strategy_decision_execution_synthesis_router
+from app.api.routes.strategy_decision_learning import router as strategy_decision_learning_router
+from app.api.routes.strategy_decision_learning_synthesis import router as strategy_decision_learning_synthesis_router
+from app.api.routes.strategy_decision_lifecycle import router as strategy_decision_lifecycle_router
+from app.api.routes.strategy_decision_lifecycle_synthesis import router as strategy_decision_lifecycle_synthesis_router
+from app.api.routes.strategy_decision_result import router as strategy_decision_result_router
+from app.api.routes.strategy_decision_synthesis import router as strategy_decision_synthesis_router
+from app.api.routes.text_imports import router as text_imports_router
+from app.api.routes.timeline import router as timeline_router
+
+
+api_router = APIRouter(
+    prefix="/api/v1",
+)
+
+# Register conversation analysis before the broader conversation/message routes.
+# This keeps the analysis sub-resource from being shadowed by any dynamic
+# conversation routes as the API surface grows.
+api_router.include_router(analysis_router)
+api_router.include_router(analysis_structured_router)
+api_router.include_router(analysis_strategy_router)
+api_router.include_router(analysis_recommendation_router)
+api_router.include_router(analysis_strategic_reply_router)
+api_router.include_router(analysis_action_plan_router)
+
+api_router.include_router(auth_account_router)
+api_router.include_router(auth_account_ui_router)
+api_router.include_router(auth_session_router)
+api_router.include_router(persons_router)
+from app.api.routes.person_memory import router as person_memory_router
+api_router.include_router(person_memory_router)
+api_router.include_router(person_profiles_router)
+api_router.include_router(relationships_router)
+api_router.include_router(relationship_state_router)
+api_router.include_router(recommendation_router)
+api_router.include_router(strategic_reply_router)
+api_router.include_router(action_plan_router)
+api_router.include_router(action_decision_router)
+api_router.include_router(action_execution_router)
+api_router.include_router(action_outcome_router)
+api_router.include_router(action_feedback_router)
+api_router.include_router(action_feedback_learning_router)
+api_router.include_router(action_feedback_learning_synthesis_router)
+api_router.include_router(memory_update_router)
+api_router.include_router(memory_synthesis_router)
+api_router.include_router(memory_learning_synthesis_router)
+api_router.include_router(learning_strategy_router)
+api_router.include_router(learning_strategy_synthesis_router)
+api_router.include_router(llm_provider_config_router)
+api_router.include_router(llm_provider_ui_router)
+api_router.include_router(strategy_decision_router)
+api_router.include_router(strategy_decision_synthesis_router)
+api_router.include_router(strategy_decision_confirmation_router)
+api_router.include_router(strategy_decision_confirmation_synthesis_router)
+api_router.include_router(strategy_decision_execution_router)
+api_router.include_router(strategy_decision_execution_synthesis_router)
+api_router.include_router(strategy_decision_result_router)
+api_router.include_router(strategy_decision_learning_router)
+api_router.include_router(strategy_decision_learning_synthesis_router)
+api_router.include_router(strategy_decision_lifecycle_router)
+api_router.include_router(strategy_decision_lifecycle_synthesis_router)
+api_router.include_router(memory_persistence_router)
+api_router.include_router(interactions_router)
+api_router.include_router(messages_router)
+api_router.include_router(conversation_messages_router)
+api_router.include_router(media_attachments_router)
+api_router.include_router(reference_context_router)
+api_router.include_router(conversations_router)
+api_router.include_router(timeline_router)
+api_router.include_router(text_imports_router)
+api_router.include_router(evidence_router)
