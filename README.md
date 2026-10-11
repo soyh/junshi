@@ -6,7 +6,7 @@
 
 ## 在自己的电脑运行
 
-需要 Git 和 **Python 3.11**。在准备存放项目的目录打开终端，执行：
+需要 Git（下载 ZIP 可不安装 Git）和 **Python 3.11 或更新版本**。在准备存放项目的目录打开终端，执行：
 
 ```sh
 git clone https://github.com/soyh/junshi.git
@@ -16,10 +16,8 @@ cd junshi
 Windows PowerShell：
 
 ```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
-.\.venv\Scripts\python.exe scripts/init_local.py
-.\.venv\Scripts\python.exe -m app.server
+python -m pip install -r backend/requirements.txt
+.\Start-AI-Love-Strategist.cmd
 ```
 
 Linux / macOS：
@@ -33,7 +31,7 @@ python3.11 -m venv .venv
 
 浏览器打开 **http://127.0.0.1:18080/app**，注册自己的账号，再到设置中填写自己的模型供应商、模型名、接口地址和 API Key。每个用户独立配置 API，不会共用其他用户的密钥。终端保持打开，按 `Ctrl+C` 停止服务。
 
-**Windows 一键启动：** 首次安装完成后，双击仓库根目录的 `Start-AI-Love-Strategist.cmd`。它会读取本机端口配置，等待服务健康后自动打开浏览器；重复双击会直接打开已运行的页面。保留首次启动的窗口，按 `Ctrl+C` 停止。它不会重新初始化或覆盖数据。
+**Windows 一键启动：** 安装应用依赖后，双击仓库根目录的 `Start-AI-Love-Strategist.cmd`。它会读取本机端口配置，等待服务健康后自动打开浏览器；重复双击会直接打开已运行的页面。保留首次启动的窗口，按 `Ctrl+C` 停止。优先使用 PATH 中的 Python，其次 Windows 的 py -3，最后兼容已有 .venv。首次空白安装自动初始化，已有配置和数据不覆盖。
 
 初始化仅创建本机私有配置和存储目录；首次启动自动创建空数据库并应用迁移。已有配置或数据库时会拒绝重新初始化。不会导入原服务器的账号、人物、聊天、参考资料或模型配置。
 

@@ -81,7 +81,7 @@ def launch(host: str, port: int, app_name: str, timeout: float = 60) -> int:
 
 def main() -> int:
     if not (ROOT / ".env").is_file() and not (ROOT / "backend/.env").is_file():
-        print("Configuration missing. Run .venv\\Scripts\\python.exe scripts/init_local.py first.")
+        print("Configuration missing. Run python scripts/init_local.py first.")
         return 1
     sys.path.insert(0, str(ROOT))
     try:

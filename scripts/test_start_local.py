@@ -2,6 +2,36 @@ import unittest
 from unittest.mock import Mock, patch
 
 import start_local as launcher
+import windows_start
+
+
+class CustomerEnvironmentTests(unittest.TestCase):
+    @patch.object(windows_start.sys, "version_info", (3, 10))
+    def test_old_python_rejected(self):
+        self.assertEqual(windows_start.main(), 1)
+
+    @patch.object(windows_start.importlib.metadata, "version", side_effect=windows_start.importlib.metadata.PackageNotFoundError)
+    @patch.object(windows_start.subprocess, "run")
+    def test_missing_dependencies_do_not_change_environment(self, run, version):
+        self.assertEqual(windows_start.main(), 1)
+        run.assert_not_called()
+
+    @patch.object(windows_start.importlib.metadata, "version", return_value="installed")
+    @patch.object(windows_start.Path, "exists", return_value=True)
+    @patch.object(windows_start.subprocess, "run")
+    @patch.object(launcher, "main", return_value=0)
+    def test_existing_configuration_not_reinitialized(self, launch, run, exists, version):
+        self.assertEqual(windows_start.main(), 0)
+        run.assert_not_called()
+        launch.assert_called_once()
+
+    @patch.object(windows_start.importlib.metadata, "version", return_value="installed")
+    @patch.object(windows_start.Path, "exists", return_value=False)
+    @patch.object(windows_start.subprocess, "run", return_value=Mock(returncode=1))
+    @patch.object(launcher, "main")
+    def test_initialization_refusal_stops_startup(self, launch, run, exists, version):
+        self.assertEqual(windows_start.main(), 1)
+        launch.assert_not_called()
 
 
 class LauncherTests(unittest.TestCase):
