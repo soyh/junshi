@@ -7,19 +7,105 @@ PC_PLATFORM_SCRIPT = r'''
     @media(max-width:768px){.pc-tools{display:none!important}}
   `;document.head.append(pcStyle);
   const pcPanel=clientEl('details','pc-tools');pcPanel.id='pc-platform-panel';
-  pcPanel.innerHTML=`<summary>PC 聊天助手 · 人物多平台账号</summary>
-    <p>同一个人物可绑定多个平台账号，共用长期档案。账号仅记录身份，不会登录或接管聊天软件。</p>
-    <ul id="pc-account-list"></ul><div class="pc-row">
-    <label>平台<select id="pc-platform"><option value="wechat">微信</option><option value="douyin">抖音</option><option value="tantan">探探</option><option value="momo">陌陌</option><option value="soul">Soul</option><option value="other">其他</option></select></label>
-    <label>账号标识<input id="pc-handle" maxlength="120" placeholder="平台账号 ID，不按昵称自动合并"></label>
-    <label>显示名称<input id="pc-display" maxlength="120"></label><button type="button" id="pc-add-account">绑定到此人物</button></div>
-    <label>当前会话来源<select id="pc-source"><option value="">未标注</option></select></label>
-    <button type="button" id="pc-save-source">保存会话来源</button>
-    <p>一个会话对应一个来源；从其他平台导入时先新建会话。旧记录默认未标注，不会猜测来源。</p>
-    <button type="button" id="pc-paste">读取已复制的聊天文字</button>
-    <button type="button" id="pc-screenshot">选择聊天截图</button>
-    <p>导入后请在下方核对内容、发送者和时间，再点击添加。生成建议后使用原有复制按钮，复制不会记作已经发送。</p>
-    <p id="pc-status" role="status"></p>`;
+  {
+  const node1=document.createElement("summary");
+  pcPanel.append(node1);
+  node1.append(document.createTextNode("PC 聊天助手 · 人物多平台账号"));
+  const node2=document.createElement("p");
+  pcPanel.append(node2);
+  node2.append(document.createTextNode("同一个人物可绑定多个平台账号，共用长期档案。账号仅记录身份，不会登录或接管聊天软件。"));
+  const node3=document.createElement("ul");
+  node3.setAttribute("id","pc-account-list");
+  pcPanel.append(node3);
+  const node4=document.createElement("div");
+  node4.setAttribute("class","pc-row");
+  pcPanel.append(node4);
+  const node5=document.createElement("label");
+  node4.append(node5);
+  node5.append(document.createTextNode("平台"));
+  const node6=document.createElement("select");
+  node6.setAttribute("id","pc-platform");
+  node5.append(node6);
+  const node7=document.createElement("option");
+  node7.setAttribute("value","wechat");
+  node6.append(node7);
+  node7.append(document.createTextNode("微信"));
+  const node8=document.createElement("option");
+  node8.setAttribute("value","douyin");
+  node6.append(node8);
+  node8.append(document.createTextNode("抖音"));
+  const node9=document.createElement("option");
+  node9.setAttribute("value","tantan");
+  node6.append(node9);
+  node9.append(document.createTextNode("探探"));
+  const node10=document.createElement("option");
+  node10.setAttribute("value","momo");
+  node6.append(node10);
+  node10.append(document.createTextNode("陌陌"));
+  const node11=document.createElement("option");
+  node11.setAttribute("value","soul");
+  node6.append(node11);
+  node11.append(document.createTextNode("Soul"));
+  const node12=document.createElement("option");
+  node12.setAttribute("value","other");
+  node6.append(node12);
+  node12.append(document.createTextNode("其他"));
+  const node13=document.createElement("label");
+  node4.append(node13);
+  node13.append(document.createTextNode("账号标识"));
+  const node14=document.createElement("input");
+  node14.setAttribute("id","pc-handle");
+  node14.setAttribute("maxlength","120");
+  node14.setAttribute("placeholder","平台账号 ID，不按昵称自动合并");
+  node13.append(node14);
+  const node15=document.createElement("label");
+  node4.append(node15);
+  node15.append(document.createTextNode("显示名称"));
+  const node16=document.createElement("input");
+  node16.setAttribute("id","pc-display");
+  node16.setAttribute("maxlength","120");
+  node15.append(node16);
+  const node17=document.createElement("button");
+  node17.setAttribute("type","button");
+  node17.setAttribute("id","pc-add-account");
+  node4.append(node17);
+  node17.append(document.createTextNode("绑定到此人物"));
+  const node18=document.createElement("label");
+  pcPanel.append(node18);
+  node18.append(document.createTextNode("当前会话来源"));
+  const node19=document.createElement("select");
+  node19.setAttribute("id","pc-source");
+  node18.append(node19);
+  const node20=document.createElement("option");
+  node20.setAttribute("value","");
+  node19.append(node20);
+  node20.append(document.createTextNode("未标注"));
+  const node21=document.createElement("button");
+  node21.setAttribute("type","button");
+  node21.setAttribute("id","pc-save-source");
+  pcPanel.append(node21);
+  node21.append(document.createTextNode("保存会话来源"));
+  const node22=document.createElement("p");
+  pcPanel.append(node22);
+  node22.append(document.createTextNode("一个会话对应一个来源；从其他平台导入时先新建会话。旧记录默认未标注，不会猜测来源。"));
+  const node23=document.createElement("button");
+  node23.setAttribute("type","button");
+  node23.setAttribute("id","pc-paste");
+  pcPanel.append(node23);
+  node23.append(document.createTextNode("读取已复制的聊天文字"));
+  const node24=document.createElement("button");
+  node24.setAttribute("type","button");
+  node24.setAttribute("id","pc-screenshot");
+  pcPanel.append(node24);
+  node24.append(document.createTextNode("选择聊天截图"));
+  const node25=document.createElement("p");
+  pcPanel.append(node25);
+  node25.append(document.createTextNode("导入后请在下方核对内容、发送者和时间，再点击添加。生成建议后使用原有复制按钮，复制不会记作已经发送。"));
+  const node26=document.createElement("p");
+  node26.setAttribute("id","pc-status");
+  node26.setAttribute("role","status");
+  pcPanel.append(node26);
+  }
   memoryHost.before(pcPanel);
   let pcEpoch=0;
   const pcNames={wechat:'微信',douyin:'抖音',tantan:'探探',momo:'陌陌',soul:'Soul',other:'其他'};
@@ -75,14 +161,49 @@ PC_PLATFORM_SCRIPT = r'''
   if(new URLSearchParams(location.search).get('pc')==='1')pcPanel.open=true;
 
   const transfer=clientEl('details','pc-tools');transfer.id='pc-transfer';
-  transfer.innerHTML=`<summary>PC 数据迁移 · 完整导出 / 导入</summary>
-    <p>导出当前账号全部业务数据、平台来源、长期档案、参考资料及媒体。登录凭据与模型密钥不导出。文件经密码加密，请牢记密码；不会上传到 GitHub。</p>
-    <label>迁移密码（至少 12 个字符）<input id="pc-transfer-password" type="password" minlength="12" maxlength="256" autocomplete="new-password"></label>
-    <button type="button" id="pc-export">完整导出到电脑</button>
-    <label>迁移包<input id="pc-transfer-file" type="file" accept=".jsa"></label>
-    <button type="button" id="pc-import">导入到当前空白账号</button>
-    <p>仅导入另一套本项目部署，不会把历史写回微信等第三方 App。导入保留原始标识；目标必须无业务数据。同一包重复导入会被拒绝。超过 64 MiB 时导出停止，不截断内容。</p>
-    <p id="pc-transfer-status" role="status"></p>`;
+  {
+  const node1=document.createElement("summary");
+  transfer.append(node1);
+  node1.append(document.createTextNode("PC 数据迁移 · 完整导出 / 导入"));
+  const node2=document.createElement("p");
+  transfer.append(node2);
+  node2.append(document.createTextNode("导出当前账号全部业务数据、平台来源、长期档案、参考资料及媒体。登录凭据与模型密钥不导出。文件经密码加密，请牢记密码；不会上传到 GitHub。"));
+  const node3=document.createElement("label");
+  transfer.append(node3);
+  node3.append(document.createTextNode("迁移密码（至少 12 个字符）"));
+  const node4=document.createElement("input");
+  node4.setAttribute("id","pc-transfer-password");
+  node4.setAttribute("type","password");
+  node4.setAttribute("minlength","12");
+  node4.setAttribute("maxlength","256");
+  node4.setAttribute("autocomplete","new-password");
+  node3.append(node4);
+  const node5=document.createElement("button");
+  node5.setAttribute("type","button");
+  node5.setAttribute("id","pc-export");
+  transfer.append(node5);
+  node5.append(document.createTextNode("完整导出到电脑"));
+  const node6=document.createElement("label");
+  transfer.append(node6);
+  node6.append(document.createTextNode("迁移包"));
+  const node7=document.createElement("input");
+  node7.setAttribute("id","pc-transfer-file");
+  node7.setAttribute("type","file");
+  node7.setAttribute("accept",".jsa");
+  node6.append(node7);
+  const node8=document.createElement("button");
+  node8.setAttribute("type","button");
+  node8.setAttribute("id","pc-import");
+  transfer.append(node8);
+  node8.append(document.createTextNode("导入到当前空白账号"));
+  const node9=document.createElement("p");
+  transfer.append(node9);
+  node9.append(document.createTextNode("仅导入另一套本项目部署，不会把历史写回微信等第三方 App。导入保留原始标识；目标必须无业务数据。同一包重复导入会被拒绝。超过 64 MiB 时导出停止，不截断内容。"));
+  const node10=document.createElement("p");
+  node10.setAttribute("id","pc-transfer-status");
+  node10.setAttribute("role","status");
+  transfer.append(node10);
+  }
   navFooter.append(transfer);
   async function pcTransfer(importing){
     const password=byId('pc-transfer-password').value,status=byId('pc-transfer-status'),token=currentAccessToken;

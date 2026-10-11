@@ -22,7 +22,8 @@ CHINA = timezone(timedelta(hours=8))
 
 
 def now_text():
-    return datetime.now(CHINA).strftime('%Y年%m月%d日 %H:%M:%S')
+    value = datetime.now(CHINA)
+    return f'{value.year:04d}年{value.month:02d}月{value.day:02d}日 {value.hour:02d}:{value.minute:02d}:{value.second:02d}'
 
 
 def timestamp(value):
