@@ -103,8 +103,11 @@ def delete_person(
     person_id: str,
     user_id: str = Depends(get_current_user_id),
 ):
-    with get_connection() as conn:
-        deleted = service.delete(conn, user_id, person_id)
+    from app.services.person_deletion import delete_person_data
+    try:
+        deleted = delete_person_data(user_id, person_id)
+    except (OSError, ValueError):
+        raise HTTPException(status_code=503, detail='人物删除或附件清理未完成，请重试；本次未确认全部清理成功。') from None
 
     if not deleted:
         raise HTTPException(

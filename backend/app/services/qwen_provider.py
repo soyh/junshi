@@ -20,7 +20,8 @@ class QwenProvider(OpenAIChatProvider):
         client: httpx.Client | None = None,
     ):
         settings = get_settings()
-        resolved_api_key = settings.dashscope_api_key if api_key is UNSET else api_key
+        # Never inherit a server-wide credential for an unconfigured account.
+        resolved_api_key = None if api_key is UNSET else api_key
         resolved_base_url = (base_url or settings.qwen_base_url).rstrip("/")
         resolved_model = model or settings.qwen_model
         resolved_timeout = (

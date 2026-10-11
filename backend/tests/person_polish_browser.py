@@ -34,6 +34,10 @@ with sync_playwright() as p:
                     result = people
             elif path in ('/api/v1/persons/p1', '/api/v1/persons/p2', '/api/v1/persons/p3'):
                 result = next(x for x in people if path.endswith(x['id']))
+                if route.request.method == 'DELETE':
+                    people.remove(result)
+                    route.fulfill(status=204)
+                    return
             elif path.endswith('/memory'):
                 result = {'summary': {}, 'processed_count': 0, 'total_count': 0}
             elif path.endswith('/settings/llm'):
@@ -61,6 +65,13 @@ with sync_playwright() as p:
         expect(page.locator('#person-memory-panel')).to_be_visible()
         page.get_by_role('button', name='人物资料与关系', exact=True).click()
         expect(page.locator('#client-person-deck [data-person-id="p1"] .client-card-back')).to_be_visible()
+        page.locator('#message-sent-at').scroll_into_view_if_needed()
+        expect(page.locator('.china-time-control')).to_have_count(2)
+        page.locator('.china-time-control summary').first.click()
+        page.get_by_label('北京时间日期').first.fill('2026-10-11')
+        page.get_by_label('小时（24小时制）').first.select_option('21')
+        expect(page.locator('#message-sent-at')).to_have_value(__import__('re').compile('2026年10月11日 21:'))
+        page.locator('.china-time-control summary').first.click()
         page.screenshot(path=str(OUT / f'person-{width}.png'), full_page=True)
         page.locator('#client-back-people').click()
         expect(page.locator('body')).to_have_attribute('data-client-view', 'people')
@@ -79,8 +90,13 @@ with sync_playwright() as p:
         page.get_by_role('button', name='创建人物卡', exact=True).click()
         expect(page.locator('body')).to_have_attribute('data-client-view', 'person')
         expect(page.locator('#client-workbar h2')).to_have_text('新人物')
-        page.locator('#client-back-people').click()
-        expect(page.locator('#client-person-deck [data-person-id="p3"]')).to_be_visible()
+        page.once('dialog', lambda d: d.dismiss())
+        page.locator('#client-delete-person').click()
+        expect(page.locator('body')).to_have_attribute('data-client-view', 'person')
+        page.once('dialog', lambda d: d.accept())
+        page.locator('#client-delete-person').click()
+        expect(page.locator('body')).to_have_attribute('data-client-view', 'people')
+        expect(page.locator('#client-person-deck [data-person-id="p3"]')).to_have_count(0)
         page.locator('#logout').click()
         expect(page.locator('#client-auth-screen')).to_be_visible()
         page.go_back()
@@ -88,5 +104,5 @@ with sync_playwright() as p:
         assert not errors, errors
         page.close()
     browser.close()
-print('TEST-211 full-page login, cards, flip navigation, profile, settings, logout and mobile: PASS')
+print('TEST-212 deletion, compact calendar and full-page login, cards, flip navigation, profile, settings, logout and mobile: PASS')
 

@@ -1,0 +1,33 @@
+name: TEST-212 Person Privacy and Polish
+on:
+  push:
+    branches: [test-212-person-polish]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Preserve migrations and runtime
+        run: test -z "$(git -C .. diff --name-only 8a0a440805e2a56cc63d4c3c530990018830eabe HEAD -- backend/migrations backend/requirements.txt deploy)"
+      - name: Focused
+        run: pytest -q tests/test_212_person_privacy.py tests/test_persons.py tests/test_210_compact_profile.py tests/test_209_memory_evidence.py tests/test_208_memory_recovery.py tests/test_207_person_memory.py tests/test_206_latest_turn_recovery.py tests/test_qwen_provider.py
+      - name: Full suite
+        run: pytest -q
+      - name: Browser acceptance
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/person_polish_browser.py
+          PYTHONPATH=. python tests/person_memory_calendar_browser.py
+          PYTHONPATH=. python tests/reply_freshness_browser.py
+          PYTHONPATH=. python tests/named_chat_import_browser.py

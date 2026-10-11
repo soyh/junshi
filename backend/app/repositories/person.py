@@ -133,6 +133,11 @@ class PersonRepository:
         user_id: str,
         person_id: str,
     ) -> bool:
+        if self.get(conn, user_id, person_id) is None:
+            return False
+        # This historical table has no foreign key; all other person-owned
+        # tables cascade through persons/conversations in the same transaction.
+        conn.execute("DELETE FROM action_plan_snapshots WHERE user_id=? AND person_id=?", (user_id, person_id))
         cursor = conn.execute(
             """
             DELETE FROM persons
