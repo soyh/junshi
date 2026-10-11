@@ -88,11 +88,18 @@ CARD_NAVIGATION_SCRIPT = r'''
   const navEdit=clientEl('button','','人物资料与关系');navEdit.type='button';
   navWorkbar.append(navBack,navName,navEdit);navShell.prepend(navWorkbar);
   document.querySelector('.client-brand p').textContent='选择一位人物，继续你们的故事。';
-  let navEpoch=0,navEntering=false;
+  let navEpoch=0,navEntering=false,navWorkspaceAnimation=null;
   function navShow(view,push=false){
     if(!currentAccessToken)view='auth';
     if(view==='person' && !selectedPersonId)view='people';
+    navWorkspaceAnimation?.cancel();navWorkspaceAnimation=null;
     document.body.dataset.clientView=view;document.body.dataset.profileEdit='false';
+    if(view==='person' && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+      navWorkspaceAnimation=navShell.animate([
+        {opacity:0,transform:'translateY(18px) scale(.975)'},
+        {opacity:1,transform:'translateY(0) scale(1)'}
+      ],{duration:380,easing:'cubic-bezier(.2,.7,.2,1)'});
+    }
     navSettings.open=false;navStatus.textContent='';
     navName.textContent=byId('person-select').selectedOptions[0]?.textContent || '人物工作区';
     if(push)history.pushState({clientView:view},'',view==='person'?'#person':'#people');
@@ -114,7 +121,7 @@ CARD_NAVIGATION_SCRIPT = r'''
     navStatus.textContent='正在进入人物…';card.classList.add('is-entering');
     try{
       await clientSelectPerson(id);
-      await Promise.all([clientPopulatePersonBack(card,id),new Promise(resolve=>setTimeout(resolve,matchMedia('(prefers-reduced-motion: reduce)').matches?0:480))]);
+      await Promise.all([clientPopulatePersonBack(card,id),new Promise(resolve=>setTimeout(resolve,matchMedia('(prefers-reduced-motion: reduce)').matches?0:700))]);
       if(epoch!==navEpoch || !currentAccessToken)return;
       navShow('person',true);
     }catch(_){if(epoch===navEpoch)navStatus.textContent='人物暂时无法打开，请重试。';}

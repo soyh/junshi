@@ -1,15 +1,20 @@
 PERSON_POLISH_STYLE = r'''
  html:has(body[data-client-view="people"]),html:has(body[data-client-view="auth"]){background:#0b1522}
  body[data-client-view="people"]{background:radial-gradient(ellipse at 50% 60%,#22455580,transparent 56%),radial-gradient(ellipse at 20% 10%,#30385850,transparent 55%),#0b1522!important}
- body[data-client-view="people"] #client-person-deck{padding-bottom:80px}
- body[data-client-view="people"] .client-person-card{animation:personHover 6s ease-in-out infinite!important;position:relative;isolation:isolate}
- body[data-client-view="people"] .client-person-card:nth-child(2n){animation-delay:-2.5s!important}
- body[data-client-view="people"] .client-person-card::after{content:"";position:absolute;pointer-events:none;bottom:-38px;left:12%;width:76%;height:13px;border-radius:50%;background:#80f5e980;box-shadow:0 0 8px #afffee,0 0 32px 12px #40c6d04d,0 12px 28px #000;transform:rotateX(35deg);z-index:-1}
- body[data-client-view="people"] .client-person-card::before{content:"";position:absolute;pointer-events:none;inset:60% 3% -35px;clip-path:polygon(0 0,100% 0,75% 100%,25% 100%);background:linear-gradient(0deg,#6be9e22b,transparent);filter:blur(9px);z-index:-1}
- body[data-client-view="people"] .client-card-front{background:linear-gradient(140deg,#36546599,#132638cc)!important;backdrop-filter:blur(18px);box-shadow:0 26px 55px #0009,inset 0 1px #b8f5ff33!important}
- body[data-client-view="people"] .client-person-card.is-flipped,body[data-client-view="people"] .client-person-card.is-entering{animation:none!important}
- @keyframes personHover{0%,100%{translate:0 0}50%{translate:0 -10px}}
- @media(prefers-reduced-motion:reduce){body[data-client-view="people"] .client-person-card{animation:none!important}}
+ body[data-client-view="people"] #client-person-deck{padding:48px 32px 64px}
+ body[data-client-view="people"] .client-person-card{animation:none!important;position:relative;isolation:isolate;translate:none;transform:none;transition:transform .32s cubic-bezier(.2,.8,.2,1);z-index:1}
+ body[data-client-view="people"] .client-person-card::before,body[data-client-view="people"] .client-person-card::after{content:none!important;display:none!important}
+ body[data-client-view="people"] .client-card-front{background:linear-gradient(140deg,#36546599,#132638cc)!important;backdrop-filter:blur(18px);border-color:#416474!important;box-shadow:0 18px 38px #0006,inset 0 1px #b8f5ff22!important;transition:border-color .25s,box-shadow .25s}
+ body[data-client-view="people"] .client-person-card.is-selected{transform:none}
+ @media(hover:hover) and (pointer:fine){
+ body[data-client-view="people"] .client-person-card:not(.is-flipped):hover{transform:translateY(-14px) scale(1.055);z-index:3}
+ body[data-client-view="people"] .client-person-card:hover .client-card-front{border-color:#a0f6eb!important;box-shadow:0 28px 48px #0009,0 0 28px #6fe8de38,inset 0 1px #d7fffa66!important}
+ }
+ body[data-client-view="people"] .client-person-card:has(.client-card-front:focus-visible){transform:translateY(-10px) scale(1.04);z-index:3}
+ body[data-client-view="people"] .client-person-card:has(.client-card-front:focus-visible) .client-card-front{border-color:#a0f6eb!important}
+ body[data-client-view="people"] .client-person-card.is-entering{transform:translateY(-16px) scale(1.14)!important;z-index:4;transition:transform .65s cubic-bezier(.2,.7,.2,1)}
+ body[data-client-view="people"] .client-person-card.is-entering .client-card-inner{transition:transform .65s cubic-bezier(.2,.7,.2,1)!important}
+ @media(prefers-reduced-motion:reduce){body[data-client-view="people"] .client-person-card{transition:none!important;transform:none!important}body[data-client-view="people"] .client-person-card.is-entering .client-card-inner{transition:none!important}}
  .china-time-control{position:relative;min-width:0;width:100%}
  .china-time-control>input{padding-right:46px!important;margin:0!important;width:100%;box-sizing:border-box}
  .china-time-control>small{display:none!important}
@@ -19,7 +24,6 @@ PERSON_POLISH_STYLE = r'''
  #client-delete-person{color:#a52e42;border-color:#ecc1c9;background:#fff6f7}
  #person-delete-status{color:#a52e42;font-size:14px;overflow-wrap:anywhere}
  body:not([data-client-view="person"]) #person-delete-status{display:none}
- body[data-client-view="people"] .client-person-card:hover,body[data-client-view="people"] .client-person-card:focus-within{animation-play-state:paused!important}
 '''
 
 PERSON_POLISH_SCRIPT = r'''
