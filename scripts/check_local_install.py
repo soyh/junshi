@@ -21,6 +21,7 @@ def run():
             shutil.copytree(SOURCE / name, root / name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         (root / "scripts").mkdir()
         shutil.copy2(SOURCE / "scripts/init_local.py", root / "scripts/init_local.py")
+        shutil.copy2(SOURCE / "scripts/start_local.py", root / "scripts/start_local.py")
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0))
             port = sock.getsockname()[1]
@@ -59,6 +60,15 @@ def run():
                 assert ready["migrations"]["applied_count"] == 20
                 with opener.open(f"http://127.0.0.1:{port}/app", timeout=5) as response:
                     assert response.status == 200 and len(response.read()) > 1000
+                # Exercise configured port discovery and reuse against a real server,
+                # replacing only the browser itself in headless CI.
+                probe = (
+                    "import sys; sys.path.insert(0, 'scripts'); import start_local; "
+                    "opened=[]; start_local.webbrowser.open=lambda url: opened.append(url) or True; "
+                    "assert start_local.main()==0; "
+                    f"assert opened==['http://127.0.0.1:{port}/app']"
+                )
+                subprocess.run([sys.executable, "-c", probe], cwd=root, env=env, check=True, timeout=15)
             finally:
                 process.terminate()
                 process.wait(timeout=15)

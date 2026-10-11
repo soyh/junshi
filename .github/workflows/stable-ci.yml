@@ -1,7 +1,7 @@
 name: Stable release checks
 on:
   push:
-    branches: [main, repository-maintenance]
+    branches: [main, repository-maintenance, windows-one-click-launcher]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -24,6 +24,7 @@ jobs:
       - run: python -m pip install -r backend/requirements.txt
       - run: python scripts/check_public_tree.py
       - run: python scripts/check_local_install.py
+      - run: python scripts/test_start_local.py
   regression:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
