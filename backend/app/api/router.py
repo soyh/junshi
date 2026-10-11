@@ -114,3 +114,9 @@ api_router.include_router(conversations_router)
 api_router.include_router(timeline_router)
 api_router.include_router(text_imports_router)
 api_router.include_router(evidence_router)
+from app.api.routes.platform_accounts import router as platform_accounts_router
+from app.api.routes.account_portability import router as account_portability_router
+api_router.include_router(platform_accounts_router)
+api_router.include_router(account_portability_router)
+from app.api.routes.pc_ingest import router as pc_ingest_router
+api_router.include_router(pc_ingest_router)

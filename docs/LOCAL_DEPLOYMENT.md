@@ -30,7 +30,7 @@
 
 ## 健康检查与常见问题
 
-浏览器打开 `http://127.0.0.1:18080/health/ready`，应显示 `ready` 且迁移数量为 20。登录页是 `/app`，根路径 `/` 不作为验收入口。
+浏览器打开 `http://127.0.0.1:18080/health/ready`，应显示 `ready` 且迁移数量为 21。登录页是 `/app`，根路径 `/` 不作为验收入口。
 
 - 安装依赖超时：可自行选择可信的 PyPI 镜像，例如给 pip 添加 `--index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple`；不关闭 TLS 校验。
 - 端口已占用：更换本机 `PORT`，访问同一个新端口。SSH 本地转发端口与服务器端口可以不同。

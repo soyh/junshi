@@ -22,3 +22,5 @@
 ## 历史资料
 
 [早期开发交接](history/DEVELOPMENT_HANDOVER_PRE_CONSOLIDATION.md)、[首用户验收流程](FIRST_USER_UAT.md)、`ops/first_user_uat/` 和其余 TEST 编号资料用于追溯。历史环境路径、测试数量与阶段结论不应替代当前安装说明，也不要把历史部署命令直接当作新安装命令。
+
+- [PC 小窗、多平台人物、完整迁移（TEST-216）](TEST-216-pc-assistant.md)

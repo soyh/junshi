@@ -1,7 +1,7 @@
 name: Stable release checks
 on:
   push:
-    branches: [main, repository-maintenance, windows-one-click-launcher]
+    branches: [main, repository-maintenance, windows-one-click-launcher, test-216-pc-platforms]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -45,8 +45,24 @@ jobs:
         run: |
           python -m pip install playwright==1.55.0
           python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/pc_platform_browser.py
           PYTHONPATH=. python tests/card_morph_browser.py
           PYTHONPATH=. python tests/person_polish_browser.py
           PYTHONPATH=. python tests/person_memory_calendar_browser.py
           PYTHONPATH=. python tests/reply_freshness_browser.py
           PYTHONPATH=. python tests/named_chat_import_browser.py
+
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r desktop/requirements.txt
+      - run: python desktop/test_desktop.py
+      - run: python desktop/test_gui.py
