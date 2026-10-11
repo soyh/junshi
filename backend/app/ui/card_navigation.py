@@ -88,8 +88,48 @@ CARD_NAVIGATION_SCRIPT = r'''
   const navEdit=clientEl('button','','人物资料与关系');navEdit.type='button';
   navWorkbar.append(navBack,navName,navEdit);navShell.prepend(navWorkbar);
   document.querySelector('.client-brand p').textContent='选择一位人物，继续你们的故事。';
-  let navEpoch=0,navEntering=false,navWorkspaceAnimation=null;
-  function navShow(view,push=false){
+  let navEpoch=0,navEntering=false,navWorkspaceAnimation=null,navMorph=null;
+  function navCancelMorph(){
+    if(!navMorph)return;
+    const current=navMorph;navMorph=null;
+    current.animations.forEach(animation=>animation.cancel());
+    current.card.style.visibility=current.visibility;current.layer.remove();
+  }
+  async function navMorphIntoWorkspace(card,front,epoch){
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches){navShow('person',true);return;}
+    const rect=front.getBoundingClientRect();
+    const layer=document.createElement('div');layer.id='client-card-morph';layer.setAttribute('aria-hidden','true');
+    layer.style.cssText='position:fixed;inset:0;z-index:9999;pointer-events:none;overflow:hidden;perspective:1200px';
+    const panel=document.createElement('div');
+    panel.style.cssText=`position:absolute;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;border-radius:18px;overflow:hidden;background:#203b4d;box-shadow:0 24px 80px #0007;transform-style:preserve-3d`;
+    const clone=front.cloneNode(true);
+    const originals=[front,...front.querySelectorAll('*')],copies=[clone,...clone.querySelectorAll('*')];
+    originals.forEach((node,i)=>{
+      const style=getComputedStyle(node);for(const property of style)copies[i].style.setProperty(property,style.getPropertyValue(property));
+      copies[i].removeAttribute('id');copies[i].removeAttribute('autofocus');copies[i].tabIndex=-1;
+    });
+    clone.className='nav-morph-face';clone.style.cssText+=';position:absolute;inset:0;width:100%;height:100%;margin:0;transform:none;backface-visibility:hidden;pointer-events:none';
+    const veil=document.createElement('div');veil.style.cssText='position:absolute;inset:0;background:#0b1522;opacity:0';
+    panel.append(clone);layer.append(veil,panel);document.body.append(layer);
+    const state={layer,card,visibility:card.style.visibility,animations:[]};navMorph=state;card.style.visibility='hidden';
+    const animate=(element,frames,options)=>{const animation=element.animate(frames,options);state.animations.push(animation);return animation;};
+    animate(veil,[{opacity:0},{opacity:1}],{duration:350,fill:'forwards'});
+    animate(clone,[{transform:'rotateY(0deg)',opacity:1},{transform:'rotateY(90deg)',opacity:0}],{duration:440,easing:'ease-in',fill:'forwards'});
+    animate(panel,[
+      {left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px',transform:'rotateY(0deg)',background:'#203b4d',borderRadius:'18px'},
+      {offset:.45,left:(rect.left-rect.width*.07)+'px',top:(rect.top-20)+'px',width:rect.width*1.14+'px',height:rect.height*1.14+'px',transform:'rotateY(150deg)',background:'#335268',borderRadius:'22px'},
+      {left:'0px',top:'0px',width:innerWidth+'px',height:innerHeight+'px',transform:'rotateY(180deg)',background:'#ecf6fc',borderRadius:'0px'}
+    ],{duration:900,easing:'cubic-bezier(.25,.65,.25,1)',fill:'forwards'});
+    await new Promise(resolve=>setTimeout(resolve,420));
+    if(epoch!==navEpoch || navMorph!==state || !currentAccessToken){if(navMorph===state)navCancelMorph();return;}
+    // Reveal the workspace while the card is still expanding, then crossfade.
+    navShow('person',true,true);
+    const fade=animate(layer,[{opacity:1},{opacity:0}],{delay:120,duration:500,easing:'ease-in-out',fill:'forwards'});
+    await fade.finished.catch(()=>{});
+    if(navMorph===state)navCancelMorph();
+  }
+  function navShow(view,push=false,preserveMorph=false){
+    if(!preserveMorph)navCancelMorph();
     if(!currentAccessToken)view='auth';
     if(view==='person' && !selectedPersonId)view='people';
     navWorkspaceAnimation?.cancel();navWorkspaceAnimation=null;
@@ -98,7 +138,7 @@ CARD_NAVIGATION_SCRIPT = r'''
       navWorkspaceAnimation=navShell.animate([
         {opacity:0,transform:'translateY(18px) scale(.975)'},
         {opacity:1,transform:'translateY(0) scale(1)'}
-      ],{duration:380,easing:'cubic-bezier(.2,.7,.2,1)'});
+      ],{duration:preserveMorph?620:380,easing:'cubic-bezier(.2,.7,.2,1)'});
     }
     navSettings.open=false;navStatus.textContent='';
     navName.textContent=byId('person-select').selectedOptions[0]?.textContent || '人物工作区';
@@ -118,12 +158,12 @@ CARD_NAVIGATION_SCRIPT = r'''
     if(!card)return;event.preventDefault();event.stopImmediatePropagation();
     if(navEntering || !currentAccessToken)return;
     const epoch=++navEpoch;navEntering=true;const id=card.dataset.personId;
-    navStatus.textContent='正在进入人物…';card.classList.add('is-entering');
+    navStatus.textContent='正在进入人物…';
     try{
       await clientSelectPerson(id);
-      await Promise.all([clientPopulatePersonBack(card,id),new Promise(resolve=>setTimeout(resolve,matchMedia('(prefers-reduced-motion: reduce)').matches?0:700))]);
+      await clientPopulatePersonBack(card,id);
       if(epoch!==navEpoch || !currentAccessToken)return;
-      navShow('person',true);
+      await navMorphIntoWorkspace(card,front,epoch);
     }catch(_){if(epoch===navEpoch)navStatus.textContent='人物暂时无法打开，请重试。';}
     finally{card.classList.remove('is-entering');if(epoch===navEpoch)navEntering=false;}
   },true);
