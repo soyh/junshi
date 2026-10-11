@@ -1,0 +1,26 @@
+[Unit]
+Description=AI Love Strategist API
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ai-love-strategist
+ExecStartPre=/opt/ai-love-strategist/.venv/bin/python -m app.backup
+ExecStartPre=/opt/ai-love-strategist/.venv/bin/python -m app.backup --retention-dir /opt/ai-love-strategist/data/backups --keep 7 --apply-retention
+ExecStartPre=/opt/ai-love-strategist/.venv/bin/python -m app.preflight --json
+ExecStart=/opt/ai-love-strategist/.venv/bin/python -m app.server
+ExecStartPost=/opt/ai-love-strategist/.venv/bin/python -m app.wait_ready --timeout-seconds 30 --interval-seconds 0.5 --probe-timeout-seconds 1 --json
+ExecStartPost=/usr/bin/rm -f /run/ai-love-strategist/watchdog.json
+ExecStartPost=/usr/bin/rm -f /run/ai-love-strategist/recovery-required
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+[Install]
+WantedBy=multi-user.target

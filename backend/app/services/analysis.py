@@ -1,26 +1,64 @@
 import sqlite3
 
-from app.domain.errors import ConversationNotFoundError
+from app.domain.errors import PersonNotFoundError
 from app.repositories.analysis import AnalysisRepository
+from app.services.learning_strategy_context import LearningStrategyContextService
+from app.services.reference_context import ReferenceContextService
 
 
 class AnalysisService:
-    def __init__(self, repository: AnalysisRepository | None = None):
+    def __init__(
+        self,
+        repository: AnalysisRepository | None = None,
+        learning_strategy_service: LearningStrategyContextService | None = None,
+        reference_context_service: ReferenceContextService | None = None,
+    ):
         self.repository = repository or AnalysisRepository()
+        self.learning_strategy_service = learning_strategy_service or LearningStrategyContextService()
+        self.reference_context_service = reference_context_service or ReferenceContextService()
 
     def get_context(
         self,
         conn: sqlite3.Connection,
         user_id: str,
         conversation_id: str,
-    ) -> tuple[sqlite3.Row, sqlite3.Row, list[sqlite3.Row]]:
+    ) -> dict:
         conversation, person, messages = self.repository.get_context(
             conn,
             user_id,
             conversation_id,
         )
 
-        if conversation is None or person is None:
-            raise ConversationNotFoundError("Conversation not found")
+        if conversation is None:
+            raise ValueError("Conversation not found")
 
-        return conversation, person, messages
+        if person is None:
+            raise PersonNotFoundError("Person not found")
+
+        learning_strategy = self.learning_strategy_service.get_learning_context(
+            conn,
+            user_id,
+            person["id"],
+        )
+        model_references = self.reference_context_service.build_context(
+            conn,
+            user_id,
+            conversation_id,
+        )
+
+        from app.services.person_memory import context_memory
+        memory, retained = context_memory(conn, user_id, person['id'], [dict(m) for m in messages])
+        result = {
+            "conversation": dict(conversation),
+            "person": dict(person),
+            "messages": retained,
+            "facts": [],
+            "inferences": [],
+            "unknowns": [],
+            "recommendations": [],
+            "learning_strategy": learning_strategy,
+            "model_references": model_references,
+        }
+        if memory:
+            result['person_memory'] = memory
+        return result

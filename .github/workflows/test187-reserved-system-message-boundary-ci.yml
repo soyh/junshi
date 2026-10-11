@@ -1,0 +1,80 @@
+name: TEST-187 Reserved System Message Boundary CI
+
+on:
+  push:
+    branches:
+      - test-187-reserved-system-message-boundary
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify TEST-187 migration scope
+        run: |
+          changed="$(git -C .. diff --name-only 8c594a8c28ff768dd6f3fdc60f38c5b1fc029fa5..HEAD -- backend/migrations)"
+          printf 'migration changes:\n%s\n' "$changed"
+          test -z "$changed"
+
+      - name: Verify reserved system sender boundary
+        run: |
+          grep -n "USER_MANAGED_MESSAGE_SENDER_TYPES" app/services/message.py
+          grep -n "def create_user_managed(" app/services/message.py
+          grep -n "def update_user_managed(" app/services/message.py
+          grep -n "def delete_user_managed(" app/services/message.py
+          grep -n "System messages are reserved for internal canonical evidence" app/services/message.py
+          grep -n "service.create_user_managed(" app/api/routes/messages.py
+          grep -n "service.update_user_managed(" app/api/routes/messages.py
+          grep -n "service.delete_user_managed(" app/api/routes/messages.py
+          grep -n '"system"' app/services/message.py
+          grep -n 'self.message_service.create(' app/services/media_attachment.py
+          python - <<'PY'
+          from pathlib import Path
+
+          routes = Path("app/api/routes/messages.py").read_text()
+          assert "service.create(" not in routes
+          assert "service.update(" not in routes
+          assert "service.delete(" not in routes
+
+          service = Path("app/services/message.py").read_text()
+          assert '"system",' in service
+          assert '"system"' not in service.split("USER_MANAGED_MESSAGE_SENDER_TYPES = {", 1)[1].split("}", 1)[0]
+          print("public system-sender boundary: PASS")
+          PY
+
+      - name: TEST-187 focused
+        run: >-
+          pytest -q
+          tests/test_187_reserved_system_message_boundary.py
+          tests/test_186_media_evidence_immutability.py
+          tests/test_185_media_analysis_lease_expiry_enforcement.py
+          tests/test_184_media_analysis_single_entrypoint.py
+          tests/test_183_media_analysis_concurrency_claim.py
+          tests/test_182_media_blob_transaction_integrity.py
+          tests/test_181_media_evidence_lifecycle_integrity.py
+          tests/test_180_media_upload_dual_model_settings_ui.py
+          tests/test_179_vision_model_routing.py
+          tests/test_177_media_attachments.py
+          tests/test_messages.py
+          tests/test_authenticated_*.py
+
+      - name: Full suite
+        run: pytest -q

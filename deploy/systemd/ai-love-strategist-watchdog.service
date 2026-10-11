@@ -1,0 +1,11 @@
+[Unit]
+Description=AI Love Strategist runtime health watchdog
+After=ai-love-strategist.service
+OnFailure=ai-love-strategist-recovery.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ai-love-strategist
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/ai-love-strategist/.venv/bin/python -m app.watchdog --json

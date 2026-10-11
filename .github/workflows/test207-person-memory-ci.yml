@@ -1,0 +1,35 @@
+name: TEST-207 Person Memory and Latency CI
+on:
+  push:
+    branches: [test-207-person-memory-latency]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Preserve historical migrations and runtime configuration
+        run: |
+          test -z "$(git -C .. diff --name-only e12ae474d5c61db7977db6f03da9a526efcd0453 HEAD -- backend/requirements.txt deploy)"
+          test -z "$(git -C .. diff --name-only --diff-filter=DMRT e12ae474d5c61db7977db6f03da9a526efcd0453 HEAD -- backend/migrations)"
+      - name: Focused
+        run: pytest -q tests/test_207_person_memory.py tests/test_206_latest_turn_recovery.py tests/test_205_reply_freshness.py tests/test_204_long_history_budget.py tests/test_strategic_reply_freshness.py tests/test_analysis.py tests/test_persons.py tests/test_relationships.py
+      - name: Full suite
+        run: pytest -q
+      - name: Browser acceptance
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/person_memory_calendar_browser.py
+          PYTHONPATH=. python tests/reply_freshness_browser.py
+          PYTHONPATH=. python tests/china_time_browser.py
+          PYTHONPATH=. python tests/named_chat_import_browser.py

@@ -1,0 +1,36 @@
+name: TEST-203 Named Chat Import CI
+on:
+  push:
+    branches: [test-203-named-chat-import]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Protect migrations, dependencies and deployment configuration
+        run: |
+          test -z "$(git -C .. diff --name-only e11309593d773fc8d3288a54ed47c2f464941dd1 HEAD -- backend/migrations backend/requirements.txt deploy)"
+      - name: Focused
+        run: pytest -q tests/test_203_named_chat_import.py tests/test_text_import.py tests/test_text_import_contract.py tests/test_text_import_auto_order.py tests/test_authenticated_unified_conversation_import.py
+      - name: Full suite
+        run: pytest -q
+      - name: Browser acceptance
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/named_chat_import_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test203-chat-import-screenshots
+          path: /tmp/test203-preview-*.png

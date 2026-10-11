@@ -1,0 +1,71 @@
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+ReferenceType = Literal["document", "skill"]
+
+
+class ModelReferenceResponse(BaseModel):
+    id: str
+    user_id: str
+    name: str
+    reference_type: ReferenceType
+    original_filename: str | None = None
+    mime_type: str | None = None
+    description: str | None = None
+    enabled_by_default: bool
+    priority: int
+    created_at: str
+    updated_at: str
+    content_chars: int
+    content_preview: str
+    effective_enabled: bool
+    effective_priority: int
+    override_enabled: bool | None = None
+    override_priority: int | None = None
+
+
+class ModelReferenceUpdate(BaseModel):
+    name: str | None = None
+    reference_type: ReferenceType | None = None
+    description: str | None = None
+    enabled_by_default: bool | None = None
+    priority: int | None = Field(default=None, ge=0, le=10000)
+
+
+class ConversationReferenceOverrideUpdate(BaseModel):
+    enabled: bool
+    priority: int | None = Field(default=None, ge=0, le=10000)
+
+
+class ModelReferenceContextResponse(BaseModel):
+    conversation_id: str
+    count: int
+    policy: dict[str, str]
+    items: list[dict]
+
+
+class ReferenceRetrievalContextResponse(ModelReferenceContextResponse):
+    conversation_id: str | None = None
+    catalog: list[dict] = Field(default_factory=list)
+    retrieval: dict = Field(default_factory=dict)
+
+
+class ReferenceBatchUpdate(BaseModel):
+    reference_ids: list[str] = Field(min_length=1, max_length=500)
+    action: Literal["enable", "disable", "inherit", "delete"]
+    scope: Literal["global", "conversation"] = "global"
+    conversation_id: str | None = None
+
+
+class ReferenceContentUpdate(BaseModel):
+    content: str = Field(min_length=1, max_length=524288)
+    expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ReferenceGuideCreate(BaseModel):
+    name: str = Field(default="主题指南.md", min_length=1, max_length=160)
+    content: str = Field(min_length=1, max_length=524288)

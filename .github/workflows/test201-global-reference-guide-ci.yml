@@ -1,0 +1,36 @@
+name: TEST-201 Global Reference Guide CI
+on:
+  push:
+    branches: [test-201-global-reference-guide]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Protect migrations and dependencies
+        run: |
+          test -z "$(git diff --name-only f0bf037c269f033f29d4c5683a5fbf5b14f74d53 HEAD -- migrations requirements.txt)"
+      - name: Focused
+        run: pytest -q tests/test_201_global_reference_guide.py tests/test_200_reference_catalog.py tests/test_200_reference_editor.py tests/test_199_reference_batch.py tests/test_198_reference_library_reader.py tests/test_197_reference_skills_context.py tests/test_197_reference_response_compatibility.py
+      - name: Full suite
+        run: pytest -q
+      - name: Browser acceptance
+        run: |
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/reference_global_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reference-global-screenshots
+          path: /tmp/reference-global-*.png

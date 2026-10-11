@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily AI Love Strategist managed SQLite backup
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=15m
+AccuracySec=1m
+Unit=ai-love-strategist-backup.service
+
+[Install]
+WantedBy=timers.target

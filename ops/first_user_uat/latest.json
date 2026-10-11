@@ -1,0 +1,7 @@
+{
+  "status": "archived",
+  "description": "Historical phase record; not current deployment state.",
+  "current_handover": "DEVELOPMENT_HANDOVER.md",
+  "historical_source_commit": "125c918f759786cec56e61e07411d794fed210cf",
+  "private_runtime_details_included": false
+}
