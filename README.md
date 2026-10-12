@@ -86,3 +86,7 @@ data/、logs/         本机运行数据（不提交）
 客户端只记住服务器地址，凭据和未提交内容仅保存在运行内存中。退出后不继续未提交的客户端操作。当前为免安装版本，尚无自动更新或代码签名。
 
 开发者在 Windows 安装 `desktop/build-requirements.txt` 后运行 `python desktop/build_windows.py --output client-release`。CI 同时运行打包后程序的启动、图片组件和异步结果检查。交付程序及依赖放在同一文件夹，不要单独复制 exe。详细操作见 `desktop/CLIENT_README.txt`。
+
+## 客户端管理功能（TEST-218）
+
+218.1 在小窗增加当前账号的大模型配置、新建人物和平台账号。新建人物时必填首个会话名称，创建后自动选中。回复模型与视觉模型独立选择；修改配置留空密钥时保留原密钥。服务器继续使用 TEST-216，无后端或网页变更。使用 `desktop/test_management.py` 验证原生管理窗口和部分成功后的续接行为。
