@@ -9,7 +9,7 @@ import queue
 import sys
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext, ttk
+from tkinter import filedialog, messagebox, scrolledtext, ttk, simpledialog
 import webbrowser
 
 from PIL import Image, ImageTk
@@ -18,6 +18,7 @@ from client import Client
 from clipboard_media import capture, files_snapshot
 from pc_workflow import new_job, generate, confirm_sent
 from preferences import load_server, save_server
+from management import PersonDialog, AccountDialog, ModelDialog
 
 CHINA = timezone(timedelta(hours=8))
 
@@ -51,6 +52,7 @@ class Assistant:
         self.conversations = []
         self.hotkey_thread = None
         self.closed = False
+        self.active_dialog = None
         self.controls = []
         frame = ttk.Frame(root, padding=12)
         frame.pack(fill='both', expand=True)
@@ -63,11 +65,16 @@ class Assistant:
         self.button(row, '登录 / 刷新人物', self.login)
         self.button(row, '打开主页面', self.open_main)
         self.button(row, '退出登录', self.logout)
+        self.button(row, '大模型设置', lambda: self.open_management(ModelDialog))
         selection = ttk.Frame(frame); selection.pack(fill='x', pady=6)
         self.person = self.combo(selection, '人物', self.change_person)
         self.account = self.combo(selection, '平台账号', self.change_account)
         self.conversation = self.combo(selection, '会话', lambda *_: self.invalidate())
-        self.button(selection, '新建此来源会话', self.create_conversation)
+        actions = ttk.Frame(selection); actions.pack(fill='x')
+        self.button(actions, '新建人物', lambda: self.open_management(PersonDialog))
+        self.button(actions, '新建平台账号', lambda: self.open_management(AccountDialog))
+        self.button(actions, '新建此来源会话', self.create_conversation)
+        self.button(actions, '刷新人物', self.refresh_people)
         panels = ttk.Panedwindow(frame, orient='vertical'); panels.pack(fill='both', expand=True)
         upper = ttk.LabelFrame(panels, text='对方消息 / 附件预览（确认后才上传）', padding=8)
         lower = ttk.LabelFrame(panels, text='回复建议（可编辑为最终发送版本）', padding=8)
@@ -179,8 +186,25 @@ class Assistant:
             self.person['values'] = [p.get('nickname') or p['name'] for p in people]
             self.person.set(''); self.account.set(''); self.conversation.set('')
             self.accounts = []; self.conversations = []; self.invalidate()
-            self.status.set('已连接。请选择人物与平台账号；绑定账号、新建人物和完整迁移在主页面操作。')
+            self.status.set('已连接。可在此新建人物、平台账号并配置模型；完整数据迁移仍在主页面操作。')
         self.submit(work, done)
+
+    def open_management(self, dialog):
+        if not self.client:return self.status.set('请先登录服务器。')
+        if self.busy:return
+        if self.active_dialog:
+            self.active_dialog.window.lift();return
+        try:dialog(self)
+        except ValueError as exc:self.status.set(str(exc))
+
+    def refresh_people(self):
+        if not self.client:return self.status.set('请先登录。')
+        def done(people):
+            self.people=people;self.person['values']=[p.get('nickname') or p['name'] for p in people]
+            self.person.set('');self.account.set('');self.conversation.set('')
+            self.accounts=[];self.conversations=[];self.account['values']=();self.conversation['values']=()
+            self.invalidate();self.status.set('人物列表已刷新，请重新选择人物。')
+        self.submit(lambda:self.client.request('GET','/persons'),done)
 
     def selected_person(self):
         index = self.person.current()
@@ -226,7 +250,10 @@ class Assistant:
         try: person = self.selected_person()
         except ValueError as exc: return self.status.set(str(exc))
         account = self.selected_account()
-        title = f'PC · {self.account.get()} · {now_text()}'
+        title = simpledialog.askstring('新建会话','请填写会话名称：',initialvalue='日常聊天',parent=self.root)
+        if title is None:return
+        title=title.strip()
+        if not title:return self.status.set('会话名称不能为空。')
         def work():
             conversation = self.client.request('POST', '/conversations', {'person_id': person, 'title': title})
             if account:
@@ -346,6 +373,8 @@ class Assistant:
 
     def activate(self):
         if self.busy: return
+        if self.active_dialog:
+            self.root.deiconify();self.active_dialog.window.lift();return
         self.root.deiconify(); self.root.lift(); self.root.attributes('-topmost', True)
         self.root.after(800, lambda: self.root.attributes('-topmost', False))
         self.read_clipboard()

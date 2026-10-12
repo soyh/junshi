@@ -32,7 +32,7 @@ def main():
     root = tk.Tk()
     root.title('AI 恋爱军师 · PC 客户端')
     app = Assistant(root, hotkey=not bool(args.self_test))
-    root.title('AI 恋爱军师 · PC 客户端 217.1')
+    root.title('AI 恋爱军师 · PC 客户端 218.1')
     root.report_callback_exception = lambda *_: messagebox.showerror('操作未完成', '界面操作未完成，请重试。已提交的服务器记录不会删除。', parent=root)
     if args.self_test:
         root.update()
@@ -45,9 +45,23 @@ def main():
         while app.busy and time.monotonic() < deadline:
             root.update(); time.sleep(.02)
         assert app.reply.get('1.0', 'end-1c') == 'Synthetic reply'
+        from management import PersonDialog, ModelDialog
+        class OfflineClient:
+            def request(self, method, path):
+                assert method == 'GET'
+                if path == '/settings/llm/profiles':return []
+                if path == '/settings/llm/vision':return None
+                raise AssertionError(path)
+        app.client=OfflineClient()
+        dialog=PersonDialog(app);root.update();dialog.close()
+        dialog=ModelDialog(app)
+        deadline=time.monotonic()+5
+        while app.busy and time.monotonic()<deadline:root.update();time.sleep(.02)
+        assert not app.busy and dialog.selector.get()=='新建配置'
+        dialog.close()
         app.logout()
         assert app.client is None and not app.media
-        Path(args.self_test).write_text(json.dumps({'status':'PASS','frozen':bool(getattr(sys,'frozen',False)), 'window':True,'image':True,'worker':True}), encoding='utf-8')
+        Path(args.self_test).write_text(json.dumps({'status':'PASS','frozen':bool(getattr(sys,'frozen',False)), 'window':True,'image':True,'worker':True,'management':True}), encoding='utf-8')
         app.closed = True
         root.destroy()
     else:
