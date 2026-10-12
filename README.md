@@ -78,3 +78,11 @@ data/、logs/         本机运行数据（不提交）
 部署新版服务器后，在 Windows 安装 `desktop/requirements.txt`，双击 **Start-PC-Assistant.cmd**。登录服务器，选择人物、平台和会话；Ctrl+Alt+J 唤起小窗并读取复制的文字、图片或本地视频文件。上方预览确认后再上传，下方显示可编辑建议，支持复制及“确认已发送”。
 
 [完整使用说明与限制](docs/TEST-216-pc-assistant.md) 包括多平台账号绑定、加密完整导出/导入、依赖安装和媒体识别要求。首次部署新版服务会新增迁移 021，请先隔离验收和备份。
+
+## 独立 Windows 客户端（TEST-217）
+
+已部署 TEST-216 服务的用户可使用独立 Windows x64 客户端：完整解压 `JunshiPC-217.1-Windows-x64.zip` 后双击 `JunshiPC.exe`，无需安装 Python，也不在电脑启动后端。填写 HTTPS 服务器地址（不含 `/app`），使用网页相同账号登录。网页功能保持不变，服务器持续保存数据。
+
+客户端只记住服务器地址，凭据和未提交内容仅保存在运行内存中。退出后不继续未提交的客户端操作。当前为免安装版本，尚无自动更新或代码签名。
+
+开发者在 Windows 安装 `desktop/build-requirements.txt` 后运行 `python desktop/build_windows.py --output client-release`。CI 同时运行打包后程序的启动、图片组件和异步结果检查。交付程序及依赖放在同一文件夹，不要单独复制 exe。详细操作见 `desktop/CLIENT_README.txt`。

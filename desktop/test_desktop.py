@@ -7,7 +7,7 @@ from PIL import Image
 
 from clipboard_media import capture, files_snapshot
 from client import Client
-from workflow import new_job, generate, confirm_sent
+from pc_workflow import new_job, generate, confirm_sent
 
 
 class ClipboardTests(unittest.TestCase):

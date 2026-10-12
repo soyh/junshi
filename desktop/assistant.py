@@ -16,7 +16,8 @@ from PIL import Image, ImageTk
 
 from client import Client
 from clipboard_media import capture, files_snapshot
-from workflow import new_job, generate, confirm_sent
+from pc_workflow import new_job, generate, confirm_sent
+from preferences import load_server, save_server
 
 CHINA = timezone(timedelta(hours=8))
 
@@ -53,9 +54,9 @@ class Assistant:
         self.controls = []
         frame = ttk.Frame(root, padding=12)
         frame.pack(fill='both', expand=True)
-        login = ttk.LabelFrame(frame, text='连接本机或服务器（账号密码仅在内存中使用）', padding=8)
+        login = ttk.LabelFrame(frame, text='连接服务器 · 聊天和分析均在服务器保存与运行', padding=8)
         login.pack(fill='x')
-        self.server = self.entry(login, '服务器', 'http://127.0.0.1:18080')
+        self.server = self.entry(login, '服务器地址（不含 /app）', load_server())
         self.username = self.entry(login, '用户名')
         self.password = self.entry(login, '密码', secret=True)
         row = ttk.Frame(login); row.pack(fill='x')
@@ -89,7 +90,7 @@ class Assistant:
         self.status = tk.StringVar(value='登录后选择人物与平台。Ctrl+Alt+J 唤起并读取剪贴板；不会自动上传。')
         ttk.Label(frame, textvariable=self.status, wraplength=620).pack(fill='x', pady=6)
         row = ttk.Frame(frame); row.pack(fill='x')
-        self.button(row, '收起窗口', self.root.withdraw)
+        self.button(row, '收起窗口', self.hide)
         self.button(row, '退出助手', self.close)
         self.root.protocol('WM_DELETE_WINDOW', self.hide)
         self.root.after(100, self.poll)
@@ -171,6 +172,10 @@ class Assistant:
             return people
         def done(people):
             self.client = client; self.people = people
+            try:
+                save_server(client.base)
+            except OSError:
+                pass  # Address persistence is optional; login remains usable.
             self.person['values'] = [p.get('nickname') or p['name'] for p in people]
             self.person.set(''); self.account.set(''); self.conversation.set('')
             self.accounts = []; self.conversations = []; self.invalidate()
