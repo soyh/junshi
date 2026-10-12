@@ -158,6 +158,8 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
 
 <script>
 (() => {
+  let browserHandoffTicket = new URLSearchParams(location.hash.slice(1)).get('desktop-login');
+  if (browserHandoffTicket !== null) history.replaceState(null, '', location.pathname + location.search);
   const byId = (id) => document.getElementById(id);
   const authStatus = byId('auth-status');
   const sessionsNode = byId('sessions');
@@ -560,6 +562,22 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
   byId('relationship-select').addEventListener('change', selectRelationship);
   byId('conversation-select').addEventListener('change', selectConversation);
 
+  queueMicrotask(async () => {
+    if (browserHandoffTicket === null) return;
+    const ticket = browserHandoffTicket;
+    browserHandoffTicket = null;
+    try {
+      const data = await api('/api/v1/auth/browser-handoff/redeem', {
+        method: 'POST', body: JSON.stringify({ticket}),
+      }, false);
+      establishSession(data, '已通过客户端登录。');
+    } catch (_) {
+      authStatus.textContent = '登录衔接已失效，请回到客户端重新点击打开主页面，或在此登录。';
+      return;
+    }
+    try { await loadProvider(); await loadWorkspace(); }
+    catch (_) { authStatus.textContent = '已登录；页面资料加载失败，请稍后重新打开。'; }
+  });
   clearSession();
 })();
 </script>

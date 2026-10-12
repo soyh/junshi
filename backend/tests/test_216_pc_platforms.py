@@ -123,6 +123,9 @@ def test_upgrade_from_twenty_preserves_all_existing_tables(client):
         for name, (sql, rows) in before.items():
             assert conn.execute('SELECT sql FROM sqlite_master WHERE name=?', (name,)).fetchone()[0] == sql
             assert [tuple(row) for row in conn.execute(f'SELECT * FROM "{name}" ORDER BY rowid')] == rows
-        assert conn.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0] == 21
+        from pathlib import Path
+        expected = {p.name.split('_', 1)[0] for p in (Path(__file__).parents[1] / 'migrations').glob('*.sql')}
+        assert '021' in expected
+        assert {row[0] for row in conn.execute('SELECT version FROM schema_migrations')} == expected
         assert conn.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
         assert not conn.execute('PRAGMA foreign_key_check').fetchall()

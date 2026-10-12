@@ -2,7 +2,7 @@ name: Windows PC client package
 on:
   workflow_dispatch:
   push:
-    branches: [test-217-desktop-client, test-218-client-management]
+    branches: [test-217-desktop-client, test-218-client-management, test-219-client-web-handoff]
     paths: ['desktop/**', '.github/workflows/desktop-package.yml']
 permissions:
   contents: read
@@ -17,6 +17,7 @@ jobs:
           python-version: '3.13'
       - run: python -m pip install -r desktop/build-requirements.txt
       - run: python desktop/test_desktop.py
+      - run: python desktop/test_handoff.py
       - run: python desktop/test_preferences.py
       - run: python desktop/test_gui.py
       - run: python desktop/test_management.py

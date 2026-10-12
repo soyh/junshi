@@ -361,8 +361,16 @@ class Assistant:
         self.submit(lambda: confirm_sent(client, job, text, sent_at), done)
 
     def open_main(self):
-        try: webbrowser.open(Client(self.server.get()).base + '/app?pc=1')
-        except ValueError as exc: self.status.set(str(exc))
+        try:
+            client = self.client or Client(self.server.get())
+        except ValueError as exc:
+            return self.status.set(str(exc))
+        def opened(url):
+            if webbrowser.open(url):
+                self.status.set('已打开主页面。' if not client.token else '已打开主页面并衔接当前账号。')
+            else:
+                self.status.set('无法打开默认浏览器，请检查系统默认浏览器后重试。')
+        self.submit(client.browser_url, opened)
 
     def logout(self):
         self.client = None; self.people = []; self.accounts = []; self.conversations = []

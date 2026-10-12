@@ -1,7 +1,7 @@
 name: Stable release checks
 on:
   push:
-    branches: [main, repository-maintenance, windows-one-click-launcher, test-216-pc-platforms]
+    branches: [main, repository-maintenance, windows-one-click-launcher, test-216-pc-platforms, test-219-client-web-handoff]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -45,6 +45,7 @@ jobs:
         run: |
           python -m pip install playwright==1.55.0
           python -m playwright install --with-deps chromium
+          PYTHONPATH=. python tests/browser_handoff_browser.py
           PYTHONPATH=. python tests/pc_platform_browser.py
           PYTHONPATH=. python tests/card_morph_browser.py
           PYTHONPATH=. python tests/person_polish_browser.py
