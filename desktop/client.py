@@ -11,6 +11,16 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class Client:
+    def browser_url(self):
+        if not self.token:
+            return self.base + '/app'
+        result = self.request('POST', '/auth/browser-handoff', timeout=15)
+        ticket = result.get('ticket', '') if isinstance(result, dict) else ''
+        import re
+        if not re.fullmatch(r'[A-Za-z0-9_-]{43}', ticket):
+            raise ValueError('服务器未返回有效登录衔接，请确认服务器已更新。')
+        return self.base + '/app#desktop-login=' + ticket
+
     def __init__(self, base, token=None):
         parts = urllib.parse.urlsplit(base.strip())
         if parts.username or parts.password or parts.query or parts.fragment or parts.path not in ('', '/'):

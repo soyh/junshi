@@ -14,6 +14,37 @@ router = APIRouter(
 service = AuthSessionService()
 
 
+from fastapi import Response
+from pydantic import BaseModel, Field
+from app.services import browser_handoff
+
+
+class BrowserHandoffRequest(BaseModel):
+    ticket: str = Field(min_length=43, max_length=43, pattern=r'^[A-Za-z0-9_-]{43}$')
+
+
+@router.post('/browser-handoff')
+def create_browser_handoff(response: Response, authorization: str | None = Header(default=None)):
+    token = parse_bearer_token(authorization)
+    response.headers['Cache-Control'] = 'no-store'
+    try:
+        with get_connection() as conn:
+            return browser_handoff.issue(conn, token)
+    except browser_handoff.InvalidHandoff as exc:
+        raise HTTPException(401, detail=str(exc), headers={'Cache-Control': 'no-store'}) from None
+
+
+@router.post('/browser-handoff/redeem', response_model=AuthSessionResponse)
+def redeem_browser_handoff(payload: BrowserHandoffRequest, response: Response):
+    response.headers['Cache-Control'] = 'no-store'
+    try:
+        with get_connection() as conn:
+            created = browser_handoff.redeem(conn, payload.ticket)
+    except browser_handoff.InvalidHandoff as exc:
+        raise HTTPException(401, detail=str(exc), headers={'Cache-Control': 'no-store'}) from None
+    return AuthSessionResponse(access_token=created.access_token, expires_at=created.expires_at)
+
+
 @router.post(
     "/sessions",
     response_model=AuthSessionResponse,
