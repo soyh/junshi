@@ -1,0 +1,21 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.junshi.assistant'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.junshi.assistant'
+        minSdk 26
+        targetSdk 35
+        versionCode 22201
+        versionName '222.1-preview'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildTypes { release { minifyEnabled false } }
+    lint { abortOnError true }
+}
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}
