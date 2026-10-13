@@ -22,12 +22,12 @@ def install_theme(root):
     style.configure('TLabelframe', background='#ffffff', relief='raised', borderwidth=2,
                     bordercolor='#ccdfef', lightcolor='#ffffff', darkcolor='#b1c9df')
     style.configure('TLabelframe.Label', background='#ffffff', foreground='#2d6795', font=('Microsoft YaHei UI', 10, 'bold'))
-    style.configure('TEntry', fieldbackground='#f7fbff', padding=(8, 5), bordercolor='#c4d9ed')
+    style.configure('TEntry', fieldbackground='#f7fbff', padding=(6, 3), bordercolor='#c4d9ed')
     style.map('TEntry', bordercolor=[('focus', '#428fd0')])
-    style.configure('TCombobox', fieldbackground='#f7fbff', padding=(7, 4), arrowsize=14)
+    style.configure('TCombobox', fieldbackground='#f7fbff', padding=(6, 3), arrowsize=14)
     style.map('TCombobox', fieldbackground=[('readonly', '#f7fbff'), ('disabled', '#edf2f6')],
               foreground=[('disabled', '#8c9baa')])
-    style.configure('TButton', background='#eff7ff', foreground='#326992', padding=(10, 6),
+    style.configure('TButton', background='#eff7ff', foreground='#326992', padding=(6, 3),
                     relief='raised', borderwidth=2, anchor='center')
     style.map('TButton', background=[('disabled', '#edf2f6'), ('pressed', '#c6e1f7'), ('active', '#deeffd')],
               foreground=[('disabled', '#8c9baa')], relief=[('pressed', 'sunken'), ('!pressed', 'raised')])
@@ -48,11 +48,14 @@ def text_surface(widget):
                      padx=12, pady=10, spacing1=2, spacing3=4, font=('Microsoft YaHei UI', 11))
 
 
-def raised_card(parent, title):
+def raised_card(parent, title, row=None, column=0):
     shadow = tk.Frame(parent, background='#cfdfed', borderwidth=0)
-    shadow.pack(fill='both', expand=True, pady=(0, 14), padx=(0, 3))
-    card = ttk.LabelFrame(shadow, text=title, padding=12)
-    card.pack(fill='both', expand=True, padx=(0, 4), pady=(0, 5))
+    if row is None:
+        shadow.pack(fill='both', expand=True, pady=(0, 8), padx=(0, 3))
+    else:
+        shadow.grid(row=row, column=column, sticky='nsew', pady=(0, 8), padx=(0, 6))
+    card = ttk.LabelFrame(shadow, text=title, padding=8)
+    card.pack(fill='both', expand=True, padx=(0, 3), pady=(0, 3))
     return card
 
 
