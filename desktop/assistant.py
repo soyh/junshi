@@ -19,7 +19,7 @@ from clipboard_media import capture, files_snapshot
 from pc_workflow import new_job, generate, confirm_sent
 from preferences import load_server, save_server
 from management import PersonDialog, AccountDialog, ModelDialog
-from theme import install_theme, scroll_page, text_surface, raised_card
+from theme import install_theme, text_surface, raised_card
 
 CHINA = timezone(timedelta(hours=8))
 
@@ -41,8 +41,14 @@ class Assistant:
         self.root = root
         self.root.title('AI 恋爱军师 · PC 助手')
         install_theme(root)
-        self.root.geometry(f'760x{min(980, max(600, root.winfo_screenheight() - 100))}')
-        self.root.minsize(660, 560)
+        screen_w, screen_h = root.winfo_screenwidth(), root.winfo_screenheight()
+        if sys.platform == 'win32':
+            work = wintypes.RECT()
+            if ctypes.windll.user32.SystemParametersInfoW(48, 0, ctypes.byref(work), 0):
+                screen_w, screen_h = work.right-work.left, work.bottom-work.top
+        width, height = min(1040, screen_w-40), min(800, screen_h-60)
+        self.root.geometry(f'{width}x{height}')
+        self.root.minsize(min(880, width), min(620, height))
         self.events = queue.Queue()
         self.client = None
         self.busy = False
@@ -56,51 +62,65 @@ class Assistant:
         self.closed = False
         self.active_dialog = None
         self.controls = []
-        frame, self.page_canvas = scroll_page(root)
-        ttk.Label(frame, text='让每一次回应，都多一点温度', style='Title.TLabel').pack(anchor='w')
-        ttk.Label(frame, text='AI 恋爱军师  ·  你的沟通小助手', style='Subtitle.TLabel').pack(anchor='w', pady=(3, 15))
-        login = raised_card(frame, '  连接与账号  ')
-        self.server = self.entry(login, '服务器地址（不含 /app）', load_server())
-        self.username = self.entry(login, '用户名')
-        self.password = self.entry(login, '密码', secret=True)
+        frame = ttk.Frame(root, padding=10, style='Page.TFrame')
+        frame.pack(fill='both', expand=True)
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(2, weight=1, uniform='message')
+        frame.rowconfigure(3, weight=1, uniform='message')
+        header = ttk.Frame(frame, style='Page.TFrame'); header.grid(row=0, column=0, sticky='ew', pady=(0, 7))
+        ttk.Label(header, text='AI 恋爱军师', style='Title.TLabel', font=('Microsoft YaHei UI', 15, 'bold')).pack(side='left')
+        ttk.Label(header, text='让每一次回应，都多一点温度', style='Subtitle.TLabel').pack(side='right')
+        top = ttk.Frame(frame, style='Page.TFrame'); top.grid(row=1, column=0, sticky='ew')
+        top.columnconfigure(0, weight=1, uniform='top'); top.columnconfigure(1, weight=1, uniform='top')
+        login = raised_card(top, '  连接与账号  ', row=0, column=0)
+        self.server = self.entry(login, '服务器', load_server(), label_width=8)
+        self.username = self.entry(login, '用户名', label_width=8)
+        self.password = self.entry(login, '密码', secret=True, label_width=8)
         row = ttk.Frame(login); row.pack(fill='x')
-        self.button(row, '登录 / 刷新人物', self.login)
+        self.button(row, '登录', self.login)
         self.button(row, '打开主页面', self.open_main)
         self.button(row, '退出登录', self.logout)
         self.button(row, '大模型设置', lambda: self.open_management(ModelDialog))
-        selection = raised_card(frame, '  选择这次对话  ')
+        selection = raised_card(top, '  选择这次对话  ', row=0, column=1)
         self.person = self.combo(selection, '人物', self.change_person)
         self.account = self.combo(selection, '平台账号', self.change_account)
         self.conversation = self.combo(selection, '会话', lambda *_: self.invalidate())
         actions = ttk.Frame(selection); actions.pack(fill='x')
         self.button(actions, '新建人物', lambda: self.open_management(PersonDialog))
         self.button(actions, '新建平台账号', lambda: self.open_management(AccountDialog))
-        self.button(actions, '新建此来源会话', self.create_conversation)
+        self.button(actions, '新建会话', self.create_conversation)
         self.button(actions, '刷新人物', self.refresh_people)
-        upper = raised_card(frame, '  对方说了什么  ·  消息与附件  ')
-        lower = raised_card(frame, '  这样回复试试  ·  可编辑后复制  ')
-        ttk.Label(upper, text='文字按对方单条消息登记；双方多条记录请在主页面识别导入。').pack(anchor='w')
-        self.incoming = scrolledtext.ScrolledText(upper, height=5, wrap='word'); self.incoming.pack(fill='both', expand=True)
+        upper = raised_card(frame, '  对方说了什么  ·  消息与附件  ', row=2)
+        lower = raised_card(frame, '  这样回复试试  ·  可编辑后复制  ', row=3)
+        upper.columnconfigure(0, weight=1); upper.rowconfigure(0, weight=1)
+        lower.columnconfigure(0, weight=1); lower.rowconfigure(0, weight=1)
+        body = ttk.Frame(upper); body.grid(row=0, column=0, sticky='nsew')
+        self.incoming = scrolledtext.ScrolledText(body, height=2, wrap='word'); self.incoming.pack(side='left', fill='both', expand=True)
         text_surface(self.incoming)
-        self.preview = ttk.Label(upper, text='无附件'); self.preview.pack(anchor='w')
-        self.incoming_time = self.entry(upper, '发送/证据时间（北京时间）', now_text())
-        row = ttk.Frame(upper); row.pack(fill='x')
+        self.preview = ttk.Label(body, text='无附件', wraplength=110); self.preview.pack(side='right', padx=(8,0))
+        incoming_footer = ttk.Frame(upper); incoming_footer.grid(row=1, column=0, sticky='ew')
+        time_box = ttk.Frame(incoming_footer); time_box.pack(side='left', fill='x', expand=True)
+        self.incoming_time = self.entry(time_box, '北京时间', now_text(), label_width=8)
+        row = ttk.Frame(incoming_footer); row.pack(side='right', padx=(6,0))
         self.button(row, '读取剪贴板', self.read_clipboard)
         self.button(row, '选择图片 / 视频', self.choose_files)
         self.button(row, '清空输入', self.clear_input)
         self.button(row, '分析并生成 / 重试', self.run_generation)
-        self.reply = scrolledtext.ScrolledText(lower, height=5, wrap='word'); self.reply.pack(fill='both', expand=True)
+        self.reply = scrolledtext.ScrolledText(lower, height=2, wrap='word'); self.reply.grid(row=0, column=0, sticky='nsew')
         text_surface(self.reply)
-        self.reply_time = self.entry(lower, '实际发送时间（北京时间）', now_text())
-        row = ttk.Frame(lower); row.pack(fill='x')
+        reply_footer = ttk.Frame(lower); reply_footer.grid(row=1, column=0, sticky='ew')
+        time_box = ttk.Frame(reply_footer); time_box.pack(side='left', fill='x', expand=True)
+        self.reply_time = self.entry(time_box, '发送时间', now_text(), label_width=8)
+        row = ttk.Frame(reply_footer); row.pack(side='right', padx=(6,0))
         self.button(row, '一键复制', self.copy_reply)
         self.button(row, '确认已发送', self.confirm)
         self.button(row, '换一条', self.regenerate)
         self.status = tk.StringVar(value='登录后选择人物与平台。Ctrl+Alt+J 唤起并读取剪贴板；不会自动上传。')
-        status_label = ttk.Label(frame, textvariable=self.status, wraplength=620, style='Status.TLabel')
-        status_label.pack(fill='x', pady=(0, 10))
+        bottom = ttk.Frame(frame, style='Page.TFrame'); bottom.grid(row=4, column=0, sticky='ew')
+        status_label = ttk.Label(bottom, textvariable=self.status, wraplength=620, style='Status.TLabel')
+        status_label.pack(side='left', fill='x', expand=True)
         status_label.bind('<Configure>', lambda event: status_label.configure(wraplength=max(240, event.width-24)))
-        row = ttk.Frame(frame); row.pack(fill='x')
+        row = ttk.Frame(bottom); row.pack(side='right', padx=(6,0))
         self.button(row, '收起窗口', self.hide)
         self.button(row, '退出助手', self.close)
         self.root.protocol('WM_DELETE_WINDOW', self.hide)
@@ -109,24 +129,24 @@ class Assistant:
             thread = threading.Thread(target=self.hotkey_loop, daemon=True)
             thread.start()
 
-    def entry(self, parent, title, value='', secret=False):
+    def entry(self, parent, title, value='', secret=False, label_width=24):
         row = ttk.Frame(parent); row.pack(fill='x', pady=2)
-        ttk.Label(row, text=title, width=24).pack(side='left')
-        entry = ttk.Entry(row, show='*' if secret else '')
+        ttk.Label(row, text=title, width=label_width).pack(side='left')
+        entry = ttk.Entry(row, width=14, show='*' if secret else '')
         entry.insert(0, value); entry.pack(side='left', fill='x', expand=True)
         self.controls.append((entry, 'normal'))
         return entry
 
     def combo(self, parent, title, callback):
         row = ttk.Frame(parent); row.pack(fill='x', pady=2)
-        ttk.Label(row, text=title, width=12).pack(side='left')
-        box = ttk.Combobox(row, state='readonly'); box.pack(side='left', fill='x', expand=True)
+        ttk.Label(row, text=title, width=8).pack(side='left')
+        box = ttk.Combobox(row, width=14, state='readonly'); box.pack(side='left', fill='x', expand=True)
         box.bind('<<ComboboxSelected>>', callback); self.controls.append((box, 'readonly'))
         return box
 
     def button(self, parent, text, command):
-        primary = text in ('登录 / 刷新人物', '分析并生成 / 重试', '一键复制')
-        button = ttk.Button(parent, text=text, command=command, style='Primary.TButton' if primary else 'TButton')
+        primary = text in ('登录', '分析并生成 / 重试', '一键复制')
+        button = ttk.Button(parent, text=text, command=command, width=0, style='Primary.TButton' if primary else 'TButton')
         button.pack(side='left', padx=2, pady=3)
         self.controls.append((button, 'normal'))
         return button

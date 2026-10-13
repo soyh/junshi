@@ -52,7 +52,7 @@ def main():
     completed=subprocess.run([str(app/'JunshiPC.exe'),'--self-test',str(report)],timeout=30)
     assert completed.returncode == 0 and json.loads(report.read_text())['frozen'], 'Packaged smoke test failed'
     assert not list(app.rglob('*.sqlite3')) and not list(app.rglob('.env'))
-    archive=Path(shutil.make_archive(str(output/'JunshiPC-220.1-Windows-x64'), 'zip', app.parent, app.name))
+    archive=Path(shutil.make_archive(str(output/'JunshiPC-221.1-Windows-x64'), 'zip', app.parent, app.name))
     digest=hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix('.zip.sha256').write_text(digest+'  '+archive.name+'\n',encoding='ascii')
     (output/'build-result.json').write_text(json.dumps({'exe':str(app/'JunshiPC.exe'),'zip':str(archive),'sha256':digest,'smoke':'PASS'},indent=2),encoding='utf-8')
