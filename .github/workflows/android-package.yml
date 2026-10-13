@@ -36,7 +36,7 @@ jobs:
           api-level: 35
           arch: x86_64
           working-directory: android
-          script: gradle connectedDebugAndroidTest --stacktrace
+          script: gradle connectedDebugAndroidTest --stacktrace || { adb logcat -d -s AndroidRuntime ActivityTaskManager TestRunner; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: JunshiAndroid-222-preview
