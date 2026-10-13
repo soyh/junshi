@@ -6,6 +6,18 @@ import org.junit.Test;
 import org.json.*;
 import static org.junit.Assert.*;
 public class AssistantTest {
+ @Test public void captureStyledPages()throws Exception {
+  try(ActivityScenario<MainActivity> a=ActivityScenario.launch(MainActivity.class)){
+   InstrumentationRegistry.getInstrumentation().waitForIdleSync();capture("login");
+   a.onActivity(activity->{activity.s.api=new Api("https://example.com","fake");activity.s.input="今天忙完啦，你在做什么？";activity.s.draft="刚准备休息，正好收到你的消息。今天过得怎么样？";activity.build();});
+   InstrumentationRegistry.getInstrumentation().waitForIdleSync();capture("workspace");
+   a.onActivity(activity->activity.s.logout());
+  }
+ }
+ void capture(String name)throws Exception {
+  android.content.Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();java.io.File dir=new java.io.File(c.getExternalFilesDir(null),"screenshots");dir.mkdirs();
+  try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(dir,name+".png"))){android.graphics.Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(bitmap);bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);bitmap.recycle();}
+ }
  @Test public void receivesSharedTextAndClearsOnLogout(){
   Intent i=new Intent(InstrumentationRegistry.getInstrumentation().getTargetContext(),MainActivity.class);
   i.setAction(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,"你在干嘛呐");

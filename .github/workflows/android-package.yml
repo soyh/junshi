@@ -1,7 +1,7 @@
 name: Android preview
 on:
   push:
-    branches: [test-222-android-client]
+    branches: [test-222-android-client, test-223-android-blue-ui]
     paths: ['android/**', '.github/workflows/android-package.yml']
   pull_request:
     paths: ['android/**', '.github/workflows/android-package.yml']
@@ -36,13 +36,19 @@ jobs:
           api-level: 35
           arch: x86_64
           working-directory: android
-          script: gradle connectedDebugAndroidTest --stacktrace || { adb logcat -d -s AndroidRuntime ActivityTaskManager TestRunner; exit 1; }
+          script: |
+            gradle connectedDebugAndroidTest --stacktrace || { adb logcat -d -s AndroidRuntime ActivityTaskManager TestRunner; exit 1; }
+            adb pull /sdcard/Android/data/com.junshi.assistant/files/screenshots ../android-previews
       - uses: actions/upload-artifact@v4
         with:
-          name: JunshiAndroid-222-preview
+          name: JunshiAndroid-223-preview
           path: android/app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Android-check-reports
           path: android/app/build/reports
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Android-page-previews
+          path: android-previews
