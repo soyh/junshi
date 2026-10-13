@@ -3,6 +3,7 @@ import android.content.*;
 import android.view.*;
 import android.widget.*;
 import android.text.*;
+import android.content.ClipboardManager;
 import org.json.*;
 
 /** One workspace shared by the activity and the explicitly enabled overlay. */
@@ -37,3 +38,4 @@ public class Workspace extends LinearLayout {
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();session.listen(listener);refresh();}
     @Override protected void onDetachedFromWindow(){session.unlisten(listener);super.onDetachedFromWindow();}
 }
+
