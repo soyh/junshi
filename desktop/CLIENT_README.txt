@@ -1,4 +1,4 @@
-AI 恋爱军师 PC 客户端 219.1（Windows x64）
+AI 恋爱军师 PC 客户端 220.1（Windows x64）
 
 1. 完整解压此文件夹，双击 JunshiPC.exe。无需安装 Python，不要单独移动 exe 或删除 _internal 文件夹。
 2. 填写 HTTPS 服务器地址（不带 /app），使用网页相同的账号登录。已有预设地址时直接登录。
