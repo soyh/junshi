@@ -38,7 +38,9 @@ jobs:
           working-directory: android
           script: |
             gradle connectedDebugAndroidTest --stacktrace || { adb logcat -d -s AndroidRuntime ActivityTaskManager TestRunner; exit 1; }
-            adb pull /sdcard/Android/data/com.junshi.assistant/files/screenshots ../android-previews
+            mkdir -p ../android-previews
+            adb pull /data/local/tmp/junshi-login.png ../android-previews/login.png
+            adb pull /data/local/tmp/junshi-workspace.png ../android-previews/workspace.png
       - uses: actions/upload-artifact@v4
         with:
           name: JunshiAndroid-223-preview

@@ -16,7 +16,7 @@ public class AssistantTest {
  }
  void capture(String name)throws Exception {
   android.content.Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();java.io.File dir=new java.io.File(c.getExternalFilesDir(null),"screenshots");dir.mkdirs();
-  try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(dir,name+".png"))){android.graphics.Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(bitmap);bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);bitmap.recycle();}
+  try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(dir,name+".png"))){android.graphics.Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(bitmap);bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);bitmap.recycle();} try(android.os.ParcelFileDescriptor fd=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("cp "+new java.io.File(dir,name+".png").getAbsolutePath()+" /data/local/tmp/junshi-"+name+".png");java.io.InputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(fd)){byte[] buffer=new byte[1024];while(in.read(buffer)!=-1){}}
  }
  @Test public void receivesSharedTextAndClearsOnLogout(){
   Intent i=new Intent(InstrumentationRegistry.getInstrumentation().getTargetContext(),MainActivity.class);
