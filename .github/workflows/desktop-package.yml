@@ -2,7 +2,7 @@ name: Windows PC client package
 on:
   workflow_dispatch:
   push:
-    branches: [test-217-desktop-client, test-218-client-management, test-219-client-web-handoff]
+    branches: [test-217-desktop-client, test-218-client-management, test-219-client-web-handoff, test-220-warm-blue-client]
     paths: ['desktop/**', '.github/workflows/desktop-package.yml']
 permissions:
   contents: read

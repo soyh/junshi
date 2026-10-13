@@ -19,6 +19,7 @@ from clipboard_media import capture, files_snapshot
 from pc_workflow import new_job, generate, confirm_sent
 from preferences import load_server, save_server
 from management import PersonDialog, AccountDialog, ModelDialog
+from theme import install_theme, scroll_page, text_surface, raised_card
 
 CHINA = timezone(timedelta(hours=8))
 
@@ -39,8 +40,9 @@ class Assistant:
     def __init__(self, root, hotkey=True):
         self.root = root
         self.root.title('AI 恋爱军师 · PC 助手')
-        self.root.geometry('660x830')
-        self.root.minsize(540, 680)
+        install_theme(root)
+        self.root.geometry(f'760x{min(980, max(600, root.winfo_screenheight() - 100))}')
+        self.root.minsize(660, 560)
         self.events = queue.Queue()
         self.client = None
         self.busy = False
@@ -54,10 +56,10 @@ class Assistant:
         self.closed = False
         self.active_dialog = None
         self.controls = []
-        frame = ttk.Frame(root, padding=12)
-        frame.pack(fill='both', expand=True)
-        login = ttk.LabelFrame(frame, text='连接服务器 · 聊天和分析均在服务器保存与运行', padding=8)
-        login.pack(fill='x')
+        frame, self.page_canvas = scroll_page(root)
+        ttk.Label(frame, text='让每一次回应，都多一点温度', style='Title.TLabel').pack(anchor='w')
+        ttk.Label(frame, text='AI 恋爱军师  ·  你的沟通小助手', style='Subtitle.TLabel').pack(anchor='w', pady=(3, 15))
+        login = raised_card(frame, '  连接与账号  ')
         self.server = self.entry(login, '服务器地址（不含 /app）', load_server())
         self.username = self.entry(login, '用户名')
         self.password = self.entry(login, '密码', secret=True)
@@ -66,7 +68,7 @@ class Assistant:
         self.button(row, '打开主页面', self.open_main)
         self.button(row, '退出登录', self.logout)
         self.button(row, '大模型设置', lambda: self.open_management(ModelDialog))
-        selection = ttk.Frame(frame); selection.pack(fill='x', pady=6)
+        selection = raised_card(frame, '  选择这次对话  ')
         self.person = self.combo(selection, '人物', self.change_person)
         self.account = self.combo(selection, '平台账号', self.change_account)
         self.conversation = self.combo(selection, '会话', lambda *_: self.invalidate())
@@ -75,12 +77,11 @@ class Assistant:
         self.button(actions, '新建平台账号', lambda: self.open_management(AccountDialog))
         self.button(actions, '新建此来源会话', self.create_conversation)
         self.button(actions, '刷新人物', self.refresh_people)
-        panels = ttk.Panedwindow(frame, orient='vertical'); panels.pack(fill='both', expand=True)
-        upper = ttk.LabelFrame(panels, text='对方消息 / 附件预览（确认后才上传）', padding=8)
-        lower = ttk.LabelFrame(panels, text='回复建议（可编辑为最终发送版本）', padding=8)
-        panels.add(upper, weight=1); panels.add(lower, weight=1)
+        upper = raised_card(frame, '  对方说了什么  ·  消息与附件  ')
+        lower = raised_card(frame, '  这样回复试试  ·  可编辑后复制  ')
         ttk.Label(upper, text='文字按对方单条消息登记；双方多条记录请在主页面识别导入。').pack(anchor='w')
         self.incoming = scrolledtext.ScrolledText(upper, height=5, wrap='word'); self.incoming.pack(fill='both', expand=True)
+        text_surface(self.incoming)
         self.preview = ttk.Label(upper, text='无附件'); self.preview.pack(anchor='w')
         self.incoming_time = self.entry(upper, '发送/证据时间（北京时间）', now_text())
         row = ttk.Frame(upper); row.pack(fill='x')
@@ -89,13 +90,16 @@ class Assistant:
         self.button(row, '清空输入', self.clear_input)
         self.button(row, '分析并生成 / 重试', self.run_generation)
         self.reply = scrolledtext.ScrolledText(lower, height=5, wrap='word'); self.reply.pack(fill='both', expand=True)
+        text_surface(self.reply)
         self.reply_time = self.entry(lower, '实际发送时间（北京时间）', now_text())
         row = ttk.Frame(lower); row.pack(fill='x')
         self.button(row, '一键复制', self.copy_reply)
         self.button(row, '确认已发送', self.confirm)
         self.button(row, '换一条', self.regenerate)
         self.status = tk.StringVar(value='登录后选择人物与平台。Ctrl+Alt+J 唤起并读取剪贴板；不会自动上传。')
-        ttk.Label(frame, textvariable=self.status, wraplength=620).pack(fill='x', pady=6)
+        status_label = ttk.Label(frame, textvariable=self.status, wraplength=620, style='Status.TLabel')
+        status_label.pack(fill='x', pady=(0, 10))
+        status_label.bind('<Configure>', lambda event: status_label.configure(wraplength=max(240, event.width-24)))
         row = ttk.Frame(frame); row.pack(fill='x')
         self.button(row, '收起窗口', self.hide)
         self.button(row, '退出助手', self.close)
@@ -121,7 +125,8 @@ class Assistant:
         return box
 
     def button(self, parent, text, command):
-        button = ttk.Button(parent, text=text, command=command)
+        primary = text in ('登录 / 刷新人物', '分析并生成 / 重试', '一键复制')
+        button = ttk.Button(parent, text=text, command=command, style='Primary.TButton' if primary else 'TButton')
         button.pack(side='left', padx=2, pady=3)
         self.controls.append((button, 'normal'))
         return button

@@ -32,7 +32,7 @@ def main():
     root = tk.Tk()
     root.title('AI 恋爱军师 · PC 客户端')
     app = Assistant(root, hotkey=not bool(args.self_test))
-    root.title('AI 恋爱军师 · PC 客户端 219.1')
+    root.title('AI 恋爱军师 · PC 客户端 220.1')
     root.report_callback_exception = lambda *_: messagebox.showerror('操作未完成', '界面操作未完成，请重试。已提交的服务器记录不会删除。', parent=root)
     if args.self_test:
         root.update()
