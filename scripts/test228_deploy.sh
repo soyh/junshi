@@ -172,7 +172,7 @@ for path in (app/'.env',app/'backend/.env'):
     assert all(after[k]==cfg[k] for k in keys)
 print('SMTP 配置已保存；原有模型密钥和其他配置保持一致：PASS')
 PY
-"$APP/.venv/bin/python" scripts/account_admin.py --grant-admin "$ADMIN_USERNAME"
+"$APP/.venv/bin/python" scripts/account_admin.py --grant-admin="$ADMIN_USERNAME"
 "$APP/.venv/bin/python" "$RUN/fingerprint.py" "$DB" > "$RUN/post.fingerprint"
 "$APP/.venv/bin/python" -m app.backup --destination "$RUN/post-migration.sqlite3"
 "$APP/.venv/bin/python" -m app.preflight --backup-dir "$RUN" --json

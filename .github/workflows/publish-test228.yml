@@ -43,7 +43,7 @@ jobs:
             const helper=(await github.rest.repos.getContent({...context.repo,path:'scripts/test228_isolated_acceptance.sh',ref:context.sha})).data;
             fs.writeFileSync('release-files/isolated-acceptance-v2.sh',Buffer.from(helper.content,'base64'));
             const deploy=(await github.rest.repos.getContent({...context.repo,path:'scripts/test228_deploy.sh',ref:context.sha})).data;
-            fs.writeFileSync('release-files/deploy-test228.sh',Buffer.from(deploy.content,'base64'));
+            fs.writeFileSync('release-files/deploy-test228-v2.sh',Buffer.from(deploy.content,'base64'));
             const files=fs.readdirSync('release-files');
             fs.writeFileSync('release-files/SHA256SUMS.txt',files.map(n=>crypto.createHash('sha256').update(fs.readFileSync('release-files/'+n)).digest('hex')+'  '+n).join('\n')+'\n');
             let release;const tag='test-228-email-accounts';
