@@ -40,12 +40,19 @@ def state(target:str,p:AccountState,admin:str=Depends(administrator)):
     return {'status':'updated'}
 
 @router.get('/{target}/data/{kind}')
-def data(target:str,kind:Literal['persons','conversations','messages'],reason:str=Query(min_length=1,max_length=500),offset:int=Query(0,ge=0),admin:str=Depends(administrator)):
-    columns={'persons':'id,name,nickname,notes,created_at','conversations':'id,person_id,title,status,created_at','messages':'id,conversation_id,sender_type,content,sent_at'}
+def data(target:str,kind:Literal['persons','conversations','messages','relationships','person_memories','person_update_events','model_references','person_platform_accounts','media_attachments'],reason:str=Query(min_length=1,max_length=500),offset:int=Query(0,ge=0),admin:str=Depends(administrator)):
+    columns={'persons':'id,name,nickname,notes,created_at','conversations':'id,person_id,title,status,created_at','messages':'id,conversation_id,sender_type,content,sent_at',
+             'relationships':'id,person_id,status,stage,notes,long_term_goal,current_goal',
+             'person_memories':'person_id,revision,summary_json,coverage_json,updated_at',
+             'person_update_events':'id,person_id,source,outcome,reason,before_json,after_json,evidence_json,created_at',
+             'model_references':'id,name,reference_type,original_filename,description,content',
+             'person_platform_accounts':'id,person_id,platform,account_handle,display_name',
+             'media_attachments':'id,person_id,conversation_id,media_type,mime_type,original_filename,size_bytes,sent_at,analysis_status,analysis_text'}
     with get_connection() as c:
         if not c.execute('SELECT 1 FROM users WHERE id=?',(target,)).fetchone(): raise HTTPException(404,'用户不存在')
         service.audit(c,admin,target,'view:'+kind,reason)
-        rows=c.execute(f'SELECT {columns[kind]} FROM {kind} WHERE user_id=? ORDER BY id LIMIT 50 OFFSET ?',(target,offset)).fetchall()
+        order='person_id' if kind=='person_memories' else 'id'
+        rows=c.execute(f'SELECT {columns[kind]} FROM {kind} WHERE user_id=? ORDER BY {order} LIMIT 50 OFFSET ?',(target,offset)).fetchall()
     return [dict(r) for r in rows]
 
 @router.get('/audit/history')

@@ -31,6 +31,9 @@ def prepare_deletion(conn,actor,target,reason,administrator=False):
     job=str(uuid.uuid4())
     service.audit(conn,actor,target,'delete-account',reason)
     conn.execute('INSERT INTO account_file_cleanup(id,user_id,paths_json) VALUES(?,?,?)',(job,target,json.dumps(paths)))
+    identity=conn.execute('SELECT email FROM account_identities WHERE user_id=?',(target,)).fetchone()
+    if identity is not None and identity['email']:
+        conn.execute('DELETE FROM email_challenges WHERE email=?',(identity['email'],))
     conn.execute('DELETE FROM users WHERE id=?',(target,))
     return job
 

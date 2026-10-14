@@ -15,6 +15,12 @@ class EmailAccountDialog(Dialog):
         self.button(row,'发送验证码',self.send)
         self.button(row,'确认注册' if purpose=='register' else '重置密码',self.save)
         self.button(row,'关闭',self.close);self.footer()
+        if purpose=='register':
+            self.button(row,'找回密码',self.open_reset)
+
+    def open_reset(self):
+        if self.busy:return
+        self.close();self.app.open_email_account('reset')
 
     def send(self):
         email=self.email.get().strip()

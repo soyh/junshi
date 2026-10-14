@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 
 from app.api.router import api_router
 from app.config.settings import Settings, get_settings
@@ -50,6 +52,14 @@ app = FastAPI(
     **_fastapi_surface_options(settings),
 )
 
+@app.exception_handler(RequestValidationError)
+async def private_auth_validation(request: Request, exc: RequestValidationError):
+    if request.url.path.startswith('/api/v1/auth'):
+        return JSONResponse(status_code=422,content={'detail':[
+            {'loc':list(error['loc']),'msg':error['msg'],'type':error['type']}
+            for error in exc.errors()]})
+    return await request_validation_exception_handler(request,exc)
+
 
 @app.middleware("http")
 async def apply_http_security_headers(request: Request, call_next):
@@ -62,6 +72,7 @@ async def apply_http_security_headers(request: Request, call_next):
     path = request.url.path
     if (
         path.startswith("/api/v1/auth")
+        or path.startswith("/api/v1/admin")
         or path.startswith("/api/v1/settings")
         or path == "/app"
         or path in {"/health/live", "/health/ready"}

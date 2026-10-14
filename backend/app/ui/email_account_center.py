@@ -17,7 +17,7 @@ EMAIL_ACCOUNT_HTML = r'''
 <button id="email-admin-list" type="button">查询用户</button><button id="email-admin-audit" type="button">查看操作记录</button>
 <label for="email-admin-target">目标用户 ID</label><input id="email-admin-target">
 <label for="email-admin-reason">查看或修改原因</label><input id="email-admin-reason">
-<select id="email-admin-kind"><option value="persons">人物资料</option><option value="conversations">会话</option><option value="messages">聊天内容</option></select>
+<select id="email-admin-kind"><option value="persons">人物资料</option><option value="conversations">会话</option><option value="messages">聊天内容</option><option value="relationships">关系状态</option><option value="person_memories">长期档案</option><option value="person_update_events">档案更新记录</option><option value="model_references">参考资料与 Skills</option><option value="person_platform_accounts">平台账号</option><option value="media_attachments">附件及分析结果</option></select>
 <label for="email-admin-offset">分页起始位置（每页 50 条）</label><input id="email-admin-offset" type="number" min="0" value="0">
 <button id="email-admin-view" type="button">查看数据</button><button id="email-admin-disable" type="button">禁用</button><button id="email-admin-enable" type="button">恢复</button><button id="email-admin-delete" type="button">永久删除用户</button>
 <pre id="email-admin-result" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto"></pre></section>

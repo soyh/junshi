@@ -37,3 +37,8 @@ def test_disabled_account_blocks_new_and_existing_login(client):
 def test_binding_cannot_issue_without_password(client,mail):
     assert client.post('/api/v1/auth/email/code',json={'email':'a@example.com','purpose':'bind'}).status_code in (401,403)
     mail.send.assert_not_called()
+
+def test_password_validation_does_not_echo_secret(client):
+    response=client.post('/api/v1/auth/email/reset-password',json={'email':'a@example.com','challenge_id':'a'*36,'code':'123456','new_password':'SECRET'})
+    assert response.status_code==422
+    assert 'SECRET' not in response.text

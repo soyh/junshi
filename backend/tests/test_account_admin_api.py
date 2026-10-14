@@ -14,6 +14,10 @@ def test_normal_user_cannot_list_and_admin_views_are_audited(client):
     assert response.status_code==200
     assert 'password_hash' not in response.text and 'access_token' not in response.text
     assert client.get(f'/api/v1/admin/accounts/{target}/data/messages',params={'reason':'用户请求排查'},headers=headers).status_code==200
+    for kind in ('persons','conversations','relationships','person_memories','person_update_events','model_references','person_platform_accounts','media_attachments'):
+        result=client.get(f'/api/v1/admin/accounts/{target}/data/{kind}',params={'reason':'数据核对'},headers=headers)
+        assert result.status_code==200,(kind,result.text)
+        assert result.headers['cache-control']=='no-store'
     with get_connection() as c:
         row=c.execute("SELECT target_id,reason FROM account_management_audit WHERE action='view:messages'").fetchone()
         assert row['target_id']==target and row['reason']=='用户请求排查'
