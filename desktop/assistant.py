@@ -19,6 +19,7 @@ from clipboard_media import capture, files_snapshot
 from pc_workflow import new_job, generate, confirm_sent
 from preferences import load_server, save_server
 from management import PersonDialog, AccountDialog, ModelDialog
+from registration import ACCOUNT_HINT, PASSWORD_HINT, validate
 from theme import install_theme, text_surface, raised_card
 
 CHINA = timezone(timedelta(hours=8))
@@ -76,8 +77,11 @@ class Assistant:
         self.server = self.entry(login, '服务器', load_server(), label_width=8)
         self.username = self.entry(login, '用户名', label_width=8)
         self.password = self.entry(login, '密码', secret=True, label_width=8)
+        ttk.Label(login, text=ACCOUNT_HINT, wraplength=420).pack(anchor='w')
+        ttk.Label(login, text=PASSWORD_HINT, wraplength=420).pack(anchor='w')
         row = ttk.Frame(login); row.pack(fill='x')
         self.button(row, '登录', self.login)
+        self.button(row, '注册', lambda: self.login(register=True))
         self.button(row, '打开主页面', self.open_main)
         self.button(row, '退出登录', self.logout)
         self.button(row, '大模型设置', lambda: self.open_management(ModelDialog))
@@ -190,15 +194,20 @@ class Assistant:
     def report(self, text):
         self.events.put(lambda: self.status.set(text))
 
-    def login(self):
+    def login(self, register=False):
         try:
             client = Client(self.server.get())
         except ValueError as exc:
             return self.status.set(str(exc))
         username, password = self.username.get(), self.password.get()
+        if register:
+            try:
+                validate(username, password)
+            except ValueError as exc:
+                return self.status.set(str(exc))
         self.password.delete(0, 'end')
         def work():
-            session = client.request('POST', '/auth/login', {'username': username, 'password': password}, timeout=30)
+            session = client.request('POST', '/auth/register' if register else '/auth/login', {'username': username, 'password': password}, timeout=30)
             client.token = session['access_token']
             people = client.request('GET', '/persons', timeout=30)
             return people

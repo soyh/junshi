@@ -48,3 +48,7 @@ python3.11 -m venv .venv
 独立 PC / 安卓客户端只需连接已有 HTTPS 服务器。Windows 客户端需完整解压，不能单独移动 exe；安卓更新若签名不同可能需要重新安装。
 
 源码与可编辑文档保存在仓库，二进制附件放在 Release Assets。历史 TEST 分支和文档保留用于追溯。账号、聊天、人物档案、私有参考资料、模型密钥、生产配置、数据库、运行日志及数据迁移包均不公开上传。
+
+
+## 三端账号注册同步更新（TEST-227）
+PC、网页、安卓已统一展示注册规则并进行提交前校验。详见 [注册说明](docs/REGISTRATION.md)。PC 227 与安卓 1.0.0-rc2 配套使用现有服务器账号接口，网页版需更新服务器代码。发布资料见 [TEST-227 下载](https://github.com/soyh/junshi/releases/tag/test-227-registration)。
