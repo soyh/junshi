@@ -9,6 +9,7 @@ AUTH_ACCOUNT_HTML = r'''<!doctype html>
     body { max-width: 920px; margin: 32px auto; padding: 0 20px; }
     fieldset { margin: 20px 0; padding: 18px; border-radius: 8px; }
     label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    .registration-rule { font-size: .86rem; line-height: 1.6; overflow-wrap: anywhere; margin: 6px 0 12px; }
     input, button { font: inherit; }
     input { width: 100%; box-sizing: border-box; padding: 9px; }
     button { margin: 12px 8px 0 0; padding: 9px 14px; cursor: pointer; }
@@ -25,9 +26,11 @@ AUTH_ACCOUNT_HTML = r'''<!doctype html>
   <fieldset>
     <legend>Register</legend>
     <label for="register-username">Username</label>
-    <input id="register-username" autocomplete="username">
+    <input id="register-username" autocomplete="username" aria-describedby="register-username-rules">
+    <p id="register-username-rules" class="registration-rule">账号：3–64 个字符，仅支持英文字母、数字、点（.）、下划线（_）和短横线（-），不区分大小写，不支持中文或空格。例如：xiaoming_01。</p>
     <label for="register-password">Password</label>
-    <input id="register-password" type="password" autocomplete="new-password">
+    <input id="register-password" type="password" autocomplete="new-password" aria-describedby="register-password-rules">
+    <p id="register-password-rules" class="registration-rule">注册密码：12–256 个字符，区分大小写；无需强制包含数字、大写字母或特殊符号。建议使用不易猜测的长密码，不要与其他网站重复。</p>
     <button id="register" type="button">Register</button>
   </fieldset>
 
@@ -113,7 +116,8 @@ AUTH_ACCOUNT_HTML = r'''<!doctype html>
   async function register() {
     const username = byId('register-username').value.trim();
     const password = byId('register-password').value;
-    if (!username || !password) throw new Error('Username and password are required');
+    if (!/^[A-Za-z0-9._-]{3,64}$/.test(username)) throw new Error('账号须为 3–64 个字符，仅允许英文字母、数字、点、下划线和短横线');
+    if (Array.from(password).length < 12 || Array.from(password).length > 256) throw new Error('注册密码须为 12–256 个字符，无需强制包含特殊符号');
     const data = await request('/api/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
