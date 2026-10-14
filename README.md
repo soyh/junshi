@@ -10,7 +10,7 @@
 - [项目总览与版本](docs/PROJECT_OVERVIEW.md)
 - [全部文档](docs/README.md)
 - [本地部署](docs/LOCAL_DEPLOYMENT.md) · [服务器运维与恢复](docs/OPERATIONS.md)
-- [PC 使用说明](desktop/CLIENT_README.txt) · [安卓使用说明](android/README.md)
+- [PC 使用说明](desktop/CLIENT_README.txt) · [安卓使用说明](android/README.md) · [iOS 开发预览与签名准备](ios/README.md)
 
 ## 当前组件版本
 
@@ -19,6 +19,7 @@
 | 后端与网页 | TEST-230 | 用户反馈服务器验收通过；数据库 001–023，统一底部迁移入口 |
 | Windows 独立客户端 | 229 | 蓝白小窗、邮箱注册与找回密码、独立模型设置 |
 | 安卓 App | 1.0.0 / versionCode 23100 | 已发布固定签名正式包，Android 8.0 及以上 |
+| iOS App | 0.1.0 / build 23201 | 开发预览，iOS 17+；尚未配置 Apple 真机签名，不可直接安装 |
 
 安卓正式包、单元测试、lint、模拟器验收、完整项目回归和签名证书一致性检查已通过。首装请下载 **JunshiAndroid-1.0.0.apk**；从测试签名 rc 版首次切换可能需卸载旧 App，先保存未提交草稿。服务器业务数据保留。以后必须沿用同一私钥及递增版本号更新。本发布不代表应用商店上架，也不会自动改变服务器版本。
 

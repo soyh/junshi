@@ -10,5 +10,9 @@
   "database_migrations": 23,
   "private_data_included": false,
   "archive_tag": "android-v1.0.0",
-  "release_status": "android-official-published"
+  "release_status": "android-official-published",
+  "ios_version": "0.1.0",
+  "ios_build": 23201,
+  "ios_status": "unsigned-development-preview",
+  "ios_device_installable": false
 }
