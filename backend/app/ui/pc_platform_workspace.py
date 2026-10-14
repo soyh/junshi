@@ -4,6 +4,10 @@ PC_PLATFORM_SCRIPT = r'''
     .pc-tools label{display:block;margin:8px 0}.pc-tools input,.pc-tools select{width:100%;box-sizing:border-box}
     .pc-tools .pc-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.pc-tools button{margin:4px 0}
     .pc-tools li{margin:8px 0;overflow-wrap:anywhere}body:not([data-client-view="person"]) #pc-platform-panel{display:none}
+    #client-footer #pc-transfer{padding:0;margin:0;border:0;background:transparent;color:inherit;box-shadow:none;max-width:100%;box-sizing:border-box}
+    #client-footer #pc-transfer>summary{font:inherit!important;color:inherit!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:8px!important;margin:0;cursor:pointer}
+    #client-footer #pc-transfer>summary:focus-visible{outline:3px solid #4cbac4;outline-offset:4px;border-radius:8px}
+    #client-footer #pc-transfer[open]{flex-basis:100%;max-width:760px;padding:16px;border:1px solid #c7ddec;border-radius:16px;background:linear-gradient(140deg,#fff,#f1f8ff);color:#193249;box-shadow:0 10px 28px #19324918}
     @media(max-width:768px){.pc-tools{display:none!important}}
   `;document.head.append(pcStyle);
   const pcPanel=clientEl('details','pc-tools');pcPanel.id='pc-platform-panel';
