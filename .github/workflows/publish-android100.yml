@@ -1,0 +1,43 @@
+name: Publish Android 1.0.0
+on:
+  push:
+    branches: [publish-android-100]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 66a769a4ed0f2527aae2f09f59cb87a08747756e
+          fetch-depth: 0
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('fs'),crypto=require('crypto');
+            for(const run_id of [38569214076,38569214057,38569202351]){
+              let run;
+              for(let i=0;i<60;i++){run=(await github.rest.actions.getWorkflowRun({...context.repo,run_id})).data;if(run.status==='completed')break;await new Promise(r=>setTimeout(r,15000));}
+              if(run.conclusion!=='success'||run.head_sha!=='66a769a4ed0f2527aae2f09f59cb87a08747756e')throw new Error('Exact Android 1.0.0 validation failed: '+run_id);
+            }
+            const all=(await github.rest.actions.listWorkflowRunArtifacts({...context.repo,run_id:38569202351})).data.artifacts;
+            const a=all.find(x=>x.name==='JunshiAndroid-1.0.0-signed'&&!x.expired);if(!a||!a.digest)throw new Error('Verified signed artifact missing');
+            const bytes=Buffer.from((await github.rest.actions.downloadArtifact({...context.repo,artifact_id:a.id,archive_format:'zip'})).data);
+            if('sha256:'+crypto.createHash('sha256').update(bytes).digest('hex')!==a.digest)throw new Error('Artifact checksum mismatch');
+            fs.writeFileSync('signed.zip',bytes);await exec.exec('unzip',['-q','signed.zip','-d','release-files']);
+            const verification=JSON.parse(fs.readFileSync('release-files/release-verification.json','utf8'));
+            if(verification.version!=='1.0.0'||verification.version_code!==23100||verification.debuggable||!verification.signature_verified||!verification.configured_certificate_matches)throw new Error('Production APK verification failed');
+            const apkHash=crypto.createHash('sha256').update(fs.readFileSync('release-files/JunshiAndroid-1.0.0.apk')).digest('hex');
+            if(!fs.readFileSync('release-files/SHA256SUMS.txt','utf8').startsWith(apkHash+'  JunshiAndroid-1.0.0.apk'))throw new Error('APK checksum does not match signed build');
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-source-android-1.0.0.zip','HEAD']);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-documents-android-1.0.0.zip','HEAD','docs','README.md','android/RELEASE.md','android/README.md','desktop/CLIENT_README.txt']);
+            const files=fs.readdirSync('release-files').filter(n=>n!=='SHA256SUMS.txt');
+            fs.writeFileSync('release-files/SHA256SUMS.txt',files.map(n=>crypto.createHash('sha256').update(fs.readFileSync('release-files/'+n)).digest('hex')+'  '+n).join('\n')+'\n');
+            let release;const tag='android-v1.0.0';
+            try{release=(await github.rest.repos.getReleaseByTag({...context.repo,tag})).data;if(!release.draft)throw new Error('A published 1.0.0 already exists; do not overwrite');}catch(e){if(e.status!==404)throw e;release=(await github.rest.repos.createRelease({...context.repo,tag_name:tag,target_commitish:'66a769a4ed0f2527aae2f09f59cb87a08747756e',name:'Android 1.0.0 · 正式版',draft:true,prerelease:false})).data;}
+            const existing=(await github.rest.repos.listReleaseAssets({...context.repo,release_id:release.id})).data;
+            for(const name of fs.readdirSync('release-files')){if(existing.some(x=>x.name===name))throw new Error('Release asset already exists; inspect before retry');const data=fs.readFileSync('release-files/'+name);await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});}
+            await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,prerelease:false,body:'Android 1.0.0 正式版，versionCode 23100，Android 8.0 及以上。使用仓库所有者配置的固定签名，APK 签名、证书一致性、非调试标志及安装版本已核对；单元测试、lint、安卓模拟器与项目回归通过。下载 JunshiAndroid-1.0.0.apk，校验 SHA256SUMS.txt。签名证书 SHA-256：'+verification.certificate_sha256+'。从测试签名 rc 版首次切换时可能需卸载旧 App，先保存未提交草稿；服务器数据保留。以后用同一私钥和递增版本号覆盖更新。本发布不修改服务器、数据库、PC 客户端，也不代表已上架应用商店。提供源码、文档、公开签名验证报告，未上传私钥、密码或用户数据。'});
