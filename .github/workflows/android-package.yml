@@ -43,7 +43,7 @@ jobs:
             adb pull /data/local/tmp/junshi-workspace.png ../android-previews/workspace.png
       - uses: actions/upload-artifact@v4
         with:
-          name: JunshiAndroid-1.0.0-rc1-debug
+          name: JunshiAndroid-1.0.0-rc2-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         if: always()
