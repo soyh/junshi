@@ -1,0 +1,47 @@
+name: Publish TEST-230 footer style fix
+on:
+  push:
+    branches: [publish-test230-style]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 21eb024dce5cd96510267c0eaecc2d4a220279c9
+          fetch-depth: 0
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('fs'),crypto=require('crypto');
+            let run;
+            for(let i=0;i<60;i++){run=(await github.rest.actions.getWorkflowRun({...context.repo,run_id:38567262689})).data;if(run.status==='completed')break;await new Promise(r=>setTimeout(r,15000));}
+            if(run.conclusion!=='success'||run.head_sha!=='21eb024dce5cd96510267c0eaecc2d4a220279c9')throw new Error('Exact candidate checks did not pass');
+            fs.mkdirSync('release-files');
+            await exec.exec('git',['branch','-f','test-230-transfer-entry-style','21eb024dce5cd96510267c0eaecc2d4a220279c9']);
+            await exec.exec('git',['bundle','create','release-files/test230.bundle','refs/heads/test-230-transfer-entry-style']);
+            await exec.exec('git',['bundle','verify','release-files/test230.bundle']);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-source-test230.zip','HEAD']);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-documents-test230.zip','HEAD','docs','README.md','android/RELEASE.md','desktop/CLIENT_README.txt']);
+            const digest=crypto.createHash('sha256').update(fs.readFileSync('release-files/test230.bundle')).digest('hex');
+            let script=fs.readFileSync('deploy/releases/test229/deploy.sh','utf8').replaceAll('TEST229','TEST230').replaceAll('TEST-229','TEST-230').replaceAll('test229','test230').replaceAll('test-229-account-style-user-picker','test-230-transfer-entry-style').replaceAll('0929710c97c4324c9816b481a7ebfec67700fc8d','21eb024dce5cd96510267c0eaecc2d4a220279c9');
+            script=script.replace(/^BUNDLE_HASH=.*$/m,'BUNDLE_HASH='+digest);
+            script=script.replace(/^BASE=.*$/m,'BASE=$(git -C "$APP" rev-parse HEAD)\ncase "$BASE" in f4ecbfd2315bfe50890891756076a40f3f524a42|0929710c97c4324c9816b481a7ebfec67700fc8d) ;; *) echo "Production baseline must be TEST-228 or TEST-229"; exit 1 ;; esac');
+            script=script.replace('TEST-228 代码及健康回退：PASS','原生产代码及健康回退：PASS');
+            script=script.replace("'email-user-table','email-user-search'","'#client-footer #pc-transfer>summary','#pc-transfer[open]','email-user-table','email-user-search'");
+            fs.writeFileSync('release-files/deploy-test230.sh',script);
+            await exec.exec('bash',['-n','release-files/deploy-test230.sh']);
+            const scriptHash=crypto.createHash('sha256').update(fs.readFileSync('release-files/deploy-test230.sh')).digest('hex');
+            fs.writeFileSync('release-files/deploy-test230.sh.sha256',scriptHash+'  deploy-test230.sh\n');
+            const files=fs.readdirSync('release-files');
+            fs.writeFileSync('release-files/SHA256SUMS.txt',files.map(n=>crypto.createHash('sha256').update(fs.readFileSync('release-files/'+n)).digest('hex')+'  '+n).join('\n')+'\n');
+            const tag='test-230-transfer-entry-style';
+            let release;
+            try{release=(await github.rest.repos.getReleaseByTag({...context.repo,tag})).data;}catch(e){if(e.status!==404)throw e;release=(await github.rest.repos.createRelease({...context.repo,tag_name:tag,target_commitish:'21eb024dce5cd96510267c0eaecc2d4a220279c9',name:'TEST-230 · account transfer footer style fix',draft:true,prerelease:true})).data;}
+            const assets=(await github.rest.repos.listReleaseAssets({...context.repo,release_id:release.id})).data;
+            for(const name of fs.readdirSync('release-files')){if(assets.some(x=>x.name===name))continue;const bytes=fs.readFileSync('release-files/'+name);await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data:bytes,headers:{'content-type':'application/octet-stream','content-length':bytes.length}});}
+            await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,body:'修复网页首页 PC 数据迁移入口样式：收起时为与设置相同的小字透明入口，展开后显示蓝白操作面板。仅网页样式与浏览器验收更新；迁移业务、数据库、PC 和安卓客户端不变。GitHub 全量和浏览器验收通过。提供离线代码包与上线脚本，兼容当前生产 TEST-228 或 TEST-229，脚本先隔离专项和全量测试再停服备份与切换；失败回退代码，不覆盖数据库。不需重装 PC 229 或 Android 1.0.0-rc4。此修复尚未在生产服务器部署。'});
