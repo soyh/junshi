@@ -1,0 +1,48 @@
+name: Project archive
+on:
+  push:
+    branches: [test-224-project-archive]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python scripts/check_public_tree.py
+      - name: Source and documentation snapshots
+        run: |
+          mkdir -p public-assets
+          git archive --format=zip --output=public-assets/project-source.zip HEAD
+          git archive --format=zip --output=public-assets/project-documents.zip HEAD docs README.md DEVELOPMENT_HANDOVER.md release.json desktop/CLIENT_README.txt android/README.md
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('fs'),crypto=require('crypto');
+            const items=[
+              [11790717578,'PC-221.1-CI-package.zip','dc957ffc3f1bebfdd351b234a08bd80427f30b1314ac949ad676562214fd9d0b'],
+              [11827408180,'JunshiAndroid-223-preview.zip','8d02718ec9464418ad541b9b7d4a093a47c0297746113c7ec85fc2298fcc3488'],
+              [11827483089,'Android-page-previews.zip','b33a2c3968834cc3e68e79f5279aaf69c56de114939f306976daf116ab8804f8'],
+              [11827527795,'Android-check-reports.zip','e697973badd30001f089aa6c485d6a70b75c8931efd045ea9993a5061e3e7f74']
+            ];
+            for(const [id,name,hash] of items){
+              const r=await github.rest.actions.downloadArtifact({...context.repo,artifact_id:id,archive_format:'zip'});
+              const bytes=Buffer.from(r.data);
+              if(crypto.createHash('sha256').update(bytes).digest('hex')!==hash)throw new Error('Checksum mismatch: '+name);
+              fs.writeFileSync('public-assets/'+name,bytes);
+            }
+            fs.writeFileSync('public-assets/SHA256SUMS.txt',fs.readdirSync('public-assets').sort().map(n=>crypto.createHash('sha256').update(fs.readFileSync('public-assets/'+n)).digest('hex')+'  '+n).join('\n')+'\n');
+            const tag='project-snapshot-223';let release;
+            try{release=(await github.rest.repos.getReleaseByTag({...context.repo,tag})).data;}
+            catch(e){if(e.status!==404)throw e;release=(await github.rest.repos.createRelease({...context.repo,tag_name:tag,target_commitish:context.sha,name:'Project archive · PC 221 / Android 223',draft:true,prerelease:true,body:'项目源码、部署文档、PC 客户端、安卓预览版、检查报告与页面截图。使用前阅读 README 和 docs/PROJECT_OVERVIEW.md。Android 为测试签名。PC 包可能包含内层 ZIP，请完整解压。此归档不包含私人数据，不执行生产部署。'})).data;}
+            const existing=(await github.rest.repos.listReleaseAssets({...context.repo,release_id:release.id})).data;
+            for(const name of fs.readdirSync('public-assets')){
+              if(existing.some(a=>a.name===name))continue;
+              const data=fs.readFileSync('public-assets/'+name);
+              await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});
+            }
+            await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false});

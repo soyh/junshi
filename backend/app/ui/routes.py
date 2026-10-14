@@ -3,6 +3,7 @@ from app.ui.china_calendar import CHINA_CALENDAR_SCRIPT
 from app.ui.person_memory import PERSON_MEMORY_SCRIPT
 from app.ui.card_navigation import CARD_NAVIGATION_STYLE, CARD_NAVIGATION_SCRIPT
 from app.ui.person_polish import PERSON_POLISH_STYLE, PERSON_POLISH_SCRIPT
+from app.ui.pc_platform_workspace import PC_PLATFORM_SCRIPT
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 from app.ui.named_chat_import import NAMED_CHAT_STYLE, NAMED_CHAT_SCRIPT
@@ -307,6 +308,7 @@ def build_product_shell_html() -> str:
         f"{CHINA_CALENDAR_SCRIPT}\n\n"
         f"{PERSON_MEMORY_SCRIPT}\n\n"
         f"{CARD_NAVIGATION_SCRIPT}\n\n{PERSON_POLISH_SCRIPT}\n\n"
+        f"{PC_PLATFORM_SCRIPT}\n\n"
         f"{script_marker}"
     )
     return html.replace(
