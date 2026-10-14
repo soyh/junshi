@@ -6,6 +6,9 @@ import org.junit.Test;
 import org.json.*;
 import static org.junit.Assert.*;
 public class AssistantTest {
+ @Test public void compactWorkspaceKeepsTransparentBackground(){
+  try(ActivityScenario<MainActivity> a=ActivityScenario.launch(MainActivity.class)){a.onActivity(activity->{Workspace workspace=new Workspace(activity);workspace.compact();assertEquals(android.graphics.Color.TRANSPARENT,((android.graphics.drawable.ColorDrawable)workspace.getBackground()).getColor());assertEquals(2,workspace.input.getMaxLines());assertEquals(3,workspace.reply.getMaxLines());});}
+ }
  @Test public void captureStyledPages()throws Exception {
   try(ActivityScenario<MainActivity> a=ActivityScenario.launch(MainActivity.class)){
    InstrumentationRegistry.getInstrumentation().waitForIdleSync();capture("login");
