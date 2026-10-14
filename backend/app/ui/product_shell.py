@@ -15,6 +15,7 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
     .workspace-card { padding: 14px; border: 1px solid rgba(127,127,127,.3); border-radius: 8px; }
     fieldset { margin: 0; padding: 18px; border-radius: 10px; min-width: 0; }
     label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    .registration-rule { font-size: .86rem; line-height: 1.6; overflow-wrap: anywhere; margin: 6px 0 12px; }
     input, select, textarea, button { font: inherit; }
     input, select, textarea { width: 100%; box-sizing: border-box; padding: 9px; }
     textarea { min-height: 72px; resize: vertical; }
@@ -44,9 +45,11 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
   <fieldset id="account">
     <legend>Account</legend>
     <label for="username">Username</label>
-    <input id="username" autocomplete="username">
+    <input id="username" autocomplete="username" aria-describedby="username-rules">
+    <p id="username-rules" class="registration-rule">账号：3–64 个字符，仅支持英文字母、数字、点（.）、下划线（_）和短横线（-），不区分大小写，不支持中文或空格。例如：xiaoming_01。</p>
     <label for="password">Password</label>
-    <input id="password" type="password" autocomplete="current-password">
+    <input id="password" type="password" autocomplete="current-password" aria-describedby="password-rules">
+    <p id="password-rules" class="registration-rule">注册密码：12–256 个字符，区分大小写；无需强制包含数字、大写字母或特殊符号。建议使用不易猜测的长密码，不要与其他网站重复。</p>
     <button id="register" type="button">Register</button>
     <button id="login" type="button">Login</button>
     <button id="logout" type="button" disabled>Logout</button>
@@ -269,7 +272,8 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
   async function register() {
     const username = byId('username').value.trim();
     const password = byId('password').value;
-    if (!username || !password) throw new Error('Username and password are required');
+    if (!/^[A-Za-z0-9._-]{3,64}$/.test(username)) throw new Error('账号须为 3–64 个字符，仅允许英文字母、数字、点、下划线和短横线');
+    if (Array.from(password).length < 12 || Array.from(password).length > 256) throw new Error('注册密码须为 12–256 个字符，无需强制包含特殊符号');
     const data = await api('/api/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
