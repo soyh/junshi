@@ -4,28 +4,25 @@
 
 ## 下载与资料
 
-- [项目附件发布页](https://github.com/soyh/junshi/releases/tag/test-228-email-accounts)：PC 安装包、安卓 APK、源码、文档、检查报告、页面预览及校验清单。
+- [安卓 1.0.0 正式版](https://github.com/soyh/junshi/releases/tag/android-v1.0.0)：固定签名 APK、源码、文档及签名验证报告。
+- [PC 229 与项目附件](https://github.com/soyh/junshi/releases/tag/test-229-account-interface)
+- [TEST-230 网页修复与部署](https://github.com/soyh/junshi/releases/tag/test-230-transfer-entry-style)
 - [项目总览与版本](docs/PROJECT_OVERVIEW.md)
 - [全部文档](docs/README.md)
 - [本地部署](docs/LOCAL_DEPLOYMENT.md) · [服务器运维与恢复](docs/OPERATIONS.md)
 - [PC 使用说明](desktop/CLIENT_README.txt) · [安卓使用说明](android/README.md)
 
-## 最新已通过 CI 的版本：TEST-229
+## 当前组件版本
 
-账号管理按钮样式统一，管理员使用可搜索、分页的用户表格选择；三端界面同步优化。1318 项全量、浏览器验收、Windows/Linux 全新安装及 PC/安卓构建通过。无新增迁移。生产服务器仍为 TEST-228，升级前须进行服务器隔离验收和备份。
-
-- [TEST-229 下载页](https://github.com/soyh/junshi/releases/tag/test-229-account-interface)：源码、文档、PC 229、Android 1.0.0-rc4、离线代码包及校验清单。
-- [界面及部署说明](docs/TEST229_ACCOUNT_INTERFACE.md)
-
-## 当前生产基线（TEST-228）
-
-| 组件 | 阶段 | 说明 |
+| 组件 | 版本 | 说明 |
 | --- | --- | --- |
-| 后端与网页 | TEST-228 | 数据库 001–023，邮箱验证、账号注销及管理员后台 |
-| Windows 独立客户端 | TEST-228 / 228 | 蓝白小窗，邮箱注册与找回密码，独立模型设置 |
-| 安卓 App | TEST-228 / 1.0.0-rc3 | 悬浮窗、邮箱注册与找回密码；测试签名候选包 |
+| 后端与网页 | TEST-230 | 用户反馈服务器验收通过；数据库 001–023，统一底部迁移入口 |
+| Windows 独立客户端 | 229 | 蓝白小窗、邮箱注册与找回密码、独立模型设置 |
+| 安卓 App | 1.0.0 / versionCode 23100 | 已发布固定签名正式包，Android 8.0 及以上 |
 
-版本表表示仓库内容，不代表生产服务器自动升级。
+安卓正式包、单元测试、lint、模拟器验收、完整项目回归和签名证书一致性检查已通过。首装请下载 **JunshiAndroid-1.0.0.apk**；从测试签名 rc 版首次切换可能需卸载旧 App，先保存未提交草稿。服务器业务数据保留。以后必须沿用同一私钥及递增版本号更新。本发布不代表应用商店上架，也不会自动改变服务器版本。
+
+[安卓发布与签名说明](android/RELEASE.md) · [TEST-230 修复说明](docs/TEST230_TRANSFER_STYLE.md)
 
 ## 在电脑部署完整项目
 

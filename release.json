@@ -1,11 +1,14 @@
 {
   "application": "AI Love Strategist",
-  "server_stage": "TEST-229",
-  "production_stage": "TEST-228",
+  "server_stage": "TEST-230",
+  "production_stage": "TEST-230",
+  "production_confirmation": "user-reported-acceptance-pass",
   "desktop_version": "229",
-  "android_version": "1.0.0-rc4",
+  "android_version": "1.0.0",
+  "android_version_code": 23100,
+  "android_signature": "fixed-production",
   "database_migrations": 23,
   "private_data_included": false,
-  "archive_tag": "test-229-account-interface",
-  "release_status": "ci-verified-pending-server-acceptance"
+  "archive_tag": "android-v1.0.0",
+  "release_status": "android-official-published"
 }

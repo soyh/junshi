@@ -1,4 +1,4 @@
-# Android 客户端预览版（TEST-222）
+# Android 客户端 1.0.0 正式版
 
 Android 8.0 及以上。客户端连接现有 HTTPS 服务器，人物、聊天、附件、模型密钥和长期档案保存在服务器。
 
@@ -8,6 +8,6 @@ Android 8.0 及以上。客户端连接现有 HTTPS 服务器，人物、聊天�
 
 主页面和模型设置在 App 内打开；自动登录需要服务器 TEST-219 的一次性登录交接接口。每个用户使用自己的模型密钥。
 
-预览 APK 使用构建环境测试签名。不同构建可能无法覆盖安装，正式发布需建立固定签名并完成真机验证。卸载客户端不会删除服务器数据，但会丢失未完成草稿。
+[1.0.0 正式 APK](https://github.com/soyh/junshi/releases/download/android-v1.0.0/JunshiAndroid-1.0.0.apk) 使用固定签名。首次由测试签名 rc 版切换可能需要卸载旧版；后续正式版可使用同一签名覆盖更新。卸载客户端不会删除服务器数据，但会丢失未完成草稿。
 
 构建环境：Java 17、Android SDK 35、Gradle 8.11.1。在 android 目录执行 `gradle testDebugUnitTest lintDebug assembleDebug`。GitHub Actions 上传 APK 和检查报告。登录凭证仅保存在运行内存；仅服务器地址持久保存。附件位于应用私有缓存，清空草稿或退出登录时删除。
