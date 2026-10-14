@@ -1,6 +1,8 @@
-name: Android signed candidate
+name: Android signed release
 on:
   workflow_dispatch:
+  push:
+    branches: [test-231-android-100-release]
 permissions:
   contents: read
 jobs:
@@ -25,7 +27,7 @@ jobs:
           test -n "$KEYSTORE_BASE64" || { echo 'Configure repository signing secrets first.'; exit 1; }
           umask 077
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-release.jks"
-      - name: Validate and sign candidate
+      - name: Test and build fixed-signature release
         working-directory: android
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.jks
@@ -33,16 +35,28 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle testDebugUnitTest lintRelease assembleRelease --stacktrace
-      - name: Verify signature
+      - name: Verify signature and package
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
-          sha256sum android/app/build/outputs/apk/release/app-release.apk > android/app/build/outputs/apk/release/SHA256SUMS.txt
+          OUT=android/app/build/outputs/apk/release
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$OUT/app-release.apk" > "$OUT/signature.txt"
+          keytool -exportcert -keystore "$RUNNER_TEMP/android-release.jks" -alias "$ANDROID_KEY_ALIAS" -storepass:env ANDROID_KEYSTORE_PASSWORD > "$RUNNER_TEMP/signing-cert.der"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$OUT/app-release.apk" > "$OUT/package.txt"
+          python scripts/check_android_release.py "$OUT" "$RUNNER_TEMP/signing-cert.der"
+          cat "$OUT/signature.txt"
+          cp "$OUT/app-release.apk" "$OUT/JunshiAndroid-1.0.0.apk"
+          cd "$OUT"
+          sha256sum JunshiAndroid-1.0.0.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: JunshiAndroid-1.0.0-rc3-signed
+          name: JunshiAndroid-1.0.0-signed
           path: |
-            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/apk/release/JunshiAndroid-1.0.0.apk
+            android/app/build/outputs/apk/release/release-verification.json
+            android/app/build/outputs/apk/release/signature.txt
             android/app/build/outputs/apk/release/SHA256SUMS.txt
       - name: Remove signing material
         if: always()
-        run: rm -f "$RUNNER_TEMP/android-release.jks"
+        run: rm -f "$RUNNER_TEMP/android-release.jks" "$RUNNER_TEMP/signing-cert.der"
