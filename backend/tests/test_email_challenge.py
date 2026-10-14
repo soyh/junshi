@@ -45,5 +45,7 @@ def test_rate_limit_and_send_failure_roll_back(setup):
     conn.rollback();now[0]+=61;mail.send.side_effect=ValueError('failed')
     with pytest.raises(ValueError): s.send(conn,'a@example.com','register','127.0.0.1')
     conn.rollback()
-    assert conn.execute('SELECT COUNT(*) FROM email_challenges').fetchone()[0]==1
-    assert conn.execute('SELECT consumed FROM email_challenges').fetchone()[0]==0
+    assert conn.execute('SELECT COUNT(*) FROM email_challenges').fetchone()[0]==2
+    rows=conn.execute('SELECT consumed FROM email_challenges ORDER BY created_at').fetchall()
+    assert rows[0][0]==0  # Previously delivered code still works.
+    assert rows[1][0]==1  # Failed-send reservation never becomes usable.

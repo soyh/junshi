@@ -3,6 +3,8 @@ from unittest.mock import patch
 from app.core.database import get_connection
 from app.config.settings import get_settings
 from app.services.account_deletion import prepare_deletion,cleanup_result,finish_cleanup
+from app.services.account_identity import AccountIdentityError
+import pytest
 
 def test_deletion_cascades_keeps_other_users_and_cleanup_retries(client,tmp_path,monkeypatch):
     monkeypatch.setattr(get_settings(),'media_storage_directory',str(tmp_path))
@@ -24,3 +26,14 @@ def test_deletion_cascades_keeps_other_users_and_cleanup_retries(client,tmp_path
     assert private.exists()
     assert finish_cleanup(job)
     assert not private.exists()
+
+def test_orphan_file_removed_and_outside_paths_rejected(client,tmp_path,monkeypatch):
+    monkeypatch.setattr(get_settings(),'media_storage_directory',str(tmp_path))
+    user=str(uuid.uuid4());folder=tmp_path/user;folder.mkdir()
+    orphan=folder/'old.png';orphan.write_bytes(b'old deleted-person file')
+    from app.services.account_deletion import checked_paths
+    with pytest.raises(AccountIdentityError):checked_paths(user,[str(tmp_path/'outside.png')])
+    with get_connection() as c:
+        c.execute('INSERT INTO users(id) VALUES(?)',(user,))
+        job=prepare_deletion(c,user,user,'注销清理')
+    finish_cleanup(job);assert not orphan.exists()

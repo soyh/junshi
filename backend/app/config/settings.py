@@ -34,10 +34,10 @@ class Settings(BaseSettings):
     smtp_host: str = ""
     smtp_port: int = Field(default=465, ge=1, le=65535)
     smtp_username: str = ""
-    smtp_password: str = ""
+    smtp_password: str = Field(default="", repr=False)
     smtp_sender: str = ""
     smtp_implicit_tls: bool = True
-    email_verification_secret: str = ""
+    email_verification_secret: str = Field(default="", repr=False)
     email_registration_required: bool = False
 
     dashscope_api_key: str | None = None

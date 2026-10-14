@@ -2,7 +2,7 @@
 import re
 import smtplib
 import ssl
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from email.message import EmailMessage
 
 
@@ -18,7 +18,7 @@ class MailSettings:
     host: str
     port: int
     username: str
-    password: str
+    password: str = field(repr=False)
     sender: str
     implicit_tls: bool = True
 

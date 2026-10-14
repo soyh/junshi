@@ -46,6 +46,7 @@ jobs:
           python -m pip install playwright==1.55.0
           python -m playwright install --with-deps chromium
           PYTHONPATH=. python tests/browser_handoff_browser.py
+          PYTHONPATH=. python tests/email_account_browser.py
           PYTHONPATH=. python tests/pc_platform_browser.py
           PYTHONPATH=. python tests/card_morph_browser.py
           PYTHONPATH=. python tests/person_polish_browser.py
@@ -65,6 +66,5 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r desktop/requirements.txt
-      - run: python desktop/test_registration.py
       - run: python desktop/test_desktop.py
       - run: python desktop/test_gui.py

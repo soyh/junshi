@@ -35,9 +35,14 @@ class EmailChallengeService:
             raise EmailChallengeError('验证码发送过于频繁，请稍后重试')
         identifier = str(uuid.uuid4())
         code = f'{secrets.randbelow(1000000):06d}'
-        conn.execute('INSERT INTO email_challenges(id,email,purpose,requester_hash,user_id,code_hash,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?)',
+        conn.execute('INSERT INTO email_challenges(id,email,purpose,requester_hash,user_id,code_hash,created_at,expires_at,consumed) VALUES(?,?,?,?,?,?,?,?,1)',
                      (identifier,email,purpose,requester_hash,user_id,self.digest(identifier+':'+code),now,now+600))
+        # Reserve the rate-limit slot before SMTP, without holding the application
+        # database write lock during network I/O. Failed sends remain inactive.
+        conn.commit()
         self.mailer.send(email, code)
+        conn.execute('BEGIN IMMEDIATE')
+        conn.execute('UPDATE email_challenges SET consumed=0 WHERE id=?',(identifier,))
         # Only a delivered new code invalidates earlier codes of the same scope.
         conn.execute('UPDATE email_challenges SET consumed=1 WHERE email=? AND purpose=? AND user_id IS ? AND id<>?', (email,purpose,user_id,identifier))
         return identifier

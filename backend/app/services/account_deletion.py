@@ -8,9 +8,12 @@ from app.services.account_identity import AccountIdentityService, AccountIdentit
 
 
 def checked_paths(user, paths):
-    if str(uuid.UUID(user)) != user:
+    try: valid=str(uuid.UUID(user))==user
+    except ValueError: valid=False
+    if not valid:
         raise AccountIdentityError('用户标识不正确')
     base=Path(get_settings().media_storage_directory).resolve()/user
+    if base.is_symlink(): raise AccountIdentityError('用户附件目录异常')
     for value in paths:
         path=Path(value)
         if path.is_symlink() or not path.resolve().is_relative_to(base):
@@ -27,7 +30,12 @@ def prepare_deletion(conn,actor,target,reason,administrator=False):
         raise AccountIdentityError('不能注销其他用户')
     if not conn.execute('SELECT 1 FROM users WHERE id=?',(target,)).fetchone():
         raise AccountIdentityError('用户不存在')
-    paths=checked_paths(target,[r[0] for r in conn.execute('SELECT storage_path FROM media_attachments WHERE user_id=?',(target,))])
+    private=Path(get_settings().media_storage_directory).resolve()/target
+    paths=[r[0] for r in conn.execute('SELECT storage_path FROM media_attachments WHERE user_id=?',(target,))]
+    if private.is_symlink(): raise AccountIdentityError('用户附件目录异常')
+    if private.exists():
+        paths.extend(str(p) for p in private.rglob('*') if p.is_file() or p.is_symlink())
+    paths=checked_paths(target,paths)
     job=str(uuid.uuid4())
     service.audit(conn,actor,target,'delete-account',reason)
     conn.execute('INSERT INTO account_file_cleanup(id,user_id,paths_json) VALUES(?,?,?)',(job,target,json.dumps(paths)))
