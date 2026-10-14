@@ -1,0 +1,48 @@
+name: Publish TEST-228 account candidate
+on:
+  push:
+    branches: [publish-test-228-candidate]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: f4ecbfd2315bfe50890891756076a40f3f524a42
+          fetch-depth: 0
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('fs'),crypto=require('crypto');
+            for(const run_id of [38542488309,38542488305,38542488318]){
+              let run;
+              for(let i=0;i<30;i++){run=(await github.rest.actions.getWorkflowRun({...context.repo,run_id})).data;if(run.status==='completed')break;await new Promise(r=>setTimeout(r,15000));}
+              if(run.conclusion!=='success'||run.head_sha!=='f4ecbfd2315bfe50890891756076a40f3f524a42')throw new Error('Exact candidate checks did not pass');
+            }
+            fs.mkdirSync('release-files');
+            for(const [run_id,name,dir] of [[38542488305,'JunshiPC-Windows-x64','pc'],[38542488309,'JunshiAndroid-1.0.0-rc3-debug','android']]){
+              const all=(await github.rest.actions.listWorkflowRunArtifacts({...context.repo,run_id})).data.artifacts;
+              const a=all.find(x=>x.name===name&&!x.expired);if(!a||!a.digest)throw new Error('Artifact missing');
+              const bytes=Buffer.from((await github.rest.actions.downloadArtifact({...context.repo,artifact_id:a.id,archive_format:'zip'})).data);
+              if('sha256:'+crypto.createHash('sha256').update(bytes).digest('hex')!==a.digest)throw new Error('Artifact checksum mismatch');
+              fs.writeFileSync(dir+'.zip',bytes);await exec.exec('unzip',['-q',dir+'.zip','-d',dir]);
+            }
+            fs.copyFileSync('android/app-debug.apk','release-files/JunshiAndroid-1.0.0-rc3-debug.apk');
+            const pc=fs.readdirSync('pc').find(x=>x.endsWith('.zip'));if(!pc)throw new Error('PC zip missing');fs.copyFileSync('pc/'+pc,'release-files/'+pc);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-source-test228.zip','HEAD']);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-documents-test228.zip','HEAD','docs','README.md','android/RELEASE.md','desktop/CLIENT_README.txt']);
+            await exec.exec('git',['branch','-f','test-228-email-account-management','f4ecbfd2315bfe50890891756076a40f3f524a42']);
+            await exec.exec('git',['bundle','create','release-files/test228.bundle','refs/heads/test-228-email-account-management']);
+            await exec.exec('git',['bundle','verify','release-files/test228.bundle']);
+            fs.copyFileSync('scripts/prepare_smtp.sh','release-files/prepare-smtp.sh');
+            const files=fs.readdirSync('release-files');
+            fs.writeFileSync('release-files/SHA256SUMS.txt',files.map(n=>crypto.createHash('sha256').update(fs.readFileSync('release-files/'+n)).digest('hex')+'  '+n).join('\n')+'\n');
+            let release;const tag='test-228-email-accounts';
+            try{release=(await github.rest.repos.getReleaseByTag({...context.repo,tag})).data;}catch(e){if(e.status!==404)throw e;release=(await github.rest.repos.createRelease({...context.repo,tag_name:tag,target_commitish:'f4ecbfd2315bfe50890891756076a40f3f524a42',name:'TEST-228 · email and account management candidate',draft:true,prerelease:true,body:'三端邮箱注册、邮箱绑定、找回密码、账号注销、管理员查询/禁用/删除和访问审计候选包。CI 通过；新增 023 迁移。真实 SMTP 与服务器数据库副本验收尚待完成，不得直接替换生产。安卓为测试签名。提供 PC、APK、源码、文档、完整 Git bundle、SMTP 准备脚本和校验清单。'})).data;}
+            const existing=(await github.rest.repos.listReleaseAssets({...context.repo,release_id:release.id})).data;
+            for(const name of fs.readdirSync('release-files')){if(existing.some(x=>x.name===name))continue;const bytes=fs.readFileSync('release-files/'+name);await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data:bytes,headers:{'content-type':'application/octet-stream','content-length':bytes.length}});}
+            await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false});
