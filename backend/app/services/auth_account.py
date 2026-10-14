@@ -160,6 +160,10 @@ class AuthAccountService:
         if not verify_password(password, str(row["password_hash"])):
             raise AuthAccountInvalidCredentials("invalid credentials")
 
+        identity = conn.execute('SELECT disabled FROM account_identities WHERE user_id=?', (row['user_id'],)).fetchone()
+        if identity is not None and identity['disabled']:
+            raise AuthAccountInvalidCredentials('invalid credentials')
+
         return self.session_service.create(conn, str(row["user_id"]))
 
     def change_password(

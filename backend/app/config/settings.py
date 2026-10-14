@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     local_user_id: str = "00000000-0000-0000-0000-000000000001"
     auth_bearer_token: str | None = None
     auth_bootstrap_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = Field(default=465, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_sender: str = ""
+    smtp_implicit_tls: bool = True
+    email_verification_secret: str = ""
 
     dashscope_api_key: str | None = None
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
