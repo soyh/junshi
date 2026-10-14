@@ -8,7 +8,7 @@ final class FlowTests: XCTestCase {
         app.textFields["username"].tap(); app.textFields["username"].typeText("synthetic-user")
         app.secureTextFields["password"].tap(); app.secureTextFields["password"].typeText("synthetic-password")
         app.buttons["login-submit"].tap()
-        XCTAssertTrue(app.buttons["person-p1"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.buttons["person-p1"].waitForExistence(timeout:10), "Login did not finish: " + app.staticTexts["status"].label + "\n" + app.debugDescription)
         app.buttons["person-p1"].tap()
         let picker = app.buttons["conversation-picker"]; XCTAssertTrue(picker.waitForExistence(timeout:5)); picker.tap()
         app.buttons["测试会话"].tap()

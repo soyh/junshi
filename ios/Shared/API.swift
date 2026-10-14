@@ -49,6 +49,7 @@ final class API: APITransport, @unchecked Sendable {
         #endif
         session = URLSession(configuration: configuration, delegate: NoRedirect(), delegateQueue: nil)
     }
+    deinit { session.invalidateAndCancel() }
     private func makeRequest(_ method: String, _ path: String) throws -> URLRequest {
         guard path.hasPrefix("/"), !path.contains(".."), !path.contains("#"),
               let url = URL(string: origin.absoluteString + "/api/v1" + path), ServerPolicy.sameOrigin(origin, url) else { throw ClientError.message("接口地址无效。") }
@@ -76,7 +77,7 @@ final class API: APITransport, @unchecked Sendable {
     func upload(_ path: String, item: MediaItem, operation: String, sentAt: String) async throws -> Data {
         let boundary = "Junshi-" + UUID().uuidString
         let spool = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".multipart")
-        FileManager.default.createFile(atPath: spool.path, contents: nil)
+        FileManager.default.createFile(atPath: spool.path, contents: nil, attributes: [.protectionKey: FileProtectionType.complete])
         defer { try? FileManager.default.removeItem(at: spool) }
         let out = try FileHandle(forWritingTo: spool)
         do {

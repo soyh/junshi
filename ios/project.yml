@@ -22,8 +22,10 @@ targets:
         CFBundleDisplayName: AI 恋爱军师
         JunshiAppGroup: $(JUNSHI_APP_GROUP)
         UILaunchScreen: {}
-        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         NSPhotoLibraryUsageDescription: 仅在你选择时读取照片或视频，上传前由你确认人物和会话。
+        NSCameraUsageDescription: 仅在你选择拍摄附件时使用相机。
+        NSMicrophoneUsageDescription: 仅在你选择录制视频附件时使用麦克风。
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false
     entitlements:

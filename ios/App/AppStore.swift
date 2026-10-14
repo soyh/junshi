@@ -38,9 +38,11 @@ import UniformTypeIdentifiers
             catch { if version == epoch { if case ClientError.unauthorized = error { logout(); status = "登录已失效，请重新登录。" } else { status = error.localizedDescription } } }
         }
     }
-    func establish(_ api: API) throws {
+    func establish(_ api: API) async throws {
         guard let token = api.token, !token.isEmpty else { throw ClientError.message("服务器未返回登录凭证。") }
+        let result: [Person] = try await api.decode("GET","/persons")
         try CredentialStore.save(Credentials(server:api.origin.absoluteString,token:token))
+        people = result
         client = api; server = api.origin.absoluteString; UserDefaults.standard.set(server,forKey:"server")
         try? inbox?.bind(owner)
     }
@@ -75,6 +77,7 @@ import UniformTypeIdentifiers
     }
     func selectConversation(_ id: String) {
         guard let api = client, !busy else { return }
+        guard !id.isEmpty else { return }
         if !conversation.isEmpty && (!input.isEmpty || !media.isEmpty) { status = "请先清空本次输入，再切换会话。"; return }
         run("正在核对会话来源…") {
             let data = try await api.request("GET","/conversations/"+id+"/platform-source")

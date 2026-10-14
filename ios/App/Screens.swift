@@ -84,7 +84,7 @@ struct LoginScreen: View {
             let api = try API(server:store.server)
             if currentMode == "login" {
                 let result: LoginResult = try await api.decode("POST","/auth/login",body:["username":name,"password":pass])
-                try store.establish(API(server:api.origin.absoluteString,token:result.access_token)); password = ""; store.status = "登录成功。"
+                try await store.establish(API(server:api.origin.absoluteString,token:result.access_token)); password = ""; store.status = "登录成功。"
             } else {
                 try Registration.validate(currentMode == "reset" ? "reset-user" : name,pass)
                 guard let challenge, challenge.email == address, challenge.purpose == currentMode, challenge.server == store.server else { throw ClientError.message("请先发送本次操作的验证码。") }
@@ -92,7 +92,7 @@ struct LoginScreen: View {
                 if currentMode == "register" {
                     body["username"] = name; body["password"] = pass
                     let result: LoginResult = try await api.decode("POST","/auth/email/register",body:body)
-                    try store.establish(API(server:api.origin.absoluteString,token:result.access_token)); password = ""; code = ""; store.status = "注册成功。"
+                    try await store.establish(API(server:api.origin.absoluteString,token:result.access_token)); password = ""; code = ""; store.status = "注册成功。"
                 } else { body["new_password"] = pass; _ = try await api.request("POST","/auth/email/reset-password",body:body); password = ""; code = ""; self.challenge = nil; mode = "login"; store.status = "密码已重置，请重新登录。" }
             }
         }
@@ -152,7 +152,7 @@ struct WorkspaceScreen: View {
                     HStack { Button("生成回复建议") { store.generate() }.buttonStyle(.borderedProminent).accessibilityIdentifier("generate"); Button("清空本次内容") { store.clearDraft() }.buttonStyle(.bordered) }
                 }.disabled(store.busy)
                 Panel("建议回复") {
-                    TextEditor(text:$store.draft).frame(minHeight:100).accessibilityIdentifier("reply-draft")
+                    TextEditor(text:$store.draft).disabled(store.job?.confirmed == true).frame(minHeight:100).accessibilityIdentifier("reply-draft")
                     HStack { Button("一键复制") { UIPasteboard.general.string = store.draft; store.status = "已复制。实际发送后再确认已发送。" }.buttonStyle(.bordered).disabled(store.draft.isEmpty); Button("确认已发送") { store.confirm() }.buttonStyle(.borderedProminent).disabled(store.draft.isEmpty).accessibilityIdentifier("confirm-sent") }
                     Text("这里的确认只登记你已发送的内容，不会接管微信等应用发送消息。").font(.caption).foregroundStyle(.secondary)
                 }.disabled(store.busy)
