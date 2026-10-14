@@ -54,3 +54,5 @@ jobs:
         with:
           name: Android-page-previews
           path: android-previews
+
+# TEST-228 final native email registration candidate.

@@ -5,8 +5,9 @@ from registration import validate
 
 class EmailAccountDialog(Dialog):
     def __init__(self,app,purpose='register'):
+        client=Client(app.server.get())
         super().__init__(app,'邮箱验证注册' if purpose=='register' else '邮箱找回密码')
-        self.client=Client(app.server.get());self.purpose=purpose;self.challenge=None
+        self.client=client;self.purpose=purpose;self.challenge=None
         self.name=self.entry('name','账号（3–64 位，英文字母、数字、. _ -）',app.username.get()) if purpose=='register' else None
         self.email=self.entry('email','邮箱地址')
         self.password=self.entry('password','密码（12–256 字符，无强制特殊符号）',secret=True)
