@@ -29,6 +29,17 @@ with sync_playwright() as p:
         page.goto('http://chat.test/app')
         page.locator('#username').fill('synthetic'); page.locator('#password').fill('synthetic-password')
         page.locator('#login').click()
+        if width == 1440:
+            expect(page.locator('body')).to_have_attribute('data-client-view','people')
+            assert page.locator('#pc-transfer').evaluate('(el)=>getComputedStyle(el).backgroundColor') == 'rgba(0, 0, 0, 0)'
+            assert page.locator('#pc-transfer > summary').evaluate('(el)=>getComputedStyle(el).fontSize') == page.locator('#guided-settings > summary').evaluate('(el)=>getComputedStyle(el).fontSize')
+            page.locator('#pc-transfer > summary').click()
+            expect(page.locator('#pc-transfer-password')).to_be_visible()
+            expect(page.locator('#pc-export')).to_be_visible()
+            expect(page.locator('#pc-import')).to_be_visible()
+            assert page.locator('#pc-transfer').evaluate('(el)=>getComputedStyle(el).color') == 'rgb(25, 50, 73)'
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+            page.locator('#pc-transfer > summary').click()
         page.locator('[data-person-id="p1"] .client-card-front').click()
         expect(page.locator('body')).to_have_attribute('data-client-view', 'person')
         if width == 1440:
