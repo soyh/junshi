@@ -10,7 +10,14 @@
 - [本地部署](docs/LOCAL_DEPLOYMENT.md) · [服务器运维与恢复](docs/OPERATIONS.md)
 - [PC 使用说明](desktop/CLIENT_README.txt) · [安卓使用说明](android/README.md)
 
-## 当前版本
+## 最新已通过 CI 的版本：TEST-229
+
+账号管理按钮样式统一，管理员使用可搜索、分页的用户表格选择；三端界面同步优化。1318 项全量、浏览器验收、Windows/Linux 全新安装及 PC/安卓构建通过。无新增迁移。生产服务器仍为 TEST-228，升级前须进行服务器隔离验收和备份。
+
+- [TEST-229 下载页](https://github.com/soyh/junshi/releases/tag/test-229-account-interface)：源码、文档、PC 229、Android 1.0.0-rc4、离线代码包及校验清单。
+- [界面及部署说明](docs/TEST229_ACCOUNT_INTERFACE.md)
+
+## 当前生产基线（TEST-228）
 
 | 组件 | 阶段 | 说明 |
 | --- | --- | --- |

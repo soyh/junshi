@@ -1,6 +1,6 @@
 # Android 正式发布准备
 
-当前版本为 1.0.0-rc3 候选，versionCode 22801。正式签名候选与普通 CI 的 debug 包明确分开。当前没有已发布的 1.0.0 正式包。
+当前版本为 1.0.0-rc4 候选，versionCode 22901。正式签名候选与普通 CI 的 debug 包明确分开。当前没有已发布的 1.0.0 正式包。
 
 ## 悬浮小窗
 
@@ -25,4 +25,4 @@ keytool -genkeypair -keystore junshi-release.jks -alias junshi -keyalg RSA -keys
 在真实手机验证登录、人物/平台/会话、文字/图片/视频导入、回复与发送确认、小窗拖动和收起、键盘、旋转、权限撤销、退出登录。验证目标机型后台限制；Android 8 与 Android 15 的行为可能不同。完成后单独将版本命名为 1.0.0，递增版本号，并发布固定签名附件。签名候选构建不会自动宣称正式发布，也不操作服务器。
 
 
-当前 [TEST-228 下载](https://github.com/soyh/junshi/releases/tag/test-228-email-accounts) 中的 APK 为测试签名，支持邮箱注册和找回密码。后端 TEST-228 已通过生产上线验收；这不代表 APK 已完成长期正式签名配置。
+当前 [TEST-228 下载](https://github.com/soyh/junshi/releases/tag/test-229-account-interface) 中的 APK 为测试签名，支持邮箱注册和找回密码。后端 TEST-228 已通过生产上线验收；这不代表 APK 已完成长期正式签名配置。

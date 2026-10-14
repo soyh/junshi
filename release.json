@@ -1,10 +1,11 @@
 {
   "application": "AI Love Strategist",
-  "server_stage": "TEST-228",
-  "desktop_version": "228",
-  "android_version": "1.0.0-rc3",
+  "server_stage": "TEST-229",
+  "production_stage": "TEST-228",
+  "desktop_version": "229",
+  "android_version": "1.0.0-rc4",
   "database_migrations": 23,
   "private_data_included": false,
-  "archive_tag": "test-228-email-accounts",
-  "release_status": "server-deployment-verified"
+  "archive_tag": "test-229-account-interface",
+  "release_status": "ci-verified-pending-server-acceptance"
 }

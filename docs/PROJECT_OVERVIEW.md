@@ -1,6 +1,12 @@
 # 项目总览与维护交接
 
-## 当前 TEST-228
+## 最新候选 TEST-229
+
+统一三端邮箱账号按钮样式，管理员用户目录支持搜索、分页、表格选择。GitHub 1318 项全量及客户端构建通过，无新增迁移。候选提交 `0929710c97c4324c9816b481a7ebfec67700fc8d`；生产尚未升级。
+
+[候选下载](https://github.com/soyh/junshi/releases/tag/test-229-account-interface) · [变更及部署说明](TEST229_ACCOUNT_INTERFACE.md)
+
+## 现有生产 TEST-228
 
 服务器已通过正式上线验收，数据库 001–023。配套 Windows 228 和 Android 1.0.0-rc3，后者仍为测试签名候选包。代码与客户端的共同已验收提交为 `f4ecbfd2315bfe50890891756076a40f3f524a42`。
 
