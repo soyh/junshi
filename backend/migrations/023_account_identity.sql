@@ -29,3 +29,12 @@ CREATE TABLE IF NOT EXISTS account_management_audit (
     reason TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- No user FK: cleanup must survive account deletion and process interruption.
+CREATE TABLE IF NOT EXISTS account_file_cleanup (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    paths_json TEXT NOT NULL,
+    completed INTEGER NOT NULL DEFAULT 0 CHECK(completed IN (0,1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

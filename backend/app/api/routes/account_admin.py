@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
 from app.services.account_identity import AccountIdentityService, AccountIdentityError
+from app.services.account_deletion import prepare_deletion,cleanup_result,finish_cleanup
 
 router=APIRouter(prefix='/admin/accounts',tags=['account-admin'])
 service=AccountIdentityService()
@@ -17,6 +18,11 @@ def administrator(user:str=Depends(get_current_user_id)):
 class AccountState(BaseModel):
     model_config=ConfigDict(extra='forbid')
     disabled:bool
+    reason:str=Field(min_length=1,max_length=500)
+
+class AdminDeletion(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    confirmation:Literal['DELETE']
     reason:str=Field(min_length=1,max_length=500)
 
 @router.get('')
@@ -48,3 +54,20 @@ def history(offset:int=Query(0,ge=0),admin:str=Depends(administrator)):
         service.audit(c,admin,'audit','view:audit','查询管理员操作记录')
         rows=c.execute('SELECT id,actor_id,target_id,action,reason,created_at FROM account_management_audit ORDER BY created_at DESC,id DESC LIMIT 50 OFFSET ?',(offset,)).fetchall()
     return [dict(r) for r in rows]
+
+@router.post('/{target}/delete')
+def delete(target:str,p:AdminDeletion,admin:str=Depends(administrator)):
+    try:
+        with get_connection() as c:
+            c.execute('BEGIN IMMEDIATE')
+            job=prepare_deletion(c,admin,target,p.reason,administrator=True)
+    except AccountIdentityError as e: raise HTTPException(400,str(e)) from None
+    return cleanup_result(job)
+
+@router.post('/cleanup/{job}/retry')
+def retry_cleanup(job:str,admin:str=Depends(administrator)):
+    with get_connection() as c:
+        if not c.execute('SELECT 1 FROM account_file_cleanup WHERE id=?',(job,)).fetchone(): raise HTTPException(404,'清理任务不存在')
+        service.audit(c,admin,job,'retry:cleanup','重试账号附件清理')
+    try: return cleanup_result(job)
+    except AccountIdentityError as e: raise HTTPException(400,str(e)) from None

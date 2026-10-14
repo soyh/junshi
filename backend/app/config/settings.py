@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     smtp_sender: str = ""
     smtp_implicit_tls: bool = True
     email_verification_secret: str = ""
+    email_registration_required: bool = False
 
     dashscope_api_key: str | None = None
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"

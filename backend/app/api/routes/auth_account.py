@@ -16,6 +16,7 @@ from app.services.auth_account import (
     AuthAccountService,
 )
 from app.services.auth_login_throttle import AuthLoginThrottleService
+from app.config.settings import get_settings
 
 
 router = APIRouter(
@@ -40,6 +41,8 @@ def _session_response(created) -> AuthSessionResponse:
     status_code=status.HTTP_201_CREATED,
 )
 def register(payload: AuthRegisterRequest):
+    if get_settings().email_registration_required:
+        raise HTTPException(400,'请通过邮箱验证码注册')
     try:
         with get_connection() as conn:
             created = service.register(

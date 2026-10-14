@@ -20,6 +20,7 @@ from pc_workflow import new_job, generate, confirm_sent
 from preferences import load_server, save_server
 from management import PersonDialog, AccountDialog, ModelDialog
 from registration import ACCOUNT_HINT, PASSWORD_HINT, validate
+from email_account import EmailAccountDialog
 from theme import install_theme, text_surface, raised_card
 
 CHINA = timezone(timedelta(hours=8))
@@ -81,7 +82,10 @@ class Assistant:
         ttk.Label(login, text=PASSWORD_HINT, wraplength=420).pack(anchor='w')
         row = ttk.Frame(login); row.pack(fill='x')
         self.button(row, '登录', self.login)
-        self.button(row, '注册', lambda: self.login(register=True))
+        self.button(row, '注册', lambda: self.open_email_account())
+        account_actions = ttk.Frame(login); account_actions.pack(fill='x')
+        self.button(account_actions, '找回密码', lambda: self.open_email_account('reset'))
+        self.button(account_actions, '邮箱 / 账号管理', self.open_main)
         self.button(row, '打开主页面', self.open_main)
         self.button(row, '退出登录', self.logout)
         self.button(row, '大模型设置', lambda: self.open_management(ModelDialog))
@@ -222,6 +226,12 @@ class Assistant:
             self.accounts = []; self.conversations = []; self.invalidate()
             self.status.set('已连接。可在此新建人物、平台账号并配置模型；完整数据迁移仍在主页面操作。')
         self.submit(work, done)
+
+    def open_email_account(self,purpose='register'):
+        if self.busy:return
+        if self.active_dialog:self.active_dialog.window.lift();return
+        try:EmailAccountDialog(self,purpose)
+        except ValueError as exc:self.status.set(str(exc))
 
     def open_management(self, dialog):
         if not self.client:return self.status.set('请先登录服务器。')

@@ -11,9 +11,16 @@ from app.services.auth_account import AuthAccountConflict
 from app.services.account_identity import AccountIdentityService, AccountIdentityError
 from app.services.account_mail import MailSettings, VerificationMailer, normalize_email
 from app.services.email_challenge import EmailChallengeService, EmailChallengeError
+from app.services.account_deletion import prepare_deletion,cleanup_result
 
 router=APIRouter(prefix='/auth/email',tags=['account-email'])
 identity=AccountIdentityService()
+
+@router.get('/policy')
+def policy():
+    c=get_settings()
+    return {'email_registration_required':c.email_registration_required,
+            'mail_available':bool(c.smtp_host and c.smtp_username and c.smtp_password and c.smtp_sender and len(c.email_verification_secret)>=32)}
 
 class SendCode(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -37,6 +44,9 @@ class EmailBinding(Verification):
 
 class PasswordReset(Verification):
     new_password:SecretStr=Field(min_length=12,max_length=256)
+
+class AccountDeletion(EmailBinding):
+    confirmation:Literal['DELETE']
 
 def challenge_service():
     c=get_settings()
@@ -108,3 +118,13 @@ def own_identity(user:str=Depends(get_current_user_id)):
     with get_connection() as c:
         row=c.execute('SELECT email,email_verified_at,administrator FROM account_identities WHERE user_id=?',(user,)).fetchone()
     return dict(row) if row else {'email':None,'email_verified_at':None,'administrator':0}
+
+@router.post('/delete-account')
+def delete_account(p:AccountDeletion,user:str=Depends(get_current_user_id)):
+    def action(c):
+        identity.require_password(c,user,p.current_password.get_secret_value())
+        row=c.execute('SELECT email FROM account_identities WHERE user_id=? AND email_verified_at IS NOT NULL',(user,)).fetchone()
+        if row is None or row['email']!=normalize_email(p.email): raise AccountIdentityError('请使用已绑定邮箱')
+        return prepare_deletion(c,user,user,'用户验证密码和邮箱后确认注销')
+    job=verified_action(p,'delete',action,user)
+    return cleanup_result(job)
