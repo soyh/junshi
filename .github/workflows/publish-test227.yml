@@ -1,0 +1,43 @@
+name: Publish TEST-227 synchronized downloads
+on:
+  push:
+    branches: [publish-test-227-downloads]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 25fe44a2252d751553ebfa42457de729e1c6afb5
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('fs'),crypto=require('crypto');
+            for(const run_id of [38525312707,38525312742,38525312781]){
+              let run;
+              for(let i=0;i<20;i++){run=(await github.rest.actions.getWorkflowRun({...context.repo,run_id})).data;if(run.status==='completed')break;await new Promise(r=>setTimeout(r,15000));}
+              if(run.conclusion!=='success'||run.head_sha!=='25fe44a2252d751553ebfa42457de729e1c6afb5')throw new Error('Checks not successful for expected candidate');
+            }
+            fs.mkdirSync('release-files');
+            for(const [run_id,artifactName,dir] of [[38525312707,'JunshiPC-Windows-x64','pc'],[38525312742,'JunshiAndroid-1.0.0-rc2-debug','android']]){
+              const all=(await github.rest.actions.listWorkflowRunArtifacts({...context.repo,run_id})).data.artifacts;
+              const a=all.find(x=>x.name===artifactName&&!x.expired);if(!a||!a.digest)throw new Error('Artifact not verified');
+              const bytes=Buffer.from((await github.rest.actions.downloadArtifact({...context.repo,artifact_id:a.id,archive_format:'zip'})).data);
+              if('sha256:'+crypto.createHash('sha256').update(bytes).digest('hex')!==a.digest)throw new Error('Checksum mismatch');
+              fs.writeFileSync(dir+'.zip',bytes);await exec.exec('unzip',['-q',dir+'.zip','-d',dir]);
+            }
+            fs.copyFileSync('android/app-debug.apk','release-files/JunshiAndroid-1.0.0-rc2-debug.apk');
+            const pc=fs.readdirSync('pc').find(x=>x.endsWith('.zip'));if(!pc)throw new Error('PC package missing');fs.copyFileSync('pc/'+pc,'release-files/'+pc);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-source-test227.zip','HEAD']);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-documents-test227.zip','HEAD','docs','README.md','android/RELEASE.md','desktop/CLIENT_README.txt']);
+            const names=fs.readdirSync('release-files');
+            fs.writeFileSync('release-files/SHA256SUMS.txt',names.map(n=>crypto.createHash('sha256').update(fs.readFileSync('release-files/'+n)).digest('hex')+'  '+n).join('\n')+'\n');
+            const tag='test-227-registration';let release;
+            try{release=(await github.rest.repos.getReleaseByTag({...context.repo,tag})).data;}catch(e){if(e.status!==404)throw e;release=(await github.rest.repos.createRelease({...context.repo,tag_name:tag,target_commitish:'25fe44a2252d751553ebfa42457de729e1c6afb5',name:'TEST-227 · PC / Web / Android registration',draft:true,prerelease:true,body:'三端注册规则与校验同步。PC 227、Android 1.0.0-rc2、完整源码、项目文档及校验清单。安卓仍为测试签名候选包。网页需要在服务器更新代码后生效；现有账号数据保持在服务器。全部 CI 通过后发布。'})).data;}
+            const existing=(await github.rest.repos.listReleaseAssets({...context.repo,release_id:release.id})).data;
+            for(const name of fs.readdirSync('release-files')){if(existing.some(x=>x.name===name))continue;const data=fs.readFileSync('release-files/'+name);await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});}
+            await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false});
