@@ -36,7 +36,11 @@ struct RootScreen: View {
 }
 struct LoginScreen: View {
     @EnvironmentObject var store: AppStore
-    @State private var mode = "login", username = "", password = "", email = "", code = ""
+    @State private var mode = "login"
+    @State private var username = ""
+    @State private var password = ""
+    @State private var email = ""
+    @State private var code = ""
     @State private var challenge: (id:String,email:String,purpose:String,server:String)?
     var body: some View {
         ScrollView {
@@ -96,7 +100,8 @@ struct LoginScreen: View {
 }
 struct PeopleScreen: View {
     @EnvironmentObject var store: AppStore
-    @State private var create = false, models = false
+    @State private var create = false
+    @State private var models = false
     let columns = [GridItem(.adaptive(minimum:150),spacing:15)]
     var body: some View {
         ScrollView {
@@ -123,7 +128,9 @@ struct PeopleScreen: View {
 }
 struct WorkspaceScreen: View {
     @EnvironmentObject var store: AppStore
-    @State private var files = false, platform = false, showBack = false
+    @State private var files = false
+    @State private var platform = false
+    @State private var showBack = false
     @State private var photos: [PhotosPickerItem] = []
     @FocusState private var editing: Bool
     private var title: String { store.people.first(where:{$0.id == store.person})?.name ?? "人物工作区" }
@@ -176,7 +183,9 @@ struct WorkspaceScreen: View {
 struct NewPersonScreen: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) var dismiss
-    @State private var name = "", nickname = "", title = ""
+    @State private var name = ""
+    @State private var nickname = ""
+    @State private var title = ""
     var body: some View {
         NavigationStack { Form { TextField("人物姓名",text:$name); TextField("昵称（可选）",text:$nickname); TextField("首个会话名称",text:$title); Text("创建人物时同时创建首个会话，名称由你填写。").font(.caption); Button("创建人物与会话") { store.createPerson(name:name,nickname:nickname,title:title) { dismiss() } }; Text(store.status) }.disabled(store.busy).navigationTitle("新建人物").toolbar { Button("关闭") { dismiss() }.disabled(store.busy) } }
     }
@@ -184,7 +193,11 @@ struct NewPersonScreen: View {
 struct PlatformScreen: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) var dismiss
-    @State private var platform = "wechat", handle = "", display = "", bind = true, uncertain = false
+    @State private var platform = "wechat"
+    @State private var handle = ""
+    @State private var display = ""
+    @State private var bind = true
+    @State private var uncertain = false
     var body: some View {
         NavigationStack { Form {
             Picker("平台",selection:$platform) { Text("微信").tag("wechat"); Text("抖音").tag("douyin"); Text("探探").tag("tantan"); Text("陌陌").tag("momo"); Text("Soul").tag("soul"); Text("其他").tag("other") }
@@ -208,7 +221,11 @@ struct PlatformScreen: View {
 struct ModelScreen: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) var dismiss
-    @State private var name = "", provider = "qwen", endpoint = "", model = "", key = ""
+    @State private var name = ""
+    @State private var provider = "qwen"
+    @State private var endpoint = ""
+    @State private var model = ""
+    @State private var key = ""
     var body: some View {
         NavigationStack { Form {
             Section("当前用户的配置") { ForEach(store.profiles) { profile in VStack(alignment:.leading) { Text(profile.name + (profile.is_active ? " · 当前" : "")); Text(profile.provider+" / "+profile.model).font(.caption); HStack { Button("启用") { action(profile.id,"activate") }; Button("测试连接") { action(profile.id,"test") } } } } }

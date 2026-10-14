@@ -5,9 +5,17 @@ import UniformTypeIdentifiers
 @MainActor final class AppStore: ObservableObject {
     @Published var client: API?
     @Published var server = UserDefaults.standard.string(forKey:"server") ?? ""
-    @Published var people: [Person] = [], conversations: [Conversation] = [], accounts: [PlatformAccount] = [], profiles: [ModelProfile] = []
-    @Published var person = "", conversation = "", account = ""
-    @Published var input = "", draft = "", status = "登录后选择人物，再导入对方消息。", busy = false
+    @Published var people: [Person] = []
+    @Published var conversations: [Conversation] = []
+    @Published var accounts: [PlatformAccount] = []
+    @Published var profiles: [ModelProfile] = []
+    @Published var person = ""
+    @Published var conversation = ""
+    @Published var account = ""
+    @Published var input = ""
+    @Published var draft = ""
+    @Published var status = "登录后选择人物，再导入对方消息。"
+    @Published var busy = false
     @Published var media: [MediaItem] = []
     @Published var sentAt = Date()
     @Published var web: WebTarget?
