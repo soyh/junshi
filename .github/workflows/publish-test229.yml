@@ -38,11 +38,15 @@ jobs:
             await exec.exec('git',['branch','-f','test-229-account-style-user-picker','0929710c97c4324c9816b481a7ebfec67700fc8d']);
             await exec.exec('git',['bundle','create','release-files/test229.bundle','refs/heads/test-229-account-style-user-picker']);
             await exec.exec('git',['bundle','verify','release-files/test229.bundle']);
+            await exec.exec('git',['fetch','origin','f387a28a0153cac152132867d157ff89f9bacbaa']);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-source-test229-final.zip','f387a28a0153cac152132867d157ff89f9bacbaa']);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-documents-test229-final.zip','f387a28a0153cac152132867d157ff89f9bacbaa','docs','README.md','android/RELEASE.md','desktop/CLIENT_README.txt','release.json']);
             const files=fs.readdirSync('release-files');
+            fs.writeFileSync('release-files/SHA256SUMS-FINAL.txt',['project-source-test229-final.zip','project-documents-test229-final.zip'].map(n=>crypto.createHash('sha256').update(fs.readFileSync('release-files/'+n)).digest('hex')+'  '+n).join('\n')+'\n');
             fs.writeFileSync('release-files/SHA256SUMS.txt',files.map(n=>crypto.createHash('sha256').update(fs.readFileSync('release-files/'+n)).digest('hex')+'  '+n).join('\n')+'\n');
             const tag='test-229-account-interface';
             let release;
             try{release=(await github.rest.repos.getReleaseByTag({...context.repo,tag})).data;}catch(e){if(e.status!==404)throw e;release=(await github.rest.repos.createRelease({...context.repo,tag_name:tag,target_commitish:'0929710c97c4324c9816b481a7ebfec67700fc8d',name:'TEST-229 · unified account UI and user directory',draft:true,prerelease:true})).data;}
             const existing=(await github.rest.repos.listReleaseAssets({...context.repo,release_id:release.id})).data;
             for(const name of fs.readdirSync('release-files')){if(existing.some(x=>x.name===name))continue;const bytes=fs.readFileSync('release-files/'+name);await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data:bytes,headers:{'content-type':'application/octet-stream','content-length':bytes.length}});}
-            await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,body:'TEST-229 统一网页、PC、安卓邮箱账号按钮风格；管理员改用可搜索、分页的用户表格选择。GitHub CI 全量回归、全新安装、PC 与安卓构建通过。无新增迁移，数据库仍为 001–023。提供源码、文档、离线 Git bundle、PC 229、Android 1.0.0-rc4 与 SHA-256 清单。安卓为测试签名包。此版本尚未在生产服务器上线；私人配置、用户数据和密钥未包含。'});
+            await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,body:'TEST-229 统一网页、PC、安卓邮箱账号按钮风格；管理员改用可搜索、分页的用户表格选择。GitHub CI 全量回归、全新安装、PC 与安卓构建通过。无新增迁移，数据库仍为 001–023。提供源码、文档、离线 Git bundle、PC 229、Android 1.0.0-rc4 与 SHA-256 清单。安卓为测试签名包。最新版部署源码和文档为 *-final.zip（附 SHA256SUMS-FINAL.txt）；此版本尚未在生产服务器上线；私人配置、用户数据和密钥未包含。'});
