@@ -1,10 +1,1 @@
-{
-  "application": "AI Love Strategist",
-  "feature_baseline": "TEST-214",
-  "feature_commit": "125c918f759786cec56e61e07411d794fed210cf",
-  "feature_branch": "test-214-card-morph",
-  "python_series": "3.11",
-  "database_migrations": 22,
-  "private_data_included": false,
-  "candidate_stage": "TEST-219"
-}
+{"application":"AI Love Strategist","server_stage":"TEST-219","desktop_version":"221.1","android_version":"223.1-preview","database_migrations":22,"private_data_included":false,"archive_tag":"project-snapshot-223"}

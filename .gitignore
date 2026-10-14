@@ -66,3 +66,10 @@ backend/.test-temp-inherited-acl/
 
 client-release/
 *.spec
+
+android/.gradle/
+android/**/build/
+android/local.properties
+*.jks
+*.keystore
+public-assets/

@@ -2,6 +2,8 @@
 
 ## 当前维护入口
 
+- [统一项目总览与下载](PROJECT_OVERVIEW.md)
+
 - [本地安装](LOCAL_DEPLOYMENT.md)
 - [运维、升级与恢复](OPERATIONS.md)
 - [开发与仓库结构](DEVELOPMENT.md)
