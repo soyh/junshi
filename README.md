@@ -4,7 +4,7 @@
 
 ## 下载与资料
 
-- [项目附件发布页](https://github.com/soyh/junshi/releases/tag/project-snapshot-223)：PC 安装包、安卓 APK、源码、文档、检查报告、页面预览及校验清单。
+- [项目附件发布页](https://github.com/soyh/junshi/releases/tag/test-228-email-accounts)：PC 安装包、安卓 APK、源码、文档、检查报告、页面预览及校验清单。
 - [项目总览与版本](docs/PROJECT_OVERVIEW.md)
 - [全部文档](docs/README.md)
 - [本地部署](docs/LOCAL_DEPLOYMENT.md) · [服务器运维与恢复](docs/OPERATIONS.md)
@@ -14,9 +14,9 @@
 
 | 组件 | 阶段 | 说明 |
 | --- | --- | --- |
-| 后端与网页 | TEST-219 | 数据库迁移 001–022，含浏览器登录交接 |
-| Windows 独立客户端 | TEST-221 / 221.1 | 蓝白紧凑小窗，独立模型设置、人物与平台管理 |
-| 安卓 App | TEST-223 / 223.1-preview | 跨应用悬浮窗、蓝白卡片界面，测试签名预览版 |
+| 后端与网页 | TEST-228 | 数据库 001–023，邮箱验证、账号注销及管理员后台 |
+| Windows 独立客户端 | TEST-228 / 228 | 蓝白小窗，邮箱注册与找回密码，独立模型设置 |
+| 安卓 App | TEST-228 / 1.0.0-rc3 | 悬浮窗、邮箱注册与找回密码；测试签名候选包 |
 
 版本表表示仓库内容，不代表生产服务器自动升级。
 
@@ -52,3 +52,7 @@ python3.11 -m venv .venv
 
 ## 三端账号注册同步更新（TEST-227）
 PC、网页、安卓已统一展示注册规则并进行提交前校验。详见 [注册说明](docs/REGISTRATION.md)。PC 227 与安卓 1.0.0-rc2 配套使用现有服务器账号接口，网页版需更新服务器代码。发布资料见 [TEST-227 下载](https://github.com/soyh/junshi/releases/tag/test-227-registration)。
+
+
+## 邮箱与管理员账号（TEST-228）
+已通过服务器隔离验收和生产上线验收，固定代码提交为 `f4ecbfd2315bfe50890891756076a40f3f524a42`。1317 项全量、真实 SMTP 注册、生产副本迁移演练通过。详情见 [账号升级说明](docs/ACCOUNT_UPGRADE.md)。既有账号继续登录，可绑定邮箱；新增生产注册必须验证邮箱。管理员由服务器控制台授予，数据查看与修改均记录原因。历史固定版本操作脚本保存在 `deploy/releases/test228/`，不能在其他基线直接运行。

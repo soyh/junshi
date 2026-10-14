@@ -6,5 +6,5 @@
   "database_migrations": 23,
   "private_data_included": false,
   "archive_tag": "test-228-email-accounts",
-  "release_status": "candidate"
+  "release_status": "server-deployment-verified"
 }
