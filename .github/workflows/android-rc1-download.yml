@@ -1,0 +1,34 @@
+name: Publish Android RC1 download
+on:
+  push:
+    branches: [publish-android-rc1-download]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('fs'),crypto=require('crypto');
+            const r=await github.rest.actions.downloadArtifact({...context.repo,artifact_id:11863922490,archive_format:'zip'});
+            const data=Buffer.from(r.data);
+            if(crypto.createHash('sha256').update(data).digest('hex')!=='2dcae6d025644ff8be0d5cdbc1ca25d6a704ad858b6c9ddc9a0936c95e84fd14')throw new Error('Archive checksum mismatch');
+            fs.writeFileSync('candidate.zip',data);
+            await exec.exec('unzip',['-q','candidate.zip','-d','candidate']);
+            if(!fs.existsSync('candidate/app-debug.apk'))throw new Error('APK missing');
+            const apk=fs.readFileSync('candidate/app-debug.apk');
+            const name='JunshiAndroid-1.0.0-rc1-debug.apk';
+            const checksum=Buffer.from(crypto.createHash('sha256').update(apk).digest('hex')+'  '+name+'\n');
+            const tag='android-1.0.0-rc1';
+            let release;
+            try{release=(await github.rest.repos.getReleaseByTag({...context.repo,tag})).data;}
+            catch(e){if(e.status!==404)throw e;release=(await github.rest.repos.createRelease({...context.repo,tag_name:tag,target_commitish:'6d839bbb04f2d0b8b08b3d249095c87d90cc0b7e',name:'Android 1.0.0-rc1 · compact transparent overlay',draft:true,prerelease:true,body:'已通过 TEST-225 CI 的同一 APK，提供直接下载入口。缩小悬浮小窗、透明外围背景和半透明卡片。仍为测试签名候选版，不是正式签名版本。服务器无需更新。安装签名冲突时需卸载旧预览版；服务器数据保留，本地草稿会丢失。'})).data;}
+            const existing=(await github.rest.repos.listReleaseAssets({...context.repo,release_id:release.id})).data;
+            for(const [filename,bytes] of [[name,apk],['SHA256SUMS.txt',checksum]]){
+              if(existing.some(x=>x.name===filename))continue;
+              await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name:filename,data:bytes,headers:{'content-type':'application/octet-stream','content-length':bytes.length}});
+            }
+            await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false});
