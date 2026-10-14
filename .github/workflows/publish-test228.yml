@@ -35,6 +35,9 @@ jobs:
             const pc=fs.readdirSync('pc').find(x=>x.endsWith('.zip'));if(!pc)throw new Error('PC zip missing');fs.copyFileSync('pc/'+pc,'release-files/'+pc);
             await exec.exec('git',['archive','--format=zip','--output=release-files/project-source-test228.zip','HEAD']);
             await exec.exec('git',['archive','--format=zip','--output=release-files/project-documents-test228.zip','HEAD','docs','README.md','android/RELEASE.md','desktop/CLIENT_README.txt']);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-documents-test228-final.zip','54687e49a8ba63d304047f02ea2fd6b67bafeef9','docs','README.md','android/RELEASE.md','desktop/CLIENT_README.txt','deploy/releases/test228']);
+            await exec.exec('git',['archive','--format=zip','--output=release-files/project-source-test228-final.zip','54687e49a8ba63d304047f02ea2fd6b67bafeef9']);
+            fs.writeFileSync('release-files/SHA256SUMS-FINAL.txt',['project-documents-test228-final.zip','project-source-test228-final.zip'].map(n=>crypto.createHash('sha256').update(fs.readFileSync('release-files/'+n)).digest('hex')+'  '+n).join('\n')+'\n');
             await exec.exec('git',['branch','-f','test-228-email-account-management','f4ecbfd2315bfe50890891756076a40f3f524a42']);
             await exec.exec('git',['bundle','create','release-files/test228.bundle','refs/heads/test-228-email-account-management']);
             await exec.exec('git',['bundle','verify','release-files/test228.bundle']);
@@ -50,4 +53,4 @@ jobs:
             try{release=(await github.rest.repos.getReleaseByTag({...context.repo,tag})).data;}catch(e){if(e.status!==404)throw e;release=(await github.rest.repos.createRelease({...context.repo,tag_name:tag,target_commitish:'f4ecbfd2315bfe50890891756076a40f3f524a42',name:'TEST-228 · email and account management candidate',draft:true,prerelease:true,body:'三端邮箱注册、邮箱绑定、找回密码、账号注销、管理员查询/禁用/删除和访问审计候选包。CI 通过；新增 023 迁移。真实 SMTP 与服务器数据库副本验收尚待完成，不得直接替换生产。安卓为测试签名。提供 PC、APK、源码、文档、完整 Git bundle、SMTP 准备脚本和校验清单。'})).data;}
             const existing=(await github.rest.repos.listReleaseAssets({...context.repo,release_id:release.id})).data;
             for(const name of fs.readdirSync('release-files')){if(existing.some(x=>x.name===name))continue;const bytes=fs.readFileSync('release-files/'+name);await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data:bytes,headers:{'content-type':'application/octet-stream','content-length':bytes.length}});}
-            await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false});
+            await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,body:'TEST-228 已通过服务器正式上线验收：001–023、强制邮箱注册、SMTP 与管理员初始化通过；1317 项全量及生产副本迁移通过。PC 228 与 Android 1.0.0-rc3 支持邮箱注册和找回密码；安卓仍为测试签名候选包。最新版完整源码及文档为 *-final.zip，并附 SHA256SUMS-FINAL.txt；保留早期候选快照和离线包用于追溯。私有配置、用户数据库、日志和用户身份信息未公开上传。'});
