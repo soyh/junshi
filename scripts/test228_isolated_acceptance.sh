@@ -26,7 +26,7 @@ curl --noproxy '*' -fsS --max-time 15 http://127.0.0.1:18080/health/ready > "$RU
 echo '===== TEST-228 / 02 离线候选版本 ====='
 cp -- "$BUNDLE" "$RUN/test228.bundle"
 printf '%s  %s\n' "$BUNDLE_HASH" "$RUN/test228.bundle" | sha256sum -c -
-git clone --quiet "$RUN/test228.bundle" "$RUN/repo"
+git clone --quiet --branch test-228-email-account-management "$RUN/test228.bundle" "$RUN/repo"
 test "$(git -C "$RUN/repo" rev-parse HEAD)" = "$SHA"
 test -z "$(git -C "$RUN/repo" status --porcelain --untracked-files=no)"
 for file in backend/requirements.txt backend/app/config/launcher.py; do
