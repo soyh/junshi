@@ -1,0 +1,52 @@
+name: iOS preview checks
+on:
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios-preview.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate project and icon
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          swift scripts/make_icon.swift
+          xcodegen generate
+          xcodebuild -version
+      - name: Simulator unit and UI tests
+        working-directory: ios
+        run: |
+          DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import json,sys;d=json.load(sys.stdin);print(next(x["udid"] for group in d["devices"].values() for x in group if x["isAvailable"] and "iPhone" in x["name"]))')
+          xcodebuild test -project Junshi.xcodeproj -scheme Junshi -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY="-"
+      - name: Unsigned device archive
+        working-directory: ios
+        run: |
+          xcodebuild archive -project Junshi.xcodeproj -scheme Junshi -destination 'generic/platform=iOS' -archivePath Junshi-unsigned.xcarchive CODE_SIGNING_ALLOWED=NO
+          ditto -c -k --keepParent Junshi-unsigned.xcarchive Junshi-iOS-0.1.0-UNSIGNED.zip
+          ditto -c -k --keepParent build/Build/Products/Debug-iphonesimulator/Junshi.app Junshi-iOS-0.1.0-SIMULATOR.zip
+          shasum -a 256 Junshi-iOS-0.1.0-*.zip > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Junshi-iOS-0.1.0-preview-not-installable
+          path: |
+            ios/Junshi-iOS-0.1.0-*.zip
+            ios/SHA256SUMS.txt
+      - name: Export simulator screenshots
+        if: always()
+        working-directory: ios
+        run: |
+          if [ -d TestResults.xcresult ]; then
+            xcrun xcresulttool export attachments --path TestResults.xcresult --output-path test-attachments
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iOS-test-results
+          path: |
+            ios/TestResults.xcresult
+            ios/test-attachments

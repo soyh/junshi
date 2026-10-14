@@ -1,0 +1,20 @@
+import AppKit
+import Foundation
+let size = NSSize(width:1024,height:1024)
+let image = NSImage(size:size)
+image.lockFocus()
+NSColor(calibratedRed:0.16,green:0.48,blue:0.76,alpha:1).setFill()
+NSBezierPath(rect:NSRect(origin:.zero,size:size)).fill()
+NSColor.white.setFill()
+NSBezierPath(roundedRect:NSRect(x:145,y:270,width:734,height:540),xRadius:100,yRadius:100).fill()
+let tail = NSBezierPath(); tail.move(to:NSPoint(x:270,y:330)); tail.line(to:NSPoint(x:270,y:150)); tail.line(to:NSPoint(x:490,y:330)); tail.close(); tail.fill()
+let heart = NSBezierPath(); heart.move(to:NSPoint(x:512,y:385)); heart.curve(to:NSPoint(x:325,y:575),controlPoint1:NSPoint(x:390,y:470),controlPoint2:NSPoint(x:325,y:510)); heart.curve(to:NSPoint(x:512,y:640),controlPoint1:NSPoint(x:325,y:700),controlPoint2:NSPoint(x:470,y:735)); heart.curve(to:NSPoint(x:699,y:575),controlPoint1:NSPoint(x:550,y:735),controlPoint2:NSPoint(x:699,y:700)); heart.curve(to:NSPoint(x:512,y:385),controlPoint1:NSPoint(x:699,y:510),controlPoint2:NSPoint(x:634,y:470)); heart.close()
+NSColor(calibratedRed:0.16,green:0.48,blue:0.76,alpha:1).setFill(); heart.fill()
+image.unlockFocus()
+let root = URL(fileURLWithPath:"App/Assets.xcassets/AppIcon.appiconset")
+try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true)
+let representation = NSBitmapImageRep(bitmapDataPlanes:nil,pixelsWide:1024,pixelsHigh:1024,bitsPerSample:8,samplesPerPixel:3,hasAlpha:false,isPlanar:false,colorSpaceName:.deviceRGB,bytesPerRow:0,bitsPerPixel:0)!
+NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep:representation)
+image.draw(in:NSRect(origin:.zero,size:size)); NSGraphicsContext.restoreGraphicsState()
+try representation.representation(using:.png,properties:[:])!.write(to:root.appendingPathComponent("AppIcon.png"))
+try "{\"images\":[{\"filename\":\"AppIcon.png\",\"idiom\":\"universal\",\"platform\":\"ios\",\"size\":\"1024x1024\"}],\"info\":{\"author\":\"xcode\",\"version\":1}}".write(to:root.appendingPathComponent("Contents.json"),atomically:true,encoding:.utf8)
