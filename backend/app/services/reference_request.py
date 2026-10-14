@@ -25,7 +25,8 @@ def prepare_context(context: dict, selector) -> dict:
         refs["items"] = [pool[key] for key in selected if key in pool]
         refs["count"] = len(refs["items"])
         refs["retrieval"] = {**report, "mode": mode, "selected_ids": selected}
-        refs["retrieval"].pop("query", None)
+        for diagnostic in ("query", "inventory", "links", "warnings"):
+            refs["retrieval"].pop(diagnostic, None)
         refs.pop("candidates", None)
         refs.pop("catalog", None)
     # The reply pipeline repeats references inside conversation_focus and other

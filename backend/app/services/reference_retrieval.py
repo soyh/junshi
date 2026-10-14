@@ -6,7 +6,7 @@ import unicodedata
 from urllib.parse import unquote
 
 
-MAX_CANDIDATES = 24
+MAX_CANDIDATES = 24  # compatibility constant; full enabled catalog is no longer sliced
 MAX_SELECTED = 6
 MAX_SKILLS = 2
 EXCERPT_CHARS = 1800
@@ -21,11 +21,11 @@ def terms(text: str) -> set[str]:
 
 
 def filename(value: str) -> str:
-    return unicodedata.normalize("NFC", unquote(value).replace("\\", "/").rsplit("/", 1)[-1]).casefold()
+    return unicodedata.normalize("NFC", unquote(value).replace("\\", "/").rsplit("/", 1)[-1]).strip().casefold()
 
 
 def retrieve(library: list[dict], query: str) -> dict:
-    """Rank all enabled documents, including their tails, before limiting candidates."""
+    """Rank all enabled documents, including their tails, with a complete enabled catalog."""
     query = query[-2400:]
     needles = terms(query)
     aliases: dict[str, set[str]] = {}
@@ -36,22 +36,29 @@ def retrieve(library: list[dict], query: str) -> dict:
 
     topics: dict[str, list[str]] = {}
     warnings = []
-    guides = set()
+    guides = {item["reference_id"] for item in library if item.get("is_guide")}
+    automatic_guides = set()
+    links = []
     for item in library:
-        for line in item["content"].splitlines():
+        for line_number, line in enumerate(item["content"].splitlines(), 1):
             targets = re.findall(r"`([^`\n]+\.(?:md|markdown|txt|skill|docx))`|\[[^\]]*\]\(([^)]+)\)", line, re.I)
             for code, link in targets:
                 target = code or link
                 if "://" in target or target.startswith("#"):
                     continue
                 matches = aliases.get(filename(target.split("#", 1)[0]), set())
-                guides.add(item["reference_id"])
+                automatic_guides.add(item["reference_id"])
+                source = {"source_id": item["reference_id"], "source_name": item["name"], "line": line_number}
+                links.append({**source, "filename": target[:200], "matched_ids": sorted(matches)})
                 if len(matches) == 1:
                     key = next(iter(matches))
                     topics.setdefault(key, []).append(line[:300])
-                elif len(warnings) < 20:
-                    warnings.append({"filename": target[:200], "reason": "ambiguous" if matches else "not_enabled_or_missing"})
+                else:
+                    warnings.append({**source, "filename": target[:200], "reason": "ambiguous" if matches else "not_enabled_or_missing"})
 
+    explicit_guides = bool(guides)
+    if not explicit_guides:
+        guides = automatic_guides
     scored = []
     for index, item in enumerate(library):
         content = item["content"]
@@ -79,7 +86,7 @@ def retrieve(library: list[dict], query: str) -> dict:
     ranked = sorted(scored, key=lambda x: (-x[0], x[1]))
     guide_items = [x for x in scored if x[2]["reference_id"] in guides and x not in skills][:2]
     reserved = skills + guide_items
-    candidates = reserved + [x for x in ranked if x not in reserved][:MAX_CANDIDATES - len(reserved)]
+    candidates = reserved + [x for x in ranked if x not in reserved]
     defaults = skills + [x for x in candidates if x not in skills][:MAX_SELECTED]
     # Public preview stays in stable user priority order.
     defaults.sort(key=lambda x: x[1])
@@ -92,7 +99,8 @@ def retrieve(library: list[dict], query: str) -> dict:
                     for x in candidates],
         "retrieval": {"mode": "local_preview", "enabled_count": len(library),
                       "candidate_count": len(candidates), "omitted_from_catalog": len(library) - len(candidates),
-                      "guide_count": len(guides), "warnings": warnings,
+                      "guide_count": len(guides), "guide_mode": "explicit" if explicit_guides else "automatic_compatibility",
+                      "warnings": warnings, "links": links,
                       "query": query, "selected_ids": [x[2]["reference_id"] for x in defaults],
                       "note": "本地预选；模型还会从候选目录选文档。未入选资料不代表已阅读。"},
     }

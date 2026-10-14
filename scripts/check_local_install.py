@@ -57,7 +57,7 @@ def run():
                 else:
                     raise AssertionError("Local server did not become ready")
                 assert ready["status"] == "ready"
-                assert ready["migrations"]["applied_count"] == 23
+                assert ready["migrations"]["applied_count"] == 24
                 with opener.open(f"http://127.0.0.1:{port}/app", timeout=5) as response:
                     assert response.status == 200 and len(response.read()) > 1000
                 # Exercise configured port discovery and reuse against a real server,
@@ -72,7 +72,7 @@ def run():
             finally:
                 process.terminate()
                 process.wait(timeout=15)
-    print("Fresh local install, existing data guards, 23 migrations and /app: PASS")
+    print("Fresh local install, existing data guards, 24 migrations and /app: PASS")
 
 
 if __name__ == "__main__":

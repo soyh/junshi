@@ -327,7 +327,13 @@ class OpenAIChatProvider(LLMProvider):
             **self._analysis_request_options(),
         }
         if len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) > get_settings().llm_input_budget_tokens:
-            return None
+            # Keep every eligible ID; shorten metadata before falling back locally.
+            compact = [{"reference_id": row["reference_id"], "name": row["name"],
+                        "topics": row.get("topics", "")[:80]} for row in catalog]
+            payload["messages"][-1]["content"] = json.dumps(
+                {"recent_conversation": query, "catalog": compact}, ensure_ascii=False)
+            if len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) > get_settings().llm_input_budget_tokens:
+                return None
         try:
             response = self._post(payload, {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"})
             response.raise_for_status()

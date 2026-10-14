@@ -90,6 +90,11 @@ def validate_payload(conn, payload):
         raise ValueError('数据包内容不完整')
     for table, rows in tables.items():
         columns = {r['name'] for r in conn.execute(f'PRAGMA table_info({table})')}
+        # Older account packages predate the optional explicit-guide flag.
+        if table == 'model_references' and 'is_guide' in columns and isinstance(rows, list):
+            for row in rows:
+                if isinstance(row, dict) and set(row) == columns - {'is_guide'}:
+                    row['is_guide'] = 0
         if not isinstance(rows, list) or any(not isinstance(r, dict) or set(r) != columns for r in rows):
             raise ValueError('数据结构不兼容，未导入')
         if any(any(not isinstance(v, (str, int, float, type(None))) for v in row.values()) for row in rows):

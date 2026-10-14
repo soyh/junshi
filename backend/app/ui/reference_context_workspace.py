@@ -510,7 +510,10 @@ REFERENCE_CONTEXT_SCRIPT = r'''
       remove.disabled = !currentAccessToken;
       remove.textContent = '删除';
       actions.append(save, remove);
-      meta.append(globalWrap, priorityWrap, overrideWrap, actions);
+      const guideWrap = document.createElement('label');
+      const guide = document.createElement('input'); guide.type = 'checkbox'; guide.checked = Boolean(item.is_guide);
+      guideWrap.append(guide, document.createTextNode('设为主题指南'));
+      meta.append(globalWrap, guideWrap, priorityWrap, overrideWrap, actions);
 
       const detail = document.createElement('div');
       detail.className = 'reference-note';
@@ -525,6 +528,7 @@ REFERENCE_CONTEXT_SCRIPT = r'''
             method: 'PATCH',
             body: JSON.stringify({
               enabled_by_default: globalEnabled.checked,
+              is_guide: guide.checked,
               priority: Number(priority.value || 100),
             }),
           });
@@ -626,9 +630,12 @@ REFERENCE_CONTEXT_SCRIPT = r'''
       scope === 'global' ? '全局目录检查：无需选择会话；各会话默认继承，已有单独设置优先。' : '当前会话目录检查：包含会话级覆盖。',
       `本地预选：启用 ${report.enabled_count || 0} 项，候选目录 ${report.candidate_count || 0} 项，识别导读 ${report.guide_count || 0} 项。`,
       '分析时模型还会从候选目录选文档；这里只预览本地检索结果，不表示模型已读取。',
+      '以下为本地正文预选（不等于完整目录）：',
       ...(data.items || []).map(item => `${item.name}${item.truncated ? '（相关片段 / 已截取）' : ''}`),
       `未进入候选目录：${report.omitted_from_catalog || 0} 项。`,
-      ...(report.warnings || []).map(w => `${w.filename}：${w.reason === 'ambiguous' ? '同名文件有歧义，请重命名并更新目录' : '未匹配到已启用文件，请检查上传名称及会话启用状态'}`),
+      '完整资料清单：',
+      ...(report.inventory || []).map(i => `${i.name} · ${i.enabled ? '已启用 / 可检索' : '已停用'}${i.is_guide ? ' · 主题指南' : ''}`),
+      ...(report.warnings || []).map(w => `${w.source_name || '未知来源'} 第 ${w.line || '?'} 行 → ${w.filename}：${w.reason === 'ambiguous' ? '同名文件有歧义，请重命名并更新目录' : '未匹配到已启用文件，请检查上传名称及会话启用状态'}`),
     ];
     byId('reference-retrieval-preview').textContent = lines.join('\n');
   }

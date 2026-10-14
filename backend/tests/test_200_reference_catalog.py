@@ -47,9 +47,9 @@ def test_chinese_directory_aliases_and_tail_retrieval():
     assert target["truncated"]
     catalog = next(x for x in result["catalog"] if x["reference_id"] == "target")
     assert "冲突与修复" in catalog["topics"]
-    assert result["retrieval"]["candidate_count"] == 24
-    assert result["retrieval"]["omitted_from_catalog"] == len(library) - 24
-    assert result["retrieval"]["warnings"] == [{"filename": "缺失.md", "reason": "not_enabled_or_missing"}]
+    assert result["retrieval"]["candidate_count"] == len(library)
+    assert result["retrieval"]["omitted_from_catalog"] == 0
+    assert result["retrieval"]["warnings"] == [{"source_id": "guide", "source_name": "导读.md", "line": 2, "filename": "缺失.md", "reason": "not_enabled_or_missing"}]
     assert all(len(x["content"]) <= 1800 for x in result["candidates"])
 
 
