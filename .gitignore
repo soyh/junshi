@@ -73,3 +73,18 @@ android/local.properties
 *.jks
 *.keystore
 public-assets/
+
+# iOS generated projects, archives, local signing and build outputs
+ios/build/
+ios/*.xcarchive/
+ios/*.xcresult/
+ios/*.zip
+ios/Junshi.xcodeproj/
+ios/App/Info.plist
+ios/App/Junshi.entitlements
+ios/ShareExtension/Info.plist
+ios/ShareExtension/JunshiShare.entitlements
+ios/App/Assets.xcassets/
+*.p12
+*.mobileprovision
+*.p8
