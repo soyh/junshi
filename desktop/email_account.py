@@ -14,7 +14,7 @@ class EmailAccountDialog(Dialog):
         self.code=self.entry('code','六位验证码（10 分钟内有效）')
         row=ttk.Frame(self.frame);row.pack(fill='x')
         self.button(row,'发送验证码',self.send)
-        self.button(row,'确认注册' if purpose=='register' else '重置密码',self.save)
+        self.button(row,'确认注册' if purpose=='register' else '重置密码',self.save).configure(style='Primary.TButton')
         self.button(row,'关闭',self.close);self.footer()
         if purpose=='register':
             self.button(row,'找回密码',self.open_reset)

@@ -11,8 +11,10 @@ final class EmailAccountDialog {
   email.setHint("邮箱地址");email.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
   code.setHint("六位验证码（10 分钟有效）");code.setInputType(InputType.TYPE_CLASS_NUMBER);
   password.setHint("密码 12–256 字符");password.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
-  form.addView(email);form.addView(password);form.addView(code);TextView status=new TextView(activity);form.addView(status);
-  Button send=new Button(activity),submit=new Button(activity);send.setText("发送验证码");submit.setText(register?"确认注册":"重置密码");form.addView(send);form.addView(submit);
+  Theme.background(form);Theme.input(email);Theme.input(password);Theme.input(code);
+  form.addView(email);form.addView(password);form.addView(code);TextView status=Theme.label(form,"",14);
+  LinearLayout actions=new LinearLayout(activity);form.addView(actions);
+  Button send=new Button(activity),submit=new Button(activity);send.setText("发送验证码");submit.setText(register?"确认注册":"重置密码");Theme.button(send,false);Theme.button(submit,true);actions.addView(send);actions.addView(submit);
   String base=activity.server.getText().toString(),name=activity.user.getText().toString(),purpose=register?"register":"reset";
   final String[] challenge={null,null};
   AlertDialog dialog=new AlertDialog.Builder(activity).setTitle(register?"邮箱验证注册":"邮箱找回密码").setView(form).setNegativeButton("关闭",null).create();
