@@ -28,6 +28,15 @@ public class Workspace extends LinearLayout {
         button(footer,"确认已发送",session::confirm);
         status=new TextView(context);status.setTextColor(0xff31516e);status.setTextSize(12);status.setPadding(Theme.dp(context,12),Theme.dp(context,8),Theme.dp(context,12),Theme.dp(context,8));status.setBackground(Theme.surface(context,0xfffff9ef,12));status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);addView(status);refresh();
     }
+    public void compact(){
+        setPadding(0,0,0,0);setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        input.setMinLines(1);input.setMaxLines(2);reply.setMinLines(1);reply.setMaxLines(3);
+        for(int i=0;i<getChildCount();i++){
+            View child=getChildAt(i);
+            if(child instanceof LinearLayout){child.setBackground(Theme.surface(getContext(),0xd9ffffff,14));child.setElevation(0);child.setPadding(Theme.dp(getContext(),8),Theme.dp(getContext(),4),Theme.dp(getContext(),8),Theme.dp(getContext(),4));
+                LinearLayout.LayoutParams lp=(LinearLayout.LayoutParams)child.getLayoutParams();lp.setMargins(0,Theme.dp(getContext(),3),0,Theme.dp(getContext(),3));child.setLayoutParams(lp);}
+        }
+    }
     static TextWatcher watch(Runnable r){return new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){r.run();}public void afterTextChanged(Editable e){}};}
     static AdapterView.OnItemSelectedListener selection(Runnable r){return new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?> p,View v,int pos,long id){r.run();}public void onNothingSelected(AdapterView<?> p){}};}
     void choose(Spinner spinner,JSONArray data,boolean person){if(rendering||session.busy)return;int i=spinner.getSelectedItemPosition()-1;if(i>=0){JSONObject o=data.optJSONObject(i);if(o!=null){if(person)session.selectPerson(o.optString("id"));else session.selectConversation(o.optString("id"));}}}

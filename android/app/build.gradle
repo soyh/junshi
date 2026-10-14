@@ -6,12 +6,29 @@ android {
         applicationId 'com.junshi.assistant'
         minSdk 26
         targetSdk 35
-        versionCode 22301
-        versionName '223.1-preview'
+        versionCode 22501
+        versionName '1.0.0-rc1'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-    buildTypes { release { minifyEnabled false } }
+    signingConfigs {
+        production {
+            def keyPath = System.getenv('ANDROID_KEYSTORE_PATH')
+            if (keyPath) storeFile file(keyPath)
+            storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            keyAlias System.getenv('ANDROID_KEY_ALIAS')
+            keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+        }
+    }
+    buildTypes { release { minifyEnabled false; signingConfig signingConfigs.production } }
+    tasks.register('checkProductionSigning') {
+        doLast {
+            ['ANDROID_KEYSTORE_PATH','ANDROID_KEYSTORE_PASSWORD','ANDROID_KEY_ALIAS','ANDROID_KEY_PASSWORD'].each {
+                if (!System.getenv(it)) throw new GradleException('Missing production signing configuration: ' + it)
+            }
+        }
+    }
+    tasks.configureEach { if (name == 'preReleaseBuild') dependsOn('checkProductionSigning') }
     lint { abortOnError true }
 }
 dependencies {
