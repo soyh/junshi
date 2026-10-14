@@ -1,3 +1,5 @@
+from app.ui.email_account_center import EMAIL_ACCOUNT_HTML, EMAIL_ACCOUNT_SCRIPT
+
 PRODUCT_SHELL_HTML = r'''<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -270,6 +272,13 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
   }
 
   async function register() {
+    const policy = await api('/api/v1/auth/email/policy', {}, false);
+    if (policy.email_registration_required) {
+      centerOpen.click();
+      byId('email-purpose').value = 'register';
+      emailStatus.textContent = '请填写邮箱并发送验证码；账号和密码使用登录框中的输入。';
+      return;
+    }
     const username = byId('username').value.trim();
     const password = byId('password').value;
     if (!/^[A-Za-z0-9._-]{3,64}$/.test(username)) throw new Error('账号须为 3–64 个字符，仅允许英文字母、数字、点、下划线和短横线');
@@ -588,3 +597,5 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
 </body>
 </html>
 '''
+
+PRODUCT_SHELL_HTML = PRODUCT_SHELL_HTML.replace('<script>', EMAIL_ACCOUNT_HTML + '<script>', 1).replace('  clearSession();', EMAIL_ACCOUNT_SCRIPT + '\n  clearSession();', 1)

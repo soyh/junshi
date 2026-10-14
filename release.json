@@ -1,1 +1,10 @@
-{"application":"AI Love Strategist","server_stage":"TEST-219","desktop_version":"221.1","android_version":"223.1-preview","database_migrations":22,"private_data_included":false,"archive_tag":"project-snapshot-223"}
+{
+  "application": "AI Love Strategist",
+  "server_stage": "TEST-228",
+  "desktop_version": "228",
+  "android_version": "1.0.0-rc3",
+  "database_migrations": 23,
+  "private_data_included": false,
+  "archive_tag": "test-228-email-accounts",
+  "release_status": "candidate"
+}

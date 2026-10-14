@@ -1,4 +1,6 @@
 from fastapi import APIRouter
+from app.api.routes.account_identity import router as account_identity_router
+from app.api.routes.account_admin import router as account_admin_router
 
 from app.api.routes.action_decision import router as action_decision_router
 from app.api.routes.action_execution import router as action_execution_router
@@ -72,6 +74,8 @@ api_router.include_router(auth_account_router)
 api_router.include_router(auth_account_ui_router)
 api_router.include_router(auth_session_router)
 api_router.include_router(persons_router)
+api_router.include_router(account_identity_router)
+api_router.include_router(account_admin_router)
 from app.api.routes.person_memory import router as person_memory_router
 api_router.include_router(person_memory_router)
 api_router.include_router(person_profiles_router)

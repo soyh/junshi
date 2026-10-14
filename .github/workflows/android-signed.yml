@@ -39,7 +39,7 @@ jobs:
           sha256sum android/app/build/outputs/apk/release/app-release.apk > android/app/build/outputs/apk/release/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: JunshiAndroid-1.0.0-rc1-signed
+          name: JunshiAndroid-1.0.0-rc3-signed
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/apk/release/SHA256SUMS.txt

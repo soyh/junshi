@@ -55,6 +55,10 @@ def get_current_user_id(
 
         with get_connection() as conn:
             session_user_id = auth_session_service.resolve(conn, token)
+            if session_user_id is not None:
+                identity = conn.execute('SELECT disabled FROM account_identities WHERE user_id=?', (session_user_id,)).fetchone()
+                if identity is not None and identity['disabled']:
+                    raise _unauthorized('account unavailable')
         if session_user_id is not None:
             return session_user_id
 

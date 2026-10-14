@@ -1,0 +1,80 @@
+from unittest.mock import Mock
+import pytest
+from app.api.routes import account_identity as routes
+from app.services.email_challenge import EmailChallengeService
+from app.core.database import get_connection
+
+@pytest.fixture
+def mail(monkeypatch):
+    mail=Mock()
+    service=EmailChallengeService('s'*32,mail)
+    mail.clock=[1000]
+    service.clock=lambda:mail.clock[0]
+    monkeypatch.setattr(routes,'challenge_service',lambda:service)
+    return mail
+
+def test_email_registration_and_failed_attempts_persist(client,mail):
+    response=client.post('/api/v1/auth/email/code',json={'email':'a@example.com','purpose':'register'})
+    assert response.status_code==200
+    identifier=response.json()['challenge_id'];code=mail.send.call_args.args[1]
+    payload={'username':'email_api','password':'password-12345','email':'a@example.com','challenge_id':identifier,'code':'000000' if code!='000000' else '000001'}
+    assert client.post('/api/v1/auth/email/register',json=payload).status_code==400
+    with get_connection() as conn:
+        assert conn.execute('SELECT attempts FROM email_challenges WHERE id=?',(identifier,)).fetchone()[0]==1
+    payload['code']=code
+    registered=client.post('/api/v1/auth/email/register',json=payload)
+    assert registered.status_code==201
+    assert 'access_token' in registered.json()
+    assert client.post('/api/v1/auth/email/register',json=payload).status_code==400
+
+def test_disabled_account_blocks_new_and_existing_login(client):
+    result=client.post('/api/v1/auth/register',json={'username':'disabled_user','password':'password-12345'})
+    token=result.json()['access_token']
+    with get_connection() as conn:
+        user=conn.execute('SELECT user_id FROM user_credentials WHERE username=?',('disabled_user',)).fetchone()[0]
+        conn.execute('INSERT INTO account_identities(user_id,disabled) VALUES(?,1)',(user,))
+    assert client.post('/api/v1/auth/login',json={'username':'disabled_user','password':'password-12345'}).status_code==401
+    assert client.get('/api/v1/persons',headers={'Authorization':'Bearer '+token}).status_code==401
+
+def test_binding_cannot_issue_without_password(client,mail):
+    assert client.post('/api/v1/auth/email/code',json={'email':'a@example.com','purpose':'bind'}).status_code in (401,403)
+    mail.send.assert_not_called()
+
+def test_password_validation_does_not_echo_secret(client):
+    response=client.post('/api/v1/auth/email/reset-password',json={'email':'a@example.com','challenge_id':'a'*36,'code':'123456','new_password':'SECRET'})
+    assert response.status_code==422
+    assert 'SECRET' not in response.text
+
+def test_register_bind_reset_and_self_delete_flow(client,mail):
+    def code(email,purpose,headers=None,password=None):
+        body={'email':email,'purpose':purpose}
+        if password:body['current_password']=password
+        r=client.post('/api/v1/auth/email/code',json=body,headers=headers or {})
+        assert r.status_code==200,r.text
+        return {'email':email,'challenge_id':r.json()['challenge_id'],'code':mail.send.call_args.args[1]}
+    payload=code('original@example.com','register')
+    payload.update(username='full_flow',password='password-12345')
+    registered=client.post('/api/v1/auth/email/register',json=payload)
+    assert registered.status_code==201,registered.text
+    headers={'Authorization':'Bearer '+registered.json()['access_token']}
+    person=client.post('/api/v1/persons',headers=headers,json={'name':'测试人物'})
+    assert person.status_code==201
+    binding=code('bound@example.com','bind',headers,'password-12345')
+    binding['current_password']='password-12345'
+    assert client.put('/api/v1/auth/email/binding',headers=headers,json=binding).status_code==200
+    mail.clock[0]+=61
+    reset=code('bound@example.com','reset');reset['new_password']='new-password-12345'
+    assert client.post('/api/v1/auth/email/reset-password',json=reset).status_code==200
+    assert client.get('/api/v1/persons',headers=headers).status_code==401
+    login=client.post('/api/v1/auth/login',json={'username':'full_flow','password':'new-password-12345'})
+    headers={'Authorization':'Bearer '+login.json()['access_token']}
+    mail.clock[0]+=61
+    deletion=code('bound@example.com','delete',headers,'new-password-12345')
+    deletion.update(current_password='new-password-12345',confirmation='DELETE')
+    deleted=client.post('/api/v1/auth/email/delete-account',headers=headers,json=deletion)
+    assert deleted.status_code==200,deleted.text
+    assert not deleted.json()['cleanup_pending']
+    assert client.get('/api/v1/persons',headers=headers).status_code==401
+    with get_connection() as conn:
+        assert conn.execute('SELECT 1 FROM persons WHERE id=?',(person.json()['id'],)).fetchone() is None
+        assert conn.execute('SELECT 1 FROM email_challenges WHERE email=?',('bound@example.com',)).fetchone() is None
