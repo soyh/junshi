@@ -32,6 +32,20 @@ def users(offset:int=Query(0,ge=0),admin:str=Depends(administrator)):
         rows=c.execute('SELECT u.id,u.created_at,c.username,i.email,i.email_verified_at,COALESCE(i.disabled,0) disabled,COALESCE(i.administrator,0) administrator FROM users u LEFT JOIN user_credentials c ON c.user_id=u.id LEFT JOIN account_identities i ON i.user_id=u.id ORDER BY u.id LIMIT 50 OFFSET ?',(offset,)).fetchall()
     return [dict(r) for r in rows]
 
+@router.get('/directory')
+def directory(q:str=Query('',max_length=100),offset:int=Query(0,ge=0),limit:int=Query(20,ge=1,le=50),admin:str=Depends(administrator)):
+    # Parameterized literal search: '%' and '_' in an account name are not wildcards.
+    term=q.strip().replace('\\','\\\\').replace('%','\\%').replace('_','\\_')
+    pattern='%'+term+'%'
+    joins=' FROM users u LEFT JOIN user_credentials c ON c.user_id=u.id LEFT JOIN account_identities i ON i.user_id=u.id'
+    where=" WHERE (u.id LIKE ? ESCAPE '\\' OR c.username LIKE ? ESCAPE '\\' OR i.email LIKE ? ESCAPE '\\')"
+    params=(pattern,pattern,pattern)
+    with get_connection() as c:
+        service.audit(c,admin,'accounts','list','查询分页用户目录')
+        total=c.execute('SELECT COUNT(*)'+joins+where,params).fetchone()[0]
+        rows=c.execute('SELECT u.id,u.created_at,c.username,i.email,COALESCE(i.disabled,0) disabled,COALESCE(i.administrator,0) administrator'+joins+where+' ORDER BY u.id LIMIT ? OFFSET ?',(*params,limit,offset)).fetchall()
+    return {'items':[dict(row) for row in rows],'total':total,'offset':offset,'limit':limit}
+
 @router.patch('/{target}/state')
 def state(target:str,p:AccountState,admin:str=Depends(administrator)):
     try:

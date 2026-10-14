@@ -23,6 +23,11 @@ with sync_playwright() as p:
                 assert body['email']=='a@example.com' and body['code']=='123456'
                 data={'access_token':'test-session','expires_at':'2030-01-01T00:00:00Z'}
             elif path.endswith('/email/identity'):data={'email':'a@example.com','administrator':1}
+            elif path.endswith('/accounts/directory'):
+                from urllib.parse import parse_qs
+                query=parse_qs(urlparse(route.request.url).query)
+                offset=int(query.get('offset',['0'])[0])
+                data={'items':[{'id':'target-user','username':'<img src=x onerror="window.attacked=1">','email':'b@example.com','disabled':0,'administrator':0}], 'total':41,'offset':offset,'limit':20}
             elif '/data/messages' in path:
                 assert 'reason=' in route.request.url
                 assert route.request.headers.get('authorization')=='Bearer test-session'
@@ -39,13 +44,27 @@ with sync_playwright() as p:
         page.locator('#email-center-close').click()
         page.locator('#client-footer').get_by_text('邮箱与账号管理',exact=True).click()
         expect(page.locator('#email-admin-panel')).to_be_visible()
-        page.locator('#email-admin-target').fill('target-user');page.locator('#email-admin-reason').fill('用户请求排查')
+        expect(page.locator('#email-users-page')).to_contain_text('41 位用户')
+        expect(page.locator('#email-admin-view')).to_be_disabled()
+        expect(page.locator('#email-users-prev')).to_be_disabled()
+        page.locator('#email-users-next').click()
+        expect(page.locator('#email-users-page')).to_contain_text('第 2 页')
+        page.locator('#email-users-next').click()
+        expect(page.locator('#email-users-page')).to_contain_text('第 3 页')
+        expect(page.locator('#email-users-next')).to_be_disabled()
+        page.locator('#email-user-search').fill('target');page.locator('#email-user-search').press('Enter')
+        expect(page.locator('#email-users-page')).to_contain_text('第 1 页')
+        page.locator('#email-user-rows button').click()
+        expect(page.locator('#email-admin-target')).to_contain_text('target-user')
+        page.locator('#email-admin-reason').fill('用户请求排查')
         page.locator('#email-admin-kind').select_option('messages');page.locator('#email-admin-view').click()
         expect(page.locator('#email-admin-result')).to_contain_text('window.attacked')
         assert page.evaluate('window.attacked === undefined')
         assert page.evaluate('localStorage.length===0 && sessionStorage.length===0')
         assert not any(path.endswith('/auth/register') for path,_ in calls)
         assert not errors,errors
+        page.locator('#email-center-close').click()
+        expect(page.locator('#email-admin-target')).not_to_contain_text('target-user')
         page.close()
     browser.close()
 print('TEST-228 email registration and admin UI: PASS')
