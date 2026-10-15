@@ -54,7 +54,7 @@ def state(target:str,p:AccountState,admin:str=Depends(administrator)):
     return {'status':'updated'}
 
 @router.get('/{target}/data/{kind}')
-def data(target:str,kind:Literal['persons','conversations','messages','relationships','person_memories','person_update_events','model_references','person_platform_accounts','media_attachments'],reason:str=Query(min_length=1,max_length=500),offset:int=Query(0,ge=0),admin:str=Depends(administrator)):
+def data(target:str,kind:Literal['persons','conversations','messages','relationships','person_memories','person_update_events','model_references','person_platform_accounts','media_attachments'],reason:str=Query(min_length=1,max_length=500),offset:int=Query(0,ge=0),paginated:bool=False,admin:str=Depends(administrator)):
     columns={'persons':'id,name,nickname,notes,created_at','conversations':'id,person_id,title,status,created_at','messages':'id,conversation_id,sender_type,content,sent_at',
              'relationships':'id,person_id,status,stage,notes,long_term_goal,current_goal',
              'person_memories':'person_id,revision,summary_json,coverage_json,updated_at',
@@ -65,9 +65,11 @@ def data(target:str,kind:Literal['persons','conversations','messages','relations
     with get_connection() as c:
         if not c.execute('SELECT 1 FROM users WHERE id=?',(target,)).fetchone(): raise HTTPException(404,'用户不存在')
         service.audit(c,admin,target,'view:'+kind,reason)
-        order='person_id' if kind=='person_memories' else 'id'
+        total=c.execute(f'SELECT COUNT(*) FROM {kind} WHERE user_id=?',(target,)).fetchone()[0] if paginated else None
+        order='julianday(sent_at),created_at,id' if kind=='messages' else 'person_id' if kind=='person_memories' else 'id'
         rows=c.execute(f'SELECT {columns[kind]} FROM {kind} WHERE user_id=? ORDER BY {order} LIMIT 50 OFFSET ?',(target,offset)).fetchall()
-    return [dict(r) for r in rows]
+    items=[dict(r) for r in rows]
+    return {'items':items,'total':total,'offset':offset,'limit':50} if paginated else items
 
 @router.get('/audit/history')
 def history(offset:int=Query(0,ge=0),admin:str=Depends(administrator)):

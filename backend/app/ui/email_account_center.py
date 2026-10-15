@@ -19,6 +19,7 @@ EMAIL_ACCOUNT_HTML = r'''
 #email-admin-result{white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto;background:#f4f9fe;border-radius:12px;padding:12px}
 #client-footer .email-footer-link{font:inherit;color:inherit;background:transparent;border:0;box-shadow:none;padding:8px;margin:0;cursor:pointer}
 @media(max-width:600px){#email-account-center{padding:16px}#email-account-center button{font-size:14px;padding:10px 12px}}
+#email-chat-table{width:100%;border-collapse:collapse;table-layout:fixed}#email-chat-table th,#email-chat-table td{padding:10px;text-align:left;border-bottom:1px solid #e2edf5;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere}#email-chat-table th:nth-child(1){width:48px}#email-chat-table th:nth-child(2){width:150px}#email-admin-panel [hidden]{display:none!important}
 </style>
 <dialog id="email-account-center" aria-labelledby="email-center-title">
 <h2 id="email-center-title">邮箱与账号管理</h2><button id="email-center-close" type="button">关闭</button>
@@ -43,8 +44,10 @@ EMAIL_ACCOUNT_HTML = r'''
 <label for="email-admin-target">已选择用户</label><output id="email-admin-target">请从表格选择用户</output>
 <label for="email-admin-reason">查看或修改原因</label><input id="email-admin-reason">
 <select id="email-admin-kind"><option value="persons">人物资料</option><option value="conversations">会话</option><option value="messages">聊天内容</option><option value="relationships">关系状态</option><option value="person_memories">长期档案</option><option value="person_update_events">档案更新记录</option><option value="model_references">参考资料与 Skills</option><option value="person_platform_accounts">平台账号</option><option value="media_attachments">附件及分析结果</option></select>
-<label for="email-admin-offset">分页起始位置（每页 50 条）</label><input id="email-admin-offset" type="number" min="0" value="0">
+<label for="email-admin-offset">操作记录起始位置（每页 50 条）</label><input id="email-admin-offset" type="number" min="0" value="0">
 <button id="email-admin-view" type="button">查看数据</button><button id="email-admin-disable" type="button">禁用</button><button id="email-admin-enable" type="button">恢复</button><button id="email-admin-delete" type="button">永久删除用户</button>
+<div id="email-chat-wrap" class="email-table-wrap" hidden><table id="email-chat-table"><caption>聊天记录（北京时间）</caption><thead><tr><th>角色</th><th>时间</th><th>聊天内容</th></tr></thead><tbody id="email-chat-rows"></tbody></table></div>
+<div id="email-data-pager" hidden><button id="email-data-prev" type="button" disabled>上一页</button><span id="email-data-page" role="status"></span><button id="email-data-next" type="button" disabled>下一页</button></div>
 <pre id="email-admin-result" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto"></pre></section>
 </dialog>
 '''
@@ -54,7 +57,7 @@ EMAIL_ACCOUNT_SCRIPT = r'''
   const emailStatus=byId('email-center-status');
   const emailRun=(id,action)=>byId(id).addEventListener('click',async()=>{
     const button=byId(id);button.disabled=true;
-    try{await action();}catch(error){emailStatus.textContent=error.message;}finally{button.disabled=false;if(typeof refreshAdminActions==='function')refreshAdminActions();if(id==='email-users-prev')button.disabled=usersOffset===0;if(id==='email-users-next')button.disabled=usersOffset+20>=usersTotal;}
+    try{await action();}catch(error){emailStatus.textContent=error.message;}finally{button.disabled=false;if(typeof refreshAdminActions==='function')refreshAdminActions();if(id==='email-users-prev')button.disabled=usersOffset===0;if(id==='email-users-next')button.disabled=usersOffset+20>=usersTotal;if(id==='email-data-prev'||id==='email-data-next')dataButtons();}
   });
   const emailValue=id=>byId(id).value;
   const centerOpen=document.createElement('button');centerOpen.type='button';centerOpen.className='email-account-launch';centerOpen.textContent='邮箱注册 / 找回密码 / 账号管理';
@@ -102,7 +105,7 @@ EMAIL_ACCOUNT_SCRIPT = r'''
   const adminActions=['email-admin-view','email-admin-disable','email-admin-enable','email-admin-delete'];
   const refreshAdminActions=()=>adminActions.forEach(id=>byId(id).disabled=!selectedAdminUser);
   const adminTarget=()=>{if(!selectedAdminUser)throw new Error('请先从用户表格选择用户');return encodeURIComponent(selectedAdminUser.id);};
-  const selectAdminUser=user=>{selectedAdminUser=user;byId('email-admin-target').textContent=(user.username||'本地用户')+' · '+user.id;byId('email-admin-result').textContent='';byId('email-admin-offset').value='0';refreshAdminActions();};
+  const selectAdminUser=user=>{clearData();selectedAdminUser=user;byId('email-admin-target').textContent=(user.username||'本地用户')+' · '+user.id;byId('email-admin-result').textContent='';byId('email-admin-offset').value='0';refreshAdminActions();};
   const loadUserDirectory=async(offset=0)=>{
     const generation=++directoryGeneration;
     byId('email-users-prev').disabled=true;byId('email-users-next').disabled=true;
@@ -125,14 +128,43 @@ EMAIL_ACCOUNT_SCRIPT = r'''
   };
   refreshAdminActions();
   byId('email-account-center').addEventListener('close',()=>{directoryGeneration++;selectedAdminUser=null;refreshAdminActions();byId('email-user-rows').replaceChildren();byId('email-admin-target').textContent='请从表格选择用户';byId('email-admin-panel').hidden=true;['email-current-password','email-new-password','email-code','email-delete-confirm'].forEach(id=>byId(id).value='');byId('email-admin-result').textContent='';emailChallenge=null;});
-  const adminShow=data=>byId('email-admin-result').textContent=JSON.stringify(data,null,2);
+  let dataOffset=0,dataTotal=0,dataBusy=false,dataGeneration=0;
+  const dataButtons=()=>{byId('email-data-prev').disabled=dataBusy||dataOffset===0;byId('email-data-next').disabled=dataBusy||dataOffset+50>=dataTotal;};
+  const clearData=()=>{dataGeneration++;dataOffset=0;dataTotal=0;byId('email-chat-rows').replaceChildren();byId('email-chat-wrap').hidden=true;byId('email-data-pager').hidden=true;byId('email-admin-result').hidden=false;byId('email-admin-result').textContent='';};
+  const adminShow=data=>{clearData();byId('email-admin-result').textContent=JSON.stringify(data,null,2);};
+  const chatTime=value=>{
+    const raw=String(value||'');const iso=raw.replace(' ','T');
+    const d=new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso)?iso:iso+'+08:00');
+    return Number.isNaN(d.getTime())?raw:new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(d);
+  };
+  const loadAdminData=async(offset=0)=>{
+    if(dataBusy)return;
+    const target=adminTarget(),kind=emailValue('email-admin-kind'),token=currentAccessToken,generation=++dataGeneration;
+    dataBusy=true;dataButtons();byId('email-data-page').textContent='正在加载…';
+    byId('email-chat-rows').replaceChildren();byId('email-admin-result').textContent='';
+    try{
+      const data=await api('/api/v1/admin/accounts/'+target+'/data/'+kind+'?paginated=true&offset='+offset+'&reason='+encodeURIComponent(emailValue('email-admin-reason')));
+      if(generation!==dataGeneration||token!==currentAccessToken||target!==adminTarget()||kind!==emailValue('email-admin-kind'))return;
+      dataOffset=data.offset;dataTotal=data.total;
+      const chat=kind==='messages';byId('email-chat-wrap').hidden=!chat;byId('email-admin-result').hidden=chat;
+      if(chat){for(const item of data.items){const row=document.createElement('tr');for(const text of [({user:'我',person:'对方',system:'系统'})[item.sender_type]||item.sender_type,chatTime(item.sent_at),item.content]){const cell=document.createElement('td');cell.textContent=text||'';row.appendChild(cell);}byId('email-chat-rows').appendChild(row);}}
+      else byId('email-admin-result').textContent=JSON.stringify(data.items,null,2);
+      byId('email-data-pager').hidden=false;
+      byId('email-data-page').textContent=dataTotal?'第 '+(Math.floor(dataOffset/50)+1)+' / '+Math.ceil(dataTotal/50)+' 页，共 '+dataTotal+' 条':'暂无记录';
+    }catch(error){if(generation===dataGeneration){byId('email-data-page').textContent='加载失败，请点击查看数据重试';byId('email-data-pager').hidden=false;dataTotal=0;}throw error;}
+    finally{dataBusy=false;dataButtons();}
+  };
+  byId('email-admin-kind').addEventListener('change',clearData);
+  byId('email-account-center').addEventListener('close',clearData);
+  emailRun('email-data-prev',async()=>loadAdminData(Math.max(0,dataOffset-50)));
+  emailRun('email-data-next',async()=>loadAdminData(dataOffset+50));
   const adminOffset=()=>String(Math.max(0,Number(emailValue('email-admin-offset'))||0));
   emailRun('email-admin-list',async()=>{usersQuery=emailValue('email-user-search').trim();await loadUserDirectory(0);});
   emailRun('email-users-prev',async()=>loadUserDirectory(Math.max(0,usersOffset-20)));
   emailRun('email-users-next',async()=>loadUserDirectory(usersOffset+20));
   byId('email-user-search').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();byId('email-admin-list').click();}});
   emailRun('email-admin-audit',async()=>adminShow(await api('/api/v1/admin/accounts/audit/history?offset='+adminOffset())));
-  emailRun('email-admin-view',async()=>adminShow(await api('/api/v1/admin/accounts/'+adminTarget()+'/data/'+emailValue('email-admin-kind')+'?offset='+adminOffset()+'&reason='+encodeURIComponent(emailValue('email-admin-reason')))));
+  emailRun('email-admin-view',async()=>loadAdminData(0));
   for(const [id,disabled] of [['email-admin-disable',true],['email-admin-enable',false]])emailRun(id,async()=>adminShow(await api('/api/v1/admin/accounts/'+adminTarget()+'/state',{method:'PATCH',body:JSON.stringify({disabled,reason:emailValue('email-admin-reason')})})));
   emailRun('email-admin-delete',async()=>{
     const target=adminTarget();if(prompt('永久删除 '+byId('email-admin-target').textContent+'：输入 DELETE 确认')!=='DELETE')return;
