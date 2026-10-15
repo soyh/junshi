@@ -2,6 +2,24 @@ import XCTest
 @testable import Junshi
 
 final class ClientTests: XCTestCase {
+    func testTransportPreservesDefiniteRejectionForCorrectableInput() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [RejectedCreationProtocol.self]
+        let api = try API(server:"https://synthetic.example",configuration:config)
+        do { _ = try await api.request("POST","/persons",body:["name":""]); XCTFail("Expected input rejection") }
+        catch let error as ClientError {
+            guard case .http(let status, let message) = error else { return XCTFail("Lost HTTP classification") }
+            XCTAssertEqual(status,422); XCTAssertEqual(message,"name required")
+            XCTAssertTrue(error.creationDefinitelyRejected)
+        }
+    }
+    func testCreationRecoveryDistinguishesRejectionFromUncertainCommit() {
+        for code in [400, 403, 404, 409, 422] { XCTAssertTrue(ClientError.http(code,"input rejected").creationDefinitelyRejected) }
+        for code in [408, 429, 500, 502, 503, 504] { XCTAssertFalse(ClientError.http(code,"unknown outcome").creationDefinitelyRejected) }
+        XCTAssertFalse(ClientError.message("timeout after server commit").creationDefinitelyRejected)
+        XCTAssertFalse(ClientError.unauthorized.creationDefinitelyRejected)
+    }
+
     func testHTTPSOriginRejectsCredentialAndPathConfusion() throws {
         XCTAssertEqual(try ServerPolicy.origin("https://example.com/app/").absoluteString,"https://example.com")
         for input in ["http://example.com","https://user:password@example.com","https://example.com/path","https://example.com?token=x","https://example.com#token=x"] { XCTAssertThrowsError(try ServerPolicy.origin(input)) }
@@ -73,4 +91,16 @@ final class ClientTests: XCTestCase {
         return path.contains("strategic-reply") ? Data("{\"draft\":\"synthetic reply\"}".utf8) : Data("{}".utf8)
     }
     func upload(_ path: String, item: MediaItem, operation: String, sentAt: String) async throws -> Data { uploadCount += 1; return Data("{\"id\":\"media-1\"}".utf8) }
+}
+
+final class RejectedCreationProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let response=HTTPURLResponse(url:request.url!,statusCode:422,httpVersion:nil,headerFields:["Content-Type":"application/json"])!
+        client?.urlProtocol(self,didReceive:response,cacheStoragePolicy:.notAllowed)
+        client?.urlProtocol(self,didLoad:Data("{\"detail\":\"name required\"}".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }

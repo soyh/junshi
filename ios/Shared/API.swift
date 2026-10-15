@@ -1,9 +1,13 @@
 import Foundation
 
 enum ClientError: LocalizedError {
-    case message(String), unauthorized
+    case message(String), unauthorized, http(Int, String)
+    var creationDefinitelyRejected: Bool {
+        if case .http(let status, _) = self { return [400, 403, 404, 409, 422].contains(status) }
+        return false
+    }
     var errorDescription: String? {
-        switch self { case .message(let text): return text; case .unauthorized: return "登录已失效，请重新登录。" }
+        switch self { case .message(let text): return text; case .unauthorized: return "登录已失效，请重新登录。"; case .http(_, let text): return text }
     }
 }
 enum ServerPolicy {
@@ -64,7 +68,7 @@ final class API: APITransport, @unchecked Sendable {
         if (300..<400).contains(response.statusCode) { throw ClientError.message("服务器发生重定向，请核对 HTTPS 地址。") }
         guard (200..<300).contains(response.statusCode) else {
             let detail = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["detail"] as? String
-            throw ClientError.message(detail ?? "服务器返回 HTTP \(response.statusCode)，请检查输入与服务器配置。")
+            throw ClientError.http(response.statusCode, String((detail ?? "服务器返回 HTTP \(response.statusCode)，请检查输入与服务器配置。").prefix(800)))
         }
         return data
     }
