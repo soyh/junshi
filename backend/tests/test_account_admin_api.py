@@ -47,3 +47,32 @@ def test_user_directory_search_and_complete_pagination(client):
     assert seen==expected
     assert client.get('/api/v1/admin/accounts/directory',params={'q':'%_not_a_wildcard'},headers=headers).json()['total']==0
     assert client.get('/api/v1/admin/accounts/directory',params={'limit':1000},headers=headers).status_code==422
+
+
+def test_admin_message_pages_are_chronological_complete_and_audited(client):
+    import uuid
+    def login(name):
+        token=client.post('/api/v1/auth/register',json={'username':name,'password':'password-12345'}).json()['access_token']
+        return {'Authorization':'Bearer '+token}
+    admin_headers=login('pages_admin');owner_headers=login('pages_owner')
+    person=client.post('/api/v1/persons',json={'name':'测试'},headers=owner_headers).json()
+    conversation=client.post('/api/v1/conversations',json={'person_id':person['id'],'title':'分页'},headers=owner_headers).json()
+    with get_connection() as c:
+        admin=c.execute("SELECT user_id FROM user_credentials WHERE username='pages_admin'").fetchone()[0]
+        owner=c.execute("SELECT user_id FROM user_credentials WHERE username='pages_owner'").fetchone()[0]
+        c.execute('INSERT INTO account_identities(user_id,administrator) VALUES(?,1)',(admin,))
+        for i in range(55):
+            c.execute('INSERT INTO messages(id,user_id,conversation_id,sender_type,content,sent_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',
+                      (str(uuid.uuid4()),owner,conversation['id'],'person',str(i),f'2026-09-20T17:{i:02d}:00','2026-09-21T00:00:00','2026-09-21T00:00:00'))
+    url=f'/api/v1/admin/accounts/{owner}/data/messages'
+    assert client.get(url,params={'reason':'分页核对','paginated':True},headers=owner_headers).status_code==403
+    seen=[]
+    for offset in (0,50):
+        response=client.get(url,params={'reason':'分页核对','paginated':True,'offset':offset},headers=admin_headers)
+        assert response.status_code==200
+        data=response.json();assert data['total']==55 and data['offset']==offset and data['limit']==50
+        seen.extend(row['content'] for row in data['items'])
+    assert seen==list(map(str,range(55)))
+    assert isinstance(client.get(url,params={'reason':'旧接口兼容'},headers=admin_headers).json(),list)
+    with get_connection() as c:
+        assert c.execute("SELECT COUNT(*) FROM account_management_audit WHERE actor_id=? AND target_id=? AND action='view:messages'",(admin,owner)).fetchone()[0]==3

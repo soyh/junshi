@@ -31,7 +31,9 @@ with sync_playwright() as p:
             elif '/data/messages' in path:
                 assert 'reason=' in route.request.url
                 assert route.request.headers.get('authorization')=='Bearer test-session'
-                data=[{'content':'<img src=x onerror="window.attacked=1">'}]
+                from urllib.parse import parse_qs
+                offset=int(parse_qs(urlparse(route.request.url).query).get('offset',['0'])[0])
+                data={'items':[{'sender_type':'person','sent_at':'2026-09-20T17:31:00','content':'<img src=x onerror="window.attacked=1">' if offset==0 else '第二页聊天'}], 'total':51,'offset':offset,'limit':50}
             elif path.endswith('/settings/llm'):data={'configured':False}
             return route.fulfill(content_type='application/json',body=json.dumps(data))
         page.route('**/*',handle);page.goto('http://chat.test/app')
@@ -58,7 +60,14 @@ with sync_playwright() as p:
         expect(page.locator('#email-admin-target')).to_contain_text('target-user')
         page.locator('#email-admin-reason').fill('用户请求排查')
         page.locator('#email-admin-kind').select_option('messages');page.locator('#email-admin-view').click()
-        expect(page.locator('#email-admin-result')).to_contain_text('window.attacked')
+        expect(page.locator('#email-chat-table')).to_contain_text('window.attacked')
+        expect(page.locator('#email-chat-table')).to_contain_text('对方')
+        expect(page.locator('#email-data-prev')).to_be_disabled()
+        page.locator('#email-data-next').click()
+        expect(page.locator('#email-chat-table')).to_contain_text('第二页聊天')
+        expect(page.locator('#email-data-next')).to_be_disabled()
+        page.locator('#email-data-prev').click()
+        expect(page.locator('#email-chat-table')).to_contain_text('window.attacked')
         assert page.evaluate('window.attacked === undefined')
         assert page.evaluate('localStorage.length===0 && sessionStorage.length===0')
         assert not any(path.endswith('/auth/register') for path,_ in calls)
