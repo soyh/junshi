@@ -64,6 +64,8 @@ with sync_playwright() as p:
     page.locator('.reference-meta-grid').first.get_by_role('button', name='保存', exact=True).click()
     page.wait_for_function("document.querySelector('#reference-status').textContent.includes('保存')")
     assert any(method == 'PATCH' and json.loads(data).get('is_guide') is True for method, url, data in requests)
+    page.locator('#reference-preview-selection').click()
+    page.wait_for_function("document.querySelector('#reference-retrieval-preview').textContent.includes('不表示模型已读取')")
     assert '不表示模型已读取' in page.locator('#reference-retrieval-preview').text_content()
     assert page.evaluate('window.injected') is None
     page.locator('#reference-select-all').click()
@@ -170,3 +172,4 @@ with sync_playwright() as p:
     page.locator('#reference-editor-close').click()
     browser.close()
 print('Global guide creation and preview without conversation; editing and batch regression: PASS')
+
