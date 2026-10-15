@@ -52,6 +52,7 @@ def create_global_reference_guide(payload: ReferenceGuideCreate, response: Respo
             item = service.create(conn, user_id=user_id, filename=name, mime_type="text/markdown",
                                   content=payload.content.encode("utf-8"), requested_type="document",
                                   name=name, enabled_by_default=True, priority=10)
+            service.update(conn, user_id, item["id"], {"is_guide": True})
             return service.get_editor(conn, user_id, item["id"])
     except ReferenceContextError as exc:
         raise _not_found_or_unprocessable(exc) from exc

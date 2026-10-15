@@ -337,6 +337,7 @@ class ReferenceContextService:
             "original_filename": row["original_filename"],
             "mime_type": row["mime_type"],
             "description": row["description"],
+            "is_guide": bool(row["is_guide"]) if "is_guide" in row.keys() else False,
             "enabled_by_default": default_enabled,
             "priority": priority,
             "created_at": row["created_at"],
@@ -433,6 +434,7 @@ class ReferenceContextService:
             "reference_type",
             "description",
             "enabled_by_default",
+            "is_guide",
             "priority",
         }
         assignments: list[str] = []
@@ -451,7 +453,7 @@ class ReferenceContextService:
                     raise ReferenceContextError("invalid reference type")
             elif key == "description":
                 value = str(value).strip() if value is not None and str(value).strip() else None
-            elif key == "enabled_by_default":
+            elif key in {"enabled_by_default", "is_guide"}:
                 value = 1 if bool(value) else 0
             elif key == "priority":
                 if value is None or int(value) < 0 or int(value) > 10000:
@@ -578,6 +580,7 @@ class ReferenceContextService:
                 "original_filename": item["original_filename"],
                 "type": item["reference_type"], "priority": item["effective_priority"],
                 "description": item["description"], "content": row["content"] or "",
+                "is_guide": item["is_guide"],
             })
         recent = conn.execute(
             "SELECT content FROM messages WHERE user_id = ? AND conversation_id = ? "
@@ -586,6 +589,7 @@ class ReferenceContextService:
         ).fetchall() if conversation_id is not None else []
         query = "\n".join(str(row["content"] or "")[-600:] for row in reversed(recent))
         selected = retrieve(library, query)
+        selected["retrieval"]["inventory"] = [{"reference_id": i["id"], "name": i["name"], "enabled": i["effective_enabled"], "is_guide": i["is_guide"]} for i in listed]
         return {
             "conversation_id": conversation_id, "policy": policy,
             "count": len(selected["items"]), **selected,

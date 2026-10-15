@@ -13,6 +13,7 @@ class ModelReferenceResponse(BaseModel):
     user_id: str
     name: str
     reference_type: ReferenceType
+    is_guide: bool = False
     original_filename: str | None = None
     mime_type: str | None = None
     description: str | None = None
@@ -29,6 +30,7 @@ class ModelReferenceResponse(BaseModel):
 
 
 class ModelReferenceUpdate(BaseModel):
+    is_guide: bool | None = None
     name: str | None = None
     reference_type: ReferenceType | None = None
     description: str | None = None
