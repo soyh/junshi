@@ -27,14 +27,14 @@ jobs:
         working-directory: ios
         run: |
           xcodebuild archive -project Junshi.xcodeproj -scheme Junshi -destination 'generic/platform=iOS' -archivePath Junshi-unsigned.xcarchive CODE_SIGNING_ALLOWED=NO
-          ditto -c -k --keepParent Junshi-unsigned.xcarchive Junshi-iOS-0.1.0-UNSIGNED.zip
-          ditto -c -k --keepParent build/Build/Products/Debug-iphonesimulator/Junshi.app Junshi-iOS-0.1.0-SIMULATOR.zip
-          shasum -a 256 Junshi-iOS-0.1.0-*.zip > SHA256SUMS.txt
+          ditto -c -k --keepParent Junshi-unsigned.xcarchive Junshi-iOS-0.1.1-UNSIGNED.zip
+          ditto -c -k --keepParent build/Build/Products/Debug-iphonesimulator/Junshi.app Junshi-iOS-0.1.1-SIMULATOR.zip
+          shasum -a 256 Junshi-iOS-0.1.1-*.zip > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Junshi-iOS-0.1.0-preview-not-installable
+          name: Junshi-iOS-0.1.1-preview-not-installable
           path: |
-            ios/Junshi-iOS-0.1.0-*.zip
+            ios/Junshi-iOS-0.1.1-*.zip
             ios/SHA256SUMS.txt
       - name: Export simulator screenshots
         if: always()

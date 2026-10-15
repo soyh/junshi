@@ -198,10 +198,12 @@ struct PlatformScreen: View {
     @State private var display = ""
     @State private var bind = true
     @State private var uncertain = false
+    @State private var created: PlatformAccount?
     var body: some View {
         NavigationStack { Form {
-            Picker("平台",selection:$platform) { Text("微信").tag("wechat"); Text("抖音").tag("douyin"); Text("探探").tag("tantan"); Text("陌陌").tag("momo"); Text("Soul").tag("soul"); Text("其他").tag("other") }
-            TextField("平台账号标识",text:$handle); TextField("显示名称（可选）",text:$display)
+            Picker("平台",selection:$platform) { Text("微信").tag("wechat"); Text("抖音").tag("douyin"); Text("探探").tag("tantan"); Text("陌陌").tag("momo"); Text("Soul").tag("soul"); Text("其他").tag("other") }.disabled(created != nil)
+            TextField("平台账号标识",text:$handle).disabled(created != nil); TextField("显示名称（可选）",text:$display).disabled(created != nil)
+            if created != nil { Text("平台账号已创建；重试只补充会话来源并刷新列表，不重复创建账号。").font(.caption) }
             if !store.conversation.isEmpty { Toggle("标注为当前会话来源",isOn:$bind) }
             Button("保存平台账号") { save() }; Text(store.status)
         }.disabled(store.busy).navigationTitle("同一人物的多个平台账号").toolbar { Button("关闭") { dismiss() }.disabled(store.busy) } }
@@ -210,8 +212,18 @@ struct PlatformScreen: View {
         guard let api = store.client else { return }; let person = store.person, conversation = store.conversation
         store.run("正在保存平台账号…") {
             guard !handle.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else { throw ClientError.message("请填写平台账号标识。") }
-            guard !uncertain else { throw ClientError.message("上次创建结果不确定，请到主网页核对平台列表后再操作。") }; uncertain = true
-            let result: PlatformAccount = try await api.decode("POST","/persons/"+person+"/platform-accounts",body:["platform":platform,"account_handle":handle,"display_name":display])
+                        if created == nil {
+                guard !uncertain else { throw ClientError.message("上次创建结果不确定，请到主网页核对平台列表后再操作。") }
+                uncertain = true
+                do {
+                    let result: PlatformAccount = try await api.decode("POST","/persons/"+person+"/platform-accounts",body:["platform":platform,"account_handle":handle,"display_name":display])
+                    guard store.client === api else { return }; created = result; uncertain = false
+                } catch {
+                    if let failure = error as? ClientError, failure.creationDefinitelyRejected { uncertain = false }
+                    throw error
+                }
+            }
+            guard let result = created else { return }
             if bind && !conversation.isEmpty { _ = try await api.request("PUT","/conversations/"+conversation+"/platform-source",body:["account_id":result.id]) }
             let accounts: [PlatformAccount] = try await api.decode("GET","/persons/"+person+"/platform-accounts")
             guard store.client === api else { return }; store.accounts = accounts; if bind { store.account = result.id }; store.status = "平台账号已保存。"; dismiss()

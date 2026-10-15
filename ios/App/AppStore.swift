@@ -153,9 +153,16 @@ import UniformTypeIdentifiers
             if self.newPerson!.id == nil {
                 guard !self.newPerson!.uncertain else { throw ClientError.message("上次人物创建结果不确定，请刷新主页面核对，避免重复创建。") }
                 self.newPerson!.uncertain = true
-                let result: Person = try await api.decode("POST","/persons",body:["name":name,"nickname":nickname])
-                guard self.client === api else { return }
-                self.newPerson!.id = result.id; self.newPerson!.uncertain = false
+                do {
+                    let result: Person = try await api.decode("POST","/persons",body:["name":name,"nickname":nickname])
+                    guard self.client === api else { return }
+                    self.newPerson!.id = result.id; self.newPerson!.uncertain = false
+                } catch {
+                    if self.client === api, let failure = error as? ClientError, failure.creationDefinitelyRejected {
+                        self.newPerson = nil
+                    }
+                    throw error
+                }
             }
             let id = self.newPerson!.id!
             var conversations: [Conversation] = try await api.decode("GET","/conversations?person_id="+id)

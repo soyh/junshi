@@ -1,6 +1,6 @@
 # iOS 客户端首版 · TEST-232
 
-状态：0.1.0 开发预览。最低 iOS 17，支持 iPhone/iPad。源码复用既有 HTTPS 服务器接口，不改变生产数据库、网页、PC 或安卓功能。
+状态：0.1.1 开发预览。最低 iOS 17，支持 iPhone/iPad。源码复用既有 HTTPS 服务器接口，不改变生产数据库、网页、PC 或安卓功能。
 
 ## 功能
 
@@ -48,3 +48,9 @@ open Junshi.xcodeproj
 6. 用同一团队签名并递增 build，上传 App Store Connect，先通过 TestFlight 测试，再提交 App Review。无 Mac 可另行配置 GitHub 的受保护签名流程，不能绕过会员、证书或审核要求。
 
 参考：[Apple 分享扩展](https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/Share.html)、[App Groups](https://developer.apple.com/documentation/xcode/configuring-app-groups)、[Apple 分发](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases)。
+
+## TEST-236 开发续接
+
+无需先购买开发者会员，可继续源码开发、GitHub macOS 模拟器与无签名归档验证。当前不提供可直接安装到 iPhone 的正式 IPA。TestFlight、App Store 和 App Groups 真机配置等待后续签名准备。
+
+创建人物时，明确的输入拒绝允许修改重试；超时或服务器错误仍按结果未知保护，需先核对。平台账号创建成功后，来源绑定失败可在同一表单重试后续步骤，避免重复创建。
