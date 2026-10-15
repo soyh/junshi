@@ -32,6 +32,7 @@ with sync_playwright() as p:
             result = {'items': [{'name': '冲突指南.md', 'truncated': True}],
                       'retrieval': {'enabled_count': 25, 'candidate_count': 25, 'guide_count': 1,
                                     'omitted_from_catalog': 0,
+                                    'topic_status': {'rows': [{'topic': '接话', 'filename':'停用.md', 'effective':False, 'reason':'disabled', 'file_status':'disabled', 'source_name':'主题指南.md', 'line':3, 'matches':[{'enabled':False,'global_enabled':True,'override_enabled':False}]}]},
                                     'inventory': [{'reference_id': x['id'], 'name': x['name'], 'enabled': True} for x in items],
                                     'warnings': [{'filename': '<script>window.injected=true</script>.md', 'reason': 'not_enabled_or_missing', 'source_name': 'skill.md', 'line': 7}]}}
         elif route.request.url.endswith('/batch'):
@@ -56,6 +57,8 @@ with sync_playwright() as p:
     page.locator('#reference-preview-selection').click()
     page.wait_for_function("document.querySelector('#reference-retrieval-preview').textContent.includes('冲突指南.md')")
     assert '未匹配到已启用文件' in page.locator('#reference-retrieval-preview').text_content()
+    assert '当前会话禁用' in page.locator('#reference-retrieval-preview').text_content()
+    assert '主题指南.md 第 3 行' in page.locator('#reference-retrieval-preview').text_content()
     assert '完整资料清单' in page.locator('#reference-retrieval-preview').text_content()
     assert 'skill.md 第 7 行' in page.locator('#reference-retrieval-preview').text_content()
     assert items[-1]['name'] in page.locator('#reference-retrieval-preview').text_content()

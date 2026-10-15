@@ -571,6 +571,9 @@ class ReferenceContextService:
                 }
             raise
 
+        from app.services.reference_status import check_topics
+        status_items = [{**item, "content": self._get_raw(conn, user_id, item["id"])["content"] or ""} for item in listed]
+        topic_status = check_topics(status_items)
         enabled = [item for item in listed if item["effective_enabled"]]
         library = []
         for item in enabled:
@@ -589,6 +592,7 @@ class ReferenceContextService:
         ).fetchall() if conversation_id is not None else []
         query = "\n".join(str(row["content"] or "")[-600:] for row in reversed(recent))
         selected = retrieve(library, query)
+        selected["retrieval"]["topic_status"] = topic_status
         selected["retrieval"]["inventory"] = [{"reference_id": i["id"], "name": i["name"], "enabled": i["effective_enabled"], "is_guide": i["is_guide"]} for i in listed]
         return {
             "conversation_id": conversation_id, "policy": policy,

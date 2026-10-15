@@ -637,6 +637,13 @@ REFERENCE_CONTEXT_SCRIPT = r'''
       report.guide_mode === 'explicit' ? '主题来源：手动指定的主题指南。' : '主题来源：兼容自动识别；可在文件设置中勾选“设为主题指南”。',
       '主题与关联文件：',
       ...(data.catalog || []).filter(i => (i.topic_labels || []).length).map(i => `${i.topic_labels.join(' / ')} → ${i.name}`),
+      '主题与文件生效检查：',
+      '可供检索不代表本次模型已选用或采纳。',
+      ...((report.topic_status || {}).rows || []).map(r => {
+        const labels = {no_file_link:'主题未关联可识别文件', unbound:'未关联文件', missing:'文件未找到', disabled:'文件已停用', ambiguous:'启用文件同名歧义', available:'文件可用', empty_topic:'主题为空', guide_disabled:'来源指南已停用', supplementary_source:'补充引用，未作为主题来源'};
+        const overrides = (r.matches || []).map(m => m.override_enabled === false ? '当前会话禁用' : m.override_enabled === true ? '当前会话启用' : m.global_enabled ? '跟随全局启用' : '全局停用').join(' / ');
+        return `${r.effective ? '可生效' : '未生效'} · ${r.topic || '未命名主题'} → ${r.filename} · ${labels[r.reason] || r.reason} · ${labels[r.file_status] || r.file_status}${overrides ? ' · ' + overrides : ''}（${r.source_name} 第 ${r.line} 行）`;
+      }),
       '完整资料清单：',
       ...(report.inventory || []).map(i => `${i.name} · ${i.enabled ? '已启用 / 可检索' : '已停用'}${i.is_guide ? ' · 主题指南' : ''}`),
       ...(report.warnings || []).map(w => `${w.source_name || '未知来源'} 第 ${w.line || '?'} 行 → ${w.filename}：${w.reason === 'ambiguous' ? '同名文件有歧义，请重命名并更新目录' : '未匹配到已启用文件，请检查上传名称及会话启用状态'}`),

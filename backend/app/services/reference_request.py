@@ -25,7 +25,7 @@ def prepare_context(context: dict, selector) -> dict:
         refs["items"] = [pool[key] for key in selected if key in pool]
         refs["count"] = len(refs["items"])
         refs["retrieval"] = {**report, "mode": mode, "selected_ids": selected}
-        for diagnostic in ("query", "inventory", "links", "warnings"):
+        for diagnostic in ("query", "inventory", "links", "warnings", "topic_status"):
             refs["retrieval"].pop(diagnostic, None)
         refs.pop("candidates", None)
         refs.pop("catalog", None)
