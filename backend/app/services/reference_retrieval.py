@@ -35,6 +35,8 @@ def retrieve(library: list[dict], query: str) -> dict:
                 aliases.setdefault(filename(name), set()).add(item["reference_id"])
 
     topics: dict[str, list[str]] = {}
+    category_labels = {}
+    explicit_ids = {item["reference_id"] for item in library if item.get("is_guide")}
     warnings = []
     guides = {item["reference_id"] for item in library if item.get("is_guide")}
     automatic_guides = set()
@@ -53,6 +55,10 @@ def retrieve(library: list[dict], query: str) -> dict:
                 if len(matches) == 1:
                     key = next(iter(matches))
                     topics.setdefault(key, []).append(line[:300])
+                    if not explicit_ids or item["reference_id"] in explicit_ids:
+                        label = re.split(r"`|\[[^\]]*\]\(", line, maxsplit=1)[0].strip(" -：:;；")[:160]
+                        if label:
+                            category_labels.setdefault(key, set()).add(label)
                 else:
                     warnings.append({**source, "filename": target[:200], "reason": "ambiguous" if matches else "not_enabled_or_missing"})
 
@@ -95,6 +101,7 @@ def retrieve(library: list[dict], query: str) -> dict:
         "candidates": [x[2] for x in candidates],
         "catalog": [{"reference_id": x[2]["reference_id"], "name": x[2]["name"][:200],
                      "type": x[2]["type"], "topics": x[3][:300],
+                     "topic_labels": sorted(category_labels.get(x[2]["reference_id"], set())),
                      "description": x[2]["description"], "is_guide": x[2]["reference_id"] in guides}
                     for x in candidates],
         "retrieval": {"mode": "local_preview", "enabled_count": len(library),

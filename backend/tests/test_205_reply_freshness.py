@@ -54,9 +54,9 @@ def test_missing_guide_is_warning_not_generation_blocker():
                 'content': '聊天接话'} for i in range(44)]
     library[0]['content'] = '- 导读：`00-导读与使用分级.md`'
     data = retrieve(library, '你在干嘛呐')
-    assert data['retrieval']['candidate_count'] == 24
-    assert data['retrieval']['omitted_from_catalog'] == 20
-    assert data['retrieval']['warnings'] == [{'filename': '00-导读与使用分级.md', 'reason': 'not_enabled_or_missing'}]
+    assert data['retrieval']['candidate_count'] == 44
+    assert data['retrieval']['omitted_from_catalog'] == 0
+    assert data['retrieval']['warnings'] == [{'source_id': '0', 'source_name': '资料0.md', 'line': 1, 'filename': '00-导读与使用分级.md', 'reason': 'not_enabled_or_missing'}]
     assert data['items']
 
 

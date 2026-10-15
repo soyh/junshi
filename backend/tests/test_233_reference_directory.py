@@ -52,3 +52,31 @@ def test_diagnostic_inventory_never_expands_model_input():
     original['model_references']['retrieval'].update(inventory=[{'name':'DIAGNOSTIC_ONLY'}], links=[{}], warnings=[{}])
     result = prepare_context(original, lambda *_: ['a'])
     assert not {'inventory','links','warnings','query'} & result['model_references']['retrieval'].keys()
+
+
+def test_two_layers_classify_then_select_then_read_only_selected_body():
+    import json
+    from tests.test_200_reference_catalog import provider, completion
+    library = [item('guide', '- 修复：`repair.md`\n- 赞美：`praise.md`', '指南.md'),
+               item('repair', 'REPAIR_BODY'), item('praise', 'PRAISE_BODY')]
+    library[0]['is_guide'] = True
+    calls = []
+    def handler(request):
+        payload = json.loads(request.content)
+        raw = payload['messages'][-1]['content']
+        user = json.loads(raw) if len(calls) < 2 else raw
+        calls.append(user)
+        if len(calls) == 1:
+            assert 'topics' in user and 'catalog' not in user
+            assert 'REPAIR_BODY' not in request.content.decode()
+            chosen = next(row['topic_id'] for row in user['topics'] if '修复' in row['label'])
+            return completion({'topic_ids': [chosen], 'uncertain': False})
+        if len(calls) == 2:
+            assert 'repair' in [row['reference_id'] for row in user['catalog']]
+            assert 'REPAIR_BODY' not in request.content.decode()
+            return completion({'reference_ids': ['repair']})
+        assert 'REPAIR_BODY' in request.content.decode()
+        assert 'PRAISE_BODY' not in request.content.decode()
+        return completion({'summary': 'ok'})
+    assert provider(handler).analyze(context(library, '发生争执怎么修复')) == {'summary': 'ok'}
+    assert len(calls) == 3

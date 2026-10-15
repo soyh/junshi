@@ -30,9 +30,10 @@ with sync_playwright() as p:
             result = {'id': '0', **editor_state}
         elif route.request.url.endswith(('/references/context', '/references/catalog')):
             result = {'items': [{'name': '冲突指南.md', 'truncated': True}],
-                      'retrieval': {'enabled_count': 25, 'candidate_count': 24, 'guide_count': 1,
-                                    'omitted_from_catalog': 1,
-                                    'warnings': [{'filename': '<script>window.injected=true</script>.md', 'reason': 'not_enabled_or_missing'}]}}
+                      'retrieval': {'enabled_count': 25, 'candidate_count': 25, 'guide_count': 1,
+                                    'omitted_from_catalog': 0,
+                                    'inventory': [{'reference_id': x['id'], 'name': x['name'], 'enabled': True} for x in items],
+                                    'warnings': [{'filename': '<script>window.injected=true</script>.md', 'reason': 'not_enabled_or_missing', 'source_name': 'skill.md', 'line': 7}]}}
         elif route.request.url.endswith('/batch'):
             payload = route.request.post_data_json
             if payload['action'] == 'delete':
@@ -55,6 +56,14 @@ with sync_playwright() as p:
     page.locator('#reference-preview-selection').click()
     page.wait_for_function("document.querySelector('#reference-retrieval-preview').textContent.includes('冲突指南.md')")
     assert '未匹配到已启用文件' in page.locator('#reference-retrieval-preview').text_content()
+    assert '完整资料清单' in page.locator('#reference-retrieval-preview').text_content()
+    assert 'skill.md 第 7 行' in page.locator('#reference-retrieval-preview').text_content()
+    assert items[-1]['name'] in page.locator('#reference-retrieval-preview').text_content()
+    page.locator('.reference-item-settings summary').first.click()
+    page.get_by_label('设为主题指南', exact=True).first.check()
+    page.locator('.reference-meta-grid').first.get_by_role('button', name='保存', exact=True).click()
+    page.wait_for_function("document.querySelector('#reference-status').textContent.includes('保存')")
+    assert any(method == 'PATCH' and json.loads(data).get('is_guide') is True for method, url, data in requests)
     assert '不表示模型已读取' in page.locator('#reference-retrieval-preview').text_content()
     assert page.evaluate('window.injected') is None
     page.locator('#reference-select-all').click()
