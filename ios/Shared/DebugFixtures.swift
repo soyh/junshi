@@ -11,7 +11,8 @@ final class FixtureProtocol: URLProtocol {
         let value: Any
         if path.hasSuffix("/auth/login") { value = ["access_token":"synthetic-session"] }
         else if path.hasSuffix("/persons") { value = [["id":"p1","name":"测试人物","nickname":"小蓝"]] }
-        else if path.hasSuffix("/conversations") { value = [["id":"c1","title":"测试会话"]] }
+        else if path.hasSuffix("/conversations") && request.httpMethod == "POST" { value = ["id":"c2","title":"第二会话"] }
+        else if path.hasSuffix("/conversations") { value = [["id":"c1","title":"测试会话"],["id":"c2","title":"第二会话"]] }
         else if path.hasSuffix("/platform-accounts") { value = [["id":"a1","platform":"wechat","account_handle":"synthetic","display_name":"测试微信"]] }
         else if path.hasSuffix("/platform-source") { value = ["id":"a1"] }
         else if path.hasSuffix("/strategic-reply/context") { value = ["draft":"刚忙完，正想找你聊聊。你呢？"] }
