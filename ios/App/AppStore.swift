@@ -22,6 +22,7 @@ import UniformTypeIdentifiers
     private(set) var job: GenerateJob?
     private var epoch = 0
     private var newPerson: (name:String,title:String,id:String?,uncertain:Bool)?
+    private var newConversation: (person:String,title:String,id:String?,uncertain:Bool)?
     private let inbox = try? ShareInbox.configured()
     var owner: String? { client.flatMap { api in api.token.map { ShareInbox.fingerprint(server:api.origin.absoluteString,token:$0) } } }
     init() {
@@ -50,7 +51,7 @@ import UniformTypeIdentifiers
         let previous = client
         epoch += 1; client = nil; CredentialStore.clear(); busy = false
         people = []; conversations = []; accounts = []; profiles = []
-        person = ""; conversation = ""; account = ""; input = ""; draft = ""; web = nil; job = nil; newPerson = nil
+        person = ""; conversation = ""; account = ""; input = ""; draft = ""; web = nil; job = nil; newPerson = nil; newConversation = nil
         MediaIO.remove(media); media = []; try? inbox?.bind(nil)
         status = "已退出登录。"
         if let previous { Task { _ = try? await previous.request("DELETE","/auth/session") } }
@@ -60,7 +61,7 @@ import UniformTypeIdentifiers
         run("正在加载人物…") {
             let result: [Person] = try await api.decode("GET","/persons")
             guard self.client === api else { return }
-            self.people = result; self.person = ""; self.conversation = ""; self.accounts = []; self.conversations = []
+            self.people = result; self.person = ""; self.conversation = ""; self.accounts = []; self.conversations = []; self.newConversation = nil
             try? self.inbox?.bind(self.owner); self.status = "请选择人物。可导入待处理的系统分享。"
         }
     }
@@ -71,7 +72,7 @@ import UniformTypeIdentifiers
             let conversations: [Conversation] = try await api.decode("GET","/conversations?person_id="+id)
             let accounts: [PlatformAccount] = try await api.decode("GET","/persons/"+id+"/platform-accounts")
             guard self.client === api else { return }
-            self.person = id; self.conversations = conversations; self.accounts = accounts; self.conversation = ""; self.account = ""; self.job = nil; self.draft = ""
+            self.person = id; self.conversations = conversations; self.accounts = accounts; self.conversation = ""; self.account = ""; self.job = nil; self.draft = ""; self.newConversation = nil
             self.status = "请选择会话，再导入对方内容。"
         }
     }
@@ -174,6 +175,46 @@ import UniformTypeIdentifiers
             guard self.client === api else { return }
             self.people = people; self.person = id; self.conversations = conversations; self.conversation = conversation.id; self.accounts = []; self.account = ""; self.newPerson = nil
             self.status = "人物和首个会话已创建。"; done()
+        }
+    }
+    func createConversation(title: String, done: @escaping () -> Void) {
+        guard let api = client, !person.isEmpty else { return }
+        run("正在创建会话…") {
+            let value = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { throw ClientError.message("请填写会话名称。") }
+            let personID = self.person
+            if let attempt = self.newConversation, attempt.person != personID || attempt.title != value {
+                throw ClientError.message("上次创建结果尚未核对，请不要更换会话名称重复创建。")
+            }
+            if let existing = self.conversations.first(where: { ($0.title ?? "") == value }) {
+                self.conversation = existing.id; self.account = ""; self.job = nil; self.draft = ""; self.newConversation = nil
+                self.status = "已打开同名会话。"; done(); return
+            }
+            if self.newConversation == nil { self.newConversation = (personID, value, nil, false) }
+            if self.newConversation!.id == nil {
+                guard !self.newConversation!.uncertain else {
+                    throw ClientError.message("上次会话创建结果不确定，请刷新人物会话后再操作，避免重复创建。")
+                }
+                self.newConversation!.uncertain = true
+                do {
+                    let result: Conversation = try await api.decode("POST", "/conversations", body: ["person_id": personID, "title": value])
+                    guard self.client === api, self.person == personID else { return }
+                    self.newConversation!.id = result.id; self.newConversation!.uncertain = false
+                } catch {
+                    if self.client === api, let failure = error as? ClientError, failure.creationDefinitelyRejected {
+                        self.newConversation = nil
+                    }
+                    throw error
+                }
+            }
+            let createdID = self.newConversation!.id!
+            let conversations: [Conversation] = try await api.decode("GET", "/conversations?person_id=" + personID)
+            guard self.client === api, self.person == personID else { return }
+            guard let created = conversations.first(where: { $0.id == createdID }) else {
+                throw ClientError.message("会话已创建，但列表尚未同步；请返回人物列表后刷新确认。")
+            }
+            self.conversations = conversations; self.conversation = created.id; self.account = ""; self.job = nil; self.draft = ""; self.newConversation = nil
+            self.status = "会话已创建并打开。"; done()
         }
     }
     func openWeb() {
