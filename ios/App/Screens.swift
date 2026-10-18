@@ -130,6 +130,7 @@ struct WorkspaceScreen: View {
     @EnvironmentObject var store: AppStore
     @State private var files = false
     @State private var platform = false
+    @State private var newConversation = false
     @State private var showBack = false
     @State private var photos: [PhotosPickerItem] = []
     @FocusState private var editing: Bool
@@ -140,7 +141,7 @@ struct WorkspaceScreen: View {
                 Panel("本次对话") {
                     Picker("会话",selection:Binding(get:{store.conversation},set:{store.selectConversation($0)})) { Text("请选择会话").tag(""); ForEach(store.conversations) { Text($0.title ?? "未命名会话").tag($0.id) } }.accessibilityIdentifier("conversation-picker")
                     Text(store.accounts.first(where:{$0.id == store.account})?.label ?? "平台来源：未标注").font(.caption).foregroundStyle(.secondary)
-                    HStack { Button("新建平台账号") { platform = true }; Button("主网页 / 完整档案") { store.openWeb() } }.font(.footnote)
+                    HStack { Button("新建会话") { newConversation = true }.accessibilityIdentifier("new-conversation"); Button("新建平台账号") { platform = true }; Button("主网页 / 完整档案") { store.openWeb() } }.font(.footnote)
                 }
                 Panel("对方的回复 / 待导入内容") {
                     TextEditor(text:$store.input).frame(minHeight:110).focused($editing).accessibilityIdentifier("incoming-text")
@@ -164,6 +165,7 @@ struct WorkspaceScreen: View {
             ToolbarItem(placement:.topBarLeading) { Button("返回人物") { if !store.input.isEmpty || !store.media.isEmpty || !store.draft.isEmpty { showBack = true } else { store.person = ""; store.conversation = "" } }.disabled(store.busy) }
         }.confirmationDialog("返回人物会清空本机未提交草稿，服务器已保存的记录保留。",isPresented:$showBack,titleVisibility:.visible) { Button("清空并返回",role:.destructive) { store.clearDraft(); store.person = ""; store.conversation = "" } }
         .sheet(isPresented:$platform) { PlatformScreen() }
+        .sheet(isPresented:$newConversation) { NewConversationScreen() }
         .fileImporter(isPresented:$files,allowedContentTypes:[.image,.movie],allowsMultipleSelection:true) { result in switch result { case .success(let urls): store.addFiles(urls); case .failure(let error): store.status = error.localizedDescription } }
         .onChange(of:store.input) { _,_ in store.changed() }.onChange(of:store.sentAt) { _,_ in store.changed() }
         .onChange(of:photos) { _,items in
@@ -188,6 +190,25 @@ struct NewPersonScreen: View {
     @State private var title = ""
     var body: some View {
         NavigationStack { Form { TextField("人物姓名",text:$name); TextField("昵称（可选）",text:$nickname); TextField("首个会话名称",text:$title); Text("创建人物时同时创建首个会话，名称由你填写。").font(.caption); Button("创建人物与会话") { store.createPerson(name:name,nickname:nickname,title:title) { dismiss() } }; Text(store.status) }.disabled(store.busy).navigationTitle("新建人物").toolbar { Button("关闭") { dismiss() }.disabled(store.busy) } }
+    }
+}
+struct NewConversationScreen: View {
+    @EnvironmentObject var store: AppStore
+    @Environment(\.dismiss) var dismiss
+    @State private var title = ""
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("会话名称", text:$title).accessibilityIdentifier("conversation-title")
+                Text("为当前人物新增一个独立会话。创建后会立即打开；同名会话不会重复创建。").font(.caption)
+                Button("创建并打开会话") { store.createConversation(title:title) { dismiss() } }
+                    .accessibilityIdentifier("create-conversation")
+                Text(store.status)
+            }
+            .disabled(store.busy)
+            .navigationTitle("新建会话")
+            .toolbar { Button("关闭") { dismiss() }.disabled(store.busy) }
+        }
     }
 }
 struct PlatformScreen: View {
