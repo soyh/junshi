@@ -57,6 +57,10 @@ def pid_path(profile_id: str) -> Path:
     return profile_dir(profile_id) / "bridge.pid"
 
 
+def status_path(profile_id: str) -> Path:
+    return profile_dir(profile_id) / "status.json"
+
+
 def _toml(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -155,6 +159,7 @@ def summary(profile_id: str) -> dict:
         "quiet": (str(quiet[0]), str(quiet[1])),
         "verify_tls": bool(app.get("verify_tls", True)),
         "running": is_running(profile_id),
+        "status": local_status(profile_id)["status"],
     }
 
 
@@ -287,42 +292,62 @@ def stop_all() -> int:
     return count
 
 
-def fetch_status(client) -> list[dict]:
+def fetch_status(client) -> list[dict]:  # noqa: ANN001
+    """Deprecated: the server aggregates per channel and cannot tell profiles apart.
+
+    Kept for callers that only need the raw server rows; the desktop panel now
+    reads the local status.json written by each bridge process.
+    """
     rows = client.request("GET", "/bridge/status")
     return rows if isinstance(rows, list) else []
 
 
-def _heartbeat_age(row: dict) -> float | None:
-    raw = row.get("updated_at")
-    if not raw:
-        return None
+def read_status(profile_id: str) -> dict:
     try:
-        stamp = datetime.fromisoformat(str(raw))
-    except ValueError:
-        return None
-    if stamp.tzinfo is None:
-        return (datetime.now() - stamp).total_seconds()
-    return (datetime.now(timezone.utc) - stamp).total_seconds()
+        data = json.loads(status_path(profile_id).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
-def status_lines(rows: list[dict]) -> list[str]:
-    by_key = {}
-    for row in rows:
-        channel = "wechat" if row.get("channel") == "wechatauto" else row.get("channel")
-        by_key[channel] = row
+def local_status(profile_id: str) -> dict:
+    """Current state of one profile, from its own process and status.json."""
+    data = read_status(profile_id)
+    running = is_running(profile_id)
+    state = str(data.get("status") or "")
+    updated = str(data.get("updated_at") or "")
+    fresh = False
+    if updated:
+        try:
+            fresh = (datetime.now() - datetime.fromisoformat(updated)).total_seconds() <= 120
+        except ValueError:
+            fresh = False
+    if not running:
+        state = "未运行"
+    elif not state:
+        state = "启动中"
+    elif state in ("online", "未登录") and not fresh:
+        state = "无响应（心跳过期）"
+    elif state == "online":
+        state = "在线"
+    return {
+        "running": running,
+        "pid": read_pid(profile_id),
+        "status": state,
+        "updated_at": updated,
+        "replies_today": int(data.get("replies_today") or 0),
+    }
+
+
+def status_lines(profiles: list[dict]) -> list[str]:
+    """One line per profile — never merge profiles of the same platform."""
     lines = []
-    for key in ("wechat", "xhs", "soul"):
-        row = by_key.get(key)
-        label = CHANNELS[key]
-        if row:
-            age = _heartbeat_age(row)
-            if age is not None and age > 180:
-                state = "离线（超过 3 分钟未心跳）"
-            elif row.get("status") == "online":
-                state = "在线"
-            else:
-                state = str(row.get("status") or "未知")
-            lines.append(f"{label}：{state} · 今日回复 {row.get('replies_today', 0)} · {row.get('updated_at', '')}")
-        else:
-            lines.append(f"{label}：未上报")
-    return lines
+    for item in profiles:
+        detail = local_status(item["id"])
+        label = CHANNELS.get(item.get("channel", ""), item.get("channel", ""))
+        stamp = detail["updated_at"][11:19] if len(detail["updated_at"]) >= 19 else "从未"
+        lines.append(
+            f"{label}｜{item.get('name', item['id'])}：{detail['status']}"
+            f" · 今日回复 {detail['replies_today']} · 更新 {stamp}"
+        )
+    return lines or ["尚未创建通道：点「新建通道」为每个平台各建一个。"]

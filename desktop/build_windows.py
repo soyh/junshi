@@ -21,6 +21,10 @@ def build_bridge(source, build, environment):
             '--name', 'JunshiBridge', '--distpath', str(dist),
             '--workpath', str(build / 'bridge-work'), '--specpath', str(build),
             '--paths', str(bridge_source)]
+    # The bridge is headless: Conda ships several Qt bindings and PyInstaller
+    # refuses to freeze more than one, so exclude them all explicitly.
+    for module in ('PyQt5', 'PyQt6', 'PySide2', 'PySide6'):
+        args += ['--exclude-module', module]
     for module in ('httpx', 'playwright', 'playwright.async_api', 'wechatauto', 'wxhook', 'wcferry'):
         try:
             found = importlib.util.find_spec(module.split('.')[0]) is not None
@@ -87,7 +91,7 @@ def main():
     assert completed.returncode == 0 and json.loads(report.read_text())['frozen'], 'Packaged smoke test failed'
     assert not list(app.rglob('*.sqlite3')) and not list(app.rglob('.env'))
     assert (app/'JunshiBridge'/'JunshiBridge.exe').is_file(), 'Bundled bridge executable missing'
-    archive=Path(shutil.make_archive(str(output/'JunshiPC-232-Windows-x64'), 'zip', app.parent, app.name))
+    archive=Path(shutil.make_archive(str(output/'JunshiPC-233-Windows-x64'), 'zip', app.parent, app.name))
     digest=hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix('.zip.sha256').write_text(digest+'  '+archive.name+'\n',encoding='ascii')
     (output/'build-result.json').write_text(json.dumps({'exe':str(app/'JunshiPC.exe'),'zip':str(archive),'sha256':digest,'smoke':'PASS'},indent=2),encoding='utf-8')

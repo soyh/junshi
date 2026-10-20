@@ -48,7 +48,7 @@ class BridgeDialog(Dialog):
         )
         ttk.Label(
             self.frame,
-            text="提示：小红书 / Soul 首次登录会自动弹出一次扫码窗口，登录成功后记录登录态，之后按无头模式运行；需要重新扫码时把“无头模式”改为“否”并重启一次。",
+            text="提示：小红书 / Soul 首次启动、或登录态过期时会自动打开可见浏览器窗口供扫码，登录成功后记录登录态并转为无头运行；「刷新状态」显示本机每个通道的当前状态，不再读取服务器汇总。",
             wraplength=560,
         ).pack(anchor="w")
 
@@ -84,7 +84,7 @@ class BridgeDialog(Dialog):
             item = self.profiles[profile_id]
             dot = "●" if item["running"] else "○"
             label = bp.CHANNELS.get(item["channel"], item["channel"])
-            self.listbox.insert("end", f"{dot} {item['name']} · {label} · {item['username']}")
+            self.listbox.insert("end", f"{dot} {item['name']} · {label} · {item.get('status', '')}")
         if not order:
             self.current = None
             return
@@ -113,7 +113,7 @@ class BridgeDialog(Dialog):
         self.cap.delete(0, "end"); self.cap.insert(0, str(item["daily_cap"]))
         self.verify.set("是" if item["verify_tls"] else "否")
         self.headless.set("是" if item.get("headless", True) else "否")
-        state = "运行中" if item["running"] else "未运行"
+        state = item.get("status") or ("运行中" if item["running"] else "未运行")
         self.message.set(f"{item['name']}：{state}")
 
     @staticmethod
@@ -239,11 +239,7 @@ class BridgeDialog(Dialog):
         if self.busy:
             return
         self.reload(select=self.current)
-        if not getattr(self.app, "client", None):
-            self.message.set("请先在主界面登录军师服务器，再刷新在线状态。")
-            return
-        client = self.app.client
-        self.perform(lambda: bp.status_lines(bp.fetch_status(client)), self.render)
+        self.perform(lambda: bp.status_lines(list(self.profiles.values())), self.render)
 
     def render(self, lines):
         self.text.configure(state="normal")
@@ -251,4 +247,4 @@ class BridgeDialog(Dialog):
         self.text.insert("1.0", "\n".join(lines))
         self.text.configure(state="disabled")
         running = sum(1 for item in self.profiles.values() if item["running"])
-        self.message.set(f"在线状态已刷新；本机运行中的通道：{running} 个。")
+        self.message.set(f"状态以本机当前为准；运行中的通道：{running} 个。")

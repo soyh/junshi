@@ -80,32 +80,78 @@ def test_config_rejects_unknown_channel(plugin_home):
         bp.build_config("x", "https://example.com", "u", "p", "telegram")
 
 
-def test_status_lines_map_bridge_channel_names():
-    lines = bp.status_lines(
-        [
-            {"channel": "wechatauto", "status": "online", "replies_today": 4, "updated_at": "now"},
-            {"channel": "xhs", "status": "online", "replies_today": 0, "updated_at": "now"},
-        ]
+def _write_snapshot(profile_id, status, updated_at, replies=0):
+    import json
+
+    bp.status_path(profile_id).write_text(
+        json.dumps({"status": status, "updated_at": updated_at, "replies_today": replies}),
+        encoding="utf-8",
     )
-    assert lines[0].startswith("微信：在线 · 今日回复 4")
-    assert lines[1].startswith("小红书：在线 · 今日回复 0")
-    assert lines[2] == "Soul：未上报"
 
 
-def test_status_lines_show_login_failure_and_stale_heartbeat():
-    from datetime import datetime, timedelta, timezone
+def _mark_alive(profile_id):
+    import os
 
-    fresh = datetime.now(timezone.utc).isoformat()
-    stale = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
-    lines = bp.status_lines(
-        [
-            {"channel": "xhs", "status": "未登录", "replies_today": 0, "updated_at": fresh},
-            {"channel": "soul", "status": "online", "replies_today": 2, "updated_at": stale},
-        ]
+    bp.pid_path(profile_id).write_text(str(os.getpid()), encoding="ascii")
+
+
+def test_local_status_reads_profile_snapshot(plugin_home):
+    from datetime import datetime
+
+    profile_id = bp.create_profile(
+        name="小红书A",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="xhs",
     )
-    assert lines[0] == "微信：未上报"
-    assert lines[1].startswith("小红书：未登录")
-    assert lines[2].startswith("Soul：离线")
+    _mark_alive(profile_id)
+    _write_snapshot(profile_id, "online", datetime.now().isoformat(timespec="seconds"), 3)
+    detail = bp.local_status(profile_id)
+    assert detail["running"] is True
+    assert detail["status"] == "在线"
+    assert detail["replies_today"] == 3
+
+
+def test_local_status_flags_stale_heartbeat_and_stopped_profile(plugin_home):
+    from datetime import datetime, timedelta
+
+    running = bp.create_profile("xhs-a")
+    _mark_alive(running)
+    stale = (datetime.now() - timedelta(minutes=10)).isoformat(timespec="seconds")
+    _write_snapshot(running, "online", stale)
+    assert bp.local_status(running)["status"] == "无响应（心跳过期）"
+
+    stopped = bp.create_profile("xhs-b")
+    _write_snapshot(stopped, "online", datetime.now().isoformat(timespec="seconds"))
+    assert bp.local_status(stopped)["status"] == "未运行"
+
+
+def test_status_lines_keep_profiles_of_the_same_platform_apart(plugin_home):
+    from datetime import datetime
+
+    now = datetime.now().isoformat(timespec="seconds")
+    first = bp.create_profile(
+        name="小红书A", server="https://example.com", username="u",
+        password="password-123456", channel="xhs",
+    )
+    second = bp.create_profile(
+        name="小红书B", server="https://example.com", username="u",
+        password="password-123456", channel="xhs",
+    )
+    for profile_id in (first, second):
+        _mark_alive(profile_id)
+    _write_snapshot(first, "online", now, 3)
+    _write_snapshot(second, "未登录", now)
+    lines = bp.status_lines(bp.list_profiles())
+    assert len(lines) == 2
+    joined = "\n".join(lines)
+    assert "小红书｜小红书A：在线 · 今日回复 3" in joined
+    assert "小红书｜小红书B：未登录" in joined
+
+
+def test_status_lines_when_empty():
+    assert bp.status_lines([]) == ["尚未创建通道：点「新建通道」为每个平台各建一个。"]
 
 
 def test_dev_command_uses_plugin_path(plugin_home):

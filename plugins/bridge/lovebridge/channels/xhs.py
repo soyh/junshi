@@ -93,15 +93,14 @@ class XhsChannel:
 
         self._profile.mkdir(parents=True, exist_ok=True)
         self._pw = await async_playwright().start()
-        await self._launch(headless=self._headless)
+        # A profile without a recorded login must open a visible window,
+        # otherwise the user has no way to scan the QR code.
+        self._headed = not self._headless or not self._login_marker.is_file()
+        await self._launch(headless=not self._headed)
+        if self._headed and not self._login_marker.is_file():
+            self._logged("[xhs] 尚未登录：已打开可见浏览器窗口，请扫码；登录后会自动记录并转为无头")
         await self._ensure_list()
-        # Already-logged-in profiles stay headless; a fresh profile gets one
-        # visible window so the user can scan.
-        if self._headless and not self._login_marker.is_file():
-            if not await self._page.locator(".xhs-im-conv-list").count():
-                self._logged("[xhs] 首次登录：已弹出扫码窗口；登录成功后自动转为无头运行")
-                await self._relaunch_headed()
-                await self._ensure_list()
+        await self._maybe_mark_logged_in()
         await self._baseline()
         self._running = True
         self._task = asyncio.create_task(self._poll())
@@ -116,14 +115,42 @@ class XhsChannel:
         )
         self._page = self._ctx.pages[0] if self._ctx.pages else await self._ctx.new_page()
 
-    async def _relaunch_headed(self) -> None:
+    async def _show_window(self, why: str) -> None:
+        """Switch from headless to a visible window so the login wall can be seen."""
+        if getattr(self, "_headed", False):
+            return
+        self._logged(f"[xhs] {why}：打开可见浏览器窗口，请完成扫码登录")
         try:
             await self._ctx.close()
         except Exception:
             pass
         await self._launch(headless=False)
+        self._headed = True
         try:
             await self._page.bring_to_front()
+        except Exception:
+            pass
+
+    async def _recover(self) -> None:
+        """Edge renderer can crash after long uptime; relaunch the browser."""
+        self._logged("[xhs] 浏览器页面已关闭/崩溃，正在重新打开…")
+        try:
+            await self._ctx.close()
+        except Exception:
+            pass
+        self._headed = not self._headless or not self._login_marker.is_file()
+        try:
+            await self._launch(headless=not self._headed)
+            await self._ensure_list()
+            await self._maybe_mark_logged_in()
+        except Exception as exc:
+            self._logged(f"[xhs] 重新打开浏览器失败：{exc!r}")
+
+    async def _maybe_mark_logged_in(self) -> None:
+        try:
+            if await self._page.locator(".xhs-im-conv-list").count() and not self._login_marker.is_file():
+                self._login_marker.write_text("ok", encoding="ascii")
+                self._logged("[xhs] 登录成功，已记录登录态；下次启动将无头运行")
         except Exception:
             pass
 
@@ -176,6 +203,9 @@ class XhsChannel:
         await asyncio.sleep(2)
         try:
             if await page.evaluate(LOGIN_JS):
+                if not getattr(self, "_headed", True):
+                    await self._show_window("检测到未登录（登录态可能已过期）")
+                    return
                 if not self._warned_login:
                     self._warned_login = True
                     try:
@@ -194,6 +224,9 @@ class XhsChannel:
 
     async def _surface_login(self, page) -> None:  # noqa: ANN001
         """Bring the login wall to the foreground so the user can scan."""
+        if not getattr(self, "_headed", True):
+            await self._show_window("会话列表不可用")
+            return
         try:
             await page.bring_to_front()
         except Exception:
@@ -239,6 +272,8 @@ class XhsChannel:
                 await self._tick()
             except Exception as exc:  # keep polling
                 self._logged(f"[xhs] poll error: {exc!r}")
+                if "Target crashed" in str(exc) or "TargetClosed" in str(exc):
+                    await self._recover()
             await asyncio.sleep(self._interval)
 
     async def _tick(self) -> None:

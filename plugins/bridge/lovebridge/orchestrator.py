@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 import random
 import time
 import uuid
@@ -93,6 +95,7 @@ class Orchestrator:
 
     async def stop(self) -> None:
         self._stop_event.set()
+        self._write_status("已停止")
         for task in self._timers.values():
             task.cancel()
         for task in self._background:
@@ -113,12 +116,40 @@ class Orchestrator:
             await self._report_once()
             return
 
+    def _status_path(self):  # noqa: ANN201
+        return self.config.source_path.parent / "status.json"
+
+    def _write_status(self, state: str, error: str = "") -> None:
+        """Local, per-profile snapshot — the desktop panel reads this file.
+
+        The server heartbeat is keyed by (user, channel) and cannot tell two
+        profiles of the same platform apart, so the local file is authoritative.
+        """
+        payload = {
+            "status": state,
+            "pid": os.getpid(),
+            "channel": self.config.channel.kind,
+            "dry_run": self.config.bot.dry_run,
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+            "replies_today": self.state.total_today(self._today()),
+        }
+        if error:
+            payload["error"] = error
+        try:
+            self._status_path().write_text(
+                json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+            )
+        except OSError:
+            pass
+
     async def _report_once(self) -> None:
         try:
+            state = await self._channel_status()
+            self._write_status(state)
             if self._heartbeat_enabled:
                 await self.app.heartbeat(
                     self.config.channel.kind,
-                    await self._channel_status(),
+                    state,
                     self.state.total_today(self._today()),
                     detail=str(getattr(self.channel, "_identity", ""))[:200],
                 )
