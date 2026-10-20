@@ -59,25 +59,32 @@ class Orchestrator:
         self._platform_cache: dict[str, tuple[str, str | None]] = {}
 
     # -- lifecycle --------------------------------------------------------
+    START_TIMEOUT = 180.0
+    HEARTBEAT_SECONDS = 20.0
+
     async def run(self) -> None:
         self._loop = asyncio.get_running_loop()
         self.channel.set_handler(self._on_event)
         self._background = []
+        # Report before the channel is ready: a slow login window must not look
+        # like a dead process on the status panel.
+        self._start_state = "启动中"
+        self._background.append(asyncio.create_task(self._heartbeat_loop()))
         try:
-            await self.channel.start()
+            await asyncio.wait_for(self.channel.start(), timeout=self.START_TIMEOUT)
+            self._start_state = ""
         except Exception as exc:
+            self._start_state = "启动失败"
             self._log(f"[bridge] channel start failed: {exc!r}; will retry every 30s")
             self._background.append(asyncio.create_task(self._retry_start()))
+        self._background.append(asyncio.create_task(self._health_loop()))
+        await self._report_once()
         initial = await self._channel_status()
         if initial != "online":
             self._log(
                 f"[bridge] channel not ready ({initial}); complete the platform login "
                 "in the browser window the bridge opened"
             )
-        self._background += [
-            asyncio.create_task(self._heartbeat_loop()),
-            asyncio.create_task(self._health_loop()),
-        ]
         self._log(
             f"[bridge] started channel={self.config.channel.kind} "
             f"dry_run={self.config.bot.dry_run} app={self.config.app.base_url}"
@@ -97,15 +104,43 @@ class Orchestrator:
         while True:
             await asyncio.sleep(30)
             try:
-                await self.channel.start()
+                await asyncio.wait_for(self.channel.start(), timeout=self.START_TIMEOUT)
             except Exception as exc:
                 self._log(f"[bridge] channel start retry failed: {exc!r}")
                 continue
+            self._start_state = ""
             self._log("[bridge] channel started after retry")
+            await self._report_once()
             return
+
+    async def _report_once(self) -> None:
+        try:
+            if self._heartbeat_enabled:
+                await self.app.heartbeat(
+                    self.config.channel.kind,
+                    await self._channel_status(),
+                    self.state.total_today(self._today()),
+                    detail=str(getattr(self.channel, "_identity", ""))[:200],
+                )
+        except AppError as exc:
+            if exc.status == 404:
+                self._heartbeat_enabled = False
+                self._log("[bridge] heartbeat endpoint not deployed; disabled")
+            else:
+                self._log(f"[bridge] heartbeat failed: {exc}")
+        except Exception as exc:  # never let monitoring kill the bridge
+            self._log(f"[bridge] heartbeat error: {exc!r}")
 
     async def _channel_status(self) -> str:
         """Report what the platform actually shows, not just that the process lives."""
+        if getattr(self, "_start_state", ""):
+            return self._start_state
+        provider = getattr(self.channel, "status", None)
+        if provider is not None:
+            try:
+                return str(await provider())
+            except Exception:
+                return "异常"
         healthy = getattr(self.channel, "healthy", None)
         if healthy is None:
             return "online"
@@ -116,32 +151,18 @@ class Orchestrator:
 
     async def _heartbeat_loop(self) -> None:
         while True:
-            try:
-                if self._heartbeat_enabled:
-                    await self.app.heartbeat(
-                        self.config.channel.kind,
-                        await self._channel_status(),
-                        self.state.total_today(self._today()),
-                        detail=str(getattr(self.channel, "_identity", ""))[:200],
-                    )
-            except AppError as exc:
-                if exc.status == 404:
-                    self._heartbeat_enabled = False
-                    self._log("[bridge] heartbeat endpoint not deployed; disabled")
-                else:
-                    self._log(f"[bridge] heartbeat failed: {exc}")
-            except Exception as exc:  # never let monitoring kill the bridge
-                self._log(f"[bridge] heartbeat error: {exc!r}")
-            await asyncio.sleep(60)
+            await self._report_once()
+            await asyncio.sleep(self.HEARTBEAT_SECONDS)
 
     async def _health_loop(self) -> None:
-        healthy = getattr(self.channel, "healthy", None)
-        if healthy is None:
+        provider = getattr(self.channel, "status", None) or getattr(self.channel, "healthy", None)
+        if provider is None:
             return
         while True:
             await asyncio.sleep(60)
             try:
-                ok = bool(await healthy())
+                value = await provider()
+                ok = value in (True, "online")
             except Exception as exc:
                 ok = False
                 self._log(f"[bridge] health check error: {exc!r}")

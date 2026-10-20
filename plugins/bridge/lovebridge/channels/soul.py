@@ -36,6 +36,8 @@ MSG_JS = """() => Array.from(document.querySelectorAll('.bubble-row')).map(el =>
   time: (el.querySelector('.bubble-time, time') || {}).textContent || ''
 }))"""
 
+PAGE_TEXT_JS = "() => document.body ? document.body.innerText : ''"
+
 
 class SoulChannel:
     def __init__(
@@ -57,6 +59,7 @@ class SoulChannel:
         self._lock = asyncio.Lock()
         self._last: dict[str, tuple[str, str]] = {}
         self._counts: dict[str, int] = {}
+        self._warned_login = False
         self._logged = print
 
     def set_handler(self, handler: Handler) -> None:
@@ -82,15 +85,27 @@ class SoulChannel:
         self._task = asyncio.create_task(self._poll())
 
     async def healthy(self) -> bool:
+        return await self.status() == "online"
+
+    async def status(self) -> str:
+        """online / 未登录 / 已登录·无会话 / 异常 — judged by what the page shows."""
         try:
-            if self._page is None:
-                return False
-            if await self._page.locator(".conv-list").count():
-                return True
-            await self._ensure_chat()
-            return await self._page.locator(".conv-list").count() > 0
+            page = self._page
+            if page is None:
+                return "启动中"
+            if await page.locator(".conv-list").count():
+                return "online"
+            text = await page.evaluate(PAGE_TEXT_JS) or ""
+            if "扫码登录" in text or "手机号登录" in text:
+                return "未登录"
+            if await page.locator(".sync-scrim").count():
+                # Logged in, only the "sync chat history?" dialog is blocking.
+                return "已登录·待同步"
+            if "选择一段对话" in text or "消息" in text:
+                return "online"
+            return "异常"
         except Exception:
-            return False
+            return "异常"
 
     async def stop(self) -> None:
         self._running = False
@@ -104,6 +119,25 @@ class SoulChannel:
     # -- page helpers -----------------------------------------------------
     async def _ensure_chat(self) -> None:
         page = self._page
+        if await page.locator(".conv-list").count():
+            return
+        text = ""
+        try:
+            text = await page.evaluate(PAGE_TEXT_JS) or ""
+        except Exception:
+            pass
+        if "扫码登录" in text or "手机号登录" in text:
+            if not self._warned_login:
+                self._warned_login = True
+                try:
+                    await page.bring_to_front()
+                except Exception:
+                    pass
+                self._logged(
+                    "[soul] 需要登录：请在弹出的浏览器窗口里用 Soul App 扫码；"
+                    "登录成功后状态会自动变成 在线"
+                )
+            return
         try:
             await page.goto("https://home.soulapp.cn/", wait_until="commit", timeout=30000)
         except Exception:
@@ -121,6 +155,14 @@ class SoulChannel:
             except Exception:
                 pass
             await asyncio.sleep(4)
+        try:
+            text = await page.evaluate(PAGE_TEXT_JS) or ""
+            if ("扫码登录" in text or "手机号登录" in text) and not self._warned_login:
+                self._warned_login = True
+                await page.bring_to_front()
+                self._logged("[soul] 需要登录：请在浏览器窗口用 Soul App 扫码")
+        except Exception:
+            pass
 
     async def _conversations(self) -> list[dict]:
         return await self._eval(CONV_JS)

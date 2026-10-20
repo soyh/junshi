@@ -50,6 +50,12 @@ STATE_JS = """() => {
   };
 }"""
 
+LOGIN_JS = """() => {
+  const text = document.body ? document.body.innerText : '';
+  return !!document.querySelector('.login-container, .login-modal, .login-mask, .login-box')
+    || /扫码登录|手机号登录|登录后推荐更懂你的笔记/.test(text);
+}"""
+
 
 class XhsChannel:
     def __init__(
@@ -71,6 +77,7 @@ class XhsChannel:
         self._lock = asyncio.Lock()
         self._last: dict[str, tuple[str, str]] = {}
         self._last_index: dict[str, str] = {}
+        self._warned_login = False
         self._logged = print
 
     def set_handler(self, handler: Handler) -> None:
@@ -96,15 +103,27 @@ class XhsChannel:
         self._task = asyncio.create_task(self._poll())
 
     async def healthy(self) -> bool:
+        return await self.status() == "online"
+
+    async def status(self) -> str:
+        """online / 未登录 / 异常 — what the browser actually shows right now."""
         try:
-            if self._page is None:
-                return False
-            if await self._page.locator(".xhs-im-conv-list").count():
-                return True
+            page = self._page
+            if page is None:
+                return "启动中"
+            if await page.locator(".xhs-im-conv-list").count():
+                return "online"
+            if await page.evaluate(LOGIN_JS):
+                return "未登录"
             await self._ensure_list()
-            return await self._page.locator(".xhs-im-conv-list").count() > 0
+            await asyncio.sleep(1.0)
+            if await page.locator(".xhs-im-conv-list").count():
+                return "online"
+            if await page.evaluate(LOGIN_JS):
+                return "未登录"
+            return "异常"
         except Exception:
-            return False
+            return "异常"
 
     async def stop(self) -> None:
         self._running = False
@@ -128,8 +147,48 @@ class XhsChannel:
         try:
             await page.locator("text=消息").first.click(timeout=6000)
         except Exception:
-            await page.goto("https://www.xiaohongshu.com/messages", wait_until="commit", timeout=20000)
-        await asyncio.sleep(3)
+            pass
+        await asyncio.sleep(2)
+        try:
+            if await page.evaluate(LOGIN_JS):
+                if not self._warned_login:
+                    self._warned_login = True
+                    try:
+                        await page.bring_to_front()
+                    except Exception:
+                        pass
+                    self._logged(
+                        "[xhs] 需要登录：请在弹出的浏览器窗口里用小红书 App 扫码；"
+                        "登录成功后状态会自动变成 在线"
+                    )
+                return
+            if not await page.locator(".xhs-im-conv-list").count():
+                await self._surface_login(page)
+        except Exception:
+            pass
+
+    async def _surface_login(self, page) -> None:  # noqa: ANN001
+        """Bring the login wall to the foreground so the user can scan."""
+        try:
+            await page.bring_to_front()
+        except Exception:
+            pass
+        if await page.evaluate(LOGIN_JS):
+            return
+        for selector in ('button:has-text("登录")', '.login-btn', '.side-bar .login'):
+            button = page.locator(selector).first
+            try:
+                if await button.count():
+                    await button.click(timeout=4000)
+                    await asyncio.sleep(1.5)
+                    if await page.evaluate(LOGIN_JS):
+                        return
+            except Exception:
+                continue
+        try:
+            await page.goto("https://www.xiaohongshu.com/login", wait_until="commit", timeout=20000)
+        except Exception:
+            pass
 
     async def _conversations(self) -> list[dict]:
         return await self._page.evaluate(CONV_JS)

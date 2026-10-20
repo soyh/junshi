@@ -93,3 +93,11 @@ plugins/bridge/**/__pycache__/
 buildtest/
 plugins/bridge/*.log
 plugins/bridge/state*.sqlite3*
+
+# Built client artifacts
+/builds/
+desktop/builds/
+
+# Bridge runtime profiles and probe screenshots
+plugins/bridge/profiles/
+plugins/bridge/screenshots/
