@@ -48,7 +48,15 @@ def scrollable(parent):
     canvas.configure(yscrollcommand=bar.set)
     canvas.pack(side='left', fill='both', expand=True)
     bar.pack(side='right', fill='y')
-    canvas.bind_all('<MouseWheel>', lambda event: canvas.yview_scroll(-1 * (event.delta // 120), 'units'))
+
+    def wheel(event):
+        # Leave nested editors (rules text, logs) to their own scrolling.
+        if str(event.widget.winfo_class()) in {'Text', 'Listbox'}:
+            return None
+        canvas.yview_scroll(-1 * (event.delta // 120), 'units')
+        return 'break'
+
+    canvas.bind_all('<MouseWheel>', wheel)
     return inner
 
 
