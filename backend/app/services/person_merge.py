@@ -36,6 +36,98 @@ class PersonMergeService:
         "person_update_events",
     )
 
+    def preview(self, conn: sqlite3.Connection, user_id: str, target_id: str, source_id: str) -> dict:
+        """Dry-run: how much would move, without touching anything."""
+        if target_id == source_id:
+            raise SamePersonMerge("source and target are the same person")
+        for person_id in (target_id, source_id):
+            row = conn.execute(
+                "SELECT id FROM persons WHERE id = ? AND user_id = ?",
+                (person_id, user_id),
+            ).fetchone()
+            if row is None:
+                raise PersonNotFoundForMerge(f"person not found: {person_id}")
+
+        counts = {}
+        for table in self.PERSON_SCOPED_TABLES:
+            counts[table] = _scalar(
+                conn,
+                f"SELECT COUNT(*) FROM {table} WHERE user_id = ? AND person_id = ?",
+                (user_id, source_id),
+            )
+        counts["conversations"] = _scalar(
+            conn,
+            "SELECT COUNT(*) FROM conversations WHERE user_id = ? AND person_id = ?",
+            (user_id, source_id),
+        )
+        counts["messages"] = _scalar(
+            conn,
+            """
+            SELECT COUNT(*) FROM messages m
+            JOIN conversations c ON c.id = m.conversation_id
+            WHERE c.user_id = ? AND c.person_id = ?
+            """,
+            (user_id, source_id),
+        )
+        counts["platform_accounts"] = _scalar(
+            conn,
+            "SELECT COUNT(*) FROM person_platform_accounts WHERE user_id = ? AND person_id = ?",
+            (user_id, source_id),
+        )
+        counts["action_plan_snapshots"] = _scalar(
+            conn,
+            "SELECT COUNT(*) FROM action_plan_snapshots WHERE user_id = ? AND person_id = ?",
+            (user_id, source_id),
+        )
+        counts["action_plan_snapshots_conflicting"] = _scalar(
+            conn,
+            """
+            SELECT COUNT(*) FROM action_plan_snapshots s
+            WHERE s.user_id = ? AND s.person_id = ? AND EXISTS (
+                SELECT 1 FROM action_plan_snapshots t
+                WHERE t.user_id = s.user_id AND t.person_id = ?
+                  AND t.recommendation_id = s.recommendation_id
+            )
+            """,
+            (user_id, source_id, target_id),
+        )
+        counts["person_memories"] = _scalar(
+            conn,
+            "SELECT COUNT(*) FROM person_memories WHERE user_id = ? AND person_id = ?",
+            (user_id, source_id),
+        )
+
+        target_relationship = conn.execute(
+            "SELECT id FROM relationships WHERE user_id = ? AND person_id = ?",
+            (user_id, target_id),
+        ).fetchone()
+        source_relationship = conn.execute(
+            "SELECT id FROM relationships WHERE user_id = ? AND person_id = ?",
+            (user_id, source_id),
+        ).fetchone()
+        if source_relationship is None:
+            relationship_action = "none"
+        elif target_relationship is None:
+            relationship_action = "adopt"
+        else:
+            relationship_action = "discard"
+
+        source = conn.execute(
+            "SELECT name, nickname FROM persons WHERE id = ?", (source_id,)
+        ).fetchone()
+        target = conn.execute(
+            "SELECT name, nickname FROM persons WHERE id = ?", (target_id,)
+        ).fetchone()
+
+        return {
+            "target_person_id": target_id,
+            "source_person_id": source_id,
+            "target": dict(target),
+            "source": dict(source),
+            "relationship_action": relationship_action,
+            "counts": counts,
+        }
+
     def merge(self, conn: sqlite3.Connection, user_id: str, target_id: str, source_id: str) -> dict:
         if target_id == source_id:
             raise SamePersonMerge("source and target are the same person")
@@ -197,3 +289,8 @@ class PersonMergeService:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _scalar(conn: sqlite3.Connection, sql: str, params: tuple) -> int:
+    row = conn.execute(sql, params).fetchone()
+    return int(row[0]) if row else 0

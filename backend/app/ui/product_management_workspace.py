@@ -20,6 +20,19 @@ PRODUCT_MANAGEMENT_HTML = r'''
         <div id="person-profile-status" class="status">Person profile not loaded.</div>
       </section>
 
+      <section class="workspace-card" aria-labelledby="merge-person-heading">
+        <h2 id="merge-person-heading">Merge people</h2>
+        <p class="note">把重复的人物合并到目标人物：会话与消息、互动、媒体、平台账号、分析记录都会迁移，来源人物随后被删除。<strong>此操作不可撤销</strong>，请先预览。</p>
+        <label for="merge-target-select">Target person（保留）</label>
+        <select id="merge-target-select" class="requires-auth" disabled></select>
+        <label for="merge-source-select">Source person（合并后删除）</label>
+        <select id="merge-source-select" class="requires-auth" disabled></select>
+        <button id="merge-preview" class="requires-auth" type="button" disabled>Preview merge</button>
+        <button id="merge-confirm" class="requires-auth" type="button" disabled>Merge</button>
+        <div id="merge-person-status" class="status">Select a person first.</div>
+        <div id="merge-person-preview" class="status"></div>
+      </section>
+
       <section class="workspace-card" aria-labelledby="manage-relationship-heading">
         <h2 id="manage-relationship-heading">Relationship management</h2>
         <p class="note">使用当前选中的 Relationship；Person / Relationship scope 一致性仍由服务端校验。</p>
@@ -474,6 +487,115 @@ PRODUCT_MANAGEMENT_SCRIPT = r'''
     await loadManagedInteractions();
     clearMessageManagement();
   }
+
+  // --- Merge duplicate people -------------------------------------------
+  const mergePersonStatus = byId('merge-person-status');
+  const mergePersonPreview = byId('merge-person-preview');
+  let mergePeopleCache = [];
+  let mergePreviewPayload = null;
+
+  function mergePersonLabel(item) {
+    return item.nickname ? `${item.name} (${item.nickname})` : item.name;
+  }
+
+  function refreshMergeSourceOptions() {
+    const target = byId('merge-target-select').value;
+    renderEntitySelect(
+      'merge-source-select',
+      mergePeopleCache.filter((item) => item.id !== target),
+      mergePersonLabel,
+      'No duplicate selected',
+    );
+  }
+
+  async function refreshMergeChoices() {
+    mergePeopleCache = await api('/api/v1/persons');
+    const preferred = mergePeopleCache.some((item) => item.id === selectedPersonId)
+      ? selectedPersonId
+      : (mergePeopleCache[0] ? mergePeopleCache[0].id : null);
+    renderEntitySelect(
+      'merge-target-select',
+      mergePeopleCache,
+      mergePersonLabel,
+      'No person selected',
+      preferred,
+    );
+    refreshMergeSourceOptions();
+    mergePreviewPayload = null;
+    mergePersonPreview.textContent = '';
+    mergePersonStatus.textContent = mergePeopleCache.length < 2
+      ? 'Need at least two people before merging.'
+      : 'Choose target and duplicate, then preview.';
+  }
+
+  async function previewMerge() {
+    const target = byId('merge-target-select').value;
+    const source = byId('merge-source-select').value;
+    if (!target || !source) throw new Error('Choose both target and source');
+    const data = await api(
+      `/api/v1/persons/${encodeURIComponent(target)}/merge-preview?source_person_id=${encodeURIComponent(source)}`
+    );
+    mergePreviewPayload = data;
+    const counts = data.counts;
+    mergePersonPreview.textContent = [
+      `合并「${data.source.name}」→「${data.target.name}」`,
+      `会话 ${counts.conversations} 段（消息 ${counts.messages} 条）`,
+      `互动 ${counts.interactions}、媒体 ${counts.media_attachments}、平台账号 ${counts.platform_accounts}`,
+      `快照 ${counts.action_plan_snapshots}（其中冲突 ${counts.action_plan_snapshots_conflicting} 条会被丢弃）、记忆 ${counts.person_memories}`,
+      `关系处理：${data.relationship_action}`,
+    ].join('；');
+    mergePersonStatus.textContent = 'Preview ready. 确认无误后点 Merge。';
+  }
+
+  async function confirmMerge() {
+    const target = byId('merge-target-select').value;
+    const source = byId('merge-source-select').value;
+    if (!target || !source) throw new Error('Choose both target and source');
+    if (
+      !mergePreviewPayload
+      || mergePreviewPayload.target_person_id !== target
+      || mergePreviewPayload.source_person_id !== source
+    ) {
+      throw new Error('Preview the selected pair first');
+    }
+    const targetName = mergePreviewPayload.target.name;
+    const sourceName = mergePreviewPayload.source.name;
+    if (!window.confirm(`Merge「${sourceName}」into「${targetName}」? 来源人物会被永久删除，且不可撤销。`)) return;
+
+    const result = await api(`/api/v1/persons/${encodeURIComponent(target)}/merge`, {
+      method: 'POST',
+      body: JSON.stringify({ source_person_id: source }),
+    });
+    selectedPersonId = target;
+    mergePreviewPayload = null;
+    await loadPersons();
+    await refreshMergeChoices();
+    if (typeof refreshManagementForPerson === 'function') {
+      await refreshManagementForPerson();
+    }
+    mergePersonStatus.textContent = `Merged. Moved: ${JSON.stringify(result.moved)}`;
+    mergePersonPreview.textContent = '';
+  }
+
+  const baseLoadPersonsForMerge = loadPersons;
+  loadPersons = async function(...args) {
+    await baseLoadPersonsForMerge.apply(this, args);
+    try { await refreshMergeChoices(); }
+    catch (error) { mergePersonStatus.textContent = error instanceof Error ? error.message : String(error); }
+  };
+
+  bind('merge-preview', previewMerge, mergePersonStatus);
+  bind('merge-confirm', confirmMerge, mergePersonStatus);
+  byId('merge-target-select').addEventListener('change', () => {
+    refreshMergeSourceOptions();
+    mergePreviewPayload = null;
+    mergePersonPreview.textContent = '';
+    mergePersonStatus.textContent = 'Target changed; preview again.';
+  });
+  byId('merge-source-select').addEventListener('change', () => {
+    mergePreviewPayload = null;
+    mergePersonPreview.textContent = '';
+  });
 
   const baseResetWorkspaceForProductManagement = resetWorkspace;
   resetWorkspace = function(message = 'Login to load persons.') {

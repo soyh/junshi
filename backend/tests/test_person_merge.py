@@ -70,6 +70,27 @@ def test_merge_moves_conversations_accounts_and_history(client):
     assert [r["person_id"] for r in relationships] == [target["id"]]
 
 
+def test_merge_preview_reports_counts_without_writing(client):
+    target = _person(client, "预览目标")
+    source = _person(client, "预览来源")
+    _relationship(client, target["id"])
+    _relationship(client, source["id"])
+    _conversation(client, source["id"], "小红书")
+
+    preview = client.get(
+        f"/api/v1/persons/{target['id']}/merge-preview",
+        params={"source_person_id": source["id"]},
+    )
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["relationship_action"] == "discard"
+    assert body["counts"]["conversations"] == 1
+    assert body["counts"]["platform_accounts"] == 0
+
+    # Nothing was written: both people still exist.
+    assert client.get(f"/api/v1/persons/{source['id']}").status_code == 200
+
+
 def test_merge_rejects_same_or_missing_person(client):
     person = _person(client, "同人")
 
