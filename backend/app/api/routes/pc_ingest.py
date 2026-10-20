@@ -19,6 +19,8 @@ router = APIRouter(prefix='/pc', tags=['pc-assistant'])
 class Incoming(MessageCreate):
     operation_id: UUID
     content: str = Field(min_length=1, max_length=200000)
+    platform: str | None = Field(default=None, max_length=40)
+    platform_account_id: str | None = Field(default=None, max_length=64)
 
 
 def receipt(conn, user, operation, conversation, content):
@@ -48,6 +50,12 @@ def incoming_message(payload: Incoming, user_id=Depends(get_current_user_id)):
         if old:
             return old
         row = MessageService().create_user_managed(conn, user_id, payload.conversation_id, payload.sender_type, payload.content, payload.sent_at)
+        if payload.platform:
+            conn.execute(
+                'INSERT OR REPLACE INTO message_platform_sources (message_id, user_id, platform, account_id, created_at) VALUES (?,?,?,?,?)',
+                (row['id'], user_id, payload.platform.strip().lower(), payload.platform_account_id, row['created_at']),
+            )
+            row = conn.execute('SELECT * FROM messages WHERE id=?', (row['id'],)).fetchone()
         result = dict(row)
         remember(conn, user_id, payload.operation_id, payload.conversation_id, fingerprint, result)
         return result
