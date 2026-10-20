@@ -47,3 +47,15 @@ JunshiPC/
 - 桥接是独立进程，崩溃不会影响客户端；状态以服务端 `/api/v1/bridge/status` 心跳为准。
 - 消息写入使用 `/api/v1/pc/messages`（幂等），平台来源记录在 `message_platform_sources`。
 - 同一个人物的所有平台消息进入同一主会话；平台身份在「平台账号」里管理。
+
+## 多用户 / 多开
+
+每个「通道配置」是独立实例，保存在 `%LOCALAPPDATA%\JunshiPC\bridge\profiles\<id>\`：
+
+- 自己的军师账号（不同用户登录各自的账号）
+- 自己的平台登录态（小红书 / Soul 使用独立浏览器 profile）
+- 自己的 state.sqlite3、config.log 与进程
+
+在「通道插件」里可以新建多个配置并分别启动，因此同一台电脑可以同时跑多个用户 / 多个平台账号。
+
+> 微信限制：一个 Windows 会话只能登录一个微信号。要同时跑两个微信账号，需要两个 Windows 用户、两台电脑或虚拟机。

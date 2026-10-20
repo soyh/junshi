@@ -1,17 +1,24 @@
-"""Channel bridge plugin: configuration and process control.
+"""Channel bridge plugin: multi-profile configuration and process control.
 
-The bridge is bundled as a separate executable (JunshiBridge.exe) because it
-drives WeChat / Edge automation and must never block or crash the assistant.
-This module owns its config file and lifecycle; the GUI only calls into it.
+Each profile is an isolated bridge instance: its own 军师 account, channel,
+browser login state, state database, log and PID. Several profiles can run at
+the same time (多开); each runs in its own JunshiBridge.exe process.
+
+WeChat limitation: one Windows session can only have one logged-in WeChat
+account, so a second WeChat profile needs another Windows user/VM. 小红书 and
+Soul use separate browser profiles per profile and can run in parallel.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tomllib
+import uuid
 from pathlib import Path
 
 CHANNELS = {"wechat": "微信", "xhs": "小红书", "soul": "Soul"}
@@ -29,12 +36,24 @@ def plugin_dir() -> Path:
     return path
 
 
-def config_path() -> Path:
-    return plugin_dir() / "config.toml"
+def profiles_dir() -> Path:
+    path = plugin_dir() / "profiles"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
-def pid_path() -> Path:
-    return plugin_dir() / "bridge.pid"
+def profile_dir(profile_id: str) -> Path:
+    path = profiles_dir() / profile_id
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def config_path(profile_id: str) -> Path:
+    return profile_dir(profile_id) / "config.toml"
+
+
+def pid_path(profile_id: str) -> Path:
+    return profile_dir(profile_id) / "bridge.pid"
 
 
 def _toml(value: str) -> str:
@@ -42,6 +61,7 @@ def _toml(value: str) -> str:
 
 
 def build_config(
+    name: str,
     server: str,
     username: str,
     password: str,
@@ -50,15 +70,19 @@ def build_config(
     daily_cap: int = 30,
     quiet: tuple[str, str] = DEFAULT_QUIET,
     verify_tls: bool = True,
+    browser_dir: str | None = None,
 ) -> str:
-    if channel not in CHANNELS:
+    if channel not in set(CHANNELS) | {"mock"}:
         raise ValueError("不支持的平台通道")
     if not server.strip():
         raise ValueError("请填写服务器地址")
     if not username.strip() or not password:
         raise ValueError("请填写军师账号与密码")
     verify = "true" if verify_tls and not server.startswith("http://") else "false"
-    return f"""[app]
+    text = f"""[profile]
+name = {_toml(name.strip() or "未命名通道")}
+
+[app]
 base_url = {_toml(server.strip())}
 username = {_toml(username.strip())}
 password = {_toml(password)}
@@ -82,27 +106,38 @@ state_path = "state.sqlite3"
 [channel]
 kind = {_toml(channel)}
 """
+    if channel in ("xhs", "soul") and browser_dir:
+        text += f"\n[channel.{channel}]\nprofile_dir = {_toml(browser_dir)}\ninterval = 4.0\n"
+    return text
 
 
-def save_config(**kwargs) -> Path:
-    text = build_config(**kwargs)
-    path = config_path()
+def save_profile(profile_id: str, **kwargs) -> Path:
+    channel = kwargs.get("channel", "wechat")
+    kwargs.setdefault("browser_dir", str(profile_dir(profile_id) / "browser" / channel))
+    path = config_path(profile_id)
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(text, encoding="utf-8")
+    temporary.write_text(build_config(**kwargs), encoding="utf-8")
     temporary.replace(path)
     return path
 
 
-def load_config_summary() -> dict:
+def _read(path: Path) -> dict:
     try:
-        data = tomllib.loads(config_path().read_text(encoding="utf-8"))
+        return tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError, tomllib.TOMLDecodeError):
         return {}
+
+
+def summary(profile_id: str) -> dict:
+    data = _read(config_path(profile_id))
     app = data.get("app", {})
     bot = data.get("bot", {})
     channel = data.get("channel", {})
+    profile = data.get("profile", {})
     quiet = bot.get("quiet_hours") or list(DEFAULT_QUIET)
     return {
+        "id": profile_id,
+        "name": str(profile.get("name") or profile_id),
         "server": str(app.get("base_url", "")),
         "username": str(app.get("username", "")),
         "password": str(app.get("password", "")),
@@ -111,7 +146,42 @@ def load_config_summary() -> dict:
         "daily_cap": int(bot.get("daily_reply_cap", 30)),
         "quiet": (str(quiet[0]), str(quiet[1])),
         "verify_tls": bool(app.get("verify_tls", True)),
+        "running": is_running(profile_id),
     }
+
+
+def _migrate_legacy() -> None:
+    legacy = plugin_dir() / "config.toml"
+    if not legacy.is_file():
+        return
+    if any(path.is_dir() for path in profiles_dir().iterdir()):
+        return
+    target = profile_dir("default")
+    for item in (legacy, plugin_dir() / "bridge.pid", plugin_dir() / "state.sqlite3"):
+        if item.is_file():
+            shutil.copy2(item, target / item.name)
+            item.unlink(missing_ok=True)
+
+
+def list_profiles() -> list[dict]:
+    _migrate_legacy()
+    items = []
+    for path in sorted(profiles_dir().iterdir()):
+        if not path.is_dir() or not (path / "config.toml").is_file():
+            continue
+        items.append(summary(path.name))
+    return items
+
+
+def create_profile(name: str = "新通道") -> str:
+    profile_id = uuid.uuid4().hex[:8]
+    profile_dir(profile_id)
+    return profile_id
+
+
+def delete_profile(profile_id: str) -> None:
+    stop(profile_id)
+    shutil.rmtree(profile_dir(profile_id), ignore_errors=True)
 
 
 def _install_root() -> Path:
@@ -120,7 +190,8 @@ def _install_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def executable_command(config: Path) -> tuple[list[str], dict | None]:
+def executable_command(profile_id: str) -> tuple[list[str], dict | None]:
+    config = config_path(profile_id)
     root = _install_root()
     for candidate in (root / "JunshiBridge" / "JunshiBridge.exe", root / "JunshiBridge.exe"):
         if candidate.is_file():
@@ -132,31 +203,28 @@ def executable_command(config: Path) -> tuple[list[str], dict | None]:
     return [sys.executable, "-m", "lovebridge", "--config", str(config), "run"], environment
 
 
-def start(config: Path | None = None) -> int:
-    config = config or config_path()
-    if not config.is_file():
-        raise ValueError("尚未保存通道配置")
-    if is_running():
-        return read_pid() or 0
-    command, environment = executable_command(config)
-    flags = 0
-    if sys.platform == "win32":
-        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+def start(profile_id: str) -> int:
+    if not config_path(profile_id).is_file():
+        raise ValueError("请先保存通道配置")
+    if is_running(profile_id):
+        return read_pid(profile_id) or 0
+    command, environment = executable_command(profile_id)
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
     process = subprocess.Popen(
         command,
-        cwd=str(plugin_dir()),
+        cwd=str(profile_dir(profile_id)),
         env=environment,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         creationflags=flags,
     )
-    pid_path().write_text(str(process.pid), encoding="ascii")
+    pid_path(profile_id).write_text(str(process.pid), encoding="ascii")
     return process.pid
 
 
-def read_pid() -> int | None:
+def read_pid(profile_id: str) -> int | None:
     try:
-        return int(pid_path().read_text(encoding="ascii").strip())
+        return int(pid_path(profile_id).read_text(encoding="ascii").strip())
     except (OSError, ValueError):
         return None
 
@@ -178,19 +246,30 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
-def is_running() -> bool:
-    pid = read_pid()
+def is_running(profile_id: str) -> bool:
+    pid = read_pid(profile_id)
     return bool(pid and _pid_alive(pid))
 
 
-def stop() -> bool:
-    pid = read_pid()
+def stop(profile_id: str) -> bool:
+    pid = read_pid(profile_id)
     if not pid or not _pid_alive(pid):
-        pid_path().unlink(missing_ok=True)
+        pid_path(profile_id).unlink(missing_ok=True)
         return False
-    subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True, check=False) if sys.platform == "win32" else os.kill(pid, 15)
-    pid_path().unlink(missing_ok=True)
+    if sys.platform == "win32":
+        subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True, check=False)
+    else:
+        os.kill(pid, 15)
+    pid_path(profile_id).unlink(missing_ok=True)
     return True
+
+
+def stop_all() -> int:
+    count = 0
+    for item in list_profiles():
+        if stop(item["id"]):
+            count += 1
+    return count
 
 
 def fetch_status(client) -> list[dict]:
