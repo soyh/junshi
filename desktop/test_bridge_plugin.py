@@ -92,6 +92,22 @@ def test_status_lines_map_bridge_channel_names():
     assert lines[2] == "Soul：未上报"
 
 
+def test_status_lines_show_login_failure_and_stale_heartbeat():
+    from datetime import datetime, timedelta, timezone
+
+    fresh = datetime.now(timezone.utc).isoformat()
+    stale = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+    lines = bp.status_lines(
+        [
+            {"channel": "xhs", "status": "未登录", "replies_today": 0, "updated_at": fresh},
+            {"channel": "soul", "status": "online", "replies_today": 2, "updated_at": stale},
+        ]
+    )
+    assert lines[0] == "微信：未上报"
+    assert lines[1].startswith("小红书：未登录")
+    assert lines[2].startswith("Soul：离线")
+
+
 def test_dev_command_uses_plugin_path(plugin_home):
     profile_id = bp.create_profile("dev")
     bp.save_profile(

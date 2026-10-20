@@ -1,4 +1,4 @@
-"""Build a standalone Windows client; never package the backend or user files."""
+﻿"""Build a standalone Windows client; never package the backend or user files."""
 import argparse
 import hashlib
 import json
@@ -65,7 +65,7 @@ def main():
         '--name', 'JunshiPC', '--distpath', str(build/'dist'), '--workpath', str(build/'work'),
         '--specpath', str(build), '--paths', str(source), str(source/'launcher.py')], check=True, env=environment)
     app = build/'dist'/'JunshiPC'
-    shutil.copy2(source/'CLIENT_README.txt', app/'使用说明.txt')
+    shutil.copy2(source/'CLIENT_README.txt', app/'浣跨敤璇存槑.txt')
     bridge = build_bridge(source, build, environment)
     shutil.copytree(bridge, app/'JunshiBridge')
     # Ship runtime license notices independently of the source checkout.
@@ -87,7 +87,7 @@ def main():
     assert completed.returncode == 0 and json.loads(report.read_text())['frozen'], 'Packaged smoke test failed'
     assert not list(app.rglob('*.sqlite3')) and not list(app.rglob('.env'))
     assert (app/'JunshiBridge'/'JunshiBridge.exe').is_file(), 'Bundled bridge executable missing'
-    archive=Path(shutil.make_archive(str(output/'JunshiPC-229-Windows-x64'), 'zip', app.parent, app.name))
+    archive=Path(shutil.make_archive(str(output/'JunshiPC-230-Windows-x64'), 'zip', app.parent, app.name))
     digest=hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix('.zip.sha256').write_text(digest+'  '+archive.name+'\n',encoding='ascii')
     (output/'build-result.json').write_text(json.dumps({'exe':str(app/'JunshiPC.exe'),'zip':str(archive),'sha256':digest,'smoke':'PASS'},indent=2),encoding='utf-8')

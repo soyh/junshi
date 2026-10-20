@@ -62,8 +62,19 @@ class Orchestrator:
     async def run(self) -> None:
         self._loop = asyncio.get_running_loop()
         self.channel.set_handler(self._on_event)
-        await self.channel.start()
-        self._background = [
+        self._background = []
+        try:
+            await self.channel.start()
+        except Exception as exc:
+            self._log(f"[bridge] channel start failed: {exc!r}; will retry every 30s")
+            self._background.append(asyncio.create_task(self._retry_start()))
+        initial = await self._channel_status()
+        if initial != "online":
+            self._log(
+                f"[bridge] channel not ready ({initial}); complete the platform login "
+                "in the browser window the bridge opened"
+            )
+        self._background += [
             asyncio.create_task(self._heartbeat_loop()),
             asyncio.create_task(self._health_loop()),
         ]
@@ -82,13 +93,34 @@ class Orchestrator:
         await self.channel.stop()
 
     # -- background -------------------------------------------------------
+    async def _retry_start(self) -> None:
+        while True:
+            await asyncio.sleep(30)
+            try:
+                await self.channel.start()
+            except Exception as exc:
+                self._log(f"[bridge] channel start retry failed: {exc!r}")
+                continue
+            self._log("[bridge] channel started after retry")
+            return
+
+    async def _channel_status(self) -> str:
+        """Report what the platform actually shows, not just that the process lives."""
+        healthy = getattr(self.channel, "healthy", None)
+        if healthy is None:
+            return "online"
+        try:
+            return "online" if await healthy() else "未登录"
+        except Exception:
+            return "异常"
+
     async def _heartbeat_loop(self) -> None:
         while True:
             try:
                 if self._heartbeat_enabled:
                     await self.app.heartbeat(
                         self.config.channel.kind,
-                        "online",
+                        await self._channel_status(),
                         self.state.total_today(self._today()),
                         detail=str(getattr(self.channel, "_identity", ""))[:200],
                     )

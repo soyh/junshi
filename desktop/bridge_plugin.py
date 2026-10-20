@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tomllib
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 CHANNELS = {"wechat": "微信", "xhs": "小红书", "soul": "Soul"}
@@ -277,6 +278,19 @@ def fetch_status(client) -> list[dict]:
     return rows if isinstance(rows, list) else []
 
 
+def _heartbeat_age(row: dict) -> float | None:
+    raw = row.get("updated_at")
+    if not raw:
+        return None
+    try:
+        stamp = datetime.fromisoformat(str(raw))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        return (datetime.now() - stamp).total_seconds()
+    return (datetime.now(timezone.utc) - stamp).total_seconds()
+
+
 def status_lines(rows: list[dict]) -> list[str]:
     by_key = {}
     for row in rows:
@@ -287,7 +301,13 @@ def status_lines(rows: list[dict]) -> list[str]:
         row = by_key.get(key)
         label = CHANNELS[key]
         if row:
-            state = "在线" if row.get("status") == "online" else str(row.get("status"))
+            age = _heartbeat_age(row)
+            if age is not None and age > 180:
+                state = "离线（超过 3 分钟未心跳）"
+            elif row.get("status") == "online":
+                state = "在线"
+            else:
+                state = str(row.get("status") or "未知")
             lines.append(f"{label}：{state} · 今日回复 {row.get('replies_today', 0)} · {row.get('updated_at', '')}")
         else:
             lines.append(f"{label}：未上报")

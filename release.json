@@ -1,9 +1,9 @@
 {
   "application": "AI Love Strategist",
-  "server_stage": "TEST-230",
-  "production_stage": "TEST-230",
+  "server_stage": "TEST-231",
+  "production_stage": "TEST-231",
   "production_confirmation": "user-reported-acceptance-pass",
-  "desktop_version": "229",
+  "desktop_version": "230",
   "android_version": "1.0.0",
   "android_version_code": 23100,
   "android_signature": "fixed-production",
