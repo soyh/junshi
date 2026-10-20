@@ -104,6 +104,7 @@ def test_heartbeat_reports_starting_before_channel_ready() -> None:
         channel=SimpleNamespace(kind="xhs"),
         bot=SimpleNamespace(dry_run=True, max_concurrency=2),
         app=SimpleNamespace(base_url="http://test"),
+        source_path=Path("/tmp/unused/bridge/config.toml"),
     )
     state = SimpleNamespace(total_today=lambda day: 0)
     orchestrator = Orchestrator(config, app, _SlowChannel(), state, log=lambda *_: None)

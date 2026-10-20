@@ -77,6 +77,7 @@ def build_config(
     verify_tls: bool = True,
     browser_dir: str | None = None,
     headless: bool = True,
+    browser_window: str = "hide",
 ) -> str:
     if channel not in set(CHANNELS) | {"mock"}:
         raise ValueError("不支持的平台通道")
@@ -107,6 +108,7 @@ quiet_hours = [{_toml(quiet[0])}, {_toml(quiet[1])}]
 max_reply_chars = 500
 reply_to_groups = false
 max_concurrency = 2
+browser_window = {_toml(browser_window)}
 state_path = "state.sqlite3"
 
 [channel]
@@ -118,6 +120,7 @@ kind = {_toml(channel)}
             f"profile_dir = {_toml(browser_dir or '')}\n"
             "interval = 4.0\n"
             f"headless = {'true' if headless else 'false'}\n"
+            f"window_mode = {_toml(browser_window)}\n"
         )
     return text
 
@@ -154,6 +157,7 @@ def summary(profile_id: str) -> dict:
         "password": str(app.get("password", "")),
         "channel": str(channel.get("kind", "wechat")),
         "headless": bool(channel.get(str(channel.get("kind", "")), {}).get("headless", True)),
+        "browser_window": str(bot.get("browser_window", "hide")).lower(),
         "dry_run": bool(bot.get("dry_run", True)),
         "daily_cap": int(bot.get("daily_reply_cap", 30)),
         "quiet": (str(quiet[0]), str(quiet[1])),
@@ -210,17 +214,39 @@ def _install_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def executable_command(profile_id: str) -> tuple[list[str], dict | None]:
+def executable_command(profile_id: str, subcommand: str = "run") -> tuple[list[str], dict | None]:
     config = config_path(profile_id)
     root = _install_root()
     for candidate in (root / "JunshiBridge" / "JunshiBridge.exe", root / "JunshiBridge.exe"):
         if candidate.is_file():
-            return [str(candidate), "--config", str(config), "run"], None
+            return [str(candidate), "--config", str(config), subcommand], None
     plugins = root / "plugins" / "bridge"
     environment = os.environ.copy()
     existing = environment.get("PYTHONPATH")
     environment["PYTHONPATH"] = str(plugins) + (os.pathsep + existing if existing else "")
-    return [sys.executable, "-m", "lovebridge", "--config", str(config), "run"], environment
+    return [sys.executable, "-m", "lovebridge", "--config", str(config), subcommand], environment
+
+
+def show_browser(profile_id: str) -> bool:
+    """Bring a parked browser window back to the desktop (no restart)."""
+    if not is_running(profile_id):
+        return False
+    command, environment = executable_command(profile_id, "window")
+    command += ["--action", "show"]
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+    try:
+        result = subprocess.run(
+            command,
+            cwd=str(profile_dir(profile_id)),
+            env=environment,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=flags,
+            timeout=20,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
 
 
 def start(profile_id: str) -> int:

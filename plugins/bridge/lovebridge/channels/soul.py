@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
 import time
 from pathlib import Path
 
+from .. import window
 from .base import Handler, InboundEvent
 
 CONV_JS = """() => Array.from(document.querySelectorAll('.conv-list .conversation')).map(el => ({
@@ -45,11 +47,14 @@ class SoulChannel:
         profile_dir: str | Path | None = None,
         interval: float = 4.0,
         headless: bool = False,
+        window_mode: str = "hide",
     ) -> None:
         root = Path(__file__).resolve().parents[2]
         self._profile = Path(profile_dir) if profile_dir else root / "profiles" / "soul"
         self._interval = float(interval)
         self._headless = bool(headless)
+        self._window_mode = (window_mode or "hide").lower()
+        self._parked = False
         self._handler: Handler | None = None
         self._pw = None
         self._ctx = None
@@ -80,9 +85,10 @@ class SoulChannel:
         self._headed = not self._headless or not self._login_marker.is_file()
         await self._launch(headless=not self._headed)
         if self._headed and not self._login_marker.is_file():
-            self._logged("[soul] 尚未登录：已打开可见浏览器窗口，请扫码；登录后会自动记录并转为无头")
+            self._logged("[soul] 尚未登录：已打开可见浏览器窗口，请扫码；登录后会自动隐藏窗口")
         await self._ensure_chat()
         await self._maybe_mark_logged_in()
+        await self._park_if_logged_in()
         await self._baseline()
         self._running = True
         self._task = asyncio.create_task(self._poll())
@@ -108,6 +114,7 @@ class SoulChannel:
             pass
         await self._launch(headless=False)
         self._headed = True
+        self._parked = False
         try:
             await self._page.bring_to_front()
         except Exception:
@@ -120,6 +127,37 @@ class SoulChannel:
                 self._logged("[soul] 登录成功，已记录登录态；下次启动将无头运行")
         except Exception:
             pass
+
+    def _profile_key(self) -> str:
+        return f"soul:{self._profile.resolve()}"
+
+    async def _park_if_logged_in(self) -> None:
+        """Move the visible window off the desktop once the login is done."""
+        if not self._headless or not self._headed or self._window_mode == "show":
+            return
+        count = await asyncio.to_thread(
+            window.hide,
+            [os.getpid()],
+            profile_key=self._profile_key(),
+            mode=self._window_mode,
+            wait=8,
+        )
+        self._parked = bool(count)
+        if count:
+            self._logged(
+                "[soul] 已登录：浏览器窗口已移出桌面，后台继续运行"
+                "（可在通道插件里“显示浏览器”）"
+            )
+
+    async def _reveal_window(self) -> None:
+        if not self._parked:
+            return
+        count = await asyncio.to_thread(
+            window.show, [os.getpid()], profile_key=self._profile_key()
+        )
+        if count:
+            self._logged("[soul] 需要重新登录：已把浏览器窗口移回桌面")
+        self._parked = False
 
     async def healthy(self) -> bool:
         return await self.status() == "online"
@@ -167,6 +205,7 @@ class SoulChannel:
             if not getattr(self, "_headed", True):
                 await self._show_window("检测到未登录（登录态可能已过期）")
                 return
+            await self._reveal_window()
             if not self._warned_login:
                 self._warned_login = True
                 try:
@@ -263,10 +302,13 @@ class SoulChannel:
         except Exception:
             pass
         self._headed = not self._headless or not self._login_marker.is_file()
+        self._parked = False
         try:
             await self._launch(headless=not self._headed)
             await self._ensure_chat()
             await self._maybe_mark_logged_in()
+            if self._headed:
+                await self._park_if_logged_in()
         except Exception as exc:
             self._logged(f"[soul] 重新打开浏览器失败：{exc!r}")
 
@@ -287,6 +329,7 @@ class SoulChannel:
             if conversations and not self._login_marker.is_file():
                 self._login_marker.write_text("ok", encoding="ascii")
                 self._logged("[soul] 登录态已记录，下次将以无头模式运行")
+                await self._park_if_logged_in()
             for conv in conversations:
                 name = conv["name"]
                 key = (conv["preview"], conv["time"])

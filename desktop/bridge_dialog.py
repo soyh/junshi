@@ -7,6 +7,10 @@ import bridge_plugin as bp
 from management import Dialog
 
 
+WINDOW_MODES = {"hide": "移出桌面（后台运行）", "minimize": "最小化", "show": "保持显示"}
+WINDOW_LABELS = {label: key for key, label in WINDOW_MODES.items()}
+
+
 class BridgeDialog(Dialog):
     def __init__(self, app):
         super().__init__(app, "自动回复通道插件（多开）")
@@ -46,9 +50,15 @@ class BridgeDialog(Dialog):
         self.headless = self.entry(
             "headless", "无头模式（网页自动回复，不弹窗口）", "是", choices=["是", "否"]
         )
+        self.window_mode = self.entry(
+            "window_mode",
+            "登录成功后浏览器窗口",
+            WINDOW_MODES["hide"],
+            choices=list(WINDOW_MODES.values()),
+        )
         ttk.Label(
             self.frame,
-            text="提示：小红书 / Soul 首次启动、或登录态过期时会自动打开可见浏览器窗口供扫码，登录成功后记录登录态并转为无头运行；「刷新状态」显示本机每个通道的当前状态，不再读取服务器汇总。",
+            text="提示：小红书 / Soul 首次启动、或登录态过期时会自动打开可见浏览器窗口供扫码；登录成功后浏览器会移出桌面继续后台运行（不重启、不降速），需要时点「显示浏览器」拿回来。",
             wraplength=560,
         ).pack(anchor="w")
 
@@ -58,6 +68,7 @@ class BridgeDialog(Dialog):
         self.button(row, "启动", self.start_profile)
         self.button(row, "停止", self.stop_profile)
         self.button(row, "启动全部", self.start_all)
+        self.button(row, "显示浏览器", self.show_browser)
         self.button(row, "刷新状态", self.refresh)
         self.button(row, "关闭", self.close)
 
@@ -113,6 +124,7 @@ class BridgeDialog(Dialog):
         self.cap.delete(0, "end"); self.cap.insert(0, str(item["daily_cap"]))
         self.verify.set("是" if item["verify_tls"] else "否")
         self.headless.set("是" if item.get("headless", True) else "否")
+        self.window_mode.set(WINDOW_MODES.get(item.get("browser_window", "hide"), WINDOW_MODES["hide"]))
         state = item.get("status") or ("运行中" if item["running"] else "未运行")
         self.message.set(f"{item['name']}：{state}")
 
@@ -142,6 +154,7 @@ class BridgeDialog(Dialog):
             "quiet": (start, end),
             "verify_tls": self.verify.get() == "是",
             "headless": self.headless.get() == "是",
+            "browser_window": WINDOW_LABELS.get(self.window_mode.get(), "hide"),
         }
 
     def new_profile(self):
@@ -234,6 +247,28 @@ class BridgeDialog(Dialog):
         self.message.set(
             f"已启动 {started} 个通道。" + (" 失败：" + "；".join(failed) if failed else "")
         )
+
+    def show_browser(self):
+        profile_id = self.current
+        if not profile_id:
+            messagebox.showinfo("提示", "先选择一个通道")
+            return
+        if not bp.is_running(profile_id):
+            messagebox.showinfo("提示", "该通道未在运行，启动后浏览器窗口会自动出现")
+            return
+        if bp.show_browser(profile_id):
+            self._log("已把浏览器窗口移回桌面")
+        else:
+            messagebox.showwarning(
+                "没找到窗口",
+                "这个通道的浏览器窗口不在（可能已退出或还没登录）。可以「停止」再「启动」重建窗口。",
+            )
+
+    def _log(self, message):
+        self.text.configure(state="normal")
+        self.text.insert("end", message + "\n")
+        self.text.see("end")
+        self.text.configure(state="disabled")
 
     def refresh(self):
         if self.busy:

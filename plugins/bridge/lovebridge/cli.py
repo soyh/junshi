@@ -1,9 +1,10 @@
-"""Command line entry point: run / doctor / contacts / map / pause / resume."""
+"""Command line entry point: run / doctor / contacts / map / link / window."""
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 import threading
 from datetime import datetime
@@ -53,12 +54,14 @@ def build_channel(config: Config):
             profile_dir=settings.get("profile_dir"),
             interval=float(settings.get("interval", 4.0)),
             headless=bool(settings.get("headless", False)),
+            window_mode=str(settings.get("window_mode", config.bot.browser_window)),
         )
     if kind == "soul":
         return SoulChannel(
             profile_dir=settings.get("profile_dir"),
             interval=float(settings.get("interval", 4.0)),
             headless=bool(settings.get("headless", False)),
+            window_mode=str(settings.get("window_mode", config.bot.browser_window)),
         )
     raise ConfigError(f"unknown channel: {kind}")
 
@@ -241,6 +244,34 @@ def cmd_pause(config: Config, paused: bool) -> int:
         state.close()
 
 
+def cmd_window(config: Config, action: str) -> int:
+    """Reveal (or re-park) the browser owned by a running bridge.
+
+    The panel has no handle on the browser, but the bridge wrote its pid into
+    ``status.json`` next to the config, so the window can be found from there.
+    """
+    from . import window as window_module
+
+    status_path = config.source_path.parent / "status.json"
+    try:
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        print("no status.json: start the channel first", file=sys.stderr)
+        return 1
+    pid = int(status.get("pid") or 0)
+    if not pid:
+        print("status.json has no pid", file=sys.stderr)
+        return 1
+    key = f"{config.channel.kind}:{config.source_path.parent.resolve()}"
+    count = (
+        window_module.show([pid], profile_key=key)
+        if action == "show"
+        else window_module.hide([pid], profile_key=key)
+    )
+    print(f"{action}: {count} window(s)")
+    return 0 if count else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="lovebridge", description="WeChat bridge for AI Love Strategist")
     parser.add_argument("--config", required=True, help="path to config.toml")
@@ -263,6 +294,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("pause", help="stop replying (keeps receiving nothing)")
     sub.add_parser("resume", help="allow replying again")
     sub.add_parser("consolidate", help="merge each person's conversations into one")
+    window_parser = sub.add_parser("window", help="show/hide the automation browser window")
+    window_parser.add_argument("--action", choices=("show", "hide"), default="show")
 
     args = parser.parse_args(argv)
     try:
@@ -287,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_pause(config, False)
     if args.command == "consolidate":
         return asyncio.run(cmd_consolidate(config))
+    if args.command == "window":
+        return cmd_window(config, args.action)
     return 2
 
 

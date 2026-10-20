@@ -38,6 +38,7 @@ class BotConfig:
     max_reply_chars: int = 500
     reply_to_groups: bool = False
     max_concurrency: int = 3
+    browser_window: str = "hide"
     state_path: Path = Path("bridge-state.sqlite3")
 
 
@@ -109,6 +110,7 @@ def load_config(path: str | Path) -> Config:
         max_reply_chars=int(bot_raw.get("max_reply_chars", 500)),
         reply_to_groups=bool(bot_raw.get("reply_to_groups", False)),
         max_concurrency=max(1, int(bot_raw.get("max_concurrency", 3))),
+        browser_window=str(bot_raw.get("browser_window", "hide")).lower(),
         state_path=state_path,
     )
 
