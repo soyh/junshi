@@ -14,6 +14,7 @@ from typing import Callable
 
 from .app_client import AppError, platform_of
 from .channels.base import Channel, InboundEvent
+from .console import write_line
 from .config import BotConfig, Config
 from .state import StateStore
 
@@ -36,7 +37,7 @@ class Orchestrator:
         channel: Channel,
         state: StateStore,
         *,
-        log: Callable[[str], None] = print,
+        log: Callable[[str], None] = write_line,
         now: Callable[[], datetime] = datetime.now,
         rng: Callable[[], float] = random.random,
     ) -> None:
@@ -45,6 +46,9 @@ class Orchestrator:
         self.channel = channel
         self.state = state
         self._log = log
+        setter = getattr(channel, "set_logger", None)
+        if callable(setter):
+            setter(log)
         self._now = now
         self._rng = rng
 

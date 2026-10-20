@@ -19,6 +19,7 @@ from .channels.webhook import WebhookChannel
 from .channels.wxhook import WxhookChannel
 from .channels.xhs import XhsChannel
 from .config import Config, ConfigError, load_config
+from .console import write_line
 from .orchestrator import Orchestrator
 from .state import StateStore
 
@@ -119,9 +120,11 @@ def make_logger(path: Path):
 
     def log(message: str) -> None:
         line = f"{datetime.now():%Y-%m-%d %H:%M:%S} {message}"
-        if sys.stdout is not None:
-            print(line, flush=True)
-        sink.write(line)
+        write_line(line)
+        try:
+            sink.write(line)
+        except OSError:
+            pass
 
     return log
 

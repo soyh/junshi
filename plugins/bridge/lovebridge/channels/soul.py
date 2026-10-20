@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 
 from .. import window
+from ..console import write_line
 from .base import Handler, InboundEvent
 
 CONV_JS = """() => Array.from(document.querySelectorAll('.conv-list .conversation')).map(el => ({
@@ -66,10 +67,13 @@ class SoulChannel:
         self._last: dict[str, tuple[str, str]] = {}
         self._counts: dict[str, int] = {}
         self._warned_login = False
-        self._logged = print
+        self._logged = write_line
 
     def set_handler(self, handler: Handler) -> None:
         self._handler = handler
+
+    def set_logger(self, log) -> None:  # noqa: ANN001
+        self._logged = log
 
     # -- lifecycle --------------------------------------------------------
     @property
