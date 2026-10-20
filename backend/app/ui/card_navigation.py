@@ -41,6 +41,18 @@ CARD_NAVIGATION_STYLE = r'''
   body[data-client-view] #client-merge-panel select{background:#0f1c26;color:#eef5fa;border:1px solid #3d5a6c;border-radius:10px;padding:9px 10px}
   body[data-client-view] #client-merge-panel .client-merge-actions button{background:#126976;border-color:#2b7e86}
   body[data-client-view] #client-merge-panel .client-merge-actions button.secondary{background:transparent;color:#7cc5e8}
+  .nav-channel-panel{position:relative;z-index:2;margin:18px auto 0;max-width:760px;padding:18px;border-radius:18px;border:1px solid #3d5a6c;background:#152430;color:#eef5fa;box-shadow:0 24px 60px #0006}
+  .nav-channel-panel h3{margin:0 0 6px;font-size:1.05rem;color:#c6e4f0}
+  .nav-channel-hint{margin:0 0 12px;color:#9db4c2;font-size:.84rem}
+  .nav-channel-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:12px;background:#0f1c26;border:1px solid #2f4757;margin-bottom:8px}
+  .nav-channel-row:last-child{margin-bottom:0}
+  .nav-channel-name{display:flex;align-items:center;gap:8px;font-weight:600;color:#d7ecf3}
+  .nav-channel-dot{width:9px;height:9px;border-radius:50%;background:#5b6f7c;display:inline-block}
+  .nav-channel-dot.is-online{background:#3ddc97;box-shadow:0 0 10px #3ddc9799}
+  .nav-channel-meta{color:#9db4c2;font-size:.8rem;text-align:right}
+  .nav-channel-actions{display:flex;justify-content:flex-end;margin-top:10px}
+  .nav-channel-actions button{padding:7px 14px;border-radius:999px;border:1px solid #2b7e86;background:#126976;color:#eef5fa;cursor:pointer;font-weight:600}
+  .nav-channel-status{margin-top:8px;color:#9db4c2;font-size:.8rem}
   #client-deck-controls{display:flex;justify-content:center;align-items:center;gap:20px;color:#91aeba}
   #client-deck-controls button{margin:0;border:1px solid #4d9198;color:#b3e5e3;background:transparent;border-radius:8px;padding:10px 20px}
   #client-navigation-status{text-align:center;min-height:24px;color:#bde1df;overflow-wrap:anywhere}
@@ -227,6 +239,78 @@ CARD_NAVIGATION_SCRIPT = r'''
   const navBaseClearForAccount=clearSession;
   clearSession=function(...args){navBaseClearForAccount(...args);navAccountLabel.textContent='';navAccountLabel.title='';};
   navRefreshAccountLabel();
+
+  // Footer: auto-reply channel status (heartbeats reported by the bridge plugin).
+  const navChannelLink=document.createElement('button');
+  navChannelLink.type='button';navChannelLink.id='client-channel-open-nav';navChannelLink.className='nav-channel-link';
+  navChannelLink.textContent='自动回复通道';
+  navFooter.insertBefore(navChannelLink,byId('logout'));
+
+  const navChannelPanel=clientEl('section','nav-channel-panel');
+  navChannelPanel.id='client-channel-panel';navChannelPanel.hidden=true;
+  const navChannelTitle=clientEl('h3','','自动回复通道');
+  const navChannelHint=clientEl('p','nav-channel-hint','微信 / 小红书 / Soul 的桥接进程每 60 秒上报一次心跳；超过 3 分钟没有心跳视为离线。');
+  const navChannelList=clientEl('div','nav-channel-list');navChannelList.id='client-channel-list';
+  const navChannelActions=clientEl('div','nav-channel-actions');
+  const navChannelRefresh=clientEl('button','','刷新');navChannelRefresh.type='button';navChannelRefresh.id='client-channel-refresh';
+  navChannelActions.append(navChannelRefresh);
+  const navChannelStatus=clientEl('div','nav-channel-status');navChannelStatus.id='client-channel-status';
+  navChannelPanel.append(navChannelTitle,navChannelHint,navChannelList,navChannelActions,navChannelStatus);
+  byId('client-person-stage').insertBefore(navChannelPanel,byId('client-deck-controls'));
+
+  const NAV_CHANNEL_META={wechat:{label:'微信'},wechatauto:{label:'微信'},xhs:{label:'小红书'},soul:{label:'Soul'}};
+  const NAV_CHANNEL_ORDER=['wechat','xhs','soul'];
+  let navChannelTimer=null;
+
+  function navChannelAge(updatedAt){
+    const parsed=Date.parse(updatedAt);if(!parsed)return null;
+    return (Date.now()-parsed)/1000;
+  }
+
+  async function navRenderChannels(){
+    if(!currentAccessToken){navChannelStatus.textContent='请先登录。';return;}
+    const rows=await api('/api/v1/bridge/status');
+    const byKey={};
+    rows.forEach(row=>{const key=row.channel==='wechatauto'?'wechat':row.channel;byKey[key]=row;});
+    navChannelList.replaceChildren();
+    NAV_CHANNEL_ORDER.forEach(key=>{
+      const row=byKey[key],meta=NAV_CHANNEL_META[key];
+      const item=clientEl('div','nav-channel-row');
+      const left=clientEl('div','nav-channel-name');
+      const dot=clientEl('span','nav-channel-dot');
+      const age=row?navChannelAge(row.updated_at):null;
+      if(row&&row.status==='online'&&age!==null&&age<180)dot.classList.add('is-online');
+      left.append(dot,clientEl('span','',meta.label));
+      const right=clientEl('div','nav-channel-meta');
+      if(row){
+        const when=age===null?'未知':(age<60?'刚刚':(age<3600?`${Math.round(age/60)} 分钟前`:`${Math.round(age/3600)} 小时前`));
+        right.textContent=`今日回复 ${row.replies_today} · ${when}`;
+      }else{
+        right.textContent='未上报';
+      }
+      item.append(left,right);
+      navChannelList.append(item);
+    });
+    navChannelStatus.textContent=rows.length?'心跳每 60 秒自动刷新。':'还没有通道上报心跳，确认桥接进程是否在运行。';
+  }
+
+  async function navRefreshChannels(){
+    try{await navRenderChannels();}
+    catch(error){navChannelStatus.textContent=error instanceof Error?error.message:String(error);}
+  }
+
+  navChannelLink.addEventListener('click',async()=>{
+    navChannelPanel.hidden=!navChannelPanel.hidden;
+    if(navChannelPanel.hidden){
+      if(navChannelTimer){clearInterval(navChannelTimer);navChannelTimer=null;}
+      return;
+    }
+    await navRefreshChannels();
+    navChannelPanel.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});
+    if(navChannelTimer)clearInterval(navChannelTimer);
+    navChannelTimer=setInterval(navRefreshChannels,60000);
+  });
+  navChannelRefresh.addEventListener('click',navRefreshChannels);
 
   navShow('auth');
 '''

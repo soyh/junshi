@@ -61,6 +61,35 @@ def test_consolidate_merges_platform_conversations(client):
     assert [c["id"] for c in conversations] == [wechat["id"]]
 
 
+def test_pc_ingest_records_platform_source(client):
+    from app.core.database import get_connection
+
+    person = _person(client, "平台来源人物")
+    conversation = _conversation(client, person["id"], "小红书")
+
+    response = client.post(
+        "/api/v1/pc/messages",
+        json={
+            "conversation_id": conversation["id"],
+            "sender_type": "person",
+            "content": "来自小红书的消息",
+            "operation_id": "11111111-1111-1111-1111-111111111111",
+            "platform": "xhs",
+            "platform_account_id": "acc-1",
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT platform, account_id FROM message_platform_sources WHERE message_id = ?",
+            (response.json()["id"],),
+        ).fetchone()
+    assert row is not None
+    assert row["platform"] == "xhs"
+    assert row["account_id"] == "acc-1"
+
+
 def test_consolidate_rejects_foreign_target(client):
     first = _person(client, "甲")
     second = _person(client, "乙")
