@@ -43,12 +43,21 @@ class BridgeDialog(Dialog):
         self.quiet = self.entry("quiet", "静默时段（开始-结束）", "03:00-05:30")
         self.cap = self.entry("cap", "每日回复上限", "30")
         self.verify = self.entry("verify", "校验 HTTPS 证书", "是", choices=["是", "否"])
+        self.headless = self.entry(
+            "headless", "无头模式（网页自动回复，不弹窗口）", "是", choices=["是", "否"]
+        )
+        ttk.Label(
+            self.frame,
+            text="提示：小红书 / Soul 首次登录会自动弹出一次扫码窗口，登录成功后记录登录态，之后按无头模式运行；需要重新扫码时把“无头模式”改为“否”并重启一次。",
+            wraplength=560,
+        ).pack(anchor="w")
 
         row = ttk.Frame(self.frame)
         row.pack(fill="x")
         self.button(row, "保存配置", self.save)
         self.button(row, "启动", self.start_profile)
         self.button(row, "停止", self.stop_profile)
+        self.button(row, "启动全部", self.start_all)
         self.button(row, "刷新状态", self.refresh)
         self.button(row, "关闭", self.close)
 
@@ -56,6 +65,15 @@ class BridgeDialog(Dialog):
         self.text.pack(fill="both", expand=True, pady=(6, 0))
         self.footer()
         self.reload()
+        self.window.after(15000, self._auto_refresh)
+
+    def _auto_refresh(self):
+        try:
+            if self.window.winfo_exists():
+                self.refresh()
+                self.window.after(15000, self._auto_refresh)
+        except Exception:
+            pass
 
     # -- profile list -----------------------------------------------------
     def reload(self, select=None):
@@ -94,6 +112,7 @@ class BridgeDialog(Dialog):
         self.quiet.delete(0, "end"); self.quiet.insert(0, f"{item['quiet'][0]}-{item['quiet'][1]}")
         self.cap.delete(0, "end"); self.cap.insert(0, str(item["daily_cap"]))
         self.verify.set("是" if item["verify_tls"] else "否")
+        self.headless.set("是" if item.get("headless", True) else "否")
         state = "运行中" if item["running"] else "未运行"
         self.message.set(f"{item['name']}：{state}")
 
@@ -122,14 +141,26 @@ class BridgeDialog(Dialog):
             "daily_cap": cap,
             "quiet": (start, end),
             "verify_tls": self.verify.get() == "是",
+            "headless": self.headless.get() == "是",
         }
 
     def new_profile(self):
-        profile_id = bp.create_profile()
+        try:
+            values = self._values()
+        except ValueError as exc:
+            self.message.set(str(exc))
+            return
+        label = self.channel.get()
+        values["name"] = f"{label}通道"
+        values["channel"] = bp.CHANNEL_LABELS.get(label, "wechat")
+        try:
+            profile_id = bp.create_profile(**values)
+        except (ValueError, OSError) as exc:
+            self.message.set(str(exc))
+            return
         self.current = profile_id
         self.reload(select=profile_id)
-        self._fill(self.name, "新通道")
-        self.message.set("已新建配置，填写后点「保存配置」。")
+        self.message.set("已新建通道配置，可直接点「启动」。")
 
     def delete_profile(self):
         if not self.current:
@@ -146,17 +177,27 @@ class BridgeDialog(Dialog):
         if not self.current:
             self.message.set("请先新建通道配置。")
             return
+        before = self.profiles.get(self.current, {})
         try:
             bp.save_profile(self.current, **self._values())
         except ValueError as exc:
             self.message.set(str(exc))
             return
+        changed = (
+            before.get("running")
+            and before.get("channel") != self._values()["channel"]
+        )
         self.reload(select=self.current)
-        self.message.set("配置已保存。")
+        self.message.set(
+            "配置已保存；平台通道变更需先「停止」再「启动」才会生效。" if changed else "配置已保存。"
+        )
 
     def start_profile(self):
         if not self.current:
             self.message.set("请先新建并保存通道配置。")
+            return
+        if self.profiles.get(self.current, {}).get("running"):
+            self.message.set("该通道已在运行；如更换了平台，请先「停止」再「启动」。")
             return
         try:
             bp.save_profile(self.current, **self._values())
@@ -178,6 +219,21 @@ class BridgeDialog(Dialog):
         count = bp.stop_all()
         self.reload()
         self.message.set(f"已停止 {count} 个通道。")
+
+    def start_all(self):
+        started, failed = 0, []
+        for profile_id, item in list(self.profiles.items()):
+            if item.get("running"):
+                continue
+            try:
+                bp.start(profile_id)
+                started += 1
+            except (ValueError, OSError) as exc:
+                failed.append(f"{item['name']}：{exc}")
+        self.reload(select=self.current)
+        self.message.set(
+            f"已启动 {started} 个通道。" + (" 失败：" + "；".join(failed) if failed else "")
+        )
 
     def refresh(self):
         if self.busy:

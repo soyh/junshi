@@ -72,6 +72,7 @@ def build_config(
     quiet: tuple[str, str] = DEFAULT_QUIET,
     verify_tls: bool = True,
     browser_dir: str | None = None,
+    headless: bool = True,
 ) -> str:
     if channel not in set(CHANNELS) | {"mock"}:
         raise ValueError("不支持的平台通道")
@@ -107,8 +108,13 @@ state_path = "state.sqlite3"
 [channel]
 kind = {_toml(channel)}
 """
-    if channel in ("xhs", "soul") and browser_dir:
-        text += f"\n[channel.{channel}]\nprofile_dir = {_toml(browser_dir)}\ninterval = 4.0\n"
+    if channel in ("xhs", "soul"):
+        text += (
+            f"\n[channel.{channel}]\n"
+            f"profile_dir = {_toml(browser_dir or '')}\n"
+            "interval = 4.0\n"
+            f"headless = {'true' if headless else 'false'}\n"
+        )
     return text
 
 
@@ -143,6 +149,7 @@ def summary(profile_id: str) -> dict:
         "username": str(app.get("username", "")),
         "password": str(app.get("password", "")),
         "channel": str(channel.get("kind", "wechat")),
+        "headless": bool(channel.get(str(channel.get("kind", "")), {}).get("headless", True)),
         "dry_run": bool(bot.get("dry_run", True)),
         "daily_cap": int(bot.get("daily_reply_cap", 30)),
         "quiet": (str(quiet[0]), str(quiet[1])),
@@ -174,9 +181,16 @@ def list_profiles() -> list[dict]:
     return items
 
 
-def create_profile(name: str = "新通道") -> str:
+def create_profile(name: str = "新通道", **kwargs) -> str:
+    """Create a profile; with complete settings the config is written at once."""
     profile_id = uuid.uuid4().hex[:8]
     profile_dir(profile_id)
+    required = {"server", "username", "password", "channel"}
+    if required <= kwargs.keys():
+        kwargs.setdefault("name", name)
+        channel = kwargs.get("channel", "wechat")
+        kwargs.setdefault("browser_dir", str(profile_dir(profile_id) / "browser" / channel))
+        save_profile(profile_id, **kwargs)
     return profile_id
 
 

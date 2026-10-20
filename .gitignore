@@ -101,3 +101,4 @@ desktop/builds/
 # Bridge runtime profiles and probe screenshots
 plugins/bridge/profiles/
 plugins/bridge/screenshots/
+/build/

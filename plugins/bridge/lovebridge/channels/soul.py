@@ -66,23 +66,48 @@ class SoulChannel:
         self._handler = handler
 
     # -- lifecycle --------------------------------------------------------
+    @property
+    def _login_marker(self) -> Path:
+        return self._profile / ".logged-in"
+
     async def start(self) -> None:
         from playwright.async_api import async_playwright
 
         self._profile.mkdir(parents=True, exist_ok=True)
         self._pw = await async_playwright().start()
+        await self._launch(headless=self._headless)
+        await self._ensure_chat()
+        # Already-logged-in profiles stay headless; a fresh profile gets one
+        # visible window so the user can scan.
+        if self._headless and not self._login_marker.is_file():
+            if not await self._page.locator(".conv-list").count():
+                self._logged("[soul] 首次登录：已弹出扫码窗口；登录成功后自动转为无头运行")
+                await self._relaunch_headed()
+                await self._ensure_chat()
+        await self._baseline()
+        self._running = True
+        self._task = asyncio.create_task(self._poll())
+
+    async def _launch(self, headless: bool) -> None:
         self._ctx = await self._pw.chromium.launch_persistent_context(
             str(self._profile),
             channel="msedge",
-            headless=self._headless,
+            headless=headless,
             viewport={"width": 1280, "height": 900},
             args=["--disable-blink-features=AutomationControlled"],
         )
         self._page = self._ctx.pages[0] if self._ctx.pages else await self._ctx.new_page()
-        await self._ensure_chat()
-        await self._baseline()
-        self._running = True
-        self._task = asyncio.create_task(self._poll())
+
+    async def _relaunch_headed(self) -> None:
+        try:
+            await self._ctx.close()
+        except Exception:
+            pass
+        await self._launch(headless=False)
+        try:
+            await self._page.bring_to_front()
+        except Exception:
+            pass
 
     async def healthy(self) -> bool:
         return await self.status() == "online"
@@ -227,6 +252,9 @@ class SoulChannel:
         async with self._lock:
             await self._ensure_chat()
             conversations = await self._conversations()
+            if conversations and not self._login_marker.is_file():
+                self._login_marker.write_text("ok", encoding="ascii")
+                self._logged("[soul] 登录态已记录，下次将以无头模式运行")
             for conv in conversations:
                 name = conv["name"]
                 key = (conv["preview"], conv["time"])
