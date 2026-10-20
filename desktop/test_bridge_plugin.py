@@ -219,3 +219,32 @@ def test_headless_can_be_turned_off(plugin_home):
     )
     assert "headless = false" in text
 
+
+
+def test_reply_rules_round_trip_per_profile(plugin_home):
+    rules = "称呼对方“小满”，每次不超过两句，不用问句收尾。"
+    profile_id = bp.create_profile(
+        name="小红书通道",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="xhs",
+        rules=rules,
+    )
+    item = {row["id"]: row for row in bp.list_profiles()}[profile_id]
+    assert item["rules"] == rules
+    text = bp.config_path(profile_id).read_text(encoding="utf-8")
+    assert "rules = " in text
+
+
+def test_reply_rules_default_to_empty_and_are_optional(plugin_home):
+    text = bp.build_config("x", "https://example.com", "u", "password-123456", "wechat")
+    assert 'rules = ""' in text
+    profile_id = bp.create_profile(
+        name="微信通道",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="wechat",
+    )
+    assert {row["id"]: row for row in bp.list_profiles()}[profile_id]["rules"] == ""

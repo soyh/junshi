@@ -11,8 +11,8 @@ class FakeService:
         self.error = error
         self.calls = []
 
-    def build_context(self, conn, user_id, conversation_id, *, provider=None):
-        self.calls.append((conn, user_id, conversation_id, provider))
+    def build_context(self, conn, user_id, conversation_id, *, provider=None, channel_rules=""):
+        self.calls.append((conn, user_id, conversation_id, provider, channel_rules))
         if self.error is not None:
             raise self.error
         return self.result
@@ -83,7 +83,25 @@ def test_analysis_strategic_reply_route_returns_derived_input(monkeypatch):
         "00000000-0000-0000-0000-000000000001",
         "conversation-1",
         fake_provider,
+        "",
     )
+
+
+def test_analysis_strategic_reply_route_forwards_channel_rules(monkeypatch):
+    fake_service = FakeService(result=strategic_reply_result())
+    fake_provider = FakeProvider()
+    monkeypatch.setattr(analysis_strategic_reply, "service", fake_service)
+    monkeypatch.setattr(analysis_strategic_reply, "QwenProvider", lambda: fake_provider)
+    rules = "称呼对方“小满”，每次不超过两句，不用问句收尾。"
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/conversations/conversation-1/strategic-reply/context",
+            json={"rules": rules},
+        )
+
+    assert response.status_code == 200
+    assert fake_service.calls[0][4] == rules
 
 
 def test_analysis_strategic_reply_route_translates_llm_failure(monkeypatch):

@@ -78,6 +78,7 @@ def build_config(
     browser_dir: str | None = None,
     headless: bool = True,
     browser_window: str = "hide",
+    rules: str = "",
 ) -> str:
     if channel not in set(CHANNELS) | {"mock"}:
         raise ValueError("不支持的平台通道")
@@ -107,6 +108,7 @@ daily_reply_cap = {int(daily_cap)}
 quiet_hours = [{_toml(quiet[0])}, {_toml(quiet[1])}]
 max_reply_chars = 500
 reply_to_groups = false
+rules = {_toml(str(rules or "").strip())}
 max_concurrency = 2
 browser_window = {_toml(browser_window)}
 state_path = "state.sqlite3"
@@ -162,6 +164,7 @@ def summary(profile_id: str) -> dict:
         "daily_cap": int(bot.get("daily_reply_cap", 30)),
         "quiet": (str(quiet[0]), str(quiet[1])),
         "verify_tls": bool(app.get("verify_tls", True)),
+        "rules": str(bot.get("rules", "")),
         "running": is_running(profile_id),
         "status": local_status(profile_id)["status"],
     }
@@ -229,10 +232,19 @@ def executable_command(profile_id: str, subcommand: str = "run") -> tuple[list[s
 
 def show_browser(profile_id: str) -> bool:
     """Bring a parked browser window back to the desktop (no restart)."""
+    return _window_action(profile_id, "show")
+
+
+def hide_browser(profile_id: str) -> bool:
+    """Move the automation browser off the desktop while the bridge keeps running."""
+    return _window_action(profile_id, "hide")
+
+
+def _window_action(profile_id: str, action: str) -> bool:
     if not is_running(profile_id):
         return False
     command, environment = executable_command(profile_id, "window")
-    command += ["--action", "show"]
+    command += ["--action", action]
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
     try:
         result = subprocess.run(

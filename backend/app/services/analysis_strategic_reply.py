@@ -171,6 +171,7 @@ class AnalysisStrategicReplyService:
         *,
         provider=None,
         progress=None,
+        channel_rules: str = "",
     ) -> dict:
         started = perf_counter()
         timings = {"analysis_seconds": 0.0, "draft_seconds": 0.0,
@@ -228,6 +229,7 @@ class AnalysisStrategicReplyService:
             "required_evidence_source_ids": conversation_focus.get(
                 "required_evidence_source_ids", []
             ),
+            "channel_rules": (channel_rules or "").strip()[:1500],
             "constraints": {
                 "must_be_evidence_backed": True,
                 "must_prioritize_current_conversation": True,
@@ -235,6 +237,9 @@ class AnalysisStrategicReplyService:
                 "must_preserve_unknowns": True,
                 "must_not_auto_send": True,
                 "must_not_auto_execute": True,
+                # channel_rules is operator style guidance only; it ranks below
+                # every safety, provenance and schema rule above.
+                "channel_rules_scope": "style_only",
             },
         }
         for attempt in range(self.MAX_CORRECTIONS + 1):

@@ -37,6 +37,7 @@ class BotConfig:
     quiet_hours: tuple[str, str] | None = None
     max_reply_chars: int = 500
     reply_to_groups: bool = False
+    rules: str = ""
     max_concurrency: int = 3
     browser_window: str = "hide"
     state_path: Path = Path("bridge-state.sqlite3")
@@ -108,6 +109,7 @@ def load_config(path: str | Path) -> Config:
         daily_reply_cap=int(bot_raw.get("daily_reply_cap", 150)),
         quiet_hours=quiet,
         max_reply_chars=int(bot_raw.get("max_reply_chars", 500)),
+        rules=str(bot_raw.get("rules", "") or ""),
         reply_to_groups=bool(bot_raw.get("reply_to_groups", False)),
         max_concurrency=max(1, int(bot_raw.get("max_concurrency", 3))),
         browser_window=str(bot_raw.get("browser_window", "hide")).lower(),

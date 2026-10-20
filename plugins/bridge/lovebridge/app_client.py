@@ -248,13 +248,17 @@ class AppClient:
             timeout=15.0,
         )
 
-    async def get_reply_context(self, conversation_id: str) -> dict:
-        """Calls the LLM chain; may take tens of seconds."""
-        return await self._request(
-            "GET",
-            f"/api/v1/conversations/{conversation_id}/strategic-reply/context",
-            timeout=max(self._timeout, 180.0),
-        )
+    async def get_reply_context(self, conversation_id: str, rules: str = "") -> dict:
+        """Calls the LLM chain; may take tens of seconds.
+
+        Extra per-channel rules travel in a POST body because they can be long;
+        without rules the plain GET keeps the previous behaviour.
+        """
+        path = f"/api/v1/conversations/{conversation_id}/strategic-reply/context"
+        timeout = max(self._timeout, 180.0)
+        if rules.strip():
+            return await self._request("POST", path, json={"rules": rules}, timeout=timeout)
+        return await self._request("GET", path, timeout=timeout)
 
     # -- relationship scoping ---------------------------------------------
     async def list_relationships(self) -> list[dict]:

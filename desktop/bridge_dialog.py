@@ -4,11 +4,15 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 import bridge_plugin as bp
-from management import Dialog
+from management import Dialog, Section, scrollable
 
 
 WINDOW_MODES = {"hide": "移出桌面（后台运行）", "minimize": "最小化", "show": "保持显示"}
 WINDOW_LABELS = {label: key for key, label in WINDOW_MODES.items()}
+RULES_HINT = (
+    "只影响语气、称呼、长度、用词、表情和话题偏好。\n"
+    "不能覆盖证据、安全边界和发送前确认，写了也会被忽略。"
+)
 
 
 class BridgeDialog(Dialog):
@@ -16,68 +20,122 @@ class BridgeDialog(Dialog):
         super().__init__(app, "自动回复通道插件（多开）")
         self.profiles = {}
         self.current = None
+        self.window.minsize(900, 560)
+        self.fit(1080, 700)
 
-        ttk.Label(self.frame, text="通道配置（每个配置独立账号、平台登录态与进程，可同时运行）").pack(anchor="w")
         ttk.Label(
             self.frame,
-            text="微信：一个 Windows 会话只能登录一个微信号，多开需不同 Windows 用户或虚拟机；小红书 / Soul：每个配置独立浏览器登录态，可并行。",
-            wraplength=560,
+            text="每个通道独立账号、独立浏览器登录态与独立进程，可同时运行；微信一个 Windows 会话只能登一个号。",
+            wraplength=900,
         ).pack(anchor="w")
-        list_row = ttk.Frame(self.frame)
-        list_row.pack(fill="both", expand=True, pady=(4, 6))
-        self.listbox = tk.Listbox(list_row, height=6, exportselection=False)
+
+        body = ttk.Frame(self.frame)
+        body.pack(fill="both", expand=True, pady=(6, 0))
+        left = ttk.Frame(body)
+        left.pack(side="left", fill="y")
+        right_wrap = ttk.Frame(body)
+        right_wrap.pack(side="left", fill="both", expand=True, padx=(12, 0))
+
+        self._build_left(left)
+        self._build_right(scrollable(right_wrap))
+
+        self.footer()
+        self.reload()
+        self.window.after(15000, self._auto_refresh)
+
+    # -- layout -----------------------------------------------------------
+    def _build_left(self, parent):
+        channels = Section(parent, "通道列表", open=True)
+        list_row = ttk.Frame(channels.body)
+        list_row.pack(fill="both", expand=True)
+        self.listbox = tk.Listbox(list_row, height=11, width=38, exportselection=False)
         self.listbox.pack(side="left", fill="both", expand=True)
         scroll = ttk.Scrollbar(list_row, command=self.listbox.yview)
         scroll.pack(side="left", fill="y")
         self.listbox.configure(yscrollcommand=scroll.set)
         self.listbox.bind("<<ListboxSelect>>", lambda _event: self.load_selected())
 
-        row = ttk.Frame(self.frame)
-        row.pack(fill="x")
+        row = ttk.Frame(channels.body)
+        row.pack(fill="x", pady=(4, 0))
         self.button(row, "新建通道", self.new_profile)
         self.button(row, "删除当前", self.delete_profile)
         self.button(row, "全部停止", self.stop_all)
 
-        self.name = self.entry("name", "配置名称", "新通道")
-        self.server = self.entry("server", "服务器", app.server.get())
-        self.username = self.entry("username", "军师账号", app.username.get())
-        self.password = self.entry("password", "军师密码", "", secret=True)
-        self.channel = self.entry("channel", "平台通道", "微信", choices=list(bp.CHANNELS.values()))
-        self.dry_run = self.entry("dry_run", "先试运行（只生成不发送）", "是", choices=["是", "否"])
-        self.quiet = self.entry("quiet", "静默时段（开始-结束）", "03:00-05:30")
-        self.cap = self.entry("cap", "每日回复上限", "30")
-        self.verify = self.entry("verify", "校验 HTTPS 证书", "是", choices=["是", "否"])
-        self.headless = self.entry(
-            "headless", "无头模式（网页自动回复，不弹窗口）", "是", choices=["是", "否"]
+        logs = Section(parent, "运行日志", open=False)
+        text_row = ttk.Frame(logs.body)
+        text_row.pack(fill="both", expand=True)
+        self.text = tk.Text(text_row, height=8, width=38, wrap="word", state="disabled")
+        self.text.pack(side="left", fill="both", expand=True)
+        bar = ttk.Scrollbar(text_row, command=self.text.yview)
+        bar.pack(side="left", fill="y")
+        self.text.configure(yscrollcommand=bar.set)
+
+    def _build_right(self, parent):
+        account = Section(parent, "基础连接", open=True)
+        grid = account.body
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=1)
+        self.name = self._cell(grid, 0, 0, "name", "配置名称", "新通道")
+        self.channel = self._cell(grid, 0, 1, "channel", "平台通道", "微信", choices=list(bp.CHANNELS.values()))
+        self.server = self._cell(grid, 1, 0, "server", "服务器", self.app.server.get())
+        self.username = self._cell(grid, 1, 1, "username", "军师账号", self.app.username.get())
+        self.password = self._cell(grid, 2, 0, "password", "军师密码", "", secret=True)
+
+        policy = Section(parent, "运行策略", open=True)
+        grid = policy.body
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=1)
+        self.dry_run = self._cell(grid, 0, 0, "dry_run", "先试运行（只生成不发送）", "是", choices=["是", "否"])
+        self.headless = self._cell(
+            grid, 0, 1, "headless", "登录后隐藏浏览器（后台运行）", "是", choices=["是", "否"]
         )
-        self.window_mode = self.entry(
-            "window_mode",
-            "登录成功后浏览器窗口",
-            WINDOW_MODES["hide"],
-            choices=list(WINDOW_MODES.values()),
+        self.window_mode = self._cell(
+            grid, 1, 0, "window_mode", "隐藏方式", WINDOW_MODES["hide"], choices=list(WINDOW_MODES.values())
         )
+        self.quiet = self._cell(grid, 1, 1, "quiet", "静默时段（开始-结束）", "03:00-05:30")
+        self.cap = self._cell(grid, 2, 0, "cap", "每日回复上限", "30")
+        self.verify = self._cell(grid, 2, 1, "verify", "校验 HTTPS 证书", "是", choices=["是", "否"])
+
+        rules = Section(parent, "回复规则 / Prompt（可选，仅本通道）", open=False)
+        ttk.Label(rules.body, text=RULES_HINT, foreground="#555").pack(anchor="w")
+        text_row = ttk.Frame(rules.body)
+        text_row.pack(fill="both", expand=True, pady=(2, 0))
+        self.rules = tk.Text(text_row, height=5, wrap="word")
+        self.rules.pack(side="left", fill="both", expand=True)
+        bar = ttk.Scrollbar(text_row, command=self.rules.yview)
+        bar.pack(side="left", fill="y")
+        self.rules.configure(yscrollcommand=bar.set)
+        self.widgets.append((self.rules, "normal"))
+        ttk.Button(rules.body, text="恢复默认（清空）", command=lambda: self.rules.delete("1.0", "end")).pack(
+            anchor="e", pady=(4, 0)
+        )
+
+        actions = ttk.Frame(parent)
+        actions.pack(fill="x", pady=(2, 4))
+        self.button(actions, "保存配置", self.save)
+        self.button(actions, "启动", self.start_profile)
+        self.button(actions, "停止", self.stop_profile)
+        self.button(actions, "启动全部", self.start_all)
+        self.button(actions, "显示浏览器", self.show_browser)
+        self.button(actions, "隐藏浏览器", self.hide_browser)
+        self.button(actions, "刷新状态", self.refresh)
+        self.button(actions, "关闭", self.close)
+
         ttk.Label(
-            self.frame,
-            text="提示：小红书 / Soul 首次启动、或登录态过期时会自动打开可见浏览器窗口供扫码；登录成功后浏览器会移出桌面继续后台运行（不重启、不降速），需要时点「显示浏览器」拿回来。",
-            wraplength=560,
+            parent,
+            text=(
+                "首次启动或登录态过期会自动弹出可见浏览器窗口供扫码；登录成功后按“隐藏方式”处理。"
+                "状态以本机当前为准（每 15 秒刷新）。"
+            ),
+            wraplength=620,
         ).pack(anchor="w")
 
-        row = ttk.Frame(self.frame)
-        row.pack(fill="x")
-        self.button(row, "保存配置", self.save)
-        self.button(row, "启动", self.start_profile)
-        self.button(row, "停止", self.stop_profile)
-        self.button(row, "启动全部", self.start_all)
-        self.button(row, "显示浏览器", self.show_browser)
-        self.button(row, "刷新状态", self.refresh)
-        self.button(row, "关闭", self.close)
+    def _cell(self, grid, row, column, key, label, value="", choices=None, secret=False):
+        holder = ttk.Frame(grid)
+        holder.grid(row=row, column=column, sticky="ew", padx=4, pady=1)
+        return self.entry(key, label, value, choices, secret, parent=holder)
 
-        self.text = tk.Text(self.frame, height=5, wrap="word", state="disabled")
-        self.text.pack(fill="both", expand=True, pady=(6, 0))
-        self.footer()
-        self.reload()
-        self.window.after(15000, self._auto_refresh)
-
+    # -- refresh ----------------------------------------------------------
     def _auto_refresh(self):
         try:
             if self.window.winfo_exists():
@@ -86,12 +144,11 @@ class BridgeDialog(Dialog):
         except Exception:
             pass
 
-    # -- profile list -----------------------------------------------------
     def reload(self, select=None):
         self.profiles = {item["id"]: item for item in bp.list_profiles()}
         self.listbox.delete(0, "end")
         order = list(self.profiles)
-        for index, profile_id in enumerate(order):
+        for profile_id in order:
             item = self.profiles[profile_id]
             dot = "●" if item["running"] else "○"
             label = bp.CHANNELS.get(item["channel"], item["channel"])
@@ -125,6 +182,9 @@ class BridgeDialog(Dialog):
         self.verify.set("是" if item["verify_tls"] else "否")
         self.headless.set("是" if item.get("headless", True) else "否")
         self.window_mode.set(WINDOW_MODES.get(item.get("browser_window", "hide"), WINDOW_MODES["hide"]))
+        self.rules.delete("1.0", "end")
+        if item.get("rules"):
+            self.rules.insert("1.0", item["rules"])
         state = item.get("status") or ("运行中" if item["running"] else "未运行")
         self.message.set(f"{item['name']}：{state}")
 
@@ -155,6 +215,7 @@ class BridgeDialog(Dialog):
             "verify_tls": self.verify.get() == "是",
             "headless": self.headless.get() == "是",
             "browser_window": WINDOW_LABELS.get(self.window_mode.get(), "hide"),
+            "rules": self.rules.get("1.0", "end").strip(),
         }
 
     def new_profile(self):
@@ -196,10 +257,7 @@ class BridgeDialog(Dialog):
         except ValueError as exc:
             self.message.set(str(exc))
             return
-        changed = (
-            before.get("running")
-            and before.get("channel") != self._values()["channel"]
-        )
+        changed = before.get("running") and before.get("channel") != self._values()["channel"]
         self.reload(select=self.current)
         self.message.set(
             "配置已保存；平台通道变更需先「停止」再「启动」才会生效。" if changed else "配置已保存。"
@@ -219,7 +277,7 @@ class BridgeDialog(Dialog):
             self.message.set(str(exc))
             return
         self.reload(select=self.current)
-        self.message.set(f"已启动（进程 {pid}）。")
+        self.message.set(f"已启动（进程 {pid}）；首次登录会自动弹出浏览器窗口。")
 
     def stop_profile(self):
         if not self.current:
@@ -262,6 +320,23 @@ class BridgeDialog(Dialog):
             messagebox.showwarning(
                 "没找到窗口",
                 "这个通道的浏览器窗口不在（可能已退出或还没登录）。可以「停止」再「启动」重建窗口。",
+            )
+
+    def hide_browser(self):
+        profile_id = self.current
+        if not profile_id:
+            messagebox.showinfo("提示", "先选择一个通道")
+            return
+        if not bp.is_running(profile_id):
+            messagebox.showinfo("提示", "该通道未在运行")
+            return
+        if bp.hide_browser(profile_id):
+            self._log("已把浏览器窗口移出桌面")
+            self.message.set("浏览器已隐藏，通道继续在后台运行。")
+        else:
+            messagebox.showwarning(
+                "没找到窗口",
+                "这个通道没有可见的浏览器窗口（可能已经在后台，或还没登录）。",
             )
 
     def _log(self, message):

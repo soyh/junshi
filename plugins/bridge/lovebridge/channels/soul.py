@@ -61,6 +61,7 @@ class SoulChannel:
         self._page = None
         self._running = False
         self._task: asyncio.Task | None = None
+        self._watch: asyncio.Task | None = None
         self._lock = asyncio.Lock()
         self._last: dict[str, tuple[str, str]] = {}
         self._counts: dict[str, int] = {}
@@ -80,18 +81,23 @@ class SoulChannel:
 
         self._profile.mkdir(parents=True, exist_ok=True)
         self._pw = await async_playwright().start()
-        # A profile without a recorded login must open a visible window,
-        # otherwise the user has no way to scan the QR code.
-        self._headed = not self._headless or not self._login_marker.is_file()
-        await self._launch(headless=not self._headed)
-        if self._headed and not self._login_marker.is_file():
+        # Always open a real window: if the session is still valid it is parked a
+        # moment later, and if it expired the login wall is already on screen.
+        # (A headless start hides the login wall and looks like "nothing happens".)
+        self._headed = True
+        await self._launch(headless=False)
+        if self._login_marker.is_file():
+            await self._park_if_logged_in()
+        else:
             self._logged("[soul] 尚未登录：已打开可见浏览器窗口，请扫码；登录后会自动隐藏窗口")
         await self._ensure_chat()
         await self._maybe_mark_logged_in()
-        await self._park_if_logged_in()
+        if not self._parked and await self.status() == "online":
+            await self._park_if_logged_in()
         await self._baseline()
         self._running = True
         self._task = asyncio.create_task(self._poll())
+        self._watch = asyncio.create_task(self._watch_login())
 
     async def _launch(self, headless: bool) -> None:
         self._ctx = await self._pw.chromium.launch_persistent_context(
@@ -124,12 +130,55 @@ class SoulChannel:
         try:
             if await self._page.locator(".conv-list").count() and not self._login_marker.is_file():
                 self._login_marker.write_text("ok", encoding="ascii")
-                self._logged("[soul] 登录成功，已记录登录态；下次启动将无头运行")
+                self._logged("[soul] 登录成功，已记录登录态；下次启动时窗口会直接隐藏")
         except Exception:
             pass
 
     def _profile_key(self) -> str:
         return f"soul:{self._profile.resolve()}"
+
+    async def _login_wall(self) -> bool:
+        """True while Soul shows a QR / phone login screen."""
+        page = self._page
+        if page is None:
+            return False
+        try:
+            if await page.locator(".login-modal, .login-mask, [class*=qr-login]").count():
+                return True
+            text = await page.evaluate(PAGE_TEXT_JS) or ""
+        except Exception:
+            return False
+        return "扫码登录" in text or "手机号登录" in text
+
+    async def _need_login(self, reason: str) -> None:
+        """Guarantee the login wall is visible: relaunch headed or un-park it."""
+        if not getattr(self, "_headed", True):
+            await self._show_window(reason)
+            return
+        await self._reveal_window()
+        try:
+            await self._page.bring_to_front()
+        except Exception:
+            pass
+        if not self._warned_login:
+            self._warned_login = True
+            self._logged(
+                f"[soul] {reason}：请在浏览器窗口用 Soul App 扫码；"
+                "登录成功后状态会自动变成 在线"
+            )
+
+    async def _watch_login(self) -> None:
+        """Keep the login wall in front of the user for three minutes after start."""
+        for _ in range(36):
+            await asyncio.sleep(5)
+            if not self._running:
+                return
+            try:
+                if await self._login_wall():
+                    await self._need_login("需要登录（登录态可能已过期）")
+                    return
+            except Exception:
+                return
 
     async def _park_if_logged_in(self) -> None:
         """Move the visible window off the desktop once the login is done."""
@@ -168,6 +217,8 @@ class SoulChannel:
             page = self._page
             if page is None:
                 return "启动中"
+            if await self._login_wall():
+                return "未登录"
             if await page.locator(".conv-list").count():
                 return "online"
             text = await page.evaluate(PAGE_TEXT_JS) or ""
@@ -184,6 +235,8 @@ class SoulChannel:
 
     async def stop(self) -> None:
         self._running = False
+        if self._watch:
+            self._watch.cancel()
         if self._task:
             self._task.cancel()
         if self._ctx:
@@ -194,28 +247,10 @@ class SoulChannel:
     # -- page helpers -----------------------------------------------------
     async def _ensure_chat(self) -> None:
         page = self._page
-        if await page.locator(".conv-list").count():
+        if await self._login_wall():
+            await self._need_login("检测到未登录")
             return
-        text = ""
-        try:
-            text = await page.evaluate(PAGE_TEXT_JS) or ""
-        except Exception:
-            pass
-        if "扫码登录" in text or "手机号登录" in text:
-            if not getattr(self, "_headed", True):
-                await self._show_window("检测到未登录（登录态可能已过期）")
-                return
-            await self._reveal_window()
-            if not self._warned_login:
-                self._warned_login = True
-                try:
-                    await page.bring_to_front()
-                except Exception:
-                    pass
-                self._logged(
-                    "[soul] 需要登录：请在弹出的浏览器窗口里用 Soul App 扫码；"
-                    "登录成功后状态会自动变成 在线"
-                )
+        if await page.locator(".conv-list").count():
             return
         try:
             await page.goto("https://home.soulapp.cn/", wait_until="commit", timeout=30000)
@@ -301,13 +336,13 @@ class SoulChannel:
             await self._ctx.close()
         except Exception:
             pass
-        self._headed = not self._headless or not self._login_marker.is_file()
+        self._headed = True
         self._parked = False
         try:
-            await self._launch(headless=not self._headed)
+            await self._launch(headless=False)
             await self._ensure_chat()
             await self._maybe_mark_logged_in()
-            if self._headed:
+            if await self.status() == "online":
                 await self._park_if_logged_in()
         except Exception as exc:
             self._logged(f"[soul] 重新打开浏览器失败：{exc!r}")
@@ -326,9 +361,11 @@ class SoulChannel:
         async with self._lock:
             await self._ensure_chat()
             conversations = await self._conversations()
-            if conversations and not self._login_marker.is_file():
-                self._login_marker.write_text("ok", encoding="ascii")
-                self._logged("[soul] 登录态已记录，下次将以无头模式运行")
+            if conversations:
+                self._warned_login = False
+                if not self._login_marker.is_file():
+                    self._login_marker.write_text("ok", encoding="ascii")
+                    self._logged("[soul] 登录态已记录，下次启动时窗口会直接隐藏")
                 await self._park_if_logged_in()
             for conv in conversations:
                 name = conv["name"]

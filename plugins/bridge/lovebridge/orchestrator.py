@@ -314,7 +314,7 @@ class Orchestrator:
         if self.state.total_today(self._today()) >= bot.daily_reply_cap:
             return TurnResult(contact_id, conversation_id, len(events), reason="daily cap")
 
-        context = await self.app.get_reply_context(conversation_id)
+        context = await self.app.get_reply_context(conversation_id, self.config.bot.rules)
         reply = (context or {}).get("draft")
         reply = reply.strip() if isinstance(reply, str) else ""
 

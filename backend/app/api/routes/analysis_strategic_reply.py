@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from uuid import UUID
 
 from app.core.context import get_current_user_id
@@ -26,6 +27,10 @@ def _build_provider(conn, user_id: str):
     if provider_config_service.get(conn, user_id) is None:
         return QwenProvider()
     return provider_config_service.build_provider(conn, user_id)
+
+
+class ChannelRulesBody(BaseModel):
+    rules: str = ""
 
 
 def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
@@ -78,6 +83,30 @@ def get_analysis_strategic_reply_context(
     request_id: UUID | None = None,
     user_id: str = Depends(get_current_user_id),
 ):
+    return _reply_context(conversation_id, request_id, "", user_id)
+
+
+@router.post(
+    "/context",
+    response_model=AnalysisStrategicReplyContextResponse,
+    status_code=status.HTTP_200_OK,
+)
+def post_analysis_strategic_reply_context(
+    conversation_id: str,
+    body: ChannelRulesBody | None = None,
+    request_id: UUID | None = None,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Same pipeline as GET, plus optional per-channel style rules from the bridge."""
+    return _reply_context(conversation_id, request_id, (body.rules if body else ""), user_id)
+
+
+def _reply_context(
+    conversation_id: str,
+    request_id: UUID | None,
+    channel_rules: str,
+    user_id: str,
+):
     from app.services.reply_progress import publish
     progress = (lambda stage, attempt=0: publish(user_id,conversation_id,str(request_id),stage,attempt)) if request_id else None
     completed = False
@@ -91,6 +120,7 @@ def get_analysis_strategic_reply_context(
                 user_id,
                 conversation_id,
                 provider=_build_provider(conn, user_id),
+                channel_rules=channel_rules,
                 **kwargs,
             )
             if progress: progress('complete')

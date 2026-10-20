@@ -8,6 +8,50 @@ PROVIDERS = ('qwen', 'deepseek', 'kimi', 'openai', 'gemini', 'openai_compatible'
 PLATFORMS = {'微信':'wechat','抖音':'douyin','探探':'tantan','陌陌':'momo','Soul':'soul','其他':'other'}
 
 
+class Section:
+    """Collapsible group: a check-button header that shows or hides its body."""
+
+    def __init__(self, parent, title, open=True, note=''):
+        self.frame = ttk.Frame(parent)
+        self.frame.pack(fill='x', pady=(2, 6))
+        self.open = tk.BooleanVar(value=open)
+        header = ttk.Frame(self.frame)
+        header.pack(fill='x')
+        ttk.Checkbutton(header, text=title, variable=self.open, command=self.toggle).pack(side='left')
+        if note:
+            ttk.Label(header, text=note, foreground='#666').pack(side='left', padx=(8, 0))
+        self.body = ttk.Frame(self.frame, padding=(16, 2, 2, 2))
+        if open:
+            self.body.pack(fill='x')
+        self.widgets = []
+
+    def toggle(self):
+        if self.open.get():
+            self.body.pack(fill='x')
+        else:
+            self.body.forget()
+
+    def entry(self, dialog, key, label, value='', choices=None, secret=False):
+        widget = dialog.entry(key, label, value, choices, secret, parent=self.body)
+        self.widgets.append(widget)
+        return widget
+
+
+def scrollable(parent):
+    """Wrap a frame in a vertical scroll area and return the inner frame."""
+    canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
+    bar = ttk.Scrollbar(parent, orient='vertical', command=canvas.yview)
+    inner = ttk.Frame(canvas)
+    inner.bind('<Configure>', lambda _event: canvas.configure(scrollregion=canvas.bbox('all')))
+    canvas.create_window((0, 0), window=inner, anchor='nw', tags='inner')
+    canvas.bind('<Configure>', lambda event: canvas.itemconfigure('inner', width=event.width))
+    canvas.configure(yscrollcommand=bar.set)
+    canvas.pack(side='left', fill='both', expand=True)
+    bar.pack(side='right', fill='y')
+    canvas.bind_all('<MouseWheel>', lambda event: canvas.yview_scroll(-1 * (event.delta // 120), 'units'))
+    return inner
+
+
 def create_person_with_conversation(client, state, name, nickname, title):
     if not name.strip() or not title.strip():
         raise ValueError('人物姓名和首个会话名称都需要填写。')
@@ -55,13 +99,23 @@ class Dialog:
         self.widgets = []; self.secrets = []; self.busy = False
         self.window.protocol('WM_DELETE_WINDOW',self.close)
 
-    def entry(self, key, label, value='', choices=None, secret=False):
-        ttk.Label(self.frame,text=label).pack(anchor='w',pady=(6,0))
-        widget = ttk.Combobox(self.frame,values=choices,state='readonly') if choices else ttk.Entry(self.frame,show='*' if secret else '')
+    def entry(self, key, label, value='', choices=None, secret=False, parent=None):
+        parent = parent if parent is not None else self.frame
+        ttk.Label(parent,text=label).pack(anchor='w',pady=(6,0))
+        widget = ttk.Combobox(parent,values=choices,state='readonly') if choices else ttk.Entry(parent,show='*' if secret else '')
         widget.pack(fill='x'); widget.set(value) if choices else widget.insert(0,value)
         self.widgets.append((widget,'readonly' if choices else 'normal'))
         if secret:self.secrets.append(widget)
         return widget
+
+    def fit(self, width=900, height=640):
+        """Centre the dialog and cap it to the usable part of the screen."""
+        self.window.update_idletasks()
+        screen_w, screen_h = self.window.winfo_screenwidth(), self.window.winfo_screenheight()
+        width, height = min(width, max(480, screen_w - 80)), min(height, max(360, screen_h - 120))
+        left, top = max(0, (screen_w - width) // 2), max(0, (screen_h - height) // 2 - 20)
+        self.window.geometry(f'{width}x{height}+{left}+{top}')
+        return self.window
 
     def button(self, row, text, command):
         widget=ttk.Button(row,text=text,command=command);widget.pack(side='left',padx=3,pady=5)
