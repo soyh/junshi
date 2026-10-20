@@ -29,6 +29,18 @@ CARD_NAVIGATION_STYLE = r'''
   body[data-client-view="people"] .client-card-subtitle{color:#a6bac8}
   body[data-client-view="people"] .client-card-avatar{background:linear-gradient(135deg,#2b7e86,#253e63);border:1px solid #70b8bc;border-radius:18px}
   body[data-client-view="people"] .client-card-rarity{background:#10232c;color:#8dc9c9;border-color:#416474}
+  #client-footer .nav-merge-link{font:inherit;color:inherit;background:transparent;border:0;box-shadow:none;padding:8px;cursor:pointer;text-decoration:underline;text-underline-offset:4px}
+  #client-footer .nav-merge-link:hover{color:#c6e4f0}
+  #client-footer .nav-account-label{color:#7f97a5;font-size:12px;letter-spacing:.02em}
+  body[data-client-view] #client-merge-panel{background:#152430;border-color:#3d5a6c;box-shadow:0 24px 60px #0006;color:#eef5fa}
+  body[data-client-view] #client-merge-panel h3{color:#c6e4f0}
+  body[data-client-view] #client-merge-panel .client-merge-hint,
+  body[data-client-view] #client-merge-panel .client-merge-status,
+  body[data-client-view] #client-merge-panel .client-merge-detail{color:#9db4c2}
+  body[data-client-view] #client-merge-panel label{color:#9db4c2}
+  body[data-client-view] #client-merge-panel select{background:#0f1c26;color:#eef5fa;border:1px solid #3d5a6c;border-radius:10px;padding:9px 10px}
+  body[data-client-view] #client-merge-panel .client-merge-actions button{background:#126976;border-color:#2b7e86}
+  body[data-client-view] #client-merge-panel .client-merge-actions button.secondary{background:transparent;color:#7cc5e8}
   #client-deck-controls{display:flex;justify-content:center;align-items:center;gap:20px;color:#91aeba}
   #client-deck-controls button{margin:0;border:1px solid #4d9198;color:#b3e5e3;background:transparent;border-radius:8px;padding:10px 20px}
   #client-navigation-status{text-align:center;min-height:24px;color:#bde1df;overflow-wrap:anywhere}
@@ -182,5 +194,39 @@ CARD_NAVIGATION_SCRIPT = r'''
   window.addEventListener('popstate',event=>{navEpoch++;navEntering=false;navShow(event.state?.clientView || 'people');});
   byId('person-select').addEventListener('change',()=>{if(document.body.dataset.clientView==='person')navName.textContent=byId('person-select').selectedOptions[0]?.textContent || '人物工作区';});
   byId('password').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();byId('login').click();}});
+  // Footer: signed-in account identifier + merge entry (panel built by the card shell).
+  const navAccountLabel=clientEl('span','nav-account-label');navAccountLabel.id='client-account-label';
+  const navMergeLink=document.createElement('button');
+  navMergeLink.type='button';navMergeLink.id='client-merge-open-nav';navMergeLink.className='nav-merge-link';
+  navMergeLink.textContent='合并重复人物';
+  navFooter.insertBefore(navAccountLabel,byId('logout'));
+  navFooter.insertBefore(navMergeLink,byId('logout'));
+
+  async function navRefreshAccountLabel(){
+    if(!currentAccessToken){navAccountLabel.textContent='';navAccountLabel.title='';return;}
+    try{
+      const identity=await api('/api/v1/auth/email/identity');
+      const name=(identity && (identity.username || identity.email)) || '';
+      navAccountLabel.textContent=name?`账号：${name}`:'';
+      navAccountLabel.title=identity && identity.user_id?`用户 ID：${identity.user_id}`:'';
+    }catch(_){navAccountLabel.textContent='';navAccountLabel.title='';}
+  }
+
+  navMergeLink.addEventListener('click',async()=>{
+    const panel=byId('client-merge-panel');
+    if(!panel||!panel.clientOpen){navStatus.textContent='合并面板尚未就绪，请刷新页面。';return;}
+    if(!currentAccessToken){navStatus.textContent='请先登录。';return;}
+    try{
+      await panel.clientOpen();
+      panel.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});
+    }catch(error){navStatus.textContent=error instanceof Error?error.message:String(error);}
+  });
+
+  const navBaseEstablishForAccount=establishSession;
+  establishSession=function(...args){navBaseEstablishForAccount(...args);navRefreshAccountLabel();};
+  const navBaseClearForAccount=clearSession;
+  clearSession=function(...args){navBaseClearForAccount(...args);navAccountLabel.textContent='';navAccountLabel.title='';};
+  navRefreshAccountLabel();
+
   navShow('auth');
 '''

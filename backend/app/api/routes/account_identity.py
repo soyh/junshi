@@ -117,7 +117,11 @@ def reset(p:PasswordReset):
 def own_identity(user:str=Depends(get_current_user_id)):
     with get_connection() as c:
         row=c.execute('SELECT email,email_verified_at,administrator FROM account_identities WHERE user_id=?',(user,)).fetchone()
-    return dict(row) if row else {'email':None,'email_verified_at':None,'administrator':0}
+        cred=c.execute('SELECT username FROM user_credentials WHERE user_id=?',(user,)).fetchone()
+    payload=dict(row) if row else {'email':None,'email_verified_at':None,'administrator':0}
+    payload['username']=cred['username'] if cred else None
+    payload['user_id']=user
+    return payload
 
 @router.post('/delete-account')
 def delete_account(p:AccountDeletion,user:str=Depends(get_current_user_id)):
