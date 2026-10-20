@@ -143,6 +143,92 @@ CARD_CLIENT_EXPERIENCE_STYLE = r'''
       font-size: .88rem;
     }
 
+    .client-merge-open {
+      align-self: center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(99, 102, 241, .35);
+      background: rgba(255, 255, 255, .85);
+      color: #4338ca;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .client-merge-panel {
+      position: relative;
+      z-index: 2;
+      margin: 0 0 18px;
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px solid rgba(99, 102, 241, .25);
+      background: rgba(255, 255, 255, .96);
+      box-shadow: 0 16px 38px rgba(30, 41, 59, .12);
+    }
+
+    .client-merge-panel h3 {
+      margin: 0 0 4px;
+      color: #1f2a44;
+      font-size: 1.05rem;
+    }
+
+    .client-merge-hint {
+      margin: 0 0 12px;
+      color: #718096;
+      font-size: .84rem;
+    }
+
+    .client-merge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .client-merge-row label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 220px;
+      flex: 1;
+      color: #475569;
+      font-size: .82rem;
+    }
+
+    .client-merge-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 8px 0;
+    }
+
+    .client-merge-actions button {
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(99, 102, 241, .35);
+      background: #4f46e5;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .client-merge-actions button.secondary {
+      background: #fff;
+      color: #4338ca;
+    }
+
+    .client-merge-status {
+      min-height: 1.2em;
+      color: #334155;
+      font-size: .85rem;
+    }
+
+    .client-merge-detail {
+      margin-top: 6px;
+      color: #475569;
+      font-size: .83rem;
+      line-height: 1.5;
+    }
+
     #client-person-deck {
       position: relative;
       z-index: 1;
@@ -503,6 +589,160 @@ CARD_CLIENT_EXPERIENCE_SCRIPT = r'''
     return chars.length ? chars[0].toUpperCase() : '?';
   }
 
+  function clientBuildMergePanel() {
+    const panel = clientEl('section', 'client-merge-panel');
+    panel.id = 'client-merge-panel';
+    panel.hidden = true;
+
+    const title = clientEl('h3', '', '合并重复人物');
+    const hint = clientEl(
+      'p',
+      'client-merge-hint',
+      '同一个人在不同平台会有多张卡。选一张保留、一张合并掉；来源人物会被删除，操作不可撤销。',
+    );
+
+    const targetLabel = clientEl('label', '', '保留（目标）');
+    const targetSelect = document.createElement('select');
+    targetSelect.id = 'client-merge-target';
+    targetLabel.appendChild(targetSelect);
+
+    const sourceLabel = clientEl('label', '', '合并后删除（来源）');
+    const sourceSelect = document.createElement('select');
+    sourceSelect.id = 'client-merge-source';
+    sourceLabel.appendChild(sourceSelect);
+
+    const row = clientEl('div', 'client-merge-row');
+    row.append(targetLabel, sourceLabel);
+
+    const actions = clientEl('div', 'client-merge-actions');
+    const previewButton = clientEl('button', '', '预览合并');
+    previewButton.type = 'button';
+    previewButton.id = 'client-merge-preview';
+    const confirmButton = clientEl('button', '', '确认合并');
+    confirmButton.type = 'button';
+    confirmButton.id = 'client-merge-confirm';
+    const closeButton = clientEl('button', 'secondary', '关闭');
+    closeButton.type = 'button';
+    closeButton.id = 'client-merge-close';
+    actions.append(previewButton, confirmButton, closeButton);
+
+    const status = clientEl('div', 'client-merge-status');
+    status.id = 'client-merge-status';
+    const detail = clientEl('div', 'client-merge-detail');
+    detail.id = 'client-merge-detail';
+
+    panel.append(title, hint, row, actions, status, detail);
+
+    let people = [];
+    let lastPreview = null;
+
+    function labelOf(item) {
+      return item.nickname ? `${item.name}（${item.nickname}）` : item.name;
+    }
+
+    function fillSelect(select, items, placeholder, selectedId) {
+      select.replaceChildren();
+      const empty = document.createElement('option');
+      empty.value = '';
+      empty.textContent = placeholder;
+      select.appendChild(empty);
+      items.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item.id;
+        option.textContent = labelOf(item);
+        select.appendChild(option);
+      });
+      select.value = items.some((item) => item.id === selectedId) ? selectedId : '';
+    }
+
+    async function loadChoices() {
+      people = await api('/api/v1/persons');
+      fillSelect(targetSelect, people, '选择要保留的人物', selectedPersonId);
+      fillSelect(
+        sourceSelect,
+        people.filter((item) => item.id !== targetSelect.value),
+        '选择要合并掉的人物',
+        '',
+      );
+      lastPreview = null;
+      detail.textContent = '';
+      status.textContent = people.length < 2
+        ? '至少需要两个人物才能合并。'
+        : '选择两张卡，先预览再确认。';
+    }
+
+    function refreshSourceChoices() {
+      fillSelect(
+        sourceSelect,
+        people.filter((item) => item.id !== targetSelect.value),
+        '选择要合并掉的人物',
+        sourceSelect.value,
+      );
+      lastPreview = null;
+      detail.textContent = '';
+      status.textContent = '已更换目标；请重新预览。';
+    }
+
+    async function runPreview() {
+      const target = targetSelect.value;
+      const source = sourceSelect.value;
+      if (!target || !source) throw new Error('请选择要保留和要合并的人物');
+      const data = await api(
+        `/api/v1/persons/${encodeURIComponent(target)}/merge-preview?source_person_id=${encodeURIComponent(source)}`
+      );
+      lastPreview = data;
+      const counts = data.counts;
+      detail.textContent = [
+        `会话 ${counts.conversations} 段（消息 ${counts.messages} 条）`,
+        `互动 ${counts.interactions} · 媒体 ${counts.media_attachments} · 平台账号 ${counts.platform_accounts}`,
+        `快照 ${counts.action_plan_snapshots}（冲突 ${counts.action_plan_snapshots_conflicting} 条丢弃）· 记忆 ${counts.person_memories}`,
+        `关系处理：${data.relationship_action}`,
+      ].join('；');
+      status.textContent = `将把「${data.source.name}」合并到「${data.target.name}」。`;
+    }
+
+    async function runMerge() {
+      const target = targetSelect.value;
+      const source = sourceSelect.value;
+      if (
+        !lastPreview
+        || lastPreview.target_person_id !== target
+        || lastPreview.source_person_id !== source
+      ) {
+        throw new Error('请先预览这组人物');
+      }
+      if (!window.confirm(`确认把「${lastPreview.source.name}」合并到「${lastPreview.target.name}」？来源人物会被永久删除，且不可撤销。`)) {
+        return;
+      }
+      const result = await api(`/api/v1/persons/${encodeURIComponent(target)}/merge`, {
+        method: 'POST',
+        body: JSON.stringify({source_person_id: source}),
+      });
+      status.textContent = '合并完成。';
+      detail.textContent = `迁移结果：${JSON.stringify(result.moved)}`;
+      lastPreview = null;
+      await loadPersons();
+      clientRenderPersonDeck();
+    }
+
+    previewButton.addEventListener('click', async () => {
+      try { await runPreview(); }
+      catch (error) { status.textContent = error instanceof Error ? error.message : String(error); }
+    });
+    confirmButton.addEventListener('click', async () => {
+      try { await runMerge(); }
+      catch (error) { status.textContent = error instanceof Error ? error.message : String(error); }
+    });
+    closeButton.addEventListener('click', () => { panel.hidden = true; });
+    targetSelect.addEventListener('change', refreshSourceChoices);
+
+    panel.clientOpen = async () => {
+      panel.hidden = false;
+      await loadChoices();
+    };
+    return panel;
+  }
+
   function clientMakeShell() {
     const guided = byId('guided-workflow');
     if (!guided || byId('client-experience-shell')) return;
@@ -529,10 +769,19 @@ CARD_CLIENT_EXPERIENCE_SCRIPT = r'''
       clientEl('p', '', '点击人物卡翻面查看人物关系与资料；修改后直接保存。'),
     );
     personHeader.append(personTitle);
+    const mergeButton = clientEl('button', 'client-merge-open', '合并重复人物');
+    mergeButton.type = 'button';
+    mergeButton.id = 'client-merge-open';
+    mergeButton.addEventListener('click', async () => {
+      const panel = byId('client-merge-panel');
+      if (panel && panel.clientOpen) await panel.clientOpen();
+    });
+    personHeader.append(mergeButton);
+    const mergePanel = clientBuildMergePanel();
     const deck = clientEl('div');
     deck.id = 'client-person-deck';
     deck.setAttribute('aria-label', '人物卡组');
-    personStage.append(personHeader, deck);
+    personStage.append(personHeader, mergePanel, deck);
 
     const conversationStage = clientEl('section', 'client-stage');
     conversationStage.id = 'client-conversation-stage';
