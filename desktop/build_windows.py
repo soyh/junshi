@@ -10,6 +10,38 @@ import sys
 import uuid
 
 
+def build_bridge(source, build, environment):
+    """Build the channel bridge executable and return its onedir folder."""
+    import importlib.util
+    bridge_source = source.parent / 'plugins' / 'bridge'
+    if not (bridge_source / 'run_bridge.py').is_file():
+        raise SystemExit('Bridge plugin sources are missing: plugins/bridge/run_bridge.py')
+    dist = build / 'bridge-dist'
+    args = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--onedir', '--noconsole',
+            '--name', 'JunshiBridge', '--distpath', str(dist),
+            '--workpath', str(build / 'bridge-work'), '--specpath', str(build),
+            '--paths', str(bridge_source)]
+    for module in ('httpx', 'playwright', 'playwright.async_api', 'wechatauto', 'wxhook', 'wcferry'):
+        try:
+            found = importlib.util.find_spec(module.split('.')[0]) is not None
+        except (ImportError, ValueError):
+            found = False
+        if found:
+            args += ['--hidden-import', module]
+    for package in ('playwright', 'wechatauto'):
+        try:
+            if importlib.util.find_spec(package) is not None:
+                args += ['--collect-all', package]
+        except (ImportError, ValueError):
+            pass
+    args.append(str(bridge_source / 'run_bridge.py'))
+    subprocess.run(args, check=True, env=environment)
+    folder = dist / 'JunshiBridge'
+    if not (folder / 'JunshiBridge.exe').is_file():
+        raise SystemExit('Bridge executable was not produced')
+    return folder
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', required=True)
@@ -34,6 +66,8 @@ def main():
         '--specpath', str(build), '--paths', str(source), str(source/'launcher.py')], check=True, env=environment)
     app = build/'dist'/'JunshiPC'
     shutil.copy2(source/'CLIENT_README.txt', app/'使用说明.txt')
+    bridge = build_bridge(source, build, environment)
+    shutil.copytree(bridge, app/'JunshiBridge')
     # Ship runtime license notices independently of the source checkout.
     notices = app/'licenses'; notices.mkdir()
     import importlib.metadata
@@ -52,6 +86,7 @@ def main():
     completed=subprocess.run([str(app/'JunshiPC.exe'),'--self-test',str(report)],timeout=30)
     assert completed.returncode == 0 and json.loads(report.read_text())['frozen'], 'Packaged smoke test failed'
     assert not list(app.rglob('*.sqlite3')) and not list(app.rglob('.env'))
+    assert (app/'JunshiBridge'/'JunshiBridge.exe').is_file(), 'Bundled bridge executable missing'
     archive=Path(shutil.make_archive(str(output/'JunshiPC-229-Windows-x64'), 'zip', app.parent, app.name))
     digest=hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix('.zip.sha256').write_text(digest+'  '+archive.name+'\n',encoding='ascii')

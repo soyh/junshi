@@ -86,6 +86,7 @@ class Assistant:
         self.button(row, '打开主页面', self.open_main)
         self.button(row, '退出登录', self.logout)
         self.button(row, '大模型设置', lambda: self.open_management(ModelDialog))
+        self.button(row, '通道插件', self.open_bridge)
         selection = raised_card(top, '  选择这次对话  ', row=0, column=1)
         self.person = self.combo(selection, '人物', self.change_person)
         self.account = self.combo(selection, '平台账号', self.change_account)
@@ -228,6 +229,14 @@ class Assistant:
         if self.busy:return
         if self.active_dialog:self.active_dialog.window.lift();return
         try:EmailAccountDialog(self,purpose)
+        except ValueError as exc:self.status.set(str(exc))
+
+    def open_bridge(self):
+        if self.busy:return
+        if self.active_dialog:self.active_dialog.window.lift();return
+        try:
+            from bridge_dialog import BridgeDialog
+            BridgeDialog(self)
         except ValueError as exc:self.status.set(str(exc))
 
     def open_management(self, dialog):

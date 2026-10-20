@@ -1,0 +1,46 @@
+# Copy to config.toml and fill in.
+# Nothing here writes to WeChat unless dry_run = false.
+
+[app]
+base_url = "https://101.34.253.116"   # your deployed instance
+username = "your_username"           # ASCII 3-64 位；别把真实密码写进这个文件
+password = "your_password"
+verify_tls = false                    # the instance uses a self-signed cert on a bare IP
+timeout_seconds = 120
+
+[bot]
+dry_run = true                # true: record inbound + generate draft, but never send
+auto_create_person = true     # first message from a stranger creates Person + Conversation
+auto_merge_same_name = false  # 多平台同名时自动并到同一人物（重名有风险，默认关）
+debounce_seconds = 4          # wait for the other side to stop typing
+max_debounce_seconds = 20     # but never wait longer than this
+human_delay_seconds = [1.5, 5.0]
+daily_reply_cap = 150
+quiet_hours = ["01:00", "08:30"]
+max_reply_chars = 500
+reply_to_groups = false       # 你只需要回个人
+max_concurrency = 3
+
+[channel]
+kind = "wechatauto"           # wechatauto | wxhook | wcferry | webhook | mock
+
+# --- 路线 C：微信 4.1.12+（推荐，UI 自动化 + 读本地库） ---
+[channel.wechatauto]
+interval = 1.0                # 轮询新消息的间隔（秒）
+
+# --- 路线 A：微信 3.9.5.81（wxhook 注入） ---
+# [channel.wxhook]
+# faked_version = "3.9.10.19" # 被提示版本过低时启用
+
+# --- 路线 B：微信 3.9.x（wcferry 注入） ---
+# [channel.wcferry]
+# poll_interval = 0.2
+
+# --- 通用 HTTP 桥（你自己的微信桥 / 另一台机器） ---
+# [channel.webhook]
+# listen_host = "0.0.0.0"
+# listen_port = 18200
+# path = "/inbound"
+# secret = "replace-with-a-long-random-string"
+# send_url = "http://127.0.0.1:18201/send"
+# verify_tls = false

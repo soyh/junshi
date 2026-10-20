@@ -88,3 +88,8 @@ ios/App/Assets.xcassets/
 *.p12
 *.mobileprovision
 *.p8
+
+plugins/bridge/**/__pycache__/
+buildtest/
+plugins/bridge/*.log
+plugins/bridge/state*.sqlite3*
