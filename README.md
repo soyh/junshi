@@ -6,7 +6,8 @@
 
 - [安卓 1.0.0 正式版](https://github.com/soyh/junshi/releases/tag/android-v1.0.0)：固定签名 APK、源码、文档及签名验证报告。
 - [PC 229 与项目附件](https://github.com/soyh/junshi/releases/tag/test-229-account-interface)
-- [PC 229 · 通道插件版](https://github.com/soyh/junshi/releases/tag/pc-bridge-plugin-1)：内置微信 / 小红书 / Soul 自动回复插件（约 200 MB）。
+- [PC 229 · 通道插件版 2](https://github.com/soyh/junshi/releases/tag/pc-bridge-plugin-2)：支持多用户登录与多开（微信 / 小红书 / Soul，约 200 MB）。
+- [PC 229 · 通道插件版 1](https://github.com/soyh/junshi/releases/tag/pc-bridge-plugin-1)：单配置版本。
 - [TEST-230 网页修复与部署](https://github.com/soyh/junshi/releases/tag/test-230-transfer-entry-style)
 - [项目总览与版本](docs/PROJECT_OVERVIEW.md)
 - [全部文档](docs/README.md)
