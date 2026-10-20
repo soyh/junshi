@@ -5,3 +5,4 @@ wechatauto-replica>=1.2.7
 # 备用通道（按需）
 # wxhook>=0.0.10      # 微信 3.9.5.81
 # wcferry>=39.6.0     # 微信 3.9.x
+playwright>=1.40
