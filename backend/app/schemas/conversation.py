@@ -49,5 +49,6 @@ class ConversationResponse(BaseModel):
     relationship_id: str | None
     title: str | None
     status: str
+    is_primary: int = 0
     created_at: str
     updated_at: str
