@@ -72,6 +72,10 @@ class Assistant:
         header = ttk.Frame(frame, style='Page.TFrame'); header.grid(row=0, column=0, sticky='ew', pady=(0, 7))
         ttk.Label(header, text='AI 恋爱军师', style='Title.TLabel', font=('Microsoft YaHei UI', 15, 'bold')).pack(side='left')
         ttk.Label(header, text='让每一次回应，都多一点温度', style='Subtitle.TLabel').pack(side='right')
+        # Settings and channel plugins belong to the app, not this account card:
+        # keeping them in the header leaves the card one button row that fits.
+        self.header_button(header, '通道插件', self.open_bridge)
+        self.header_button(header, '大模型设置', lambda: self.open_management(ModelDialog))
         top = ttk.Frame(frame, style='Page.TFrame'); top.grid(row=1, column=0, sticky='ew')
         top.columnconfigure(0, weight=1, uniform='top'); top.columnconfigure(1, weight=1, uniform='top')
         login = raised_card(top, '  连接与账号  ', row=0, column=0)
@@ -85,8 +89,6 @@ class Assistant:
         self.button(row, '注册', lambda: self.open_email_account())
         self.button(row, '打开主页面', self.open_main)
         self.button(row, '退出登录', self.logout)
-        self.button(row, '大模型设置', lambda: self.open_management(ModelDialog))
-        self.button(row, '通道插件', self.open_bridge)
         selection = raised_card(top, '  选择这次对话  ', row=0, column=1)
         self.person = self.combo(selection, '人物', self.change_person)
         self.account = self.combo(selection, '平台账号', self.change_account)
@@ -150,10 +152,21 @@ class Assistant:
         box.bind('<<ComboboxSelected>>', callback); self.controls.append((box, 'readonly'))
         return box
 
-    def button(self, parent, text, command):
+    def header_button(self, parent, text, command):
+        button = ttk.Button(parent, text=text, command=command, width=0, style='TButton')
+        button.pack(side='right', padx=(6, 0))
+        self.controls.append((button, 'normal'))
+        return button
+
+    def button(self, parent, text, command, grid=None):
         primary = text in ('登录', '分析并生成 / 重试', '一键复制')
         button = ttk.Button(parent, text=text, command=command, width=0, style='Primary.TButton' if primary else 'TButton')
-        button.pack(side='left', padx=2, pady=3)
+        if grid is None:
+            button.pack(side='left', padx=2, pady=3)
+        else:
+            row, column = grid
+            button.grid(row=row, column=column, sticky='ew', padx=2, pady=3)
+            parent.columnconfigure(column, weight=1, uniform='actions')
         self.controls.append((button, 'normal'))
         return button
 

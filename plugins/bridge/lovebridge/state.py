@@ -32,6 +32,22 @@ CREATE TABLE IF NOT EXISTS flags (
     name TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id TEXT NOT NULL UNIQUE,
+    contact_id TEXT NOT NULL,
+    contact_name TEXT,
+    text TEXT NOT NULL,
+    sent_at REAL,
+    is_group INTEGER NOT NULL DEFAULT 0,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    state TEXT NOT NULL DEFAULT 'queued',
+    reason TEXT,
+    next_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS outbox_due ON outbox (state, next_at);
 """
 
 
@@ -137,6 +153,105 @@ class StateStore:
                 (day, contact_id),
             ).fetchone()
         return int(row["count"])
+
+    # -- outbox -----------------------------------------------------------
+    def enqueue(
+        self,
+        message_id: str,
+        contact_id: str,
+        text: str,
+        *,
+        contact_name: str = "",
+        sent_at: float | None = None,
+        is_group: bool = False,
+    ) -> bool:
+        """Store an inbound message that still owes a reply. True when new."""
+        now = datetime.now().isoformat(timespec="seconds")
+        with self._lock:
+            cur = self._conn.execute(
+                """
+                INSERT OR IGNORE INTO outbox
+                    (message_id, contact_id, contact_name, text, sent_at, is_group,
+                     attempts, state, next_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 0, 'queued', ?, ?, ?)
+                """,
+                (
+                    message_id, contact_id, contact_name or "", text,
+                    float(sent_at or 0.0), 1 if is_group else 0,
+                    now, now, now,
+                ),
+            )
+            self._conn.commit()
+        return cur.rowcount == 1
+
+    def outbox_due(self, now: str, limit: int = 50) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT * FROM outbox
+                WHERE state = 'queued' AND (next_at IS NULL OR next_at <= ?)
+                ORDER BY id LIMIT ?
+                """,
+                (now, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def outbox_pending(self, contact_id: str) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM outbox WHERE contact_id = ? AND state = 'queued' ORDER BY id",
+                (contact_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def outbox_counts(self) -> dict[str, int]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT state, COUNT(*) AS n FROM outbox GROUP BY state"
+            ).fetchall()
+        counts = {str(row["state"]): int(row["n"]) for row in rows}
+        return {
+            "queued": counts.get("queued", 0),
+            "failed": counts.get("failed", 0),
+            "skipped": counts.get("skipped", 0),
+            "sent": counts.get("sent", 0),
+        }
+
+    def outbox_finish(self, ids: list[int], state: str, reason: str = "",
+                      next_at: str | None = None, *, attempts: int | None = None) -> None:
+        if not ids:
+            return
+        now = datetime.now().isoformat(timespec="seconds")
+        marks = ",".join("?" for _ in ids)
+        with self._lock:
+            self._conn.execute(
+                f"""
+                UPDATE outbox SET state = ?, reason = ?, next_at = ?, updated_at = ?,
+                    attempts = COALESCE(?, attempts)
+                WHERE id IN ({marks})
+                """,
+                [state, reason or None, next_at, now, attempts, *ids],
+            )
+            self._conn.commit()
+
+    def outbox_rows(self, state: str, limit: int = 20) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM outbox WHERE state = ? ORDER BY updated_at DESC LIMIT ?",
+                (state, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def last_failure(self) -> str:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT contact_id, reason, updated_at FROM outbox "
+                "WHERE state IN ('failed', 'skipped', 'queued') AND reason IS NOT NULL "
+                "ORDER BY updated_at DESC LIMIT 1"
+            ).fetchone()
+        if not row:
+            return ""
+        return f"{row['contact_id']}: {row['reason']}"
 
     # -- flags ------------------------------------------------------------
     def get_flag(self, name: str) -> str | None:

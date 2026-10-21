@@ -9,7 +9,7 @@ import random
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable
 
 from .app_client import AppError, platform_of
@@ -67,6 +67,10 @@ class Orchestrator:
     # -- lifecycle --------------------------------------------------------
     START_TIMEOUT = 180.0
     HEARTBEAT_SECONDS = 20.0
+    RETRY_SECONDS = 20.0
+    MAX_ATTEMPTS = 6
+    BACKOFF = (15, 60, 180, 600, 1800)
+    DEFER_SECONDS = 600
 
     async def run(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -84,6 +88,7 @@ class Orchestrator:
             self._log(f"[bridge] channel start failed: {exc!r}; will retry every 30s")
             self._background.append(asyncio.create_task(self._retry_start()))
         self._background.append(asyncio.create_task(self._health_loop()))
+        self._background.append(asyncio.create_task(self._outbox_loop()))
         await self._report_once()
         initial = await self._channel_status()
         if initial != "online":
@@ -129,6 +134,7 @@ class Orchestrator:
         The server heartbeat is keyed by (user, channel) and cannot tell two
         profiles of the same platform apart, so the local file is authoritative.
         """
+        outbox = self.state.outbox_counts()
         payload = {
             "status": state,
             "pid": os.getpid(),
@@ -136,9 +142,12 @@ class Orchestrator:
             "dry_run": self.config.bot.dry_run,
             "updated_at": datetime.now().isoformat(timespec="seconds"),
             "replies_today": self.state.total_today(self._today()),
+            "outbox": outbox,
         }
         if error:
             payload["error"] = error
+        elif outbox["queued"] or outbox["failed"]:
+            payload["error"] = self.state.last_failure()[:200]
         try:
             self._status_path().write_text(
                 json.dumps(payload, ensure_ascii=False), encoding="utf-8"
@@ -214,6 +223,16 @@ class Orchestrator:
     def _accept(self, event: InboundEvent) -> None:
         if not self.state.first_seen(event.message_id, event.contact_id):
             return
+        # Persist before any network work: a crash or a failed turn must not
+        # silently drop the message, it owes a reply until we mark it.
+        self.state.enqueue(
+            event.message_id,
+            event.contact_id,
+            event.text,
+            contact_name=event.contact_name,
+            sent_at=event.timestamp,
+            is_group=event.is_group,
+        )
 
         bot = self.config.bot
         contact_id = event.contact_id
@@ -252,7 +271,115 @@ class Orchestrator:
                     result = await self._turn(contact_id, events)
                     self.results.append(result)
                 except Exception as exc:  # keep the bridge alive no matter what
+                    message = f"{type(exc).__name__}: {exc}"
                     self._log(f"[bridge] turn failed contact={contact_id}: {exc!r}")
+                    self._finish_outbox(contact_id, events, error=message)
+                    return
+                self._finish_outbox(contact_id, events, result)
+
+    # -- outbox -----------------------------------------------------------
+    def _finish_outbox(
+        self,
+        contact_id: str,
+        events: list[InboundEvent],
+        result: TurnResult | None = None,
+        *,
+        error: str = "",
+    ) -> None:
+        """Mark the owed replies: sent, skipped, deferred or queued for retry."""
+        wanted = {event.message_id for event in events}
+        rows = [
+            row for row in self.state.outbox_pending(contact_id)
+            if row["message_id"] in wanted
+        ]
+        if not rows:
+            return
+        ids = [int(row["id"]) for row in rows]
+        attempts = max(int(row["attempts"]) for row in rows)
+
+        if error:
+            attempts += 1
+            if attempts >= self.MAX_ATTEMPTS:
+                self.state.outbox_finish(ids, "failed", error, attempts=attempts)
+                self._log(
+                    f"[bridge] gave up contact={contact_id} after {attempts} attempts: {error}"
+                )
+            else:
+                delay = self.BACKOFF[min(attempts - 1, len(self.BACKOFF) - 1)]
+                self.state.outbox_finish(
+                    ids, "queued", error, self._later(delay), attempts=attempts
+                )
+                self._log(
+                    f"[bridge] retry contact={contact_id} in {delay}s "
+                    f"(attempt {attempts}/{self.MAX_ATTEMPTS}): {error}"
+                )
+            return
+
+        reason = (result.reason if result else "").strip()
+        if result is not None and result.sent:
+            self.state.outbox_finish(ids, "sent")
+            return
+        if reason in ("quiet hours", "daily cap", "paused"):
+            # Not a failure: keep the message and try again later.
+            delay = self.DEFER_SECONDS
+            if reason == "daily cap":
+                delay = self._seconds_until_tomorrow()
+            self.state.outbox_finish(ids, "queued", reason, self._later(delay))
+            self._log(f"[bridge] defer contact={contact_id} ({reason}) for {delay}s")
+            return
+        self.state.outbox_finish(ids, "skipped", reason or "no reply")
+        self._log(f"[bridge] skip contact={contact_id}: {reason or 'no reply'}")
+
+    async def _outbox_loop(self) -> None:
+        while True:
+            await asyncio.sleep(self.RETRY_SECONDS)
+            try:
+                await self.drain_outbox()
+            except Exception as exc:  # the loop must outlive any one failure
+                self._log(f"[bridge] outbox pass failed: {exc!r}")
+
+    async def drain_outbox(self) -> int:
+        """Retry every owed reply that is due. Returns how many were handled."""
+        if await self._channel_status() not in ("online",):
+            return 0
+        now = self._now().isoformat(timespec="seconds")
+        grouped: dict[str, list[dict]] = {}
+        for row in self.state.outbox_due(now):
+            grouped.setdefault(row["contact_id"], []).append(row)
+        handled = 0
+        for contact_id, items in grouped.items():
+            lock = self._locks.setdefault(contact_id, asyncio.Lock())
+            async with self._semaphore:
+                async with lock:
+                    # The live path may have answered while we waited for the lock.
+                    pending = {
+                        int(row["id"]): row
+                        for row in self.state.outbox_pending(contact_id)
+                    }
+                    chosen = [pending[int(row["id"])] for row in items
+                              if int(row["id"]) in pending]
+                    if not chosen:
+                        continue
+                    events = [_event_from_row(row) for row in chosen]
+                    try:
+                        result = await self._turn(contact_id, events)
+                    except Exception as exc:
+                        message = f"{type(exc).__name__}: {exc}"
+                        self._log(f"[bridge] retry failed contact={contact_id}: {exc!r}")
+                        self._finish_outbox(contact_id, events, error=message)
+                    else:
+                        self.results.append(result)
+                        self._finish_outbox(contact_id, events, result)
+                    handled += 1
+        return handled
+
+    def _later(self, seconds: float | int) -> str:
+        return (self._now() + timedelta(seconds=int(seconds))).isoformat(timespec="seconds")
+
+    def _seconds_until_tomorrow(self) -> int:
+        now = self._now()
+        tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
+        return max(60, int((tomorrow - now).total_seconds()))
 
     # -- one conversation turn -------------------------------------------
     async def _turn(self, contact_id: str, events: list[InboundEvent]) -> TurnResult:
@@ -397,3 +524,15 @@ def _to_minutes(value: str) -> int:
     if not (0 <= h < 24 and 0 <= m < 60):
         raise ValueError(value)
     return h * 60 + m
+
+
+def _event_from_row(row: dict) -> InboundEvent:
+    """Rebuild the inbound message an outbox row is still waiting to answer."""
+    return InboundEvent(
+        contact_id=row["contact_id"],
+        contact_name=row.get("contact_name") or "",
+        text=row["text"],
+        message_id=row["message_id"],
+        is_group=bool(row.get("is_group")),
+        timestamp=float(row.get("sent_at") or 0) or None,
+    )

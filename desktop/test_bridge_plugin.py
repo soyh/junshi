@@ -127,6 +127,36 @@ def test_local_status_flags_stale_heartbeat_and_stopped_profile(plugin_home):
     assert bp.local_status(stopped)["status"] == "未运行"
 
 
+def test_local_status_surfaces_retries_and_failures(plugin_home):
+    import json
+    from datetime import datetime
+
+    profile_id = bp.create_profile(
+        name="小红书C", server="https://example.com", username="u",
+        password="password-123456", channel="xhs",
+    )
+    _mark_alive(profile_id)
+    bp.status_path(profile_id).write_text(
+        json.dumps({
+            "status": "online",
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+            "replies_today": 1,
+            "outbox": {"queued": 2, "failed": 1, "skipped": 0, "sent": 1},
+            "error": "xhs:小柯: RemoteProtocolError",
+        }),
+        encoding="utf-8",
+    )
+
+    detail = bp.local_status(profile_id)
+    assert detail["status"] == "在线 · 待重试 2 · 1 条未发出"
+    assert detail["queued"] == 2 and detail["failed"] == 1
+    assert "RemoteProtocolError" in detail["error"]
+
+    line = bp.status_lines([{"id": profile_id, "name": "小红书C", "channel": "xhs"}])[0]
+    assert "待重试 2" in line and "1 条未发出" in line
+    assert "RemoteProtocolError" in line
+
+
 def test_status_lines_keep_profiles_of_the_same_platform_apart(plugin_home):
     from datetime import datetime
 

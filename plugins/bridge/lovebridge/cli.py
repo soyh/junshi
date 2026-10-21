@@ -275,6 +275,29 @@ def cmd_window(config: Config, action: str) -> int:
     return 0 if count else 1
 
 
+def cmd_outbox(config: Config, state_name: str) -> int:
+    """Show the replies the bridge still owes, and why the last one failed."""
+    state = StateStore(config.bot.state_path)
+    try:
+        counts = state.outbox_counts()
+        print(
+            f"queued={counts['queued']} failed={counts['failed']} "
+            f"skipped={counts['skipped']} sent={counts['sent']}"
+        )
+        rows = state.outbox_rows(state_name, limit=20) if hasattr(state, "outbox_rows") else []
+        for row in rows:
+            print(
+                f"{row['id']:>5} {row['state']:<8} {row['contact_id']} "
+                f"attempts={row['attempts']} next={row['next_at'] or '-'} "
+                f"{row['reason'] or ''} :: {row['text'][:40]}"
+            )
+        if not rows:
+            print("(no rows)")
+        return 0
+    finally:
+        state.close()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="lovebridge", description="WeChat bridge for AI Love Strategist")
     parser.add_argument("--config", required=True, help="path to config.toml")
@@ -299,6 +322,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("consolidate", help="merge each person's conversations into one")
     window_parser = sub.add_parser("window", help="show/hide the automation browser window")
     window_parser.add_argument("--action", choices=("show", "hide"), default="show")
+    outbox_parser = sub.add_parser("outbox", help="show replies still owed and retry reasons")
+    outbox_parser.add_argument("--state", choices=("queued", "failed", "skipped", "sent"),
+                               default="queued")
 
     args = parser.parse_args(argv)
     try:
@@ -325,6 +351,8 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(cmd_consolidate(config))
     if args.command == "window":
         return cmd_window(config, args.action)
+    if args.command == "outbox":
+        return cmd_outbox(config, args.state)
     return 2
 
 

@@ -360,6 +360,9 @@ def local_status(profile_id: str) -> dict:
             fresh = (datetime.now() - datetime.fromisoformat(updated)).total_seconds() <= 120
         except ValueError:
             fresh = False
+    outbox = data.get("outbox") if isinstance(data.get("outbox"), dict) else {}
+    queued = int(outbox.get("queued") or 0)
+    failed = int(outbox.get("failed") or 0)
     if not running:
         state = "未运行"
     elif not state:
@@ -368,12 +371,19 @@ def local_status(profile_id: str) -> dict:
         state = "无响应（心跳过期）"
     elif state == "online":
         state = "在线"
+    if running and queued:
+        state = f"{state} · 待重试 {queued}"
+    if running and failed:
+        state = f"{state} · {failed} 条未发出"
     return {
         "running": running,
         "pid": read_pid(profile_id),
         "status": state,
         "updated_at": updated,
         "replies_today": int(data.get("replies_today") or 0),
+        "queued": queued,
+        "failed": failed,
+        "error": str(data.get("error") or ""),
     }
 
 
@@ -384,8 +394,11 @@ def status_lines(profiles: list[dict]) -> list[str]:
         detail = local_status(item["id"])
         label = CHANNELS.get(item.get("channel", ""), item.get("channel", ""))
         stamp = detail["updated_at"][11:19] if len(detail["updated_at"]) >= 19 else "从未"
-        lines.append(
+        line = (
             f"{label}｜{item.get('name', item['id'])}：{detail['status']}"
             f" · 今日回复 {detail['replies_today']} · 更新 {stamp}"
         )
+        if detail.get("error"):
+            line += f"｜{detail['error'][:40]}"
+        lines.append(line)
     return lines or ["尚未创建通道：点「新建通道」为每个平台各建一个。"]

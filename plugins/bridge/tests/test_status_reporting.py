@@ -106,7 +106,11 @@ def test_heartbeat_reports_starting_before_channel_ready() -> None:
         app=SimpleNamespace(base_url="http://test"),
         source_path=Path("/tmp/unused/bridge/config.toml"),
     )
-    state = SimpleNamespace(total_today=lambda day: 0)
+    state = SimpleNamespace(
+        total_today=lambda day: 0,
+        outbox_counts=lambda: {"queued": 0, "failed": 0, "skipped": 0, "sent": 0},
+        last_failure=lambda: "",
+    )
     orchestrator = Orchestrator(config, app, _SlowChannel(), state, log=lambda *_: None)
 
     async def run() -> None:
