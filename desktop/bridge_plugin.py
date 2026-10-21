@@ -75,6 +75,44 @@ def status_path(profile_id: str) -> Path:
     return profile_dir(profile_id) / "status.json"
 
 
+GLOBAL_FILE = "global.json"
+
+
+def global_path() -> Path:
+    """Settings shared by every channel (identity, default reply rules)."""
+    return plugin_dir() / GLOBAL_FILE
+
+
+def load_global() -> dict:
+    path = global_path()
+    data = {}
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+    person = data.get("person") if isinstance(data.get("person"), dict) else {}
+    return {
+        "person": {key: str(person.get(key, "")) for key in PERSON_FIELDS if str(person.get(key, "")).strip()},
+        "rules": str(data.get("rules", "") or ""),
+    }
+
+
+def save_global(person: dict[str, str] | None = None, rules: str | None = None) -> Path:
+    """Persist the shared settings; omitted arguments keep their stored value."""
+    current = load_global()
+    if person is not None:
+        current["person"] = {
+            key: str(value).strip() for key, value in person.items()
+            if key in PERSON_FIELDS and str(value).strip()
+        }
+    if rules is not None:
+        current["rules"] = rules
+    path = global_path()
+    path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
 def _toml(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -92,7 +130,7 @@ def build_config(
     browser_dir: str | None = None,
     headless: bool = True,
     browser_window: str = "hide",
-    rules: str = "",
+    rules: str | None = None,
     person: dict[str, str] | None = None,
 ) -> str:
     if channel not in set(CHANNELS) | {"mock"}:
@@ -105,6 +143,12 @@ def build_config(
     text = f"""[profile]
 name = {_toml(name.strip() or "未命名通道")}
 """
+    shared = load_global()
+    effective_rules = rules if rules is not None else shared["rules"]
+    if not (effective_rules or "").strip():
+        effective_rules = shared["rules"]
+    if person is None:
+        person = shared["person"]
     facts = {
         key: str(value).strip()
         for key, value in (person or {}).items()
@@ -133,7 +177,7 @@ daily_reply_cap = {int(daily_cap)}
 quiet_hours = [{_toml(quiet[0])}, {_toml(quiet[1])}]
 max_reply_chars = 500
 reply_to_groups = false
-rules = {_toml(str(rules or "").strip())}
+rules = {_toml(str(effective_rules or "").strip())}
 max_concurrency = 2
 browser_window = {_toml(browser_window)}
 state_path = "state.sqlite3"
@@ -189,12 +233,8 @@ def summary(profile_id: str) -> dict:
         "daily_cap": int(bot.get("daily_reply_cap", 30)),
         "quiet": (str(quiet[0]), str(quiet[1])),
         "verify_tls": bool(app.get("verify_tls", True)),
-        "rules": str(bot.get("rules", "")),
-        "person": {
-            key: str(data.get("person", {}).get(key, ""))
-            for key in PERSON_FIELDS
-            if str(data.get("person", {}).get(key, "")).strip()
-        },
+        "rules": str(bot.get("rules", "")) or load_global()["rules"],
+        "person": load_global()["person"],
         "running": is_running(profile_id),
         "status": local_status(profile_id)["status"],
     }

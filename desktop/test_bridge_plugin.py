@@ -280,20 +280,23 @@ def test_reply_rules_default_to_empty_and_are_optional(plugin_home):
     assert {row["id"]: row for row in bp.list_profiles()}[profile_id]["rules"] == ""
 
 
-def test_person_facts_round_trip_and_stay_optional(plugin_home):
+def test_person_facts_come_from_the_shared_settings(plugin_home):
+    """本人信息是全局的：录一次，所有通道的配置和界面都用这一份。"""
+    bp.save_global(person={"nickname": "阿哲", "city": "杭州"})
     profile_id = bp.create_profile(
         name="微信通道",
         server="https://example.com",
         username="u",
         password="password-123456",
         channel="wechat",
-        person={"nickname": "阿哲", "city": "杭州"},
     )
     item = {row["id"]: row for row in bp.list_profiles()}[profile_id]
     assert item["person"] == {"nickname": "阿哲", "city": "杭州"}
     text = bp.config_path(profile_id).read_text(encoding="utf-8")
     assert "[person]" in text and 'nickname = "阿哲"' in text
 
+    # 没填就是空，不写进配置，也不编造
+    bp.save_global(person={}, rules="")
     blank = bp.create_profile(
         name="空通道",
         server="https://example.com",
@@ -301,6 +304,7 @@ def test_person_facts_round_trip_and_stay_optional(plugin_home):
         password="password-123456",
         channel="soul",
     )
+    assert "[person]" not in bp.config_path(blank).read_text(encoding="utf-8")
     assert {row["id"]: row for row in bp.list_profiles()}[blank]["person"] == {}
 
 
@@ -359,3 +363,39 @@ def test_retry_outbox_reports_daemon_answer(plugin_home, monkeypatch):
     monkeypatch.setattr(bp.subprocess, "run", fake_run)
     assert bp.retry_outbox(profile_id) == "resent 2 message(s)"
     assert "outbox" in seen["command"] and "--retry" in seen["command"]
+
+
+def test_global_settings_are_shared_and_survive_profile_creation(plugin_home):
+    assert bp.load_global() == {"person": {}, "rules": ""}
+    bp.save_global(person={"nickname": "小满", "city": "杭州", "unused": "x"}, rules="短句、口语")
+    shared = bp.load_global()
+    assert shared["person"] == {"nickname": "小满", "city": "杭州"}
+    assert shared["rules"] == "短句、口语"
+
+    profile_id = bp.create_profile(
+        name="微信通道",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="wechat",
+    )
+    item = bp.summary(profile_id)
+    assert item["person"]["nickname"] == "小满"
+    # 通道自己没写规则时继承全局默认规则
+    assert item["rules"] == "短句、口语"
+    assert "小满" in bp.config_path(profile_id).read_text(encoding="utf-8")
+
+
+def test_channel_rules_override_the_global_default(plugin_home):
+    bp.save_global(person={"nickname": "小满"}, rules="全局默认")
+    profile_id = bp.create_profile(
+        name="小红书通道",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="xhs",
+        rules="本通道专用规则",
+    )
+    item = bp.summary(profile_id)
+    assert item["rules"] == "本通道专用规则"
+    assert bp.load_global()["rules"] == "全局默认"

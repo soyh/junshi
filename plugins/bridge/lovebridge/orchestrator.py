@@ -451,10 +451,16 @@ class Orchestrator:
         await self.app.ensure_scoped(conversation_id, person_id)
 
         for event in events:
+            text = event.text
+            media_url = (event.raw or {}).get("media_url")
+            if media_url:
+                described = await self._describe_media(conversation_id, str(media_url))
+                if described:
+                    text = f"{text}（看图：{described}）"
             await self.app.add_message_once(
                 conversation_id,
                 "person",
-                event.text,
+                text,
                 operation_id=str(uuid.uuid5(uuid.NAMESPACE_URL, event.message_id)),
                 sent_at=datetime.fromtimestamp(event.timestamp or time.time())
                 .astimezone()
@@ -497,6 +503,27 @@ class Orchestrator:
         return TurnResult(contact_id, conversation_id, len(events), reply=reply, sent=True)
 
     # -- helpers ----------------------------------------------------------
+    async def _describe_media(self, conversation_id: str, url: str) -> str:
+        """Download an inbound picture and let the app's vision model describe it."""
+        fetch = getattr(self.channel, "fetch_media", None)
+        if fetch is None:
+            return ""
+        try:
+            content = await fetch(url)
+        except Exception as exc:
+            self._log(f"[bridge] media download failed: {exc!r}")
+            return ""
+        if not content:
+            return ""
+        try:
+            text = await self.app.describe_media(conversation_id, content)
+        except Exception as exc:  # never let vision break the answered turn
+            self._log(f"[bridge] media describe failed: {exc!r}")
+            return ""
+        if text:
+            self._log(f"[bridge] described inbound image: {text[:60]!r}")
+        return text
+
     async def _platform_identity(
         self, contact_id: str, person_id: str, contact_name: str
     ) -> tuple[str, str | None]:

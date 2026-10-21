@@ -44,7 +44,8 @@ MSG_JS = """() => Array.from(document.querySelectorAll('.xhs-im-msg-list .chat-i
     me: !!el.querySelector('.chat-item__content--right'),
     text: (el.querySelector('.xhs-im-bubble__text') || {}).textContent || '',
     sticker: !!el.querySelector('.xhs-im-bubble__emoji, .emoji, [class*=sticker], [class*=emoji]'),
-    image: !!el.querySelector('.xhs-im-bubble img, .xhs-im-bubble__image, [class*=image]')
+    image: !!el.querySelector('.xhs-im-bubble img, .xhs-im-bubble__image, [class*=image]'),
+    image_url: ((el.querySelector('.xhs-im-bubble img, .xhs-im-bubble__image img, [class*=image] img') || {}).src) || ''
   }))"""
 
 STATE_JS = """() => {
@@ -408,6 +409,7 @@ class XhsChannel:
             text = (message.get("text") or "").strip() or media_text(message)
             if not text:
                 continue
+            media_url = (message.get("image_url") or "").strip()
             event = InboundEvent(
                 contact_id=f"xhs:{conv['id']}",
                 contact_name=conv["name"] or conv["id"],
@@ -415,11 +417,24 @@ class XhsChannel:
                 message_id=f"xhs-{conv['id']}-{message['id']}",
                 is_group=False,
                 timestamp=time.time(),
+                raw={"media_url": media_url} if media_url else {},
             )
             if self._handler:
                 self._handler(event)
 
     # -- sending ----------------------------------------------------------
+    async def fetch_media(self, url: str) -> bytes:
+        """Download a bubble picture through the logged-in browser session."""
+        if not url or self._ctx is None:
+            return b""
+        try:
+            response = await self._ctx.request.get(url, timeout=20000)
+            if not response.ok:
+                return b""
+            return await response.body()
+        except Exception:
+            return b""
+
     async def send(self, contact_id: str, text: str, is_group: bool = False) -> None:
         conv_id = contact_id.split(":", 1)[1] if ":" in contact_id else contact_id
         wanted = text.strip()

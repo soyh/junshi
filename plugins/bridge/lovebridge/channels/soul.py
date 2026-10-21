@@ -38,7 +38,8 @@ MSG_JS = """() => Array.from(document.querySelectorAll('.bubble-row')).map(el =>
   text: (el.querySelector('.bubble-text') || {}).textContent || '',
   time: (el.querySelector('.bubble-time, time') || {}).textContent || '',
   sticker: !!el.querySelector('[class*=emoji], [class*=sticker], .bubble-img--emoji'),
-  image: !!el.querySelector('.bubble-img, img[class*=bubble], [class*=bubble-image]')
+  image: !!el.querySelector('.bubble-img, img[class*=bubble], [class*=bubble-image]'),
+  image_url: ((el.querySelector('.bubble-img img, img[class*=bubble], .bubble-img') || {}).src) || ''
 }))"""
 
 PAGE_TEXT_JS = "() => document.body ? document.body.innerText : ''"
@@ -403,6 +404,7 @@ class SoulChannel:
             if not text:
                 continue
             digest = hashlib.md5(f"{name}|{text}|{int(time.time() // 60)}".encode()).hexdigest()[:12]
+            media_url = (message.get("image_url") or "").strip()
             event = InboundEvent(
                 contact_id=f"soul:{name}",
                 contact_name=name,
@@ -410,11 +412,24 @@ class SoulChannel:
                 message_id=f"soul-{digest}",
                 is_group=False,
                 timestamp=time.time(),
+                raw={"media_url": media_url} if media_url else {},
             )
             if self._handler:
                 self._handler(event)
 
     # -- sending ----------------------------------------------------------
+    async def fetch_media(self, url: str) -> bytes:
+        """Download a bubble picture through the logged-in browser session."""
+        if not url or self._ctx is None:
+            return b""
+        try:
+            response = await self._ctx.request.get(url, timeout=20000)
+            if not response.ok:
+                return b""
+            return await response.body()
+        except Exception:
+            return b""
+
     async def send(self, contact_id: str, text: str, is_group: bool = False) -> None:
         name = contact_id.split(":", 1)[1] if ":" in contact_id else contact_id
         wanted = text.strip()

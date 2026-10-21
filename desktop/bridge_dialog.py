@@ -43,6 +43,7 @@ class BridgeDialog(Dialog):
         self._build_right(scrollable(right_wrap))
 
         self.footer()
+        self.load_shared()
         self.reload()
         self.window.after(15000, self._auto_refresh)
 
@@ -73,6 +74,59 @@ class BridgeDialog(Dialog):
         bar.pack(side="left", fill="y")
         self.text.configure(yscrollcommand=bar.set)
 
+    def _build_shared(self, parent):
+        """Identity and default rules: one copy for every channel."""
+        shared = Section(parent, "全局设置（所有通道共用：本人信息 + 默认规则）", open=False)
+        self.shared_section = shared
+        note = ttk.Label(
+            shared.body,
+            text="这些内容不属于某个通道：改一次，所有通道下次启动都生效。",
+            foreground="#666",
+            wraplength=660,
+        )
+        note.pack(anchor="w")
+        grid = ttk.Frame(shared.body)
+        grid.pack(fill="x", pady=(4, 6))
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=1)
+        ttk.Label(
+            grid,
+            text="本人信息：填了才会用；没填的项模型保持模糊，不会自己编年龄、职业或城市。",
+            foreground="#666",
+            wraplength=620,
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(0, 4))
+        self.person = {}
+        for index, key in enumerate(bp.PERSON_FIELDS):
+            row, column = divmod(index + 1, 2)
+            self.person[key] = self._cell(grid, row, column, key, bp.PERSON_LABELS[key], "")
+
+        rules_head = ttk.Frame(shared.body)
+        rules_head.pack(fill="x")
+        ttk.Label(rules_head, text="默认回复规则（通道没写规则时用这份）：").pack(side="left")
+        self.global_template = ttk.Combobox(rules_head, values=NAMES, state="readonly", width=26)
+        self.global_template.pack(side="left", padx=(4, 0))
+        self.global_template.set(NAMES[0])
+        self.global_template.bind(
+            "<<ComboboxSelected>>",
+            lambda _event: self.fill_template(insert_only=True, target=self.global_rules),
+        )
+        ttk.Button(
+            rules_head,
+            text="填入模板",
+            command=lambda: self.fill_template(insert_only=True, target=self.global_rules),
+        ).pack(side="left", padx=(4, 0))
+        row = ttk.Frame(shared.body)
+        row.pack(fill="both", expand=True, pady=(3, 0))
+        self.global_rules = tk.Text(row, height=5, wrap="word", spacing1=2, spacing3=2)
+        self.global_rules.pack(side="left", fill="both", expand=True)
+        bar = ttk.Scrollbar(row, command=self.global_rules.yview)
+        bar.pack(side="left", fill="y")
+        self.global_rules.configure(yscrollcommand=bar.set)
+        self.widgets.append((self.global_rules, "normal"))
+        bar_row = ttk.Frame(shared.body)
+        bar_row.pack(fill="x", pady=(4, 0))
+        self.button(bar_row, "保存全局设置", self.save_shared)
+
     def _build_right(self, parent):
         account = Section(parent, "基础连接", open=True)
         grid = account.body
@@ -99,23 +153,7 @@ class BridgeDialog(Dialog):
         self.cap = self._cell(grid, 2, 0, "cap", "每日回复上限", "30")
         self.verify = self._cell(grid, 2, 1, "verify", "校验 HTTPS 证书", "是", choices=["是", "否"])
 
-        person = Section(parent, "本人信息（让回复用你的真实身份说话）", open=False)
-        self.person_section = person
-        grid = person.body
-        grid.columnconfigure(0, weight=1)
-        grid.columnconfigure(1, weight=1)
-        ttk.Label(
-            grid,
-            text="填了才会用；没填的项模型会保持模糊，不会自己编年龄、职业或城市。",
-            foreground="#666",
-            wraplength=620,
-        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(0, 6))
-        self.person = {}
-        for index, key in enumerate(bp.PERSON_FIELDS):
-            row, column = divmod(index + 1, 2)
-            self.person[key] = self._cell(grid, row, column, key, bp.PERSON_LABELS[key], "")
-
-        rules = Section(parent, "回复规则 / Prompt（可选，仅本通道）", open=False)
+        rules = Section(parent, "本通道回复规则（留空则用全局默认）", open=False)
         self.rules_section = rules
         ttk.Label(rules.body, text=RULES_HINT, foreground="#555").pack(anchor="w")
         picker = ttk.Frame(rules.body)
@@ -140,6 +178,8 @@ class BridgeDialog(Dialog):
             anchor="e", pady=(4, 0)
         )
         self.fill_template(insert_only=False)
+
+        self._build_shared(parent)
 
         queue = Section(parent, "待发 / 失败（续聊兜底）", open=True)
         queue_row = ttk.Frame(queue.body)
@@ -189,7 +229,10 @@ class BridgeDialog(Dialog):
             pass
 
     def reload(self, select=None):
-        self.profiles = {item["id"]: item for item in bp.list_profiles()}
+        self._render_list(items={item["id"]: item for item in bp.list_profiles()}, select=select)
+
+    def _render_list(self, items, select=None, load=True):
+        self.profiles = items
         self.listbox.delete(0, "end")
         order = list(self.profiles)
         for profile_id in order:
@@ -206,7 +249,8 @@ class BridgeDialog(Dialog):
         index = order.index(target)
         self.listbox.selection_clear(0, "end")
         self.listbox.selection_set(index)
-        self.load_selected()
+        if load:
+            self.load_selected()
 
     def load_selected(self):
         selection = self.listbox.curselection()
@@ -229,10 +273,30 @@ class BridgeDialog(Dialog):
         self.rules.delete("1.0", "end")
         if item.get("rules"):
             self.rules.insert("1.0", item["rules"])
-        for key, widget in self.person.items():
-            self._fill(widget, item.get("person", {}).get(key, ""))
         state = item.get("status") or ("运行中" if item["running"] else "未运行")
         self.message.set(f"{item['name']}：{state}")
+
+    def _person_values(self):
+        return {key: widget.get().strip() for key, widget in self.person.items()}
+
+    def load_shared(self):
+        shared = bp.load_global()
+        for key, widget in self.person.items():
+            self._fill(widget, shared["person"].get(key, ""))
+        self.global_rules.delete("1.0", "end")
+        if shared["rules"]:
+            self.global_rules.insert("1.0", shared["rules"])
+
+    def save_shared(self):
+        try:
+            bp.save_global(
+                person=self._person_values(),
+                rules=self.global_rules.get("1.0", "end").strip(),
+            )
+        except OSError as exc:
+            self.message.set(f"全局设置保存失败：{exc}")
+            return
+        self.message.set("全局设置已保存：所有通道下次启动都使用这份本人信息和默认规则。")
 
     @staticmethod
     def _fill(widget, value):
@@ -262,7 +326,7 @@ class BridgeDialog(Dialog):
             "headless": self.headless.get() == "是",
             "browser_window": WINDOW_LABELS.get(self.window_mode.get(), "hide"),
             "rules": self.rules.get("1.0", "end").strip(),
-            "person": {key: widget.get().strip() for key, widget in self.person.items()},
+            "person": self._person_values(),
         }
 
     def new_profile(self):
@@ -300,6 +364,10 @@ class BridgeDialog(Dialog):
             return
         before = self.profiles.get(self.current, {})
         try:
+            bp.save_global(
+                person=self._person_values(),
+                rules=self.global_rules.get("1.0", "end").strip(),
+            )
             bp.save_profile(self.current, **self._values())
         except ValueError as exc:
             self.message.set(str(exc))
@@ -318,6 +386,10 @@ class BridgeDialog(Dialog):
             self.message.set("该通道已在运行；如更换了平台，请先「停止」再「启动」。")
             return
         try:
+            bp.save_global(
+                person=self._person_values(),
+                rules=self.global_rules.get("1.0", "end").strip(),
+            )
             bp.save_profile(self.current, **self._values())
             pid = bp.start(self.current)
         except (ValueError, OSError) as exc:
@@ -386,12 +458,15 @@ class BridgeDialog(Dialog):
                 "这个通道没有可见的浏览器窗口（可能已经在后台，或还没登录）。",
             )
 
-    def fill_template(self, insert_only=True):
-        note, text = rr.template(self.template.get())
-        self.template_note.configure(text=note)
+    def fill_template(self, insert_only=True, target=None):
+        picker = self.global_template if target is not None else self.template
+        note, text = rr.template(picker.get())
+        if target is None:
+            self.template_note.configure(text=note)
         if insert_only:
-            self.rules.delete("1.0", "end")
-            self.rules.insert("1.0", text)
+            box = target if target is not None else self.rules
+            box.delete("1.0", "end")
+            box.insert("1.0", text)
 
     def _log(self, message):
         self.text.configure(state="normal")
@@ -400,11 +475,21 @@ class BridgeDialog(Dialog):
         self.text.configure(state="disabled")
 
     def refresh(self):
+        """Update list/status only: whatever the user typed in the form stays."""
         if self.busy:
             return
-        self.reload(select=self.current)
-        self.perform(lambda: bp.status_lines(list(self.profiles.values())), self.render)
-        self.refresh_queue()
+        self.perform(self._scan, self._refreshed)
+
+    def _scan(self):
+        items = {item["id"]: item for item in bp.list_profiles()}
+        return items, bp.outbox_lines(list(items.values()))
+
+    def _refreshed(self, payload):
+        items, queue = payload
+        self._render_list(items=items, select=self.current, load=False)
+        self.render_queue(queue)
+        running = sum(1 for item in items.values() if item["running"])
+        self.message.set(f"状态以本机当前为准；运行中的通道：{running} 个。")
 
     def refresh_queue(self):
         self.perform(lambda: bp.outbox_lines(list(self.profiles.values())), self.render_queue)

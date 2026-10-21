@@ -248,6 +248,50 @@ class AppClient:
             timeout=15.0,
         )
 
+    async def describe_media(
+        self,
+        conversation_id: str,
+        content: bytes,
+        mime_type: str = "image/jpeg",
+        filename: str = "photo.jpg",
+    ) -> str:
+        """Reuse the app's own vision pipeline to describe an inbound picture.
+
+        Upload → analyse; the analysis text is what the reply model gets to read.
+        Failures never raise: the caller falls back to a text placeholder.
+        """
+        if not content:
+            return ""
+        if self._token is None:
+            await self.login()
+        headers = {"Authorization": f"Bearer {self._token}"}
+        response = await self._client.post(
+            f"/api/v1/conversations/{conversation_id}/media",
+            files={"file": (filename, content, mime_type)},
+            headers=headers,
+            timeout=max(self._timeout, 120.0),
+        )
+        if response.status_code == 401:
+            await self.login()
+            headers = {"Authorization": f"Bearer {self._token}"}
+            response = await self._client.post(
+                f"/api/v1/conversations/{conversation_id}/media",
+                files={"file": (filename, content, mime_type)},
+                headers=headers,
+                timeout=max(self._timeout, 120.0),
+            )
+        if response.status_code >= 400:
+            return ""
+        attachment = response.json()
+        attachment_id = attachment.get("id")
+        if not attachment_id:
+            return ""
+        analyzed = await self._request(
+            "POST", f"/api/v1/media/{attachment_id}/analyze", timeout=180.0
+        )
+        text = ((analyzed or {}).get("attachment") or {}).get("analysis_text") or ""
+        return " ".join(str(text).split())[:400]
+
     async def get_reply_context(
         self,
         conversation_id: str,
