@@ -4,10 +4,13 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 import bridge_plugin as bp
+import reply_rules as rr
 from management import Dialog, Section, scrollable
 
+NAMES = rr.NAMES
 
-WINDOW_MODES = {"hide": "移出桌面（后台运行）", "minimize": "最小化", "show": "保持显示"}
+
+WINDOW_MODES = {"hide": "移出桌面（不占任务栏）", "minimize": "最小化", "show": "保持显示"}
 WINDOW_LABELS = {label: key for key, label in WINDOW_MODES.items()}
 RULES_HINT = (
     "只影响语气、称呼、长度、用词、表情和话题偏好。\n"
@@ -97,10 +100,21 @@ class BridgeDialog(Dialog):
         self.verify = self._cell(grid, 2, 1, "verify", "校验 HTTPS 证书", "是", choices=["是", "否"])
 
         rules = Section(parent, "回复规则 / Prompt（可选，仅本通道）", open=False)
+        self.rules_section = rules
         ttk.Label(rules.body, text=RULES_HINT, foreground="#555").pack(anchor="w")
+        picker = ttk.Frame(rules.body)
+        picker.pack(fill="x", pady=(3, 2))
+        ttk.Label(picker, text="模板：").pack(side="left")
+        self.template = ttk.Combobox(picker, values=NAMES, state="readonly", width=28)
+        self.template.pack(side="left")
+        self.template.set(NAMES[0])
+        ttk.Button(picker, text="填入模板", command=self.fill_template).pack(side="left", padx=(4, 0))
+        self.template_note = ttk.Label(rules.body, text="", foreground="#666", wraplength=820)
+        self.template_note.pack(anchor="w")
+        self.template.bind("<<ComboboxSelected>>", lambda _event: self.fill_template(insert_only=False))
         text_row = ttk.Frame(rules.body)
         text_row.pack(fill="both", expand=True, pady=(2, 0))
-        self.rules = tk.Text(text_row, height=5, wrap="word")
+        self.rules = tk.Text(text_row, height=7, wrap="word")
         self.rules.pack(side="left", fill="both", expand=True)
         bar = ttk.Scrollbar(text_row, command=self.rules.yview)
         bar.pack(side="left", fill="y")
@@ -109,6 +123,7 @@ class BridgeDialog(Dialog):
         ttk.Button(rules.body, text="恢复默认（清空）", command=lambda: self.rules.delete("1.0", "end")).pack(
             anchor="e", pady=(4, 0)
         )
+        self.fill_template(insert_only=False)
 
         actions = ttk.Frame(parent)
         actions.pack(fill="x", pady=(2, 4))
@@ -338,6 +353,13 @@ class BridgeDialog(Dialog):
                 "没找到窗口",
                 "这个通道没有可见的浏览器窗口（可能已经在后台，或还没登录）。",
             )
+
+    def fill_template(self, insert_only=True):
+        note, text = rr.template(self.template.get())
+        self.template_note.configure(text=note)
+        if insert_only:
+            self.rules.delete("1.0", "end")
+            self.rules.insert("1.0", text)
 
     def _log(self, message):
         self.text.configure(state="normal")

@@ -31,6 +31,10 @@ SW_RESTORE = 9
 SWP_NOSIZE = 0x0001
 SWP_NOZORDER = 0x0004
 SWP_NOACTIVATE = 0x0010
+SWP_FRAMECHANGED = 0x0020
+GWL_EXSTYLE = -20
+WS_EX_TOOLWINDOW = 0x00000080
+WS_EX_APPWINDOW = 0x00040000
 TH32CS_SNAPPROCESS = 0x00000002
 
 OFFSCREEN = (-30000, -30000)
@@ -165,6 +169,21 @@ def _find(
         time.sleep(0.5)
 
 
+def _ex_style(hwnd: int) -> int:
+    return ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+
+
+def _set_ex_style(hwnd: int, value: int) -> None:
+    ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, value)
+
+
+def taskbar_visible(hwnd: int) -> bool:
+    """False when the window carries WS_EX_TOOLWINDOW (no taskbar button)."""
+    if not IS_WINDOWS:
+        return True
+    return not (_ex_style(hwnd) & WS_EX_TOOLWINDOW)
+
+
 def hide(
     root_pids: list[int] | None = None,
     *,
@@ -172,7 +191,7 @@ def hide(
     mode: str = "hide",
     wait: float = 12.0,
 ) -> int:
-    """Move the window off-screen (or minimize it). Returns windows touched."""
+    """Park the window off-screen and drop it from the taskbar. Returns windows touched."""
     if not IS_WINDOWS:
         return 0
     user32 = ctypes.windll.user32
@@ -185,9 +204,15 @@ def hide(
             if mode == "minimize":
                 user32.ShowWindow(hwnd, SW_MINIMIZE)
             else:
+                # Moving alone leaves a taskbar button that restores the page, so
+                # the window also becomes a tool window: no taskbar entry, no
+                # Alt-Tab entry, and still "visible" to Chromium (no throttling).
+                _set_ex_style(
+                    hwnd, (_ex_style(hwnd) | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW,
+                )
                 user32.SetWindowPos(
                     hwnd, 0, OFFSCREEN[0], OFFSCREEN[1], 0, 0,
-                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
                 )
             touched += 1
         except Exception:
@@ -212,9 +237,10 @@ def show(
     for hwnd in handles:
         try:
             user32.ShowWindow(hwnd, SW_RESTORE)
+            _set_ex_style(hwnd, (_ex_style(hwnd) & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW)
             user32.SetWindowPos(
                 hwnd, 0, ONSCREEN[0], ONSCREEN[1], 0, 0,
-                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
             )
             user32.SetForegroundWindow(hwnd)
             touched += 1

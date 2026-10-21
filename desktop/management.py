@@ -8,28 +8,43 @@ PROVIDERS = ('qwen', 'deepseek', 'kimi', 'openai', 'gemini', 'openai_compatible'
 PLATFORMS = {'微信':'wechat','抖音':'douyin','探探':'tantan','陌陌':'momo','Soul':'soul','其他':'other'}
 
 
+SECTION_OPEN = '\u25be'   # ▾
+SECTION_CLOSED = '\u25b8'  # ▸
+
+
 class Section:
-    """Collapsible group: a check-button header that shows or hides its body."""
+    """Collapsible group: a clickable caption that shows or hides its body."""
 
     def __init__(self, parent, title, open=True, note=''):
         self.frame = ttk.Frame(parent)
         self.frame.pack(fill='x', pady=(2, 6))
         self.open = tk.BooleanVar(value=open)
+        self.title = title
         header = ttk.Frame(self.frame)
         header.pack(fill='x')
-        ttk.Checkbutton(header, text=title, variable=self.open, command=self.toggle).pack(side='left')
+        self.caption = ttk.Label(header, text=self._caption(), cursor='hand2', foreground='#1f5fbf')
+        self.caption.pack(side='left')
+        self.caption.bind('<Button-1>', lambda _event: self.toggle())
+        self.caption.bind('<Enter>', lambda _event: self.caption.configure(foreground='#0b3d8c'))
+        self.caption.bind('<Leave>', lambda _event: self.caption.configure(foreground='#1f5fbf'))
         if note:
             ttk.Label(header, text=note, foreground='#666').pack(side='left', padx=(8, 0))
+        ttk.Separator(self.frame, orient='horizontal').pack(fill='x', pady=(2, 0))
         self.body = ttk.Frame(self.frame, padding=(16, 2, 2, 2))
         if open:
             self.body.pack(fill='x')
         self.widgets = []
 
+    def _caption(self):
+        return f'{SECTION_OPEN if self.open.get() else SECTION_CLOSED} {self.title}'
+
     def toggle(self):
+        self.open.set(not self.open.get())
         if self.open.get():
             self.body.pack(fill='x')
         else:
             self.body.forget()
+        self.caption.configure(text=self._caption())
 
     def entry(self, dialog, key, label, value='', choices=None, secret=False):
         widget = dialog.entry(key, label, value, choices, secret, parent=self.body)

@@ -96,3 +96,22 @@ class NativeManagementTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class SectionTests(unittest.TestCase):
+    def test_toggle_flips_the_caption_and_the_body(self):
+        import tkinter as tk
+        from management import Section
+        root = tk.Tk(); root.withdraw()
+        try:
+            section = Section(root, '分组', open=True)
+            self.assertEqual(section.body.winfo_manager(), 'pack')
+            self.assertTrue(section.caption.cget('text').startswith('\u25be'))
+            section.toggle()
+            self.assertEqual(section.body.winfo_manager(), '')
+            self.assertTrue(section.caption.cget('text').startswith('\u25b8'))
+            section.toggle()
+            self.assertEqual(section.body.winfo_manager(), 'pack')
+            self.assertTrue(section.caption.cget('text').startswith('\u25be'))
+        finally:
+            root.destroy()
