@@ -43,8 +43,9 @@ class _App:
     async def add_message(self, conversation_id, sender, text, **kwargs):  # noqa: ANN001
         self.messages.append((sender, text))
 
-    async def get_reply_context(self, conversation_id, rules=""):  # noqa: ANN001
+    async def get_reply_context(self, conversation_id, rules="", self_profile=None):  # noqa: ANN001
         self.context_calls += 1
+        self.last_profile = self_profile
         if self.error is not None:
             raise self.error
         draft = self.drafts.pop(0) if self.drafts else ""

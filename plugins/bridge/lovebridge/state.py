@@ -234,6 +234,22 @@ class StateStore:
             )
             self._conn.commit()
 
+    def outbox_retry_now(self) -> dict[str, int]:
+        """Make every owed reply due immediately (failed ones are revived)."""
+        now = datetime.now().isoformat(timespec="seconds")
+        with self._lock:
+            revived = self._conn.execute(
+                "UPDATE outbox SET state = 'queued', next_at = NULL, reason = NULL, "
+                "attempts = 0, updated_at = ? WHERE state = 'failed'",
+                (now,),
+            ).rowcount
+            due = self._conn.execute(
+                "UPDATE outbox SET next_at = NULL, updated_at = ? WHERE state = 'queued'",
+                (now,),
+            ).rowcount
+            self._conn.commit()
+        return {"revived": int(revived or 0), "queued": int(due or 0)}
+
     def outbox_rows(self, state: str, limit: int = 20) -> list[dict]:
         with self._lock:
             rows = self._conn.execute(

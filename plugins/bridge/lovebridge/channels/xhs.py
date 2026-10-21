@@ -23,7 +23,7 @@ from pathlib import Path
 
 from .. import window
 from ..console import write_line
-from .base import Handler, InboundEvent
+from .base import Handler, InboundEvent, media_text
 
 CONV_ITEM = '.xhs-im-conv-item[data-conv-kind="c2c"]'
 EDITOR = ".xhs-im-input-bar-editor"
@@ -42,7 +42,9 @@ MSG_JS = """() => Array.from(document.querySelectorAll('.xhs-im-msg-list .chat-i
     id: el.getAttribute('data-message-id') || '',
     type: el.getAttribute('data-content-type') || '',
     me: !!el.querySelector('.chat-item__content--right'),
-    text: (el.querySelector('.xhs-im-bubble__text') || {}).textContent || ''
+    text: (el.querySelector('.xhs-im-bubble__text') || {}).textContent || '',
+    sticker: !!el.querySelector('.xhs-im-bubble__emoji, .emoji, [class*=sticker], [class*=emoji]'),
+    image: !!el.querySelector('.xhs-im-bubble img, .xhs-im-bubble__image, [class*=image]')
   }))"""
 
 STATE_JS = """() => {
@@ -401,8 +403,10 @@ class XhsChannel:
         self._last_index[conv["id"]] = fresh[-1]["id"]
 
         for message in fresh:
-            text = (message.get("text") or "").strip()
-            if message.get("me") or not text:
+            if message.get("me"):
+                continue
+            text = (message.get("text") or "").strip() or media_text(message)
+            if not text:
                 continue
             event = InboundEvent(
                 contact_id=f"xhs:{conv['id']}",

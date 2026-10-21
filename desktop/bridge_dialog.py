@@ -13,7 +13,7 @@ NAMES = rr.NAMES
 WINDOW_MODES = {"hide": "移出桌面（不占任务栏）", "minimize": "最小化", "show": "保持显示"}
 WINDOW_LABELS = {label: key for key, label in WINDOW_MODES.items()}
 RULES_HINT = (
-    "只影响语气、称呼、长度、用词、表情和话题偏好。\n"
+    "只影响语气、称呼、长度、用词、表情和话题偏好；真人感优先于泛泛的礼貌。\n"
     "不能覆盖证据、安全边界和发送前确认，写了也会被忽略。"
 )
 
@@ -99,6 +99,22 @@ class BridgeDialog(Dialog):
         self.cap = self._cell(grid, 2, 0, "cap", "每日回复上限", "30")
         self.verify = self._cell(grid, 2, 1, "verify", "校验 HTTPS 证书", "是", choices=["是", "否"])
 
+        person = Section(parent, "本人信息（让回复用你的真实身份说话）", open=False)
+        self.person_section = person
+        grid = person.body
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=1)
+        ttk.Label(
+            grid,
+            text="填了才会用；没填的项模型会保持模糊，不会自己编年龄、职业或城市。",
+            foreground="#666",
+            wraplength=620,
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(0, 6))
+        self.person = {}
+        for index, key in enumerate(bp.PERSON_FIELDS):
+            row, column = divmod(index + 1, 2)
+            self.person[key] = self._cell(grid, row, column, key, bp.PERSON_LABELS[key], "")
+
         rules = Section(parent, "回复规则 / Prompt（可选，仅本通道）", open=False)
         self.rules_section = rules
         ttk.Label(rules.body, text=RULES_HINT, foreground="#555").pack(anchor="w")
@@ -114,7 +130,7 @@ class BridgeDialog(Dialog):
         self.template.bind("<<ComboboxSelected>>", lambda _event: self.fill_template(insert_only=False))
         text_row = ttk.Frame(rules.body)
         text_row.pack(fill="both", expand=True, pady=(2, 0))
-        self.rules = tk.Text(text_row, height=7, wrap="word")
+        self.rules = tk.Text(text_row, height=7, wrap="word", spacing1=2, spacing3=2)
         self.rules.pack(side="left", fill="both", expand=True)
         bar = ttk.Scrollbar(text_row, command=self.rules.yview)
         bar.pack(side="left", fill="y")
@@ -124,6 +140,19 @@ class BridgeDialog(Dialog):
             anchor="e", pady=(4, 0)
         )
         self.fill_template(insert_only=False)
+
+        queue = Section(parent, "待发 / 失败（续聊兜底）", open=True)
+        queue_row = ttk.Frame(queue.body)
+        queue_row.pack(fill="both", expand=True)
+        self.queue_text = tk.Text(queue_row, height=4, wrap="word", state="disabled")
+        self.queue_text.pack(side="left", fill="both", expand=True)
+        queue_bar = ttk.Scrollbar(queue_row, command=self.queue_text.yview)
+        queue_bar.pack(side="left", fill="y")
+        self.queue_text.configure(yscrollcommand=queue_bar.set)
+        queue_buttons = ttk.Frame(queue.body)
+        queue_buttons.pack(fill="x", pady=(3, 0))
+        self.button(queue_buttons, "立即重试", self.retry_outbox)
+        self.button(queue_buttons, "刷新队列", self.refresh_queue)
 
         actions = ttk.Frame(parent)
         actions.pack(fill="x", pady=(2, 4))
@@ -200,6 +229,8 @@ class BridgeDialog(Dialog):
         self.rules.delete("1.0", "end")
         if item.get("rules"):
             self.rules.insert("1.0", item["rules"])
+        for key, widget in self.person.items():
+            self._fill(widget, item.get("person", {}).get(key, ""))
         state = item.get("status") or ("运行中" if item["running"] else "未运行")
         self.message.set(f"{item['name']}：{state}")
 
@@ -231,6 +262,7 @@ class BridgeDialog(Dialog):
             "headless": self.headless.get() == "是",
             "browser_window": WINDOW_LABELS.get(self.window_mode.get(), "hide"),
             "rules": self.rules.get("1.0", "end").strip(),
+            "person": {key: widget.get().strip() for key, widget in self.person.items()},
         }
 
     def new_profile(self):
@@ -372,6 +404,29 @@ class BridgeDialog(Dialog):
             return
         self.reload(select=self.current)
         self.perform(lambda: bp.status_lines(list(self.profiles.values())), self.render)
+        self.refresh_queue()
+
+    def refresh_queue(self):
+        self.perform(lambda: bp.outbox_lines(list(self.profiles.values())), self.render_queue)
+
+    def render_queue(self, lines):
+        self.queue_text.configure(state="normal")
+        self.queue_text.delete("1.0", "end")
+        self.queue_text.insert("1.0", "\n".join(lines))
+        self.queue_text.configure(state="disabled")
+
+    def retry_outbox(self):
+        if not self.current:
+            self.message.set("请先选择一个通道。")
+            return
+        if not self.profiles.get(self.current, {}).get("running"):
+            self.message.set("该通道未在运行；启动后待发消息会自动补发。")
+            return
+        self.perform(lambda: bp.retry_outbox(self.current), self._retried)
+
+    def _retried(self, result):
+        self.message.set(f"已请求重试：{result}")
+        self.refresh_queue()
 
     def render(self, lines):
         self.text.configure(state="normal")

@@ -26,6 +26,20 @@ CHANNELS = {"wechat": "微信", "xhs": "小红书", "soul": "Soul"}
 CHANNEL_LABELS = {label: key for key, label in CHANNELS.items()}
 DEFAULT_QUIET = ("03:00", "05:30")
 
+#: 「本人信息」登记项 —— 让自动回复用真实身份说话，不瞎编年龄/职业。
+PERSON_FIELDS = ("nickname", "gender", "birth_year", "city", "job", "hobbies",
+                 "relationship", "about")
+PERSON_LABELS = {
+    "nickname": "我的称呼",
+    "gender": "性别",
+    "birth_year": "出生年份",
+    "city": "所在城市",
+    "job": "职业",
+    "hobbies": "兴趣",
+    "relationship": "感情状态",
+    "about": "其他设定",
+}
+
 
 def app_data_dir() -> Path:
     return Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "JunshiPC"
@@ -79,6 +93,7 @@ def build_config(
     headless: bool = True,
     browser_window: str = "hide",
     rules: str = "",
+    person: dict[str, str] | None = None,
 ) -> str:
     if channel not in set(CHANNELS) | {"mock"}:
         raise ValueError("不支持的平台通道")
@@ -89,7 +104,17 @@ def build_config(
     verify = "true" if verify_tls and not server.startswith("http://") else "false"
     text = f"""[profile]
 name = {_toml(name.strip() or "未命名通道")}
-
+"""
+    facts = {
+        key: str(value).strip()
+        for key, value in (person or {}).items()
+        if key in PERSON_FIELDS and str(value).strip()
+    }
+    if facts:
+        text += "\n[person]\n" + "".join(
+            f"{key} = {_toml(facts[key])}\n" for key in PERSON_FIELDS if key in facts
+        )
+    text += f"""
 [app]
 base_url = {_toml(server.strip())}
 username = {_toml(username.strip())}
@@ -165,6 +190,11 @@ def summary(profile_id: str) -> dict:
         "quiet": (str(quiet[0]), str(quiet[1])),
         "verify_tls": bool(app.get("verify_tls", True)),
         "rules": str(bot.get("rules", "")),
+        "person": {
+            key: str(data.get("person", {}).get(key, ""))
+            for key in PERSON_FIELDS
+            if str(data.get("person", {}).get(key, "")).strip()
+        },
         "running": is_running(profile_id),
         "status": local_status(profile_id)["status"],
     }
@@ -238,6 +268,45 @@ def show_browser(profile_id: str) -> bool:
 def hide_browser(profile_id: str) -> bool:
     """Move the automation browser off the desktop while the bridge keeps running."""
     return _window_action(profile_id, "hide")
+
+
+def outbox_lines(profiles: list[dict]) -> list[str]:
+    """One line per channel: what is still owed and why the last attempt failed."""
+    lines = []
+    for item in profiles:
+        detail = local_status(item["id"])
+        queued, failed = detail["queued"], detail["failed"]
+        label = CHANNELS.get(item.get("channel", ""), item.get("channel", ""))
+        if not queued and not failed:
+            continue
+        line = f"{label}｜{item.get('name', item['id'])}：待重试 {queued} 条，未发出 {failed} 条"
+        if detail.get("error"):
+            line += f"\n    最近原因：{detail['error']}"
+        lines.append(line)
+    return lines or ["暂无待发或失败的消息：每条收到的消息都已回完。"]
+
+
+def retry_outbox(profile_id: str) -> str:
+    """Ask a running bridge to resend everything it still owes, right now."""
+    command, environment = executable_command(profile_id, "outbox")
+    command += ["--retry"]
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=str(profile_dir(profile_id)),
+            env=environment,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=flags,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"重试失败：{exc}"
+    output = (completed.stdout or completed.stderr or "").strip()
+    return output.splitlines()[0] if output else "已通知桥接立即重试。"
 
 
 def _window_action(profile_id: str, action: str) -> bool:

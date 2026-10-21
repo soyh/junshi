@@ -11,8 +11,10 @@ class FakeService:
         self.error = error
         self.calls = []
 
-    def build_context(self, conn, user_id, conversation_id, *, provider=None, channel_rules=""):
-        self.calls.append((conn, user_id, conversation_id, provider, channel_rules))
+    def build_context(self, conn, user_id, conversation_id, *, provider=None,
+                      channel_rules="", self_profile=None):
+        self.calls.append((conn, user_id, conversation_id, provider, channel_rules,
+                           self_profile))
         if self.error is not None:
             raise self.error
         return self.result
@@ -84,6 +86,7 @@ def test_analysis_strategic_reply_route_returns_derived_input(monkeypatch):
         "conversation-1",
         fake_provider,
         "",
+        {},
     )
 
 
@@ -102,6 +105,24 @@ def test_analysis_strategic_reply_route_forwards_channel_rules(monkeypatch):
 
     assert response.status_code == 200
     assert fake_service.calls[0][4] == rules
+    assert fake_service.calls[0][5] == {}
+
+
+def test_analysis_strategic_reply_route_forwards_self_profile(monkeypatch):
+    fake_service = FakeService(result=strategic_reply_result())
+    monkeypatch.setattr(analysis_strategic_reply, "service", fake_service)
+    monkeypatch.setattr(analysis_strategic_reply, "QwenProvider", lambda: FakeProvider())
+    profile = {"nickname": "阿哲", "birth_year": "1994", "city": "杭州"}
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/conversations/conversation-1/strategic-reply/context",
+            json={"rules": "像本人在打字", "self_profile": profile},
+        )
+
+    assert response.status_code == 200
+    assert fake_service.calls[0][4] == "像本人在打字"
+    assert fake_service.calls[0][5] == profile
 
 
 def test_analysis_strategic_reply_route_translates_llm_failure(monkeypatch):

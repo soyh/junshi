@@ -31,6 +31,7 @@ def _build_provider(conn, user_id: str):
 
 class ChannelRulesBody(BaseModel):
     rules: str = ""
+    self_profile: dict[str, str] = {}
 
 
 def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
@@ -83,7 +84,7 @@ def get_analysis_strategic_reply_context(
     request_id: UUID | None = None,
     user_id: str = Depends(get_current_user_id),
 ):
-    return _reply_context(conversation_id, request_id, "", user_id)
+    return _reply_context(conversation_id, request_id, "", {}, user_id)
 
 
 @router.post(
@@ -98,13 +99,20 @@ def post_analysis_strategic_reply_context(
     user_id: str = Depends(get_current_user_id),
 ):
     """Same pipeline as GET, plus optional per-channel style rules from the bridge."""
-    return _reply_context(conversation_id, request_id, (body.rules if body else ""), user_id)
+    return _reply_context(
+        conversation_id,
+        request_id,
+        (body.rules if body else ""),
+        (body.self_profile if body else {}),
+        user_id,
+    )
 
 
 def _reply_context(
     conversation_id: str,
     request_id: UUID | None,
     channel_rules: str,
+    self_profile: dict[str, str],
     user_id: str,
 ):
     from app.services.reply_progress import publish
@@ -121,6 +129,7 @@ def _reply_context(
                 conversation_id,
                 provider=_build_provider(conn, user_id),
                 channel_rules=channel_rules,
+                self_profile=self_profile,
                 **kwargs,
             )
             if progress: progress('complete')

@@ -38,6 +38,7 @@ class BotConfig:
     max_reply_chars: int = 500
     reply_to_groups: bool = False
     rules: str = ""
+    person: dict[str, str] = field(default_factory=dict)
     max_concurrency: int = 3
     browser_window: str = "hide"
     state_path: Path = Path("bridge-state.sqlite3")
@@ -61,6 +62,22 @@ def _require(mapping: dict[str, Any], key: str, section: str) -> Any:
     if key not in mapping:
         raise ConfigError(f"missing [{section}] {key}")
     return mapping[key]
+
+
+#: Facts the operator registers about themselves; they keep the reply from
+#: inventing an age, a city or a job the user never claimed.
+PERSON_FIELDS = ("nickname", "gender", "birth_year", "city", "job", "hobbies",
+                 "relationship", "about")
+
+
+def _person(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        key: str(raw[key]).strip()[:200]
+        for key in PERSON_FIELDS
+        if str(raw.get(key, "")).strip()
+    }
 
 
 def load_config(path: str | Path) -> Config:
@@ -110,6 +127,7 @@ def load_config(path: str | Path) -> Config:
         quiet_hours=quiet,
         max_reply_chars=int(bot_raw.get("max_reply_chars", 500)),
         rules=str(bot_raw.get("rules", "") or ""),
+        person=_person(raw.get("person", {})),
         reply_to_groups=bool(bot_raw.get("reply_to_groups", False)),
         max_concurrency=max(1, int(bot_raw.get("max_concurrency", 3))),
         browser_window=str(bot_raw.get("browser_window", "hide")).lower(),

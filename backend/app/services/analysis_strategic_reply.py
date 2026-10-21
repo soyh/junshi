@@ -13,6 +13,23 @@ from app.services.strategic_reply_learning_strategy_bridge import (
 )
 from app.services.strategic_reply_llm import StrategicReplyLLMService
 
+#: Facts the operator registered about themselves; they are authoritative for
+#: first-person claims (age, city, job…) and must never be invented otherwise.
+PROFILE_FIELDS = ("nickname", "gender", "birth_year", "city", "job", "hobbies",
+                  "relationship", "about")
+
+
+def _clean_profile(raw: dict[str, str] | None) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    cleaned = {}
+    for key, value in raw.items():
+        name = str(key).strip().lower()
+        text = str(value).strip()
+        if name in PROFILE_FIELDS and text:
+            cleaned[name] = text[:200]
+    return cleaned
+
 
 class AnalysisStrategicReplyService:
     """Orchestrate AnalysisContext → Recommendation → evidence-backed reply draft."""
@@ -172,6 +189,7 @@ class AnalysisStrategicReplyService:
         provider=None,
         progress=None,
         channel_rules: str = "",
+        self_profile: dict[str, str] | None = None,
     ) -> dict:
         started = perf_counter()
         timings = {"analysis_seconds": 0.0, "draft_seconds": 0.0,
@@ -230,6 +248,7 @@ class AnalysisStrategicReplyService:
                 "required_evidence_source_ids", []
             ),
             "channel_rules": (channel_rules or "").strip()[:1500],
+            "self_profile": _clean_profile(self_profile),
             "constraints": {
                 "must_be_evidence_backed": True,
                 "must_prioritize_current_conversation": True,
@@ -237,9 +256,11 @@ class AnalysisStrategicReplyService:
                 "must_preserve_unknowns": True,
                 "must_not_auto_send": True,
                 "must_not_auto_execute": True,
-                # channel_rules is operator style guidance only; it ranks below
-                # every safety, provenance and schema rule above.
-                "channel_rules_scope": "style_only",
+                # channel_rules is operator style guidance; it ranks below every
+                # safety, provenance and schema rule, but above generic style.
+                "channel_rules_scope": "style_first",
+                "may_speak_as_user": True,
+                "self_profile_scope": "authoritative_personal_facts",
             },
         }
         for attempt in range(self.MAX_CORRECTIONS + 1):

@@ -275,10 +275,13 @@ def cmd_window(config: Config, action: str) -> int:
     return 0 if count else 1
 
 
-def cmd_outbox(config: Config, state_name: str) -> int:
+def cmd_outbox(config: Config, state_name: str, retry: bool = False) -> int:
     """Show the replies the bridge still owes, and why the last one failed."""
     state = StateStore(config.bot.state_path)
     try:
+        if retry:
+            outcome = state.outbox_retry_now()
+            print(f"retry: revived={outcome['revived']} due={outcome['queued']}")
         counts = state.outbox_counts()
         print(
             f"queued={counts['queued']} failed={counts['failed']} "
@@ -325,6 +328,8 @@ def main(argv: list[str] | None = None) -> int:
     outbox_parser = sub.add_parser("outbox", help="show replies still owed and retry reasons")
     outbox_parser.add_argument("--state", choices=("queued", "failed", "skipped", "sent"),
                                default="queued")
+    outbox_parser.add_argument("--retry", action="store_true",
+                               help="make owed replies due now and revive failed ones")
 
     args = parser.parse_args(argv)
     try:
@@ -352,7 +357,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "window":
         return cmd_window(config, args.action)
     if args.command == "outbox":
-        return cmd_outbox(config, args.state)
+        return cmd_outbox(config, args.state, args.retry)
     return 2
 
 

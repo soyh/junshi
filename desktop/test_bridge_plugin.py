@@ -278,3 +278,84 @@ def test_reply_rules_default_to_empty_and_are_optional(plugin_home):
         channel="wechat",
     )
     assert {row["id"]: row for row in bp.list_profiles()}[profile_id]["rules"] == ""
+
+
+def test_person_facts_round_trip_and_stay_optional(plugin_home):
+    profile_id = bp.create_profile(
+        name="微信通道",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="wechat",
+        person={"nickname": "阿哲", "city": "杭州"},
+    )
+    item = {row["id"]: row for row in bp.list_profiles()}[profile_id]
+    assert item["person"] == {"nickname": "阿哲", "city": "杭州"}
+    text = bp.config_path(profile_id).read_text(encoding="utf-8")
+    assert "[person]" in text and 'nickname = "阿哲"' in text
+
+    blank = bp.create_profile(
+        name="空通道",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="soul",
+    )
+    assert {row["id"]: row for row in bp.list_profiles()}[blank]["person"] == {}
+
+
+def test_outbox_lines_surface_pending_work(plugin_home, monkeypatch):
+    profile_id = bp.create_profile(
+        name="小红书通道",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="xhs",
+    )
+    items = bp.list_profiles()
+
+    monkeypatch.setattr(
+        bp,
+        "local_status",
+        lambda pid: {
+            "state": "在线", "queued": 2, "failed": 1, "error": "Server disconnected",
+            "running": True, "raw": "online",
+        },
+    )
+    lines = bp.outbox_lines(items)
+    assert any("待重试 2 条" in line and "未发出 1 条" in line for line in lines)
+    assert any("Server disconnected" in line for line in lines)
+
+    monkeypatch.setattr(
+        bp,
+        "local_status",
+        lambda pid: {
+            "state": "在线", "queued": 0, "failed": 0, "error": "",
+            "running": True, "raw": "online",
+        },
+    )
+    assert "暂无待发或失败的消息" in bp.outbox_lines(items)[0]
+
+
+def test_retry_outbox_reports_daemon_answer(plugin_home, monkeypatch):
+    profile_id = bp.create_profile(
+        name="微信通道",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="wechat",
+    )
+
+    class Done:
+        stdout = "resent 2 message(s)\n"
+        stderr = ""
+
+    seen = {}
+
+    def fake_run(command, **kwargs):
+        seen["command"] = command
+        return Done()
+
+    monkeypatch.setattr(bp.subprocess, "run", fake_run)
+    assert bp.retry_outbox(profile_id) == "resent 2 message(s)"
+    assert "outbox" in seen["command"] and "--retry" in seen["command"]

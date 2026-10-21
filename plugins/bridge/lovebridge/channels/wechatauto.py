@@ -22,7 +22,7 @@ import threading
 import time
 import uuid
 
-from .base import Handler, InboundEvent
+from .base import Handler, InboundEvent, media_text
 
 
 class AccountMismatch(RuntimeError):
@@ -160,7 +160,11 @@ class WechatautoChannel:
             return
 
         content = msg.get("content")
-        if not isinstance(content, str) or not content.strip():
+        if isinstance(content, str):
+            content = content.strip()
+        if not content:
+            content = media_text(msg)
+        if not content:
             return
         if self._is_echo(username, content):
             return

@@ -62,6 +62,7 @@ class Orchestrator:
         self.results: list[TurnResult] = []
         self._background: list[asyncio.Task] = []
         self._heartbeat_enabled = True
+        self._last_state = ""
         self._platform_cache: dict[str, tuple[str, str | None]] = {}
 
     # -- lifecycle --------------------------------------------------------
@@ -158,6 +159,7 @@ class Orchestrator:
     async def _report_once(self) -> None:
         try:
             state = await self._channel_status()
+            self._last_state = state
             self._write_status(state)
             if self._heartbeat_enabled:
                 await self.app.heartbeat(
@@ -174,6 +176,13 @@ class Orchestrator:
                 self._log(f"[bridge] heartbeat failed: {exc}")
         except Exception as exc:  # never let monitoring kill the bridge
             self._log(f"[bridge] heartbeat error: {exc!r}")
+
+    def _sync_status(self) -> None:
+        """Rewrite status.json after an outbox change (panel shows it instantly)."""
+        try:
+            self._write_status(self._last_state or "online")
+        except Exception:  # status is best effort only
+            pass
 
     async def _channel_status(self) -> str:
         """Report what the platform actually shows, not just that the process lives."""
@@ -287,6 +296,21 @@ class Orchestrator:
         error: str = "",
     ) -> None:
         """Mark the owed replies: sent, skipped, deferred or queued for retry."""
+        try:
+            self._apply_outbox(contact_id, events, result, error=error)
+        finally:
+            # The panel polls status.json; refresh it the moment a reply is
+            # queued or sent instead of waiting for the next heartbeat.
+            self._sync_status()
+
+    def _apply_outbox(
+        self,
+        contact_id: str,
+        events: list,
+        result,
+        *,
+        error: str = "",
+    ) -> None:
         wanted = {event.message_id for event in events}
         rows = [
             row for row in self.state.outbox_pending(contact_id)
@@ -445,7 +469,11 @@ class Orchestrator:
         if self.state.total_today(self._today()) >= bot.daily_reply_cap:
             return TurnResult(contact_id, conversation_id, len(events), reason="daily cap")
 
-        context = await self.app.get_reply_context(conversation_id, self.config.bot.rules)
+        context = await self.app.get_reply_context(
+            conversation_id,
+            self.config.bot.rules,
+            self.config.bot.person,
+        )
         reply = (context or {}).get("draft")
         reply = reply.strip() if isinstance(reply, str) else ""
 

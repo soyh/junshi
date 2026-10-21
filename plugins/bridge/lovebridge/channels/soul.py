@@ -24,7 +24,7 @@ from pathlib import Path
 
 from .. import window
 from ..console import write_line
-from .base import Handler, InboundEvent
+from .base import Handler, InboundEvent, media_text
 
 CONV_JS = """() => Array.from(document.querySelectorAll('.conv-list .conversation')).map(el => ({
   name: (el.querySelector('.conv-name') || {}).textContent || '',
@@ -36,7 +36,9 @@ CONV_JS = """() => Array.from(document.querySelectorAll('.conv-list .conversatio
 MSG_JS = """() => Array.from(document.querySelectorAll('.bubble-row')).map(el => ({
   self: el.classList.contains('is-self'),
   text: (el.querySelector('.bubble-text') || {}).textContent || '',
-  time: (el.querySelector('.bubble-time, time') || {}).textContent || ''
+  time: (el.querySelector('.bubble-time, time') || {}).textContent || '',
+  sticker: !!el.querySelector('[class*=emoji], [class*=sticker], .bubble-img--emoji'),
+  image: !!el.querySelector('.bubble-img, img[class*=bubble], [class*=bubble-image]')
 }))"""
 
 PAGE_TEXT_JS = "() => document.body ? document.body.innerText : ''"
@@ -395,8 +397,10 @@ class SoulChannel:
 
         self._counts[name] = len(messages)
         for message in fresh:
-            text = (message.get("text") or "").strip()
-            if message["self"] or not text:
+            if message["self"]:
+                continue
+            text = (message.get("text") or "").strip() or media_text(message)
+            if not text:
                 continue
             digest = hashlib.md5(f"{name}|{text}|{int(time.time() // 60)}".encode()).hexdigest()[:12]
             event = InboundEvent(

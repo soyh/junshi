@@ -248,16 +248,28 @@ class AppClient:
             timeout=15.0,
         )
 
-    async def get_reply_context(self, conversation_id: str, rules: str = "") -> dict:
+    async def get_reply_context(
+        self,
+        conversation_id: str,
+        rules: str = "",
+        self_profile: dict[str, str] | None = None,
+    ) -> dict:
         """Calls the LLM chain; may take tens of seconds.
 
-        Extra per-channel rules travel in a POST body because they can be long;
-        without rules the plain GET keeps the previous behaviour.
+        Extra per-channel rules and the registered self facts travel in a POST
+        body because they can be long; without either the plain GET keeps the
+        previous behaviour.
         """
         path = f"/api/v1/conversations/{conversation_id}/strategic-reply/context"
         timeout = max(self._timeout, 180.0)
-        if rules.strip():
-            return await self._request("POST", path, json={"rules": rules}, timeout=timeout)
+        profile = {k: v for k, v in (self_profile or {}).items() if str(v).strip()}
+        if rules.strip() or profile:
+            return await self._request(
+                "POST",
+                path,
+                json={"rules": rules, "self_profile": profile},
+                timeout=timeout,
+            )
         return await self._request("GET", path, timeout=timeout)
 
     # -- relationship scoping ---------------------------------------------
