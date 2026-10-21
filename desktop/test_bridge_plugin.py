@@ -379,8 +379,8 @@ def test_outbox_lines_separate_channels_and_show_who_is_waiting(plugin_home, mon
     lines = bp.outbox_lines(items)
     text = "\n".join(lines)
     assert "微信主号（微信）" in text and "Soul 小号（Soul）" in text
-    assert "梁雨秋：第 2/3 次，立即" in text
-    assert "蓝.：重试 3 次仍失败" in text
+    assert "梁雨秋：1 条待发，第 2/3 次，立即" in text
+    assert "蓝.：1 条重试 3 次仍失败" in text
     assert "Server disconnected" in text
 
 

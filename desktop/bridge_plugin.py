@@ -348,10 +348,38 @@ def _waiting(next_at) -> str:
     return f"{seconds // 60} 分 {seconds % 60} 秒后"
 
 
-def outbox_lines(profiles: list[dict]) -> list[str]:
+def _short_reason(text: str, limit: int = 96) -> str:
+    """Turn a long HTTP error into one readable line for the panel."""
+    compact = re.sub(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", "…", str(text))
+    compact = re.sub(r"\s+", " ", compact).strip()
+    return compact if len(compact) <= limit else compact[: limit - 1] + "…"
+
+
+def _outbox_groups(profile_id: str) -> list[dict]:
+    """Fold the owed messages of one channel into one row per contact."""
+    groups: dict[str, dict] = {}
+    for row in outbox_rows(profile_id):
+        who = str(row.get("contact_name") or row.get("contact_id") or "对方")
+        group = groups.setdefault(
+            who, {"who": who, "queued": 0, "failed": 0, "attempts": 0,
+                  "next_at": None, "reason": ""},
+        )
+        state = str(row.get("state") or "queued")
+        group[state if state in ("queued", "failed") else "queued"] += 1
+        group["attempts"] = max(group["attempts"], int(row.get("attempts") or 0))
+        reason = str(row.get("reason") or "").strip()
+        if reason:
+            group["reason"] = reason
+        next_at = row.get("next_at")
+        if next_at and (group["next_at"] is None or str(next_at) < str(group["next_at"])):
+            group["next_at"] = next_at
+    return sorted(groups.values(), key=lambda item: (-item["failed"], -item["queued"]))
+
+
+def outbox_lines(items: list[dict], *, empty: str | None = None) -> list[str]:
     """One block per channel: what is owed, to whom, and why it is waiting."""
     lines: list[str] = []
-    for item in profiles:
+    for item in items:
         detail = local_status(item["id"])
         queued, failed = detail["queued"], detail["failed"]
         if not queued and not failed:
@@ -359,18 +387,24 @@ def outbox_lines(profiles: list[dict]) -> list[str]:
         label = CHANNELS.get(item.get("channel", ""), item.get("channel", ""))
         name = item.get("name", item["id"])
         lines.append(f"▸ {name}（{label}）  待重试 {queued} · 未发出 {failed}")
-        for row in outbox_rows(item["id"]):
-            who = str(row.get("contact_name") or row.get("contact_id") or "对方")
-            attempts = int(row.get("attempts") or 0)
-            if row.get("state") == "failed":
-                head = f"   ✕ {who}：重试 {attempts} 次仍失败"
+        for group in _outbox_groups(item["id"]):
+            if group["failed"] == 0 and group["queued"] > 0:
+                head = (
+                    f"   · {group['who']}：{group['queued']} 条待发，"
+                    f"第 {group['attempts'] + 1}/{MAX_ATTEMPTS_LABEL} 次，"
+                    f"{_waiting(group['next_at'])}"
+                )
+            elif group["failed"]:
+                head = f"   ✕ {group['who']}：{group['failed']} 条重试 {group['attempts']} 次仍失败"
             else:
-                head = f"   · {who}：第 {attempts + 1}/{MAX_ATTEMPTS_LABEL} 次，{_waiting(row.get('next_at'))}"
-            reason = str(row.get("reason") or "").strip()
-            lines.append(head + (f"（{reason[:60]}）" if reason else ""))
+                continue
+            reason = _short_reason(group["reason"])
+            lines.append(head + (f"（{reason}）" if reason else ""))
         if detail.get("error"):
-            lines.append(f"   最近原因：{detail['error'][:80]}")
-    return lines or ["暂无待发或失败的消息：每条收到的消息都已回完。"]
+            lines.append(f"   最近原因：{_short_reason(detail['error'])}")
+    if lines:
+        return lines
+    return [empty] if empty else ["暂无待发或失败的消息：每条收到的消息都已回完。"]
 
 
 def retry_outbox(profile_id: str) -> str:

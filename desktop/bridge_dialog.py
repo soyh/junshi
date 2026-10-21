@@ -193,10 +193,10 @@ class BridgeDialog(Dialog):
 
         self._build_shared(parent)
 
-        queue = Section(parent, "待发 / 失败（续聊兜底）", open=True)
+        queue = Section(parent, "待发 / 失败（仅当前通道）", open=True)
         queue_row = ttk.Frame(queue.body)
         queue_row.pack(fill="both", expand=True)
-        self.queue_text = tk.Text(queue_row, height=4, wrap="word", state="disabled")
+        self.queue_text = tk.Text(queue_row, height=10, wrap="char", state="disabled")
         self.queue_text.pack(side="left", fill="both", expand=True)
         queue_bar = ttk.Scrollbar(queue_row, command=self.queue_text.yview)
         queue_bar.pack(side="left", fill="y")
@@ -290,6 +290,7 @@ class BridgeDialog(Dialog):
             self.rules.insert("1.0", item["rules"])
         state = item.get("status") or ("运行中" if item["running"] else "未运行")
         self.message.set(f"{item['name']}：{state}")
+        self.refresh_queue()
 
     def _person_values(self):
         return {key: widget.get().strip() for key, widget in self.person.items()}
@@ -507,7 +508,14 @@ class BridgeDialog(Dialog):
         self.message.set(f"状态以本机当前为准；运行中的通道：{running} 个。")
 
     def refresh_queue(self):
-        self.perform(lambda: bp.outbox_lines(list(self.profiles.values())), self.render_queue)
+        current = self.profiles.get(self.current or "", None)
+        if current is None:
+            self.render_queue(["先在上面选择一个通道。"])
+            return
+        self.perform(
+            lambda: bp.outbox_lines([current], empty=f"{current['name']}：当前没有待发或失败的消息。"),
+            self.render_queue,
+        )
 
     def render_queue(self, lines):
         self.queue_text.configure(state="normal")

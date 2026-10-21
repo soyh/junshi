@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from uuid import UUID
@@ -146,6 +148,10 @@ def _reply_context(
             detail=str(exc),
         ) from exc
     except LLMAnalysisError as exc:
+        logging.getLogger(__name__).warning(
+            "strategic-reply failed conversation=%s: %s: %s",
+            conversation_id, type(exc).__name__, exc,
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=_safe_llm_failure_detail(exc),
