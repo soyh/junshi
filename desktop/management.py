@@ -122,13 +122,32 @@ class Dialog:
         self.widgets = []; self.secrets = []; self.busy = False
         self.window.protocol('WM_DELETE_WINDOW',self.close)
 
-    def entry(self, key, label, value='', choices=None, secret=False, parent=None):
+    def entry(self, key, label, value='', choices=None, secret=False, parent=None,
+              sample=None, free=False):
+        """One labelled input. `sample` adds an editable example ("示例") button."""
         parent = parent if parent is not None else self.frame
-        ttk.Label(parent,text=label).pack(anchor='w',pady=(6,0))
-        widget = ttk.Combobox(parent,values=choices,state='readonly') if choices else ttk.Entry(parent,show='*' if secret else '')
-        widget.pack(fill='x'); widget.set(value) if choices else widget.insert(0,value)
-        self.widgets.append((widget,'readonly' if choices else 'normal'))
-        if secret:self.secrets.append(widget)
+        head = ttk.Frame(parent)
+        head.pack(fill='x', pady=(6, 0))
+        ttk.Label(head, text=label).pack(side='left')
+        if choices:
+            widget = ttk.Combobox(parent, values=choices, state='normal' if free else 'readonly')
+        else:
+            widget = ttk.Entry(parent, show='*' if secret else '')
+        widget.pack(fill='x')
+        widget.set(value) if choices else widget.insert(0, value)
+        if sample:
+            def insert_sample(_event=None, widget=widget, sample=sample):
+                text = sample() if callable(sample) else sample
+                widget.delete(0, 'end')
+                widget.insert(0, text)
+                widget.focus_set()
+            ttk.Button(head, text='示例', width=4, command=insert_sample).pack(side='right')
+            if choices:
+                first = sample() if callable(sample) else sample
+                ttk.Label(head, text=f'如 {first}', foreground='#888').pack(side='right', padx=(0, 6))
+        self.widgets.append((widget, 'readonly' if choices and not free else 'normal'))
+        if secret:
+            self.secrets.append(widget)
         return widget
 
     def fit(self, width=900, height=640):

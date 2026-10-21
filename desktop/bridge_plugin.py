@@ -15,6 +15,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tomllib
@@ -24,6 +25,7 @@ from pathlib import Path
 
 CHANNELS = {"wechat": "微信", "xhs": "小红书", "soul": "Soul"}
 CHANNEL_LABELS = {label: key for key, label in CHANNELS.items()}
+MAX_ATTEMPTS_LABEL = 3
 DEFAULT_QUIET = ("03:00", "05:30")
 
 #: 「本人信息」登记项 —— 让自动回复用真实身份说话，不瞎编年龄/职业。
@@ -310,19 +312,64 @@ def hide_browser(profile_id: str) -> bool:
     return _window_action(profile_id, "hide")
 
 
+def outbox_rows(profile_id: str, limit: int = 8) -> list[dict]:
+    """Read the owed messages of one channel straight from its state file."""
+    path = profile_dir(profile_id) / "state.sqlite3"
+    if not path.is_file():
+        return []
+    rows: list[dict] = []
+    try:
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
+            connection.row_factory = sqlite3.Row
+            for row in connection.execute(
+                "SELECT state, contact_name, contact_id, attempts, next_at, reason, text"
+                " FROM outbox WHERE state IN ('queued', 'failed')"
+                " ORDER BY state DESC, updated_at DESC LIMIT ?",
+                (int(limit),),
+            ):
+                rows.append(dict(row))
+    except sqlite3.Error:
+        return []
+    return rows
+
+
+def _waiting(next_at) -> str:
+    if not next_at:
+        return "立即"
+    try:
+        due = datetime.fromisoformat(str(next_at))
+    except ValueError:
+        return "稍后"
+    seconds = int((due - datetime.now()).total_seconds())
+    if seconds <= 0:
+        return "立即"
+    if seconds < 60:
+        return f"{seconds} 秒后"
+    return f"{seconds // 60} 分 {seconds % 60} 秒后"
+
+
 def outbox_lines(profiles: list[dict]) -> list[str]:
-    """One line per channel: what is still owed and why the last attempt failed."""
-    lines = []
+    """One block per channel: what is owed, to whom, and why it is waiting."""
+    lines: list[str] = []
     for item in profiles:
         detail = local_status(item["id"])
         queued, failed = detail["queued"], detail["failed"]
-        label = CHANNELS.get(item.get("channel", ""), item.get("channel", ""))
         if not queued and not failed:
             continue
-        line = f"{label}｜{item.get('name', item['id'])}：待重试 {queued} 条，未发出 {failed} 条"
+        label = CHANNELS.get(item.get("channel", ""), item.get("channel", ""))
+        name = item.get("name", item["id"])
+        lines.append(f"▸ {name}（{label}）  待重试 {queued} · 未发出 {failed}")
+        for row in outbox_rows(item["id"]):
+            who = str(row.get("contact_name") or row.get("contact_id") or "对方")
+            attempts = int(row.get("attempts") or 0)
+            if row.get("state") == "failed":
+                head = f"   ✕ {who}：重试 {attempts} 次仍失败"
+            else:
+                head = f"   · {who}：第 {attempts + 1}/{MAX_ATTEMPTS_LABEL} 次，{_waiting(row.get('next_at'))}"
+            reason = str(row.get("reason") or "").strip()
+            lines.append(head + (f"（{reason[:60]}）" if reason else ""))
         if detail.get("error"):
-            line += f"\n    最近原因：{detail['error']}"
-        lines.append(line)
+            lines.append(f"   最近原因：{detail['error'][:80]}")
     return lines or ["暂无待发或失败的消息：每条收到的消息都已回完。"]
 
 

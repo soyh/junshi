@@ -327,7 +327,7 @@ def test_outbox_lines_surface_pending_work(plugin_home, monkeypatch):
         },
     )
     lines = bp.outbox_lines(items)
-    assert any("待重试 2 条" in line and "未发出 1 条" in line for line in lines)
+    assert any("小红书通道" in line and "待重试 2 · 未发出 1" in line for line in lines)
     assert any("Server disconnected" in line for line in lines)
 
     monkeypatch.setattr(
@@ -339,6 +339,49 @@ def test_outbox_lines_surface_pending_work(plugin_home, monkeypatch):
         },
     )
     assert "暂无待发或失败的消息" in bp.outbox_lines(items)[0]
+
+
+def test_outbox_lines_separate_channels_and_show_who_is_waiting(plugin_home, monkeypatch):
+    wechat = bp.create_profile(
+        name="微信主号",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="wechat",
+    )
+    soul = bp.create_profile(
+        name="Soul 小号",
+        server="https://example.com",
+        username="u",
+        password="password-123456",
+        channel="soul",
+    )
+    items = bp.list_profiles()
+    monkeypatch.setattr(
+        bp,
+        "local_status",
+        lambda pid: {
+            "state": "在线", "queued": 1 if pid == wechat else 0,
+            "failed": 1 if pid == soul else 0, "error": "", "running": True, "raw": "online",
+        },
+    )
+    monkeypatch.setattr(
+        bp,
+        "outbox_rows",
+        lambda pid, limit=8: (
+            [{"state": "queued", "contact_name": "梁雨秋", "contact_id": "wxid_1",
+              "attempts": 1, "next_at": "", "reason": "boom", "text": "在吗"}]
+            if pid == wechat else
+            [{"state": "failed", "contact_name": "蓝.", "contact_id": "soul:蓝.",
+              "attempts": 3, "next_at": "", "reason": "Server disconnected", "text": "hi"}]
+        ),
+    )
+    lines = bp.outbox_lines(items)
+    text = "\n".join(lines)
+    assert "微信主号（微信）" in text and "Soul 小号（Soul）" in text
+    assert "梁雨秋：第 2/3 次，立即" in text
+    assert "蓝.：重试 3 次仍失败" in text
+    assert "Server disconnected" in text
 
 
 def test_retry_outbox_reports_daemon_answer(plugin_home, monkeypatch):

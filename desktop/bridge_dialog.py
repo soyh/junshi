@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 import bridge_plugin as bp
+import field_templates as ft
 import reply_rules as rr
 from management import Dialog, Section, scrollable
 
@@ -98,7 +99,10 @@ class BridgeDialog(Dialog):
         self.person = {}
         for index, key in enumerate(bp.PERSON_FIELDS):
             row, column = divmod(index + 1, 2)
-            self.person[key] = self._cell(grid, row, column, key, bp.PERSON_LABELS[key], "")
+            self.person[key] = self._cell(
+                grid, row, column, key, bp.PERSON_LABELS[key], "",
+                sample=ft.person_sample(key),
+            )
 
         rules_head = ttk.Frame(shared.body)
         rules_head.pack(fill="x")
@@ -132,7 +136,9 @@ class BridgeDialog(Dialog):
         grid = account.body
         grid.columnconfigure(0, weight=1)
         grid.columnconfigure(1, weight=1)
-        self.name = self._cell(grid, 0, 0, "name", "配置名称", "新通道")
+        self.name = self._cell(grid, 0, 0, "name", "配置名称", "新通道", sample=lambda: ft.name_sample(
+            bp.CHANNEL_LABELS.get(self.channel.get(), "wechat")
+        ))
         self.channel = self._cell(grid, 0, 1, "channel", "平台通道", "微信", choices=list(bp.CHANNELS.values()))
         self.server = self._cell(grid, 1, 0, "server", "服务器", self.app.server.get())
         self.username = self._cell(grid, 1, 1, "username", "军师账号", self.app.username.get())
@@ -149,8 +155,14 @@ class BridgeDialog(Dialog):
         self.window_mode = self._cell(
             grid, 1, 0, "window_mode", "隐藏方式", WINDOW_MODES["hide"], choices=list(WINDOW_MODES.values())
         )
-        self.quiet = self._cell(grid, 1, 1, "quiet", "静默时段（开始-结束）", "03:00-05:30")
-        self.cap = self._cell(grid, 2, 0, "cap", "每日回复上限", "30")
+        self.quiet = self._cell(
+            grid, 1, 1, "quiet", "静默时段（开始-结束）", "03:00-05:30",
+            choices=ft.QUIET_PRESETS, sample=ft.QUIET_PRESETS[0], free=True,
+        )
+        self.cap = self._cell(
+            grid, 2, 0, "cap", "每日回复上限", "30",
+            choices=ft.CAP_PRESETS, sample=ft.CAP_PRESETS[1], free=True,
+        )
         self.verify = self._cell(grid, 2, 1, "verify", "校验 HTTPS 证书", "是", choices=["是", "否"])
 
         rules = Section(parent, "本通道回复规则（留空则用全局默认）", open=False)
@@ -214,10 +226,13 @@ class BridgeDialog(Dialog):
             wraplength=620,
         ).pack(anchor="w")
 
-    def _cell(self, grid, row, column, key, label, value="", choices=None, secret=False):
+    def _cell(self, grid, row, column, key, label, value="", choices=None, secret=False,
+              sample=None, free=False):
         holder = ttk.Frame(grid)
         holder.grid(row=row, column=column, sticky="ew", padx=4, pady=1)
-        return self.entry(key, label, value, choices, secret, parent=holder)
+        return self.entry(
+            key, label, value, choices, secret, parent=holder, sample=sample, free=free
+        )
 
     # -- refresh ----------------------------------------------------------
     def _auto_refresh(self):

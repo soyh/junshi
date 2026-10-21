@@ -68,9 +68,9 @@ class Orchestrator:
     # -- lifecycle --------------------------------------------------------
     START_TIMEOUT = 180.0
     HEARTBEAT_SECONDS = 20.0
-    RETRY_SECONDS = 20.0
-    MAX_ATTEMPTS = 6
-    BACKOFF = (15, 60, 180, 600, 1800)
+    RETRY_SECONDS = 10.0
+    MAX_ATTEMPTS = 3
+    BACKOFF = (8, 20, 45)
     DEFER_SECONDS = 600
 
     async def run(self) -> None:

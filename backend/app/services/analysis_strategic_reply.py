@@ -31,6 +31,60 @@ def _clean_profile(raw: dict[str, str] | None) -> dict[str, str]:
     return cleaned
 
 
+#: Emoji a person actually types into a chat box (not the whole Unicode set).
+CHAT_EMOJI = "😀😄😅🙂😊🥲😂🤣😉😍🤔😎🙃😭😤👍🙏❤️💔🥰😘😏😴🤝👌✨"
+MY_STYLE_SAMPLE_LIMIT = 30
+MY_STYLE_SAMPLE_MESSAGES = 6
+
+
+def build_self_style(messages: list[dict[str, Any]] | None) -> dict[str, Any]:
+    """Summarise how *this* user writes, from their own past messages.
+
+    Only style is kept (length, rhythm, punctuation and emoji habits, a few
+    verbatim samples). Content facts are deliberately excluded: the draft may
+    imitate the rhythm but must never replay the samples as new events.
+    """
+    mine = [
+        str(message.get("content") or "").strip()
+        for message in messages or []
+        if isinstance(message, dict)
+        and message.get("sender_type") == "user"
+        and str(message.get("content") or "").strip()
+    ][-MY_STYLE_SAMPLE_LIMIT:]
+    if not mine:
+        return {}
+    lengths = [len(text) for text in mine]
+    emoji_count = sum(1 for text in mine if any(char in text for char in CHAT_EMOJI))
+    question_count = sum(
+        1 for text in mine if text.rstrip("。.!！~～ ").endswith(("?", "？"))
+    )
+    exclamation_count = sum(1 for text in mine if any(ch in text for ch in "!！~～"))
+    openers: dict[str, int] = {}
+    for text in mine:
+        head = text[:2]
+        if len(head) == 2:
+            openers[head] = openers.get(head, 0) + 1
+    common = [
+        head for head, count in sorted(openers.items(), key=lambda item: -item[1])[:5]
+        if count > 1
+    ]
+    ordered = sorted(lengths)
+    return {
+        "message_count": len(mine),
+        "avg_chars": round(sum(lengths) / len(lengths), 1),
+        "median_chars": ordered[len(ordered) // 2],
+        "short_share": round(sum(1 for n in lengths if n <= 15) / len(lengths), 2),
+        "emoji_share": round(emoji_count / len(mine), 2),
+        "question_share": round(question_count / len(mine), 2),
+        "exclamation_share": round(exclamation_count / len(mine), 2),
+        "uses_period": round(
+            sum(1 for text in mine if text.endswith(("。", "."))) / len(mine), 2
+        ),
+        "common_openers": common,
+        "recent_samples": mine[-MY_STYLE_SAMPLE_MESSAGES:],
+    }
+
+
 class AnalysisStrategicReplyService:
     """Orchestrate AnalysisContext → Recommendation → evidence-backed reply draft."""
 
@@ -249,6 +303,7 @@ class AnalysisStrategicReplyService:
             ),
             "channel_rules": (channel_rules or "").strip()[:1500],
             "self_profile": _clean_profile(self_profile),
+            "self_style": build_self_style(analysis_context.get("messages")),
             "constraints": {
                 "must_be_evidence_backed": True,
                 "must_prioritize_current_conversation": True,
@@ -261,6 +316,7 @@ class AnalysisStrategicReplyService:
                 "channel_rules_scope": "style_first",
                 "may_speak_as_user": True,
                 "self_profile_scope": "authoritative_personal_facts",
+                "self_style_scope": "style_only",
             },
         }
         for attempt in range(self.MAX_CORRECTIONS + 1):
