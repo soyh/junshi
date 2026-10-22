@@ -1,3 +1,12 @@
+# Android 1.0.2 正式发布
+
+版本 **1.0.2**（versionCode **23201**），同一固定签名，可直接覆盖安装 1.0.1。下载 [JunshiAndroid-1.0.2.apk](https://github.com/soyh/junshi/releases/download/android-v1.0.2/JunshiAndroid-1.0.2.apk)；国内镜像 <https://101.34.253.116/downloads/JunshiAndroid-1.0.2.apk>。
+
+改动：
+- 小窗点「输入」不再闪：键盘改由一个透明的小输入页（`OverlayInputActivity`）承接，小窗本身永远不抢焦点，系统不用在小窗和下层应用之间来回切焦点。输入页可选「只填入小窗」或「填入并生成」，关掉即把焦点还给下面的应用。
+- 去掉小窗底部的「收起键盘」按钮（不再需要）。
+- 网页端配合：点对方的消息改成弹出编辑框（不再往消息行里插输入框），保存后即时生效，手机上不再整页闪。
+
 # Android 1.0.1 正式发布
 
 版本 **1.0.1**（versionCode **23200**），同一固定签名，可直接覆盖安装 1.0.0。下载 [JunshiAndroid-1.0.1.apk](https://github.com/soyh/junshi/releases/download/android-v1.0.1/JunshiAndroid-1.0.1.apk)；国内镜像 <https://101.34.253.116/downloads/JunshiAndroid-1.0.1.apk>。

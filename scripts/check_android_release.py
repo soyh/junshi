@@ -10,9 +10,9 @@ assert match and match.group(1).lower()==digest, 'APK signing certificate differ
 assert 'CN=Android Debug' not in signature, 'Debug signing certificate is not a production release'
 assert re.search(r'Verified using v2 scheme .*: true',signature), 'APK v2 signature missing'
 assert "name='com.junshi.assistant'" in package
-assert "versionCode='23200'" in package and "versionName='1.0.1'" in package
+assert "versionCode='23201'" in package and "versionName='1.0.2'" in package
 assert "sdkVersion:'26'" in package
 assert 'application-debuggable' not in package
-report={'version':'1.0.1','version_code':23200,'application_id':'com.junshi.assistant','debuggable':False,'signature_verified':True,'configured_certificate_matches':True,'certificate_sha256':digest}
+report={'version':'1.0.2','version_code':23201,'application_id':'com.junshi.assistant','debuggable':False,'signature_verified':True,'configured_certificate_matches':True,'certificate_sha256':digest}
 (out/'release-verification.json').write_text(json.dumps(report,indent=2)+'\n')
 print('Fixed certificate, production signature, version and non-debuggable APK: PASS')
