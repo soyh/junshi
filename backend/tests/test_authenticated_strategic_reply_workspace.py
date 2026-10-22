@@ -13,7 +13,8 @@ class FakeStrategicReplyService:
         self.result = result
         self.calls = []
 
-    def build_context(self, conn, user_id, conversation_id, *, provider=None):
+    def build_context(self, conn, user_id, conversation_id, *, provider=None,
+                      channel_rules="", self_profile=None, progress=None):
         self.calls.append((user_id, conversation_id, provider))
         return self.result
 

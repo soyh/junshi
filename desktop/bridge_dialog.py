@@ -98,11 +98,11 @@ class BridgeDialog(Dialog):
 
     def _build_shared(self, parent):
         """Identity and default rules: one copy for every channel."""
-        shared = Section(parent, "全局设置（所有通道共用：本人信息 + 默认规则）", open=False)
+        shared = Section(parent, "全局设置（跟随账号：本人信息 + 默认规则）", open=False)
         self.shared_section = shared
         note = ttk.Label(
             shared.body,
-            text="这些内容不属于某个通道：改一次，所有通道下次启动都生效。",
+            text="这些内容保存在你的账号里：网页、手机、电脑看到的是同一份；改了所有通道下次启动都生效。",
             foreground="#666",
             wraplength=660,
         )
@@ -113,7 +113,7 @@ class BridgeDialog(Dialog):
         grid.columnconfigure(1, weight=1)
         ttk.Label(
             grid,
-            text="本人信息：填了才会用；没填的项模型保持模糊，不会自己编年龄、职业或城市。",
+            text="本人信息：填了才会用；没填的项模型保持模糊，不会自己编年龄、职业或城市。可在网页或手机「我的资料」里改。",
             foreground="#666",
             wraplength=620,
         ).grid(row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(0, 4))
@@ -306,23 +306,60 @@ class BridgeDialog(Dialog):
         return {key: widget.get().strip() for key, widget in self.person.items()}
 
     def load_shared(self):
+        """Identity lives on the account; the local file is only an offline cache."""
         shared = bp.load_global()
+        person = shared["person"]
+        rules = shared["rules"]
+        remote = self._fetch_shared()
+        if remote is not None:
+            person = {key: remote.get(key, "") for key in bp.PERSON_FIELDS}
+            rules = remote.get("reply_rules", "")
+            try:
+                bp.save_global(
+                    person={key: str(person.get(key, "")) for key in bp.PERSON_FIELDS},
+                    rules=rules,
+                )
+            except OSError:
+                pass
         for key, widget in self.person.items():
-            self._fill(widget, shared["person"].get(key, ""))
+            self._fill(widget, person.get(key, ""))
         self.global_rules.delete("1.0", "end")
-        if shared["rules"]:
-            self.global_rules.insert("1.0", shared["rules"])
+        if rules:
+            self.global_rules.insert("1.0", rules)
+
+    def _fetch_shared(self):
+        if not self.client:
+            return None
+        try:
+            data = self.client.request("GET", "/api/v1/settings/profile", timeout=20)
+        except Exception:
+            return None
+        return data if isinstance(data, dict) else None
 
     def save_shared(self):
+        person = self._person_values()
+        rules = self.global_rules.get("1.0", "end").strip()
         try:
-            bp.save_global(
-                person=self._person_values(),
-                rules=self.global_rules.get("1.0", "end").strip(),
-            )
+            bp.save_global(person=person, rules=rules)
         except OSError as exc:
             self.message.set(f"全局设置保存失败：{exc}")
             return
-        self.message.set("全局设置已保存：所有通道下次启动都使用这份本人信息和默认规则。")
+        if not self.client:
+            self.message.set("已保存到本机（未登录，暂时只在本机生效）。")
+            return
+        def work():
+            payload = {key: person.get(key, "") for key in bp.PERSON_FIELDS}
+            payload["reply_rules"] = rules
+            return self.client.request("PUT", "/api/v1/settings/profile", payload, timeout=20)
+
+        def done(result, error):
+            if error:
+                self.message.set(f"已存本机，但同步到账号失败：{error}")
+            else:
+                stamp = result.get("updated_at", "") if isinstance(result, dict) else ""
+                self.message.set(f"已保存到账号（网页/手机同一步生效{('，' + stamp) if stamp else ''}）。")
+
+        self.perform(work, done)
 
     @staticmethod
     def _fill(widget, value):

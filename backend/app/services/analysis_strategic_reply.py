@@ -19,6 +19,40 @@ PROFILE_FIELDS = ("nickname", "gender", "birth_year", "city", "job", "hobbies",
                   "relationship", "about")
 
 
+def _stored_profile(conn: sqlite3.Connection, user_id: str):
+    """The signed-in user's own facts live on the account, not on each device."""
+    # Tests hand in a stub connection; only real sqlite handles have execute().
+    if not hasattr(conn, "execute"):
+        return None
+    try:
+        from app.services.user_profile import UserProfileService
+        return UserProfileService().get(conn, user_id)
+    except Exception:
+        # A database without the profile table must not break draft generation.
+        return None
+
+
+def _resolve_profile(conn: sqlite3.Connection, user_id: str, override) -> dict[str, str]:
+    cleaned = _clean_profile(override)
+    if cleaned:
+        return cleaned
+    stored = _stored_profile(conn, user_id)
+    if stored is None:
+        return {}
+    from app.services.user_profile import UserProfileService
+    return _clean_profile(UserProfileService().prompt_facts(stored))
+
+
+def _resolve_rules(conn: sqlite3.Connection, user_id: str, override: str) -> str:
+    value = (override or "").strip()
+    if value:
+        return value[:1500]
+    stored = _stored_profile(conn, user_id)
+    if stored is None:
+        return ""
+    return str(stored.reply_rules or "").strip()[:1500]
+
+
 def _clean_profile(raw: dict[str, str] | None) -> dict[str, str]:
     if not isinstance(raw, dict):
         return {}
@@ -301,8 +335,8 @@ class AnalysisStrategicReplyService:
             "required_evidence_source_ids": conversation_focus.get(
                 "required_evidence_source_ids", []
             ),
-            "channel_rules": (channel_rules or "").strip()[:1500],
-            "self_profile": _clean_profile(self_profile),
+            "channel_rules": _resolve_rules(conn, user_id, channel_rules),
+            "self_profile": _resolve_profile(conn, user_id, self_profile),
             "self_style": build_self_style(analysis_context.get("messages")),
             "constraints": {
                 "must_be_evidence_backed": True,

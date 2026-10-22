@@ -84,6 +84,11 @@ from app.ui.media_upload_workspace import (
     MEDIA_UPLOAD_WORKSPACE_STYLE,
 )
 from app.ui.message_history_window_workspace import MESSAGE_HISTORY_WINDOW_SCRIPT
+from app.ui.my_profile_workspace import (
+    MY_PROFILE_HTML,
+    MY_PROFILE_SCRIPT,
+    MY_PROFILE_STYLE,
+)
 from app.ui.multi_provider_settings_workspace import (
     MULTI_PROVIDER_SETTINGS_SCRIPT,
     MULTI_PROVIDER_SETTINGS_STYLE,
@@ -240,6 +245,7 @@ def build_product_shell_html() -> str:
             f"{VIEWPORT_SAFE_UI_POLISH_STYLE}\n"
             f"{NAMED_CHAT_STYLE}\n"
             f"{CARD_NAVIGATION_STYLE}\n{PERSON_POLISH_STYLE}\n"
+            f"{MY_PROFILE_STYLE}\n"
             f"{style_marker}"
         ),
         1,
@@ -248,6 +254,7 @@ def build_product_shell_html() -> str:
     workspace_html = (
         f"{GUIDED_WORKFLOW_HTML}\n"
         f"{ACCOUNT_SECURITY_HTML}\n"
+        f"{MY_PROFILE_HTML}\n"
         f"{PRODUCT_MANAGEMENT_HTML}\n"
         f"{CONVERSATION_CONTENT_HTML}\n"
         f"{RELATIONSHIP_EVIDENCE_HTML}\n"
@@ -308,6 +315,7 @@ def build_product_shell_html() -> str:
         f"{CHINA_CALENDAR_SCRIPT}\n\n"
         f"{PERSON_MEMORY_SCRIPT}\n\n"
         f"{CARD_NAVIGATION_SCRIPT}\n\n{PERSON_POLISH_SCRIPT}\n\n"
+        f"{MY_PROFILE_SCRIPT}\n\n"
         f"{PC_PLATFORM_SCRIPT}\n\n"
         f"{script_marker}"
     )

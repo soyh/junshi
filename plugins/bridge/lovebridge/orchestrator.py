@@ -475,10 +475,11 @@ class Orchestrator:
         if self.state.total_today(self._today()) >= bot.daily_reply_cap:
             return TurnResult(contact_id, conversation_id, len(events), reason="daily cap")
 
+        # Identity and default rules live on the account (web/PC/phone all read
+        # the same record), so only channel-specific rules travel from here.
         context = await self.app.get_reply_context(
             conversation_id,
             self.config.bot.rules,
-            self.config.bot.person,
         )
         reply = (context or {}).get("draft")
         reply = reply.strip() if isinstance(reply, str) else ""
