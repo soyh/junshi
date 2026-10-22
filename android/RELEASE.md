@@ -1,3 +1,14 @@
+# Android 1.0.1 正式发布
+
+版本 **1.0.1**（versionCode **23200**），同一固定签名，可直接覆盖安装 1.0.0。下载 [JunshiAndroid-1.0.1.apk](https://github.com/soyh/junshi/releases/download/android-v1.0.1/JunshiAndroid-1.0.1.apk)；国内镜像 <https://101.34.253.116/downloads/JunshiAndroid-1.0.1.apk>。
+
+APK SHA-256：`6405f00fac2b5a6f500408df940803be76366da0267e75c591c4697ec660c4e1`。
+
+改动：
+- 悬浮小窗默认不抢输入焦点（`FLAG_NOT_FOCUSABLE`），下面的应用能正常弹输入法；小窗底部新增「输入 / 收起键盘」，需要在小窗里打字时临时把窗口变成可聚焦，用完把焦点还回去（`OverlayService.setTyping/releaseKeyboard`）。
+- `WebActivity` 接管 `WebChromeClient` 的 `alert/confirm/prompt`，并支持网页定位（`onGeolocationPermissionsShowPrompt` + 运行时定位权限，请求码 41）。
+- 网页端配合：消息改成行内编辑、删除改「再点一次」、长消息展开从单击改双击；渲染不再反复自触发（只在文案变化时写回、每帧合并一次）。
+
 # Android 1.0.0 正式发布
 
 正式版 **1.0.0** 已发布，versionCode **23100**。下载 [固定签名正式 APK](https://github.com/soyh/junshi/releases/download/android-v1.0.0/JunshiAndroid-1.0.0.apk)，完整附件见 [正式发布页](https://github.com/soyh/junshi/releases/tag/android-v1.0.0)。普通 CI 的 debug 包仅用于测试，不能作为正式包分发。
