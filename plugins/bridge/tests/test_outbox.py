@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -190,16 +191,34 @@ def test_quiet_hours_defers_without_burning_attempts(tmp_path):
     assert channel.sent == []
 
 
-def test_daily_cap_defers_to_the_next_day(tmp_path):
+def test_daily_cap_long_wait_is_marked_failed_not_silently_deferred(tmp_path):
+    """每日上限要等到明天（远超 3 分钟）时，直接显示成失败，别让用户干等。"""
     app = _App(["不该发出"])
     channel = _Channel()
     orchestrator, state, _logs = _build(tmp_path, app, channel, daily_reply_cap=0)
 
     _run(orchestrator, _event())
 
-    rows = state.outbox_pending(CONTACT)
-    assert len(rows) == 1 and rows[0]["reason"] == "daily cap"
+    assert state.outbox_pending(CONTACT) == []
+    failed = state.outbox_rows("failed", limit=10)
+    assert failed and "daily cap" in failed[0]["reason"]
+    assert "3 分钟" in failed[0]["reason"]
     assert channel.sent == []
+
+
+def test_quiet_hours_short_wait_stays_queued_then_fails_after_three_minutes(tmp_path):
+    """安静时段前两次仍排队，等满 3 分钟还没发出去就转成失败。"""
+    app = _App(["好"])
+    channel = _Channel()
+    orchestrator, state, _logs = _build(tmp_path, app, channel)
+    orchestrator.LONG_WAIT_LIMIT = 180
+    orchestrator.DEFER_SECONDS = 120
+
+    row = {"created_at": orchestrator._now().isoformat(timespec="seconds")}
+    assert orchestrator._waited_seconds([row]) < 1
+
+    stale = {"created_at": (orchestrator._now() - timedelta(seconds=200)).isoformat(timespec="seconds")}
+    assert orchestrator._waited_seconds([stale]) >= 180
 
 
 def test_drain_skips_rows_that_were_already_answered(tmp_path):

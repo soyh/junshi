@@ -71,7 +71,10 @@ class Orchestrator:
     RETRY_SECONDS = 10.0
     MAX_ATTEMPTS = 3
     BACKOFF = (8, 20, 45)
-    DEFER_SECONDS = 600
+    DEFER_SECONDS = 120
+    #: 排队消息最长等 3 分钟。超过就当场记为“失败”，让用户在面板里看得见、
+    #: 自己决定手动回还是计入已回，而不是静静躺上一小时。
+    LONG_WAIT_LIMIT = 180
 
     async def run(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -348,6 +351,20 @@ class Orchestrator:
             delay = self.DEFER_SECONDS
             if reason == "daily cap":
                 delay = self._seconds_until_tomorrow()
+            waited = self._waited_seconds(rows)
+            if delay > self.LONG_WAIT_LIMIT or waited >= self.LONG_WAIT_LIMIT:
+                # 等太久（每日上限要等到明天、安静时段一直没结束）就别挂着：
+                # 直接显示成失败，用户看到后手动回一句，再点“计入已回”。
+                if delay > self.LONG_WAIT_LIMIT:
+                    note = f"{reason}（下次要等 {int(delay) // 60} 分钟）"
+                else:
+                    note = f"{reason}（已等 {int(waited) // 60} 分钟）"
+                note += "，超过 3 分钟未发出"
+                self.state.outbox_finish(
+                    ids, "failed", note, attempts=max(attempts, self.MAX_ATTEMPTS)
+                )
+                self._log(f"[bridge] give up contact={contact_id}: {note}")
+                return
             self.state.outbox_finish(ids, "queued", reason, self._later(delay))
             self._log(f"[bridge] defer contact={contact_id} ({reason}) for {delay}s")
             return
@@ -396,6 +413,15 @@ class Orchestrator:
                         self._finish_outbox(contact_id, events, result)
                     handled += 1
         return handled
+
+    def _waited_seconds(self, rows: list[dict]) -> float:
+        """How long the oldest of these queued rows has already been waiting."""
+        oldest = min((str(row.get("created_at") or "") for row in rows), default="")
+        try:
+            created = datetime.fromisoformat(oldest)
+        except ValueError:
+            return 0.0
+        return max(0.0, (self._now() - created).total_seconds())
 
     def _later(self, seconds: float | int) -> str:
         return (self._now() + timedelta(seconds=int(seconds))).isoformat(timespec="seconds")

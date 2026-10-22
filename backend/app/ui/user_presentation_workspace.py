@@ -159,14 +159,33 @@ USER_PRESENTATION_STYLE = r'''
 
     .message-editable { cursor: text; }
 
-    .inline-message-editor {
-      display: grid;
-      gap: 6px;
-      margin: 4px 0 6px;
+    .message-editor-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(6, 20, 34, .55);
     }
 
-    .inline-message-editor textarea,
-    .inline-message-editor input {
+    .message-editor-card {
+      display: grid;
+      gap: 8px;
+      width: min(520px, 100%);
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 16px;
+      border-radius: 14px;
+      background: var(--panel, #fff);
+      box-shadow: 0 18px 48px rgba(6, 20, 34, .35);
+    }
+
+    .message-editor-card h3 { margin: 0; font-size: 1rem; }
+
+    .message-editor-card textarea,
+    .message-editor-card input {
       width: 100%;
       box-sizing: border-box;
       padding: 8px 10px;
@@ -177,13 +196,12 @@ USER_PRESENTATION_STYLE = r'''
       resize: vertical;
     }
 
-    .inline-message-editor button {
-      justify-self: start;
-    }
+    .message-editor-actions { display: flex; gap: 8px; }
 
     @media (max-width: 760px) {
-      .inline-message-editor textarea,
-      .inline-message-editor input { font-size: 16px; }
+      .message-editor-card { width: 100%; }
+      .message-editor-card textarea,
+      .message-editor-card input { font-size: 16px; }
     }
 
     .user-content-meta {

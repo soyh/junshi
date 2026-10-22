@@ -17,6 +17,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".WebActivity" android:exported="false" />
+        <activity android:name=".OverlayInputActivity" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" android:windowSoftInputMode="stateVisible|adjustResize" />
         <service android:name=".OverlayService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User enabled floating conversation assistant with explicit clipboard and reply actions" />
         </service>

@@ -46,14 +46,14 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$OUT/app-release.apk" > "$OUT/package.txt"
           python scripts/check_android_release.py "$OUT" "$RUNNER_TEMP/signing-cert.der"
           cat "$OUT/signature.txt"
-          cp "$OUT/app-release.apk" "$OUT/JunshiAndroid-1.0.1.apk"
+          cp "$OUT/app-release.apk" "$OUT/JunshiAndroid-1.0.2.apk"
           cd "$OUT"
-          sha256sum JunshiAndroid-1.0.1.apk > SHA256SUMS.txt
+          sha256sum JunshiAndroid-1.0.2.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: JunshiAndroid-1.0.1-signed
+          name: JunshiAndroid-1.0.2-signed
           path: |
-            android/app/build/outputs/apk/release/JunshiAndroid-1.0.1.apk
+            android/app/build/outputs/apk/release/JunshiAndroid-1.0.2.apk
             android/app/build/outputs/apk/release/release-verification.json
             android/app/build/outputs/apk/release/signature.txt
             android/app/build/outputs/apk/release/SHA256SUMS.txt

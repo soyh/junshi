@@ -82,20 +82,36 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     }));
   }
 
-  // 页内编辑：手机上 window.prompt 可能不弹（WebView 没有实现 JS 对话框），
-  // 所以直接在消息行里换成输入框，点保存才提交。
-  function startInlineEdit(item, row, body, actions) {
-    if (row.dataset.editing === '1') return;
-    row.dataset.editing = '1';
-    const original = body.textContent;
-    const editor = document.createElement('div');
-    editor.className = 'inline-message-editor';
+  // 编辑弹层：不往消息行里插输入框。往行里插节点会触发列表的
+  // MutationObserver 反复重排，手机上表现为整页快速闪烁。
+  let messageEditor = null;
+
+  function closeMessageEditor() {
+    if (!messageEditor) return;
+    messageEditor.remove();
+    messageEditor = null;
+  }
+
+  function openMessageEditor(item) {
+    closeMessageEditor();
+    const box = document.createElement('div');
+    box.className = 'message-editor-modal';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    const card = document.createElement('div');
+    card.className = 'message-editor-card';
+    const title = document.createElement('h3');
+    title.textContent = '修改这条消息';
     const text = document.createElement('textarea');
-    text.value = item.content;
-    text.rows = 3;
+    text.value = item.content || '';
+    text.rows = 5;
+    text.setAttribute('aria-label', '消息内容');
     const time = document.createElement('input');
     time.value = chinaTimeText(item.sent_at);
+    time.setAttribute('aria-label', '发送时间');
     time.setAttribute('placeholder', '发送时间（北京时间，24小时制）');
+    const actions = document.createElement('div');
+    actions.className = 'message-editor-actions';
     const save = document.createElement('button');
     save.type = 'button';
     save.textContent = '保存修改';
@@ -104,20 +120,25 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     cancel.textContent = '取消';
     const status = document.createElement('div');
     status.className = 'status';
-    editor.append(text, time, save, cancel, status);
-    body.hidden = true;
-    actions.hidden = true;
-    row.insertBefore(editor, body.nextSibling);
-    text.focus();
-    try { text.setSelectionRange(text.value.length, text.value.length); } catch (_) {}
-    const stop = () => {
-      row.dataset.editing = '';
-      editor.remove();
-      body.hidden = false;
-      body.textContent = original;
-      actions.hidden = false;
+    actions.append(save, cancel);
+    card.append(title, text, time, actions, status);
+    box.appendChild(card);
+    document.body.appendChild(box);
+    messageEditor = box;
+
+    const close = () => closeMessageEditor();
+    cancel.addEventListener('click', close);
+    box.addEventListener('click', (event) => {
+      if (event.target === box) close();
+    });
+    const onKey = (event) => {
+      if (!messageEditor) {
+        document.removeEventListener('keydown', onKey);
+        return;
+      }
+      if (event.key === 'Escape') close();
     };
-    cancel.addEventListener('click', stop);
+    document.addEventListener('keydown', onKey);
     save.addEventListener('click', async () => {
       save.disabled = true;
       status.textContent = '正在保存…';
@@ -128,8 +149,10 @@ CONVERSATION_CONTENT_SCRIPT = r'''
         save.disabled = false;
         return;
       }
-      stop();
+      close();
     });
+    text.focus();
+    try { text.setSelectionRange(text.value.length, text.value.length); } catch (_) {}
   }
 
   function renderMessages(items) {
@@ -151,9 +174,8 @@ CONVERSATION_CONTENT_SCRIPT = r'''
       body.classList.add('message-editable');
       body.setAttribute('title', '点击修改这条消息');
       body.addEventListener('click', (event) => {
-        if (row.dataset.editing === '1') return;
         event.stopPropagation();
-        startInlineEdit(item, row, body, actions);
+        openMessageEditor(item);
       });
 
       const edit = document.createElement('button');
@@ -161,7 +183,7 @@ CONVERSATION_CONTENT_SCRIPT = r'''
       edit.className = 'requires-auth';
       edit.disabled = !currentAccessToken;
       edit.textContent = '修改';
-      edit.addEventListener('click', () => startInlineEdit(item, row, body, actions));
+      edit.addEventListener('click', () => openMessageEditor(item));
 
 
       const remove = document.createElement('button');
