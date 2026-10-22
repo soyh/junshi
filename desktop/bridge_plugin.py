@@ -42,6 +42,26 @@ PERSON_LABELS = {
     "about": "其他设定",
 }
 
+# The account API calls it relationship_status; the local file keeps "relationship".
+API_FIELDS = {"relationship": "relationship_status"}
+
+
+def person_from_api(data: dict) -> dict[str, str]:
+    """Map an account profile response onto local person keys."""
+    person = {}
+    for key in PERSON_FIELDS:
+        value = data.get(API_FIELDS.get(key, key), "")
+        person[key] = str(value or "").strip()
+    return person
+
+
+def api_payload(person: dict[str, str], rules: str) -> dict[str, str]:
+    """Build the account profile body from local person fields and rules."""
+    payload = {API_FIELDS.get(key, key): str(person.get(key, "") or "").strip()
+               for key in PERSON_FIELDS}
+    payload["reply_rules"] = str(rules or "")
+    return payload
+
 
 def app_data_dir() -> Path:
     return Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "JunshiPC"

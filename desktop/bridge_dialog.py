@@ -65,7 +65,7 @@ class BridgeDialog(Dialog):
             ),
             wraplength=1000,
         ).pack(anchor="w")
-        self.load_shared()
+        self.load_shared(announce=True)
         self.reload()
         self.window.after(15000, self._auto_refresh)
 
@@ -151,6 +151,9 @@ class BridgeDialog(Dialog):
         bar_row = ttk.Frame(shared.body)
         bar_row.pack(fill="x", pady=(4, 0))
         self.button(bar_row, "保存全局设置", self.save_shared)
+        self.button(bar_row, "从账号重新读取", self.reload_shared)
+        self.shared_status = tk.StringVar(value="账号同步状态：打开时自动读取")
+        ttk.Label(bar_row, textvariable=self.shared_status, foreground="#666").pack(side="left", padx=(8, 0))
 
     def _build_right(self, parent):
         account = Section(parent, "基础连接", open=True)
@@ -305,22 +308,27 @@ class BridgeDialog(Dialog):
     def _person_values(self):
         return {key: widget.get().strip() for key, widget in self.person.items()}
 
-    def load_shared(self):
+    def reload_shared(self):
+        self.load_shared(announce=True)
+
+    def load_shared(self, announce=False):
         """Identity lives on the account; the local file is only an offline cache."""
         shared = bp.load_global()
         person = shared["person"]
         rules = shared["rules"]
-        remote = self._fetch_shared()
+        remote, error = self._fetch_shared()
         if remote is not None:
-            person = {key: remote.get(key, "") for key in bp.PERSON_FIELDS}
-            rules = remote.get("reply_rules", "")
+            person = bp.person_from_api(remote)
+            rules = str(remote.get("reply_rules") or "")
             try:
-                bp.save_global(
-                    person={key: str(person.get(key, "")) for key in bp.PERSON_FIELDS},
-                    rules=rules,
-                )
+                bp.save_global(person=person, rules=rules)
             except OSError:
                 pass
+            if announce:
+                stamp = str(remote.get("updated_at") or "")
+                self.shared_status.set("账号同步状态：已从账号读取" + (f"（{stamp}）" if stamp else ""))
+        elif announce:
+            self.shared_status.set(f"账号同步状态：读取失败——{error or '未登录'}")
         for key, widget in self.person.items():
             self._fill(widget, person.get(key, ""))
         self.global_rules.delete("1.0", "end")
@@ -328,13 +336,14 @@ class BridgeDialog(Dialog):
             self.global_rules.insert("1.0", rules)
 
     def _fetch_shared(self):
+        """Return (profile, error). The client already prefixes /api/v1."""
         if not self.client:
-            return None
+            return None, "未登录"
         try:
-            data = self.client.request("GET", "/api/v1/settings/profile", timeout=20)
-        except Exception:
-            return None
-        return data if isinstance(data, dict) else None
+            data = self.client.request("GET", "/settings/profile", timeout=20)
+        except Exception as exc:
+            return None, str(exc)
+        return (data, "") if isinstance(data, dict) else (None, "返回格式不正确")
 
     def save_shared(self):
         person = self._person_values()
@@ -346,18 +355,19 @@ class BridgeDialog(Dialog):
             return
         if not self.client:
             self.message.set("已保存到本机（未登录，暂时只在本机生效）。")
+            self.shared_status.set("账号同步状态：未登录，仅本机")
             return
         def work():
-            payload = {key: person.get(key, "") for key in bp.PERSON_FIELDS}
-            payload["reply_rules"] = rules
-            return self.client.request("PUT", "/api/v1/settings/profile", payload, timeout=20)
+            return self.client.request("PUT", "/settings/profile", bp.api_payload(person, rules), timeout=20)
 
         def done(result, error):
             if error:
                 self.message.set(f"已存本机，但同步到账号失败：{error}")
+                self.shared_status.set(f"账号同步状态：保存失败——{error}")
             else:
                 stamp = result.get("updated_at", "") if isinstance(result, dict) else ""
                 self.message.set(f"已保存到账号（网页/手机同一步生效{('，' + stamp) if stamp else ''}）。")
+                self.shared_status.set("账号同步状态：已保存到账号" + (f"（{stamp}）" if stamp else ""))
 
         self.perform(work, done)
 

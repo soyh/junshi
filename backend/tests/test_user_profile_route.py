@@ -65,6 +65,19 @@ def test_profile_route_round_trips_and_trims():
     assert body["updated_at"]
 
 
+def test_profile_route_accepts_the_legacy_relationship_key():
+    """Build 244 desktop clients send "relationship" instead of "relationship_status"."""
+    with TestClient(app) as client:
+        saved = client.put(
+            "/api/v1/settings/profile",
+            json={"nickname": "小林", "relationship": "暧昧中"},
+        )
+        reloaded = client.get("/api/v1/settings/profile")
+
+    assert saved.status_code == 200
+    assert reloaded.json()["relationship_status"] == "暧昧中"
+
+
 def test_reply_templates_are_served_to_the_web_page():
     with TestClient(app) as client:
         response = client.get("/api/v1/settings/reply-templates")

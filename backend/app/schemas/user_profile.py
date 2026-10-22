@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class UserProfilePayload(BaseModel):
@@ -8,7 +8,13 @@ class UserProfilePayload(BaseModel):
     city: str = Field(default="", max_length=40)
     job: str = Field(default="", max_length=40)
     hobbies: str = Field(default="", max_length=120)
-    relationship_status: str = Field(default="", max_length=40)
+    # Older desktop builds send "relationship"; keep accepting it on input while
+    # the response keeps the canonical name the web workspace reads.
+    relationship_status: str = Field(
+        default="",
+        max_length=40,
+        validation_alias=AliasChoices("relationship_status", "relationship"),
+    )
     about: str = Field(default="", max_length=400)
     reply_rules: str = Field(default="", max_length=1500)
 

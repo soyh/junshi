@@ -429,6 +429,36 @@ def test_global_settings_are_shared_and_survive_profile_creation(plugin_home):
     assert "小满" in bp.config_path(profile_id).read_text(encoding="utf-8")
 
 
+def test_shared_settings_use_the_client_relative_path():
+    """Client.request already prefixes /api/v1; a full path became a 404."""
+    source = Path(__file__).with_name("bridge_dialog.py").read_text(encoding="utf-8")
+    assert '"/settings/profile"' in source
+    assert "/api/v1/settings/profile" not in source
+
+
+def test_account_profile_maps_relationship_status_both_ways(plugin_home):
+    remote = {
+        "nickname": "小满",
+        "gender": "女",
+        "birth_year": "1996",
+        "city": "杭州",
+        "job": "设计",
+        "hobbies": "爬山",
+        "relationship_status": "单身",
+        "about": "喜欢猫",
+        "reply_rules": "短句",
+        "updated_at": "2026-10-22 20:00",
+    }
+    person = bp.person_from_api(remote)
+    assert person["relationship"] == "单身"
+    assert set(person) == set(bp.PERSON_FIELDS)
+    payload = bp.api_payload(person, "短句")
+    # The account API never sees the local key name.
+    assert "relationship" not in payload
+    assert payload["relationship_status"] == "单身"
+    assert payload["reply_rules"] == "短句"
+
+
 def test_channel_rules_override_the_global_default(plugin_home):
     bp.save_global(person={"nickname": "小满"}, rules="全局默认")
     profile_id = bp.create_profile(
