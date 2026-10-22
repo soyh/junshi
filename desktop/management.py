@@ -1,5 +1,8 @@
 """Authenticated desktop management using the existing per-user server APIs."""
 import threading
+import ctypes
+import sys
+from ctypes import wintypes
 import tkinter as tk
 from tkinter import ttk, messagebox
 from urllib.parse import urlsplit
@@ -154,7 +157,11 @@ class Dialog:
         """Centre the dialog and cap it to the usable part of the screen."""
         self.window.update_idletasks()
         screen_w, screen_h = self.window.winfo_screenwidth(), self.window.winfo_screenheight()
-        width, height = min(width, max(480, screen_w - 80)), min(height, max(360, screen_h - 120))
+        if sys.platform == 'win32':
+            work = wintypes.RECT()
+            if ctypes.windll.user32.SystemParametersInfoW(48, 0, ctypes.byref(work), 0):
+                screen_w, screen_h = work.right - work.left, work.bottom - work.top
+        width, height = min(width, max(480, screen_w - 60)), min(height, max(360, screen_h - 80))
         left, top = max(0, (screen_w - width) // 2), max(0, (screen_h - height) // 2 - 20)
         self.window.geometry(f'{width}x{height}+{left}+{top}')
         return self.window

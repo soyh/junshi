@@ -33,6 +33,9 @@ class BridgeDialog(Dialog):
             wraplength=900,
         ).pack(anchor="w")
 
+        bar = ttk.Frame(self.frame)
+        bar.pack(side="bottom", fill="x", pady=(8, 0))
+
         body = ttk.Frame(self.frame)
         body.pack(fill="both", expand=True, pady=(6, 0))
         left = ttk.Frame(body)
@@ -43,7 +46,25 @@ class BridgeDialog(Dialog):
         self._build_left(left)
         self._build_right(scrollable(right_wrap))
 
-        self.footer()
+        actions = ttk.Frame(bar)
+        actions.pack(fill="x")
+        self.button(actions, "保存配置", self.save)
+        self.button(actions, "启动", self.start_profile)
+        self.button(actions, "停止", self.stop_profile)
+        self.button(actions, "启动全部", self.start_all)
+        self.button(actions, "显示浏览器", self.show_browser)
+        self.button(actions, "隐藏浏览器", self.hide_browser)
+        self.button(actions, "刷新状态", self.refresh)
+        self.button(actions, "关闭", self.close)
+        ttk.Label(bar, textvariable=self.message, wraplength=1000).pack(fill="x", pady=(4, 0))
+        ttk.Label(
+            bar,
+            text=(
+                "首次启动或登录态过期会自动弹出可见浏览器窗口供扫码；登录成功后按“隐藏方式”处理。"
+                "状态以本机当前为准（每 15 秒刷新）。"
+            ),
+            wraplength=1000,
+        ).pack(anchor="w")
         self.load_shared()
         self.reload()
         self.window.after(15000, self._auto_refresh)
@@ -205,26 +226,15 @@ class BridgeDialog(Dialog):
         queue_buttons.pack(fill="x", pady=(3, 0))
         self.button(queue_buttons, "立即重试", self.retry_outbox)
         self.button(queue_buttons, "刷新队列", self.refresh_queue)
+        ttk.Label(queue_buttons, text="已手动回复：").pack(side="left", padx=(10, 2))
+        self.queue_contact = tk.StringVar()
+        self.queue_picker = ttk.Combobox(
+            queue_buttons, textvariable=self.queue_contact, state="readonly", width=18
+        )
+        self.queue_picker.pack(side="left")
+        self.button(queue_buttons, "计入已回", self.resolve_contact)
+        self.button(queue_buttons, "清除失败记录", self.clear_failed)
 
-        actions = ttk.Frame(parent)
-        actions.pack(fill="x", pady=(2, 4))
-        self.button(actions, "保存配置", self.save)
-        self.button(actions, "启动", self.start_profile)
-        self.button(actions, "停止", self.stop_profile)
-        self.button(actions, "启动全部", self.start_all)
-        self.button(actions, "显示浏览器", self.show_browser)
-        self.button(actions, "隐藏浏览器", self.hide_browser)
-        self.button(actions, "刷新状态", self.refresh)
-        self.button(actions, "关闭", self.close)
-
-        ttk.Label(
-            parent,
-            text=(
-                "首次启动或登录态过期会自动弹出可见浏览器窗口供扫码；登录成功后按“隐藏方式”处理。"
-                "状态以本机当前为准（每 15 秒刷新）。"
-            ),
-            wraplength=620,
-        ).pack(anchor="w")
 
     def _cell(self, grid, row, column, key, label, value="", choices=None, secret=False,
               sample=None, free=False):
@@ -498,11 +508,18 @@ class BridgeDialog(Dialog):
 
     def _scan(self):
         items = {item["id"]: item for item in bp.list_profiles()}
-        return items, bp.outbox_lines(list(items.values()))
+        current = items.get(self.current or "")
+        if current is None:
+            return items, ["先在上面选择一个通道。"], []
+        lines = bp.outbox_lines(
+            [current], empty=f"{current['name']}：当前没有待发或失败的消息。"
+        )
+        return items, lines, bp.pending_contacts(self.current)
 
     def _refreshed(self, payload):
-        items, queue = payload
+        items, queue, contacts = payload
         self._render_list(items=items, select=self.current, load=False)
+        self._set_contacts(contacts)
         self.render_queue(queue)
         running = sum(1 for item in items.values() if item["running"])
         self.message.set(f"状态以本机当前为准；运行中的通道：{running} 个。")
@@ -513,9 +530,53 @@ class BridgeDialog(Dialog):
             self.render_queue(["先在上面选择一个通道。"])
             return
         self.perform(
-            lambda: bp.outbox_lines([current], empty=f"{current['name']}：当前没有待发或失败的消息。"),
-            self.render_queue,
+            lambda: (bp.outbox_lines([current], empty=f"{current['name']}：当前没有待发或失败的消息。"),
+                     bp.pending_contacts(self.current)),
+            self._queue_loaded,
         )
+
+    def _queue_loaded(self, payload):
+        lines, contacts = payload
+        self.render_queue(lines)
+        self._set_contacts(contacts)
+
+    def _set_contacts(self, contacts):
+        labels = [f"{row.get('contact_name') or row['contact_id']}" for row in contacts]
+        self.queue_picker.configure(values=labels)
+        if self.queue_contact.get() not in labels:
+            self.queue_contact.set(labels[0] if labels else "")
+        self._contact_ids = {
+            f"{row.get('contact_name') or row['contact_id']}": row["contact_id"] for row in contacts
+        }
+
+    def resolve_contact(self):
+        contact = getattr(self, "_contact_ids", {}).get(self.queue_contact.get())
+        if not self.current or not contact:
+            self.message.set("先在队列里选择一个人（只有待发/失败的才会列出）。")
+            return
+        if not messagebox.askyesno(
+            "计入已回",
+            f"确认你已经在 {self.profiles[self.current]['name']} 里手动回复了"
+            f"「{self.queue_contact.get()}」？\n该人的待发与失败记录会被清掉，不再自动发送。",
+            parent=self.window,
+        ):
+            return
+        removed = bp.clear_outbox(self.current, contact, only_failed=False)
+        self.message.set(f"已清掉「{self.queue_contact.get()}」的 {removed} 条待发/失败记录。")
+        self.refresh_queue()
+
+    def clear_failed(self):
+        if not self.current:
+            return
+        if not messagebox.askyesno(
+            "清除失败记录",
+            "确认清掉本通道所有「重试 3 次仍失败」的记录？\n只是不再显示，不会补发。",
+            parent=self.window,
+        ):
+            return
+        removed = bp.clear_outbox(self.current, only_failed=True)
+        self.message.set(f"已清掉 {removed} 条失败记录。")
+        self.refresh_queue()
 
     def render_queue(self, lines):
         self.queue_text.configure(state="normal")

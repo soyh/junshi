@@ -250,6 +250,41 @@ class StateStore:
             self._conn.commit()
         return {"revived": int(revived or 0), "queued": int(due or 0)}
 
+    def outbox_clear(self, *, contact_id: str | None = None,
+                     only_failed: bool = True) -> int:
+        """Drop owed replies from the queue (the user answered by hand)."""
+        now = datetime.now().isoformat(timespec="seconds")
+        states = ("failed",) if only_failed else ("queued", "failed")
+        marks = ",".join("?" for _ in states)
+        sql = (
+            f"UPDATE outbox SET state = 'skipped', reason = 'cleared by user', "
+            f"next_at = NULL, updated_at = ? WHERE state IN ({marks})"
+        )
+        params: list = [now, *states]
+        if contact_id:
+            sql += " AND contact_id = ?"
+            params.append(contact_id)
+        with self._lock:
+            changed = self._conn.execute(sql, params).rowcount
+            self._conn.commit()
+        return int(changed or 0)
+
+    def outbox_contacts(self) -> list[dict]:
+        """Contacts that still owe a reply, with how many and the last reason."""
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT contact_id,
+                       MAX(COALESCE(contact_name, '')) AS contact_name,
+                       SUM(state = 'queued') AS queued,
+                       SUM(state = 'failed') AS failed,
+                       MAX(updated_at) AS updated_at
+                FROM outbox WHERE state IN ('queued', 'failed')
+                GROUP BY contact_id ORDER BY updated_at DESC LIMIT 50
+                """
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def outbox_rows(self, state: str, limit: int = 20) -> list[dict]:
         with self._lock:
             rows = self._conn.execute(

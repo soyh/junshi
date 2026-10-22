@@ -333,6 +333,52 @@ def outbox_rows(profile_id: str, limit: int = 8) -> list[dict]:
     return rows
 
 
+def pending_contacts(profile_id: str) -> list[dict]:
+    """Contacts that still owe a reply in one channel (name + how many)."""
+    path = profile_dir(profile_id) / "state.sqlite3"
+    if not path.is_file():
+        return []
+    rows: list[dict] = []
+    try:
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
+            connection.row_factory = sqlite3.Row
+            for row in connection.execute(
+                "SELECT contact_id, MAX(COALESCE(contact_name, '')) AS contact_name,"
+                " SUM(state = 'queued') AS queued, SUM(state = 'failed') AS failed"
+                " FROM outbox WHERE state IN ('queued', 'failed')"
+                " GROUP BY contact_id ORDER BY MAX(updated_at) DESC LIMIT 50"
+            ):
+                rows.append(dict(row))
+    except sqlite3.Error:
+        return []
+    return rows
+
+
+def clear_outbox(profile_id: str, contact_id: str | None = None,
+                 only_failed: bool = True) -> int:
+    """Forget owed replies — the user answered that person by hand."""
+    path = profile_dir(profile_id) / "state.sqlite3"
+    if not path.is_file():
+        return 0
+    states = ("failed",) if only_failed else ("queued", "failed")
+    marks = ",".join("?" for _ in states)
+    sql = (
+        "UPDATE outbox SET state = 'skipped', reason = 'cleared by user', next_at = NULL,"
+        f" updated_at = ? WHERE state IN ({marks})"
+    )
+    params: list = [datetime.now().isoformat(timespec="seconds"), *states]
+    if contact_id:
+        sql += " AND contact_id = ?"
+        params.append(contact_id)
+    try:
+        with sqlite3.connect(path, timeout=5) as connection:
+            changed = connection.execute(sql, params).rowcount
+            connection.commit()
+    except sqlite3.Error:
+        return 0
+    return int(changed or 0)
+
+
 def _waiting(next_at) -> str:
     if not next_at:
         return "立即"

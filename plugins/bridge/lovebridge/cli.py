@@ -275,10 +275,16 @@ def cmd_window(config: Config, action: str) -> int:
     return 0 if count else 1
 
 
-def cmd_outbox(config: Config, state_name: str, retry: bool = False) -> int:
+def cmd_outbox(config: Config, state_name: str, retry: bool = False, *,
+               clear_failed: bool = False, clear_contact: str | None = None,
+               as_json: bool = False) -> int:
     """Show the replies the bridge still owes, and why the last one failed."""
     state = StateStore(config.bot.state_path)
     try:
+        if clear_failed or clear_contact:
+            removed = state.outbox_clear(contact_id=clear_contact,
+                                         only_failed=not clear_contact)
+            print(f"cleared={removed} contact={clear_contact or '-'}")
         if retry:
             outcome = state.outbox_retry_now()
             print(f"retry: revived={outcome['revived']} due={outcome['queued']}")
@@ -287,7 +293,15 @@ def cmd_outbox(config: Config, state_name: str, retry: bool = False) -> int:
             f"queued={counts['queued']} failed={counts['failed']} "
             f"skipped={counts['skipped']} sent={counts['sent']}"
         )
-        rows = state.outbox_rows(state_name, limit=20) if hasattr(state, "outbox_rows") else []
+        if as_json:
+            import json as _json
+            print(_json.dumps({
+                "counts": counts,
+                "rows": state.outbox_rows(state_name, limit=50),
+                "contacts": state.outbox_contacts(),
+            }, ensure_ascii=False))
+            return 0
+        rows = state.outbox_rows(state_name, limit=20)
         for row in rows:
             print(
                 f"{row['id']:>5} {row['state']:<8} {row['contact_id']} "
@@ -330,6 +344,12 @@ def main(argv: list[str] | None = None) -> int:
                                default="queued")
     outbox_parser.add_argument("--retry", action="store_true",
                                help="make owed replies due now and revive failed ones")
+    outbox_parser.add_argument("--clear-failed", action="store_true",
+                               help="forget every failed reply (you answered by hand)")
+    outbox_parser.add_argument("--clear-contact",
+                               help="forget queued and failed replies for one contact")
+    outbox_parser.add_argument("--json", action="store_true",
+                               help="machine readable output for the desktop client")
 
     args = parser.parse_args(argv)
     try:
@@ -357,7 +377,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "window":
         return cmd_window(config, args.action)
     if args.command == "outbox":
-        return cmd_outbox(config, args.state, args.retry)
+        return cmd_outbox(config, args.state, args.retry,
+                          clear_failed=args.clear_failed,
+                          clear_contact=args.clear_contact,
+                          as_json=args.json)
     return 2
 
 

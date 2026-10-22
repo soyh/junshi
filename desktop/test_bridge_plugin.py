@@ -442,3 +442,60 @@ def test_channel_rules_override_the_global_default(plugin_home):
     item = bp.summary(profile_id)
     assert item["rules"] == "本通道专用规则"
     assert bp.load_global()["rules"] == "全局默认"
+
+
+def _write_outbox(profile_id, rows):
+    import sqlite3
+
+    path = bp.profile_dir(profile_id) / "state.sqlite3"
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS outbox (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " message_id TEXT UNIQUE, contact_id TEXT, contact_name TEXT, text TEXT,"
+            " sent_at REAL, is_group INTEGER, attempts INTEGER DEFAULT 0,"
+            " state TEXT DEFAULT 'queued', reason TEXT, next_at TEXT,"
+            " created_at TEXT, updated_at TEXT)"
+        )
+        for row in rows:
+            connection.execute(
+                "INSERT INTO outbox (message_id, contact_id, contact_name, text, state,"
+                " attempts, reason, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                row,
+            )
+        connection.commit()
+
+
+def test_pending_contacts_groups_what_is_still_owed(plugin_home):
+    profile_id = bp.create_profile(
+        name="Soul 小号", server="https://example.com", username="u",
+        password="password-123456", channel="soul",
+    )
+    _write_outbox(profile_id, [
+        ("m1", "soul:a", "蓝.", "在吗", "queued", 0, None, "2026-10-22T09:00:00"),
+        ("m2", "soul:a", "蓝.", "忙吗", "failed", 3, "Timeout", "2026-10-22T09:01:00"),
+        ("m3", "soul:b", "松影", "早", "sent", 0, None, "2026-10-22T09:02:00"),
+    ])
+    contacts = {row["contact_id"]: row for row in bp.pending_contacts(profile_id)}
+    assert set(contacts) == {"soul:a"}
+    assert contacts["soul:a"]["queued"] == 1
+    assert contacts["soul:a"]["failed"] == 1
+    assert contacts["soul:a"]["contact_name"] == "蓝."
+
+
+def test_clear_outbox_forgets_failures_or_one_contact(plugin_home):
+    profile_id = bp.create_profile(
+        name="Soul 小号", server="https://example.com", username="u",
+        password="password-123456", channel="soul",
+    )
+    _write_outbox(profile_id, [
+        ("m1", "soul:a", "蓝.", "在吗", "queued", 0, None, "2026-10-22T09:00:00"),
+        ("m2", "soul:a", "蓝.", "忙吗", "failed", 3, "Timeout", "2026-10-22T09:01:00"),
+        ("m3", "soul:b", "松影", "早", "failed", 3, "502", "2026-10-22T09:02:00"),
+    ])
+    # 用户手动回了「蓝.」：这个人的待发与失败一起清掉
+    assert bp.clear_outbox(profile_id, "soul:a", only_failed=False) == 2
+    assert [row["contact_id"] for row in bp.pending_contacts(profile_id)] == ["soul:b"]
+    # 「清除失败记录」只清失败的，不动仍在排队的
+    _write_outbox(profile_id, [("m4", "soul:b", "松影", "早", "queued", 0, None, "2026-10-22T09:03:00")])
+    assert bp.clear_outbox(profile_id, only_failed=True) == 1
+    assert [row["contact_id"] for row in bp.pending_contacts(profile_id)] == ["soul:b"]

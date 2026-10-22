@@ -116,6 +116,9 @@ JunshiPC/
 - 「待发 / 失败」面板只显示**当前选中的通道**（切换通道即刷新）：第一行 `▸ 通道名（平台）待重试 N · 未发出 M`，
   同一个人的多条消息合并成一行（「N 条待发，第 x/3 次，还有几秒」），失败原因压成一行短文本
 - 手工排查：`JunshiBridge.exe --config config.toml outbox --state failed`（可选 queued / skipped / sent）
+- **你已经手动回了那个人**：在队列里选中他 → 「计入已回」，他的待发与失败记录一起清掉，桥接不再补发；
+  只是不想再看红字 → 「清除失败记录」（只清 `✕`，不动还在排队的）
+- 命令行同样可用：`outbox --clear-contact <contact_id>`、`outbox --clear-failed`
 
 ## 注意
 
