@@ -29,13 +29,17 @@ MAX_ATTEMPTS_LABEL = 3
 DEFAULT_QUIET = ("03:00", "05:30")
 
 #: 「本人信息」登记项 —— 让自动回复用真实身份说话，不瞎编年龄/职业。
-PERSON_FIELDS = ("nickname", "gender", "birth_year", "city", "job", "hobbies",
+PERSON_FIELDS = ("nickname", "gender", "birth_year", "city", "hometown",
+                 "current_location", "work_address", "job", "hobbies",
                  "relationship", "about")
 PERSON_LABELS = {
     "nickname": "我的称呼",
     "gender": "性别",
     "birth_year": "出生年份",
     "city": "所在城市",
+    "hometown": "籍贯/老家",
+    "current_location": "当前所在地",
+    "work_address": "工作地址",
     "job": "职业",
     "hobbies": "兴趣",
     "relationship": "感情状态",

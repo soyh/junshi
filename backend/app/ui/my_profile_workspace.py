@@ -61,6 +61,10 @@ MY_PROFILE_STYLE = r'''
   #my-profile-card button { padding: 9px 16px; border-radius: 10px; border: 1px solid #9cc3de; background: #f4fbff; color: #12506f; font: inherit; cursor: pointer; }
   #my-profile-card button.primary { background: #1976a8; border-color: #1976a8; color: #fff; }
   .my-profile-hint { margin: 6px 0; color: #6b8497; font-size: .78rem; line-height: 1.5; }
+  #my-profile-location-row > span { display: flex; gap: 6px; align-items: stretch; }
+  #my-profile-location-row > span input { flex: 1 1 auto; min-width: 0; }
+  #my-profile-location-row > span button { flex: 0 0 auto; padding: 8px 10px; white-space: nowrap; }
+  #mp-location-note { display: block; font-style: normal; }
 
   @media (max-width: 620px) {
     #my-profile-panel { padding: 0; align-items: stretch; }
@@ -85,6 +89,9 @@ MY_PROFILE_HTML = r'''
         <div><label for="mp-gender">性别</label><input id="mp-gender" maxlength="20" placeholder="比如：男"></div>
         <div><label for="mp-birth-year">出生年份</label><input id="mp-birth-year" maxlength="20" inputmode="numeric" placeholder="比如：1996"></div>
         <div><label for="mp-city">所在城市</label><input id="mp-city" maxlength="40" placeholder="比如：杭州"></div>
+        <div><label for="mp-hometown">籍贯 / 老家</label><input id="mp-hometown" maxlength="40" placeholder="比如：台州"></div>
+        <div id="my-profile-location-row"><label for="mp-current-location">当前所在地</label><span><input id="mp-current-location" maxlength="80" placeholder="点右侧按钮读取，或手动填写"><button id="mp-detect-location" type="button">读取当前位置</button></span><em id="mp-location-note" class="my-profile-hint"></em></div>
+        <div><label for="mp-work-address">工作地址</label><input id="mp-work-address" maxlength="120" placeholder="比如：西湖区文三路 100 号"></div>
         <div><label for="mp-job">职业</label><input id="mp-job" maxlength="40" placeholder="比如：产品经理"></div>
         <div><label for="mp-hobbies">兴趣爱好</label><input id="mp-hobbies" maxlength="120" placeholder="比如：跑步、看展"></div>
         <div><label for="mp-relationship">感情状态</label><input id="mp-relationship" maxlength="40" placeholder="比如：单身"></div>
@@ -120,6 +127,9 @@ MY_PROFILE_SCRIPT = r'''
       gender: byId('mp-gender'),
       birth_year: byId('mp-birth-year'),
       city: byId('mp-city'),
+      hometown: byId('mp-hometown'),
+      current_location: byId('mp-current-location'),
+      work_address: byId('mp-work-address'),
       job: byId('mp-job'),
       hobbies: byId('mp-hobbies'),
       relationship_status: byId('mp-relationship'),
@@ -189,7 +199,29 @@ MY_PROFILE_SCRIPT = r'''
       templateNote.textContent = found.note || '';
     }
 
+    function detectLocation() {
+      const note = byId('mp-location-note');
+      if (!navigator.geolocation) { note.textContent = '这台设备不支持定位，手动填写即可。'; return; }
+      note.textContent = '正在读取定位…（手机第一次会弹权限）';
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+        note.textContent = '正在换算成地址…';
+        try {
+          const data = await api(`/api/v1/settings/location?lat=${latitude}&lng=${longitude}`);
+          profileFields.current_location.value = (data && data.label) || `纬度 ${latitude.toFixed(4)}，经度 ${longitude.toFixed(4)}`;
+          note.textContent = data && data.fallback ? '只拿到坐标，可以自己改成常用叫法。' : '已填入，可手动调整。';
+        } catch (error) {
+          profileFields.current_location.value = `纬度 ${latitude.toFixed(4)}，经度 ${longitude.toFixed(4)}`;
+          note.textContent = '地址换算没成功，已填坐标。';
+        }
+      }, (error) => {
+        const reasons = {1: '你拒绝了定位权限', 2: '暂时定位不到', 3: '定位超时'};
+        note.textContent = `${reasons[error.code] || '定位失败'}，手动填写也可以。`;
+      }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+    }
+
     byId('my-profile-close').addEventListener('click', closeProfile);
+    byId('mp-detect-location').addEventListener('click', detectLocation);
     byId('my-profile-save').addEventListener('click', saveProfile);
     byId('mp-fill-template').addEventListener('click', fillTemplate);
     profilePanel.addEventListener('click', (event) => { if (event.target === profilePanel) closeProfile(); });

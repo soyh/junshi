@@ -157,6 +157,35 @@ USER_PRESENTATION_STYLE = r'''
       max-height: 10.5rem;
     }
 
+    .message-editable { cursor: text; }
+
+    .inline-message-editor {
+      display: grid;
+      gap: 6px;
+      margin: 4px 0 6px;
+    }
+
+    .inline-message-editor textarea,
+    .inline-message-editor input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border: 1px solid rgba(25, 167, 232, .35);
+      border-radius: 9px;
+      font: inherit;
+      line-height: 1.5;
+      resize: vertical;
+    }
+
+    .inline-message-editor button {
+      justify-self: start;
+    }
+
+    @media (max-width: 760px) {
+      .inline-message-editor textarea,
+      .inline-message-editor input { font-size: 16px; }
+    }
+
     .user-content-meta {
       color: var(--muted, #5d7790);
       font-size: .78rem;
@@ -273,7 +302,7 @@ USER_PRESENTATION_SCRIPT = r'''
       node.setAttribute('aria-expanded', 'true');
     } else {
       node.classList.remove('is-expanded');
-      node.dataset.drawerLabel = '点击展开';
+      node.dataset.drawerLabel = '双击展开';
       node.setAttribute('aria-expanded', 'false');
     }
   }
@@ -281,14 +310,6 @@ USER_PRESENTATION_SCRIPT = r'''
   function userBindDrawerEvents(node) {
     if (node.dataset.userDrawerBound === '1') return;
     node.dataset.userDrawerBound = '1';
-
-    node.addEventListener('click', (event) => {
-      if (!node.classList.contains('user-long-content')) return;
-      const ancestor = node.parentElement && node.parentElement.closest('.user-long-content');
-      if (ancestor) userSetDrawerExpanded(ancestor, true);
-      if (!node.classList.contains('is-expanded')) userSetDrawerExpanded(node, true);
-      event.stopPropagation();
-    });
 
     node.addEventListener('dblclick', (event) => {
       if (!node.classList.contains('user-long-content')) return;
@@ -356,9 +377,12 @@ USER_PRESENTATION_SCRIPT = r'''
       return;
     }
     meta.classList.add('user-content-meta');
-    meta.textContent = metaText
+    const friendlyMeta = metaText
       .replace(/\buser\b/gi, '我')
       .replace(/\bperson\b/gi, '对方');
+    // textContent 每次赋值都会替换文本节点，会再触发一次 MutationObserver；
+    // 手机上表现为整页闪。只在文案真的变了时写回。
+    if (meta.textContent !== friendlyMeta) meta.textContent = friendlyMeta;
     userPrepareDrawer(body, false);
   }
 
@@ -368,9 +392,11 @@ USER_PRESENTATION_SCRIPT = r'''
     const parts = row.querySelectorAll(':scope > div');
     if (parts.length === 0) return;
     parts[0].classList.add('user-content-meta');
-    parts[0].textContent = (parts[0].textContent || '')
+    const timelineMeta = (parts[0].textContent || '')
       .replace(/\s*·\s*(message|interaction|conversation)\s*$/i, '')
       .replace(/\s*·\s*relationship\s+[0-9a-f-]+/gi, '');
+    // 同样只在文案变化时写回，否则每次通知都会再改一次 DOM，手机端会持续闪。
+    if (parts[0].textContent !== timelineMeta) parts[0].textContent = timelineMeta;
     if (parts.length > 1) userPrepareDrawer(parts[parts.length - 1], false);
   }
 
@@ -402,19 +428,37 @@ USER_PRESENTATION_SCRIPT = r'''
     userApplyExplicitDrawers(scope);
   }
 
+  let userEnhanceScheduled = false;
+  const userEnhanceQueue = new Set();
+
+  function userScheduleEnhance(node) {
+    if (node instanceof Element) userEnhanceQueue.add(node);
+    if (userEnhanceScheduled) return;
+    userEnhanceScheduled = true;
+    // 每帧最多处理一次：DOM 写入引起的再次通知不会滚成死循环。
+    requestAnimationFrame(() => {
+      userEnhanceScheduled = false;
+      const pending = Array.from(userEnhanceQueue);
+      userEnhanceQueue.clear();
+      pending.forEach((target) => {
+        if (target.isConnected) userEnhanceVisibleContent(target);
+      });
+    });
+  }
+
   const userPresentationObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       const targetElement = mutation.target instanceof Element
         ? mutation.target
         : mutation.target.parentElement;
 
-      if (targetElement) userEnhanceVisibleContent(targetElement);
+      if (targetElement) userScheduleEnhance(targetElement);
 
       mutation.addedNodes.forEach((node) => {
         if (node instanceof Element) {
-          userEnhanceVisibleContent(node);
+          userScheduleEnhance(node);
         } else if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
-          userEnhanceVisibleContent(node.parentElement);
+          userScheduleEnhance(node.parentElement);
         }
       });
     });

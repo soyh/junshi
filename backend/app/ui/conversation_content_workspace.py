@@ -58,33 +58,78 @@ CONVERSATION_CONTENT_SCRIPT = r'''
     byId('message-sent-at').value = chinaTimeInputNow();
   }
 
-  async function editHistoryMessage(item) {
-    const nextContent = window.prompt('修改消息内容', item.content);
-    if (nextContent === null) return;
-    if (!nextContent.trim()) throw new Error('Message content cannot be empty');
-    const displayedSentAt = chinaTimeText(item.sent_at);
-    const nextSentAt = window.prompt('修改发送时间（北京时间，24小时制）', displayedSentAt);
-    if (nextSentAt === null) return;
-    const updated = await api(`/api/v1/messages/${encodeURIComponent(item.id)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({content: nextContent,
-        sent_at: nextSentAt === displayedSentAt ? item.sent_at : chinaTimeIso(nextSentAt)}),
-    });
-    await loadMessages(currentMessageWindow);
-    messagesStatus.textContent = `Updated message at ${chinaTimeText(updated.sent_at)}.`;
-    window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
-      detail: {source: '历史消息修改', conversation_id: selectedConversationId},
-    }));
-  }
-
   async function deleteHistoryMessage(item) {
-    if (!window.confirm('确定删除这条历史消息吗？')) return;
     await api(`/api/v1/messages/${encodeURIComponent(item.id)}`, {method: 'DELETE'});
     await loadMessages(currentMessageWindow);
     messagesStatus.textContent = 'Message deleted.';
     window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
       detail: {source: '历史消息删除', conversation_id: selectedConversationId},
     }));
+  }
+
+  async function saveInlineEdit(item, nextContent, nextSentAt) {
+    if (!nextContent.trim()) throw new Error('消息内容不能为空');
+    const displayedSentAt = chinaTimeText(item.sent_at);
+    const updated = await api(`/api/v1/messages/${encodeURIComponent(item.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({content: nextContent,
+        sent_at: nextSentAt === displayedSentAt ? item.sent_at : chinaTimeIso(nextSentAt)}),
+    });
+    await loadMessages(currentMessageWindow);
+    messagesStatus.textContent = `已修改 ${chinaTimeText(updated.sent_at)} 的这条消息。`;
+    window.dispatchEvent(new CustomEvent('junshi:evidence-changed', {
+      detail: {source: '历史消息修改', conversation_id: selectedConversationId},
+    }));
+  }
+
+  // 页内编辑：手机上 window.prompt 可能不弹（WebView 没有实现 JS 对话框），
+  // 所以直接在消息行里换成输入框，点保存才提交。
+  function startInlineEdit(item, row, body, actions) {
+    if (row.dataset.editing === '1') return;
+    row.dataset.editing = '1';
+    const original = body.textContent;
+    const editor = document.createElement('div');
+    editor.className = 'inline-message-editor';
+    const text = document.createElement('textarea');
+    text.value = item.content;
+    text.rows = 3;
+    const time = document.createElement('input');
+    time.value = chinaTimeText(item.sent_at);
+    time.setAttribute('placeholder', '发送时间（北京时间，24小时制）');
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.textContent = '保存修改';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = '取消';
+    const status = document.createElement('div');
+    status.className = 'status';
+    editor.append(text, time, save, cancel, status);
+    body.hidden = true;
+    actions.hidden = true;
+    row.insertBefore(editor, body.nextSibling);
+    text.focus();
+    try { text.setSelectionRange(text.value.length, text.value.length); } catch (_) {}
+    const stop = () => {
+      row.dataset.editing = '';
+      editor.remove();
+      body.hidden = false;
+      body.textContent = original;
+      actions.hidden = false;
+    };
+    cancel.addEventListener('click', stop);
+    save.addEventListener('click', async () => {
+      save.disabled = true;
+      status.textContent = '正在保存…';
+      try {
+        await saveInlineEdit(item, text.value, time.value.trim());
+      } catch (error) {
+        status.textContent = `保存失败：${error instanceof Error ? error.message : String(error)}`;
+        save.disabled = false;
+        return;
+      }
+      stop();
+    });
   }
 
   function renderMessages(items) {
@@ -103,25 +148,46 @@ CONVERSATION_CONTENT_SCRIPT = r'''
       actions.className = 'client-controls-actions';
       meta.textContent = `${chinaTimeText(item.sent_at)} · ${item.sender_type}`;
       body.textContent = item.content;
+      body.classList.add('message-editable');
+      body.setAttribute('title', '点击修改这条消息');
+      body.addEventListener('click', (event) => {
+        if (row.dataset.editing === '1') return;
+        event.stopPropagation();
+        startInlineEdit(item, row, body, actions);
+      });
 
       const edit = document.createElement('button');
       edit.type = 'button';
       edit.className = 'requires-auth';
       edit.disabled = !currentAccessToken;
       edit.textContent = '修改';
-      edit.addEventListener('click', async () => {
-        try { await editHistoryMessage(item); }
-        catch (error) { messagesStatus.textContent = error instanceof Error ? error.message : String(error); }
-      });
+      edit.addEventListener('click', () => startInlineEdit(item, row, body, actions));
+
 
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'requires-auth';
       remove.disabled = !currentAccessToken;
       remove.textContent = '删除';
+      // 手机 WebView 可能不弹 confirm，所以改成“再点一次”确认。
       remove.addEventListener('click', async () => {
+        if (remove.dataset.confirming !== '1') {
+          remove.dataset.confirming = '1';
+          remove.textContent = '再点一次删除';
+          setTimeout(() => {
+            remove.dataset.confirming = '';
+            remove.textContent = '删除';
+          }, 5000);
+          return;
+        }
+        remove.disabled = true;
         try { await deleteHistoryMessage(item); }
-        catch (error) { messagesStatus.textContent = error instanceof Error ? error.message : String(error); }
+        catch (error) {
+          remove.disabled = false;
+          remove.dataset.confirming = '';
+          remove.textContent = '删除';
+          messagesStatus.textContent = error instanceof Error ? error.message : String(error);
+        }
       });
 
       actions.append(edit, remove);

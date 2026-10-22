@@ -529,3 +529,26 @@ def test_clear_outbox_forgets_failures_or_one_contact(plugin_home):
     _write_outbox(profile_id, [("m4", "soul:b", "松影", "早", "queued", 0, None, "2026-10-22T09:03:00")])
     assert bp.clear_outbox(profile_id, only_failed=True) == 1
     assert [row["contact_id"] for row in bp.pending_contacts(profile_id)] == ["soul:b"]
+
+
+def test_place_fields_survive_the_account_round_trip():
+    person = {key: "" for key in bp.PERSON_FIELDS}
+    person.update(
+        {
+            "nickname": "小满",
+            "city": "杭州",
+            "hometown": "台州",
+            "current_location": "杭州，西湖区",
+            "work_address": "文三路 100 号",
+            "relationship": "单身",
+        }
+    )
+    payload = bp.api_payload(person, "")
+    for key in ("hometown", "current_location", "work_address"):
+        assert payload[key] == person[key]
+    assert bp.person_from_api(payload)["hometown"] == "台州"
+    # 每个新字段都要有「示例」，否则用户还是只能空着。
+    import field_templates as ft
+
+    for key in ("hometown", "current_location", "work_address"):
+        assert ft.person_sample(key)

@@ -18,6 +18,9 @@ def _conn():
             gender TEXT NOT NULL DEFAULT '',
             birth_year TEXT NOT NULL DEFAULT '',
             city TEXT NOT NULL DEFAULT '',
+            hometown TEXT NOT NULL DEFAULT '',
+            current_location TEXT NOT NULL DEFAULT '',
+            work_address TEXT NOT NULL DEFAULT '',
             job TEXT NOT NULL DEFAULT '',
             hobbies TEXT NOT NULL DEFAULT '',
             relationship_status TEXT NOT NULL DEFAULT '',
@@ -139,3 +142,86 @@ def test_web_and_desktop_reply_templates_do_not_drift():
     assert [text for _name, _note, text in module.TEMPLATES] == [
         text for _name, _note, text in TEMPLATES
     ]
+
+
+def test_profile_keeps_the_three_place_fields():
+    payload = {
+        "nickname": "小林",
+        "city": "杭州",
+        "hometown": "台州",
+        "current_location": "杭州市西湖区",
+        "work_address": "文三路 100 号",
+    }
+    with TestClient(app) as client:
+        client.put("/api/v1/settings/profile", json=payload)
+        body = client.get("/api/v1/settings/profile").json()
+
+    assert body["hometown"] == "台州"
+    assert body["current_location"] == "杭州市西湖区"
+    assert body["work_address"] == "文三路 100 号"
+
+
+def test_location_falls_back_to_coordinates_when_geocoding_fails(monkeypatch):
+    import app.api.routes.user_profile as route
+
+    def boom(*args, **kwargs):
+        raise OSError("no network")
+
+    monkeypatch.setattr(route.urllib.request, "urlopen", boom)
+    with TestClient(app) as client:
+        body = client.get("/api/v1/settings/location?lat=30.2741&lng=120.1551").json()
+
+    assert body["fallback"] is True
+    assert "30.2741" in body["label"] and "120.1551" in body["label"]
+
+
+def test_location_shortens_the_geocoder_label(monkeypatch):
+    import app.api.routes.user_profile as route
+
+    class Fake:
+        def read(self, size):
+            return ('{"display_name": "文三路, 西湖区, 杭州市, 浙江省, 中国"}').encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(route.urllib.request, "urlopen", lambda *a, **k: Fake())
+    with TestClient(app) as client:
+        body = client.get("/api/v1/settings/location?lat=30.0&lng=120.0").json()
+
+    assert body["label"] == "文三路西湖区杭州市"
+    assert body["fallback"] is False
+
+
+def test_location_uses_the_keyless_geocoder_first(monkeypatch):
+    import app.api.routes.user_profile as route
+
+    class Fake:
+        def read(self, size):
+            return (
+                '{"principalSubdivision": "浙江省", "city": "杭州市", "locality": "拱墅区",'
+                ' "countryName": "中华人民共和国"}'
+            ).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    calls = []
+
+    def fake_urlopen(request, *a, **k):
+        calls.append(str(getattr(request, "full_url", request)))
+        return Fake()
+
+    monkeypatch.setattr(route.urllib.request, "urlopen", fake_urlopen)
+    with TestClient(app) as client:
+        body = client.get("/api/v1/settings/location?lat=30.2741&lng=120.1551").json()
+
+    assert body["label"] == "浙江省杭州市拱墅区"
+    assert body["fallback"] is False
+    assert len(calls) == 1 and "bigdatacloud" in calls[0]
