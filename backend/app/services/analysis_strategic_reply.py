@@ -43,6 +43,17 @@ def _resolve_profile(conn: sqlite3.Connection, user_id: str, override) -> dict[s
     return _clean_profile(UserProfileService().prompt_facts(stored))
 
 
+def _auto_send_authorized(conn: sqlite3.Connection, user_id: str) -> bool:
+    """True when the account opted into the bridge sending drafts itself."""
+    stored = _stored_profile(conn, user_id)
+    return bool(getattr(stored, "auto_send_authorized", False)) if stored else False
+
+
+def _auto_send_boundary(authorized: bool) -> dict[str, bool]:
+    """The send boundary: hard rule by default, a note once the user opted in."""
+    return {"must_not_auto_send": not authorized, "auto_send_authorized": bool(authorized)}
+
+
 def _resolve_rules(conn: sqlite3.Connection, user_id: str, override: str) -> str:
     value = (override or "").strip()
     if value:
@@ -324,6 +335,7 @@ class AnalysisStrategicReplyService:
             conversation_focus,
         )
 
+        auto_send = _auto_send_authorized(conn, user_id)
         generation_context = {
             "person_memory": analysis_context.get("person_memory"),
             "current_state": recommendation_context.get("current_state", {}),
@@ -343,7 +355,7 @@ class AnalysisStrategicReplyService:
                 "must_prioritize_current_conversation": True,
                 "must_prioritize_latest_reply_target": True,
                 "must_preserve_unknowns": True,
-                "must_not_auto_send": True,
+                **_auto_send_boundary(auto_send),
                 "must_not_auto_execute": True,
                 # channel_rules is operator style guidance; it ranks below every
                 # safety, provenance and schema rule, but above generic style.

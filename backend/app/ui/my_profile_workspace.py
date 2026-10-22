@@ -61,6 +61,9 @@ MY_PROFILE_STYLE = r'''
   #my-profile-card button { padding: 9px 16px; border-radius: 10px; border: 1px solid #9cc3de; background: #f4fbff; color: #12506f; font: inherit; cursor: pointer; }
   #my-profile-card button.primary { background: #1976a8; border-color: #1976a8; color: #fff; }
   .my-profile-hint { margin: 6px 0; color: #6b8497; font-size: .78rem; line-height: 1.5; }
+  #my-profile-auto-send { border-top: 1px dashed #d6e2ec; padding-top: 10px; }
+  .my-profile-check { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: #23485f; cursor: pointer; }
+  .my-profile-check input { width: 16px; height: 16px; margin: 0; }
   #my-profile-location-row > span { display: flex; gap: 6px; align-items: stretch; }
   #my-profile-location-row > span input { flex: 1 1 auto; min-width: 0; }
   #my-profile-location-row > span button { flex: 0 0 auto; padding: 8px 10px; white-space: nowrap; }
@@ -107,6 +110,10 @@ MY_PROFILE_HTML = r'''
         <p id="my-profile-note-rules" class="my-profile-hint">通道里没单独写规则时用这里；只影响语气、称呼、长度、用词、表情和节奏，不能覆盖证据与安全边界。留空即使用默认风格。</p>
         <textarea id="mp-rules" maxlength="1500" placeholder="例如：短句、口语、允许倒装；不要破折号，不要设问后自答。"></textarea>
       </div>
+      <div id="my-profile-auto-send">
+        <label class="my-profile-check" for="mp-auto-send"><input id="mp-auto-send" type="checkbox"> 我授权电脑客户端自动代发</label>
+        <p class="my-profile-hint">勾选后，服务端把「必须由本人发送」这条约束降级为提示：通道插件生成的回复可以直接发出，统计里记为已授权。不勾选时保持原样。</p>
+      </div>
     </div>
     <footer>
       <span id="my-profile-status" role="status"></span>
@@ -136,6 +143,7 @@ MY_PROFILE_SCRIPT = r'''
       about: byId('mp-about'),
       reply_rules: byId('mp-rules'),
     };
+    const autoSend = byId('mp-auto-send');
     const templateSelect = byId('mp-template');
     const templateNote = byId('my-profile-template-note');
     let templateCache = null;
@@ -164,6 +172,7 @@ MY_PROFILE_SCRIPT = r'''
         Object.entries(profileFields).forEach(([key, node]) => {
           node.value = (data && data[key]) || '';
         });
+        if (autoSend) { autoSend.checked = !!(data && data.auto_send_authorized); }
         profileSetStatus(data && data.updated_at ? `上次保存：${data.updated_at}` : '还没有填写过。');
         await loadTemplates();
       } catch (error) {
@@ -176,6 +185,7 @@ MY_PROFILE_SCRIPT = r'''
     async function saveProfile() {
       const payload = {};
       Object.entries(profileFields).forEach(([key, node]) => { payload[key] = node.value; });
+      payload.auto_send_authorized = !!(autoSend && autoSend.checked);
       profileSetStatus('正在保存…');
       try {
         const data = await api('/api/v1/settings/profile', {

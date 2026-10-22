@@ -4,7 +4,14 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.analysis_strategic_reply import _resolve_profile, _resolve_rules
+from app.services.analysis_strategic_reply import (
+    _auto_send_authorized,
+    _auto_send_boundary,
+    _resolve_profile,
+    _resolve_rules,
+)
+from app.services.user_profile import UserProfileService
+from app.schemas.user_profile import UserProfilePayload
 
 
 def _conn():
@@ -26,6 +33,7 @@ def _conn():
             relationship_status TEXT NOT NULL DEFAULT '',
             about TEXT NOT NULL DEFAULT '',
             reply_rules TEXT NOT NULL DEFAULT '',
+            auto_send_authorized INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
@@ -225,3 +233,38 @@ def test_location_uses_the_keyless_geocoder_first(monkeypatch):
     assert body["label"] == "浙江省杭州市拱墅区"
     assert body["fallback"] is False
     assert len(calls) == 1 and "bigdatacloud" in calls[0]
+
+
+def test_auto_send_is_off_until_the_user_opts_in():
+    conn = _conn()
+    service = UserProfileService()
+    service.save(conn, "u1", UserProfilePayload(nickname="小林"))
+
+    assert _auto_send_authorized(conn, "u1") is False
+    assert _auto_send_boundary(False) == {
+        "must_not_auto_send": True,
+        "auto_send_authorized": False,
+    }
+
+    service.save(
+        conn, "u1", UserProfilePayload(nickname="小林", auto_send_authorized=True)
+    )
+
+    assert _auto_send_authorized(conn, "u1") is True
+    assert _auto_send_boundary(True) == {
+        "must_not_auto_send": False,
+        "auto_send_authorized": True,
+    }
+
+
+def test_profile_route_round_trips_the_auto_send_flag():
+    with TestClient(app) as client:
+        saved = client.put(
+            "/api/v1/settings/profile",
+            json={"nickname": "小林", "auto_send_authorized": True},
+        )
+        reread = client.get("/api/v1/settings/profile")
+
+    assert saved.status_code == 200
+    assert saved.json()["auto_send_authorized"] is True
+    assert reread.json()["auto_send_authorized"] is True

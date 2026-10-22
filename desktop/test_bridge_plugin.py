@@ -409,7 +409,7 @@ def test_retry_outbox_reports_daemon_answer(plugin_home, monkeypatch):
 
 
 def test_global_settings_are_shared_and_survive_profile_creation(plugin_home):
-    assert bp.load_global() == {"person": {}, "rules": ""}
+    assert bp.load_global() == {"person": {}, "rules": "", "auto_send": False}
     bp.save_global(person={"nickname": "小满", "city": "杭州", "unused": "x"}, rules="短句、口语")
     shared = bp.load_global()
     assert shared["person"] == {"nickname": "小满", "city": "杭州"}
@@ -457,6 +457,8 @@ def test_account_profile_maps_relationship_status_both_ways(plugin_home):
     assert "relationship" not in payload
     assert payload["relationship_status"] == "单身"
     assert payload["reply_rules"] == "短句"
+    # Authorisation is off unless the dialog checkbox says otherwise.
+    assert payload["auto_send_authorized"] is False
 
 
 def test_channel_rules_override_the_global_default(plugin_home):
@@ -552,3 +554,17 @@ def test_place_fields_survive_the_account_round_trip():
 
     for key in ("hometown", "current_location", "work_address"):
         assert ft.person_sample(key)
+
+
+def test_auto_send_authorisation_round_trips_through_the_local_cache(plugin_home):
+    assert bp.load_global()["auto_send"] is False
+    bp.save_global(person={"nickname": "小满"}, auto_send=True)
+    shared = bp.load_global()
+    assert shared["auto_send"] is True
+    assert shared["person"] == {"nickname": "小满"}
+    # A later save that only touches the rules keeps the authorisation.
+    bp.save_global(rules="短句")
+    assert bp.load_global()["auto_send"] is True
+
+    person = bp.person_from_api({"nickname": "小满", "auto_send_authorized": True})
+    assert bp.api_payload(person, "", True)["auto_send_authorized"] is True

@@ -22,6 +22,8 @@ class UserProfilePayload(BaseModel):
     )
     about: str = Field(default="", max_length=400)
     reply_rules: str = Field(default="", max_length=1500)
+    # Explicit opt-in for the desktop bridge sending drafts unchanged.
+    auto_send_authorized: bool = False
 
 
 class UserProfileResponse(UserProfilePayload):

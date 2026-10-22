@@ -59,11 +59,12 @@ def person_from_api(data: dict) -> dict[str, str]:
     return person
 
 
-def api_payload(person: dict[str, str], rules: str) -> dict[str, str]:
+def api_payload(person: dict[str, str], rules: str, auto_send: bool = False) -> dict:
     """Build the account profile body from local person fields and rules."""
     payload = {API_FIELDS.get(key, key): str(person.get(key, "") or "").strip()
                for key in PERSON_FIELDS}
     payload["reply_rules"] = str(rules or "")
+    payload["auto_send_authorized"] = bool(auto_send)
     return payload
 
 
@@ -121,10 +122,15 @@ def load_global() -> dict:
     return {
         "person": {key: str(person.get(key, "")) for key in PERSON_FIELDS if str(person.get(key, "")).strip()},
         "rules": str(data.get("rules", "") or ""),
+        "auto_send": bool(data.get("auto_send", False)),
     }
 
 
-def save_global(person: dict[str, str] | None = None, rules: str | None = None) -> Path:
+def save_global(
+    person: dict[str, str] | None = None,
+    rules: str | None = None,
+    auto_send: bool | None = None,
+) -> Path:
     """Persist the shared settings; omitted arguments keep their stored value."""
     current = load_global()
     if person is not None:
@@ -134,6 +140,8 @@ def save_global(person: dict[str, str] | None = None, rules: str | None = None) 
         }
     if rules is not None:
         current["rules"] = rules
+    if auto_send is not None:
+        current["auto_send"] = bool(auto_send)
     path = global_path()
     path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
     return path

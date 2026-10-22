@@ -148,6 +148,20 @@ class BridgeDialog(Dialog):
         bar.pack(side="left", fill="y")
         self.global_rules.configure(yscrollcommand=bar.set)
         self.widgets.append((self.global_rules, "normal"))
+        self.auto_send = tk.BooleanVar(value=False)
+        consent = ttk.Frame(shared.body)
+        consent.pack(fill="x", pady=(6, 0))
+        ttk.Checkbutton(
+            consent,
+            text="我授权本机通道插件自动代发（写进账号，服务端同步降级「必须本人发送」）",
+            variable=self.auto_send,
+        ).pack(anchor="w")
+        ttk.Label(
+            consent,
+            text="不勾选也能用，只是服务端会继续按「必须由本人发送」提示；勾选后网页、手机、电脑看到的是同一个授权状态。",
+            foreground="#666",
+            wraplength=660,
+        ).pack(anchor="w")
         bar_row = ttk.Frame(shared.body)
         bar_row.pack(fill="x", pady=(4, 0))
         self.button(bar_row, "保存全局设置", self.save_shared)
@@ -316,12 +330,14 @@ class BridgeDialog(Dialog):
         shared = bp.load_global()
         person = shared["person"]
         rules = shared["rules"]
+        auto_send = bool(shared.get("auto_send"))
         remote, error = self._fetch_shared()
         if remote is not None:
             person = bp.person_from_api(remote)
             rules = str(remote.get("reply_rules") or "")
+            auto_send = bool(remote.get("auto_send_authorized"))
             try:
-                bp.save_global(person=person, rules=rules)
+                bp.save_global(person=person, rules=rules, auto_send=auto_send)
             except OSError:
                 pass
             if announce:
@@ -334,6 +350,7 @@ class BridgeDialog(Dialog):
         self.global_rules.delete("1.0", "end")
         if rules:
             self.global_rules.insert("1.0", rules)
+        self.auto_send.set(auto_send)
 
     def _fetch_shared(self):
         """Return (profile, error). The client already prefixes /api/v1."""
@@ -348,8 +365,9 @@ class BridgeDialog(Dialog):
     def save_shared(self):
         person = self._person_values()
         rules = self.global_rules.get("1.0", "end").strip()
+        auto_send = bool(self.auto_send.get())
         try:
-            bp.save_global(person=person, rules=rules)
+            bp.save_global(person=person, rules=rules, auto_send=auto_send)
         except OSError as exc:
             self.message.set(f"全局设置保存失败：{exc}")
             return
@@ -358,7 +376,9 @@ class BridgeDialog(Dialog):
             self.shared_status.set("账号同步状态：未登录，仅本机")
             return
         def work():
-            return self.client.request("PUT", "/settings/profile", bp.api_payload(person, rules), timeout=20)
+            return self.client.request(
+                "PUT", "/settings/profile", bp.api_payload(person, rules, auto_send), timeout=20
+            )
 
         def done(result, error):
             if error:
@@ -366,7 +386,12 @@ class BridgeDialog(Dialog):
                 self.shared_status.set(f"账号同步状态：保存失败——{error}")
             else:
                 stamp = result.get("updated_at", "") if isinstance(result, dict) else ""
-                self.message.set(f"已保存到账号（网页/手机同一步生效{('，' + stamp) if stamp else ''}）。")
+                self.message.set(
+                    "已保存到账号（网页/手机同一步生效"
+                    + ("，已授权自动代发" if auto_send else "，未授权自动代发")
+                    + (f"，{stamp}" if stamp else "")
+                    + "）。"
+                )
                 self.shared_status.set("账号同步状态：已保存到账号" + (f"（{stamp}）" if stamp else ""))
 
         self.perform(work, done)

@@ -4,6 +4,8 @@
 
 ## 下载与资料
 
+- 最新 PC 客户端：[Build 249](https://github.com/soyh/junshi/releases/tag/pc-bridge-plugin-22)（通道插件里新增「我授权自动代发」，写进账号，三端同一个状态）。
+- 最新安卓包：[1.0.2](https://github.com/soyh/junshi/releases/tag/android-v1.0.2)：小窗输入不再闪、点对方消息弹层编辑。
 - [安卓 1.0.0 正式版](https://github.com/soyh/junshi/releases/tag/android-v1.0.0)：固定签名 APK、源码、文档及签名验证报告。
 - [PC 229 与项目附件](https://github.com/soyh/junshi/releases/tag/test-229-account-interface)
 - [PC 229 · 通道插件版 2](https://github.com/soyh/junshi/releases/tag/pc-bridge-plugin-2)：支持多用户登录与多开（微信 / 小红书 / Soul，约 200 MB）。
@@ -13,6 +15,15 @@
 - [全部文档](docs/README.md)
 - [本地部署](docs/LOCAL_DEPLOYMENT.md) · [服务器运维与恢复](docs/OPERATIONS.md)
 - [PC 使用说明](desktop/CLIENT_README.txt) · [安卓使用说明](android/README.md) · [iOS 开发预览与签名准备](ios/README.md)
+
+## 自动代发的授权
+
+产品规则是「必须由本人发送」。要让电脑端的通道插件直接发出生成的回复，需要由你本人在「通道插件 → 全局设置」里勾选 **我授权本机通道插件自动代发**（网页「我的资料」里也有同一个勾选框）：
+
+- 勾选状态存在账号里，网页 / 电脑 / 手机看到的是同一份，不是每台机器各管各的。
+- 勾选后，服务端把生成上下文里的 `must_not_auto_send` 从硬性约束降级为提示（`auto_send_authorized: true`），并在提示里写明「用户已授权代发」。
+- 授权只解除「必须本人点发送」这一条：证据、出处、安全边界、以及「不许声称已经发过」都照旧。
+- 不勾选也能用，只是服务端会继续按「必须由本人发送」处理。
 
 ## 当前组件版本
 
