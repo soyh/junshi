@@ -9,7 +9,7 @@ def test_product_shell_exposes_compact_user_presentation(client):
 
     for marker in (
         "user-long-content",
-        "点击展开",
+        "双击展开",
         "双击收起",
         "userPresentationObserver",
         "user-system-message",
@@ -19,14 +19,15 @@ def test_product_shell_exposes_compact_user_presentation(client):
         assert marker in html
 
 
-def test_long_content_drawer_uses_click_expand_and_double_click_collapse():
+def test_long_content_drawer_uses_double_click_to_expand_and_collapse():
     assert "const userLongContentThreshold = 260" in USER_PRESENTATION_SCRIPT
     assert "const userLongListRowThreshold = 4" in USER_PRESENTATION_SCRIPT
-    assert "node.addEventListener('click'" in USER_PRESENTATION_SCRIPT
+    assert "node.addEventListener('dblclick'" in USER_PRESENTATION_SCRIPT
+    assert "node.addEventListener('click'" not in USER_PRESENTATION_SCRIPT
     assert "node.classList.add('is-expanded')" in USER_PRESENTATION_SCRIPT
     assert "node.addEventListener('dblclick'" in USER_PRESENTATION_SCRIPT
     assert "node.classList.remove('is-expanded')" in USER_PRESENTATION_SCRIPT
-    assert "node.dataset.drawerLabel = '点击展开'" in USER_PRESENTATION_SCRIPT
+    assert "node.dataset.drawerLabel = '双击展开'" in USER_PRESENTATION_SCRIPT
     assert "node.dataset.drawerLabel = '双击收起'" in USER_PRESENTATION_SCRIPT
     assert "aria-expanded" in USER_PRESENTATION_SCRIPT
 
@@ -68,7 +69,7 @@ def test_drawer_observer_handles_textcontent_replacement_and_list_growth():
     # textContent assignment commonly arrives as a childList mutation whose
     # added node is a Text node. TEST-160 missed that path for message detail.
     assert "node.nodeType === Node.TEXT_NODE && node.parentElement" in USER_PRESENTATION_SCRIPT
-    assert "userEnhanceVisibleContent(node.parentElement)" in USER_PRESENTATION_SCRIPT
+    assert "userScheduleEnhance(node.parentElement)" in USER_PRESENTATION_SCRIPT
     assert "const targetElement = mutation.target instanceof Element" in USER_PRESENTATION_SCRIPT
 
     # A window with many short records must also collapse even if no individual
