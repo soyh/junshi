@@ -115,3 +115,36 @@ class SectionTests(unittest.TestCase):
             self.assertTrue(section.caption.cget('text').startswith('\u25be'))
         finally:
             root.destroy()
+
+
+class EventPumpTests(unittest.TestCase):
+    def test_a_raising_callback_does_not_stop_the_pump(self):
+        import queue
+        from assistant import drain_events
+        events, seen = queue.Queue(), []
+        events.put(lambda: (_ for _ in ()).throw(RuntimeError('boom')))
+        events.put(lambda: seen.append('next'))
+        drain_events(events, lambda: seen.append('reported'))
+        self.assertEqual(seen, ['reported', 'next'])
+        self.assertTrue(events.empty())
+
+    def test_a_failing_result_callback_leaves_the_dialog_usable(self):
+        root = tk.Tk()
+        app = Assistant(root, hotkey=False)
+        try:
+            dialog = PersonDialog(app)
+
+            def boom(_result):
+                raise RuntimeError('界面更新炸了')
+
+            dialog.perform(lambda: {'ok': True}, boom)
+            until = time.monotonic() + 5
+            while dialog.busy and time.monotonic() < until:
+                app.poll(); root.update(); time.sleep(.02)
+            self.assertFalse(dialog.busy)
+            for widget, state in dialog.widgets:
+                self.assertEqual(str(widget.cget('state')), state)
+            dialog.close()
+        finally:
+            app.closed = True
+            root.destroy()

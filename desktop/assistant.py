@@ -38,6 +38,24 @@ def timestamp(value):
         raise ValueError('时间请使用 年月日 和 24 小时制，例如 2026年10月11日 20:30:00') from None
 
 
+def drain_events(events, on_error=None):
+    """Run queued main-thread callbacks until the queue is empty.
+
+    A callback that raises is reported and skipped: letting the exception
+    escape used to kill the 100 ms pump and freeze the whole window.
+    """
+    while True:
+        try:
+            callback = events.get_nowait()
+        except queue.Empty:
+            return
+        try:
+            callback()
+        except Exception:
+            if on_error is not None:
+                on_error()
+
+
 class Assistant:
     def __init__(self, root, hotkey=True):
         self.root = root
@@ -174,12 +192,15 @@ class Assistant:
         if self.closed:
             return
         try:
-            while True:
-                callback = self.events.get_nowait()
-                callback()
-        except queue.Empty:
-            pass
-        self.root.after(100, self.poll)
+            drain_events(self.events, self._event_failed)
+        finally:
+            # One broken callback must never stop the pump: the window would
+            # look frozen with every control still disabled.
+            if not self.closed:
+                self.root.after(100, self.poll)
+
+    def _event_failed(self):
+        self.status.set('有一个操作没能完成界面刷新；可以继续使用，必要时点“刷新状态”。')
 
     def lock(self, busy):
         self.busy = busy

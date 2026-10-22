@@ -185,11 +185,19 @@ class Dialog:
         for widget,_ in self.widgets:widget.configure(state='disabled')
         self.message.set('正在处理，请等待…')
         def finish(result,error):
+            # Unlock before `done`: these callbacks often kick off the next
+            # request, which is refused while the app is still locked.
             self.busy=False;self.app.lock(False)
-            for widget,state in self.widgets:widget.configure(state=state)
-            if error:
-                self.message.set(error)
-            else:done(result)
+            for widget,state in self.widgets:
+                try:widget.configure(state=state)
+                except tk.TclError:pass
+            try:
+                if error:
+                    self.message.set(error)
+                else:
+                    done(result)
+            except Exception:
+                self.message.set('操作已完成，但界面更新失败；可点“刷新状态”重试。')
         def run():
             try:result=work();error=None
             except Exception as exc:
