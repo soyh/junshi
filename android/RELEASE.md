@@ -2,6 +2,8 @@
 
 版本 **1.0.2**（versionCode **23201**），同一固定签名，可直接覆盖安装 1.0.1。下载 [JunshiAndroid-1.0.2.apk](https://github.com/soyh/junshi/releases/download/android-v1.0.2/JunshiAndroid-1.0.2.apk)；国内镜像 <https://101.34.253.116/downloads/JunshiAndroid-1.0.2.apk>。
 
+APK SHA-256：`d67adf307acfbd228bb2073332f4ee3dd634f8822f41eba373d0d7246302de03`。构建提交 `3cf0509`，固定签名证书 SHA-256 `2dced13cb16401fc6ec015c7c8ebd9f5e0f4aa91cd501e8b33c31e3367b36c69`。
+
 改动：
 - 小窗点「输入」不再闪：键盘改由一个透明的小输入页（`OverlayInputActivity`）承接，小窗本身永远不抢焦点，系统不用在小窗和下层应用之间来回切焦点。输入页可选「只填入小窗」或「填入并生成」，关掉即把焦点还给下面的应用。
 - 去掉小窗底部的「收起键盘」按钮（不再需要）。
