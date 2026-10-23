@@ -526,6 +526,11 @@ class Orchestrator:
             )
         reply = (context or {}).get("draft")
         reply = reply.strip() if isinstance(reply, str) else ""
+        if isinstance(plan, dict) and reply:
+            self._log(
+                f"[bridge] plan {contact_id}: {plan.get('signal') or '?'}/"
+                f"{str(plan.get('tactic') or (plan.get('options') or [{}])[0].get('tactic') or '')[:40]}"
+            )
 
         if not reply:
             return TurnResult(contact_id, conversation_id, len(events), reason="empty draft")

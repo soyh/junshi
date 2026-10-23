@@ -78,6 +78,13 @@ def _conn() -> sqlite3.Connection:
             conversation_id TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE strategic_reply_plans (
+            conversation_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            target_message_id TEXT,
+            payload TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         """
     )
     conn.execute(
@@ -470,3 +477,64 @@ def test_hold_payload_survives_response_model_validation():
     validated = AnalysisStrategicReplyContextResponse.model_validate(result)
     assert validated.draft is None
     assert validated.structured_analysis.summary == "她说别再发了"
+
+
+def _send_plan(**overrides):
+    payload = {
+        "read": "她在接话",
+        "signal": "green",
+        "stage": "刚认识",
+        "goal_this_turn": "接住并抛回",
+        "options": [{"tactic": "顺着聊", "why": "她主动", "line": "在呢"}],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_plan_is_stored_and_read_back_with_its_target():
+    conn = _conn()
+    context = strategic_plan.build_context(conn, "u1", "c1")
+    plan = strategic_plan.generate(context, provider=_Provider(_send_plan()))
+    payload = strategic_plan.plan_payload(plan)
+
+    strategic_plan.save_plan(conn, "u1", "c1", payload, target_message_id="m1")
+    stored = strategic_plan.load_plan(conn, "u1", "c1")
+
+    assert stored["read"] == "她在接话"
+    assert stored["target_message_id"] == "m1"
+    assert stored["created_at"]
+    assert strategic_plan.load_plan(conn, "u2", "c1") is None
+
+
+def test_same_target_reuses_the_stored_plan_without_calling_the_model():
+    conn = _conn()
+    context = strategic_plan.build_context(conn, "u1", "c1")
+    plan = strategic_plan.generate(context, provider=_Provider(_send_plan()))
+    strategic_plan.save_plan(
+        conn, "u1", "c1", strategic_plan.plan_payload(plan), target_message_id="m1"
+    )
+
+    reused_plan, payload, reused = strategic_plan.create_plan(
+        conn, context, provider=_Provider({})  # an empty answer would fail validation
+    )
+
+    assert reused is True
+    assert reused_plan.read == "她在接话"
+    assert payload["target_message_id"] == "m1"
+
+
+def test_a_new_message_invalidates_the_stored_plan():
+    conn = _conn()
+    context = strategic_plan.build_context(conn, "u1", "c1")
+    plan = strategic_plan.generate(context, provider=_Provider(_send_plan()))
+    strategic_plan.save_plan(
+        conn, "u1", "c1", strategic_plan.plan_payload(plan), target_message_id="m-old"
+    )
+
+    fresh_plan, payload, reused = strategic_plan.create_plan(
+        conn, context, provider=_Provider(_send_plan(read="她又追问了一句"))
+    )
+
+    assert reused is False
+    assert fresh_plan.read == "她又追问了一句"
+    assert payload["read"] == "她又追问了一句"

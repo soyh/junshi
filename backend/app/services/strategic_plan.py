@@ -139,6 +139,7 @@ def build_context(
     references, skipped = load_references(conn, user_id, conversation_id)
     target = next((item for item in reversed(transcript) if item["who"] == "她"), None)
     return {
+        "user_id": user_id,
         "conversation": {"id": conversation_id, "title": conversation["title"]},
         "person": {
             "name": person["name"] if person else "",
@@ -268,12 +269,107 @@ def structured_analysis_from_plan(plan, *, reply_target_id=None):
     )
 
 
+def save_plan(
+    conn: sqlite3.Connection,
+    user_id: str,
+    conversation_id: str,
+    payload: dict[str, Any],
+    *,
+    target_message_id: str | None = None,
+) -> None:
+    """Remember the latest plan so the pages and the bridge can show it later."""
+    try:
+        conn.execute(
+            """
+            INSERT INTO strategic_reply_plans
+                (conversation_id, user_id, target_message_id, payload, created_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(conversation_id) DO UPDATE SET
+                user_id = excluded.user_id,
+                target_message_id = excluded.target_message_id,
+                payload = excluded.payload,
+                created_at = CURRENT_TIMESTAMP
+            """,
+            (
+                conversation_id,
+                user_id,
+                target_message_id,
+                json.dumps(payload, ensure_ascii=False),
+            ),
+        )
+        conn.commit()
+    except sqlite3.OperationalError:
+        return
+
+
+def load_plan(
+    conn: sqlite3.Connection, user_id: str, conversation_id: str
+) -> dict[str, Any] | None:
+    """Return the stored plan payload plus its timestamp, or None."""
+    try:
+        row = conn.execute(
+            """
+            SELECT payload, target_message_id, created_at
+            FROM strategic_reply_plans
+            WHERE conversation_id = ? AND user_id = ?
+            """,
+            (conversation_id, user_id),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    if row is None:
+        return None
+    try:
+        payload = json.loads(row["payload"])
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    payload["created_at"] = row["created_at"]
+    payload["target_message_id"] = row["target_message_id"]
+    return payload
+
+
+def create_plan(
+    conn: sqlite3.Connection,
+    context: dict[str, Any],
+    *,
+    provider: Any,
+) -> tuple[StrategicPlan, dict[str, Any], bool]:
+    """Plan once per target message: reuse the stored plan when nothing new arrived.
+
+    Returns (plan, payload, reused). A fresh message invalidates the cache; a
+    retry, a re-generate or a second channel reading the same turn does not.
+    """
+    target = (context.get("reply_target_message") or {}).get("id")
+    if target:
+        stored = load_plan(conn, context["user_id"], context["conversation"]["id"])
+        if stored and stored.get("target_message_id") == target:
+            try:
+                plan = StrategicPlan.model_validate(
+                    {key: stored[key] for key in stored if key in StrategicPlan.model_fields}
+                )
+            except Exception:
+                plan = None
+            if plan is not None:
+                return plan, stored, True
+    plan = generate(context, provider=provider)
+    if plan is None:
+        raise LLMAnalysisError("LLM provider cannot produce a strategic plan")
+    payload = plan_payload(
+        plan,
+        used=[item["name"] for item in context.get("references") or []],
+        skipped=context.get("references_skipped") or [],
+    )
+    return plan, payload, False
+
+
 def context_for_prompt(context: dict[str, Any]) -> str:
     """Serialise the planner input. References go last so they stay readable."""
     payload = {
         key: value
         for key, value in context.items()
-        if key not in {"references", "references_skipped"}
+        if key not in {"references", "references_skipped", "user_id"}
     }
     lines = [
         "# 对话与背景",

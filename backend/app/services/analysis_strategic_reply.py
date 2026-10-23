@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 from copy import deepcopy
 from time import perf_counter
@@ -348,14 +349,16 @@ class AnalysisStrategicReplyService:
                     self_profile=_resolve_profile(conn, user_id, self_profile),
                     self_style=build_self_style(analysis_context.get("messages")),
                 )
-                plan = plan_service.generate(plan_context, provider=provider)
+                plan, plan_payload_value, reused = plan_service.create_plan(
+                    conn, plan_context, provider=provider,
+                )
+                plan_service.save_plan(
+                    conn, user_id, conversation_id, plan_payload_value,
+                    target_message_id=(plan_context.get("reply_target_message") or {}).get("id"),
+                )
+                timings["plan_reused"] = reused
                 if plan is not None:
                     sendable = plan.sendable()
-                    plan_payload_value = plan_service.plan_payload(
-                        plan,
-                        used=[item["name"] for item in plan_context.get("references") or []],
-                        skipped=plan_context.get("references_skipped") or [],
-                    )
                     if sendable:
                         chosen_tactic = sendable[0].model_dump(mode="json")
                         targets = conversation_focus.get("required_evidence_source_ids") or []
@@ -494,6 +497,17 @@ class AnalysisStrategicReplyService:
         result["plan"] = plan_payload_value
         timings["total_seconds"] = perf_counter() - started
         result["reply_inputs"]["timings"] = timings
+        logging.info(
+            "strategic reply timing conversation=%s plan=%.1fs(reused=%s) analysis=%.1fs(%sx) draft=%.1fs(%sx) total=%.1fs",
+            conversation_id,
+            timings.get("plan_seconds", 0.0),
+            timings.get("plan_reused", False),
+            timings.get("analysis_seconds", 0.0),
+            timings.get("analysis_attempts", 0),
+            timings.get("draft_seconds", 0.0),
+            timings.get("draft_attempts", 0),
+            timings["total_seconds"],
+        )
         return result
 
     def _hold_result(

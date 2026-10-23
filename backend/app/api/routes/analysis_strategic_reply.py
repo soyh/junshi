@@ -168,6 +168,20 @@ def _reply_context(
             progress('failed')
 
 
+@router.get('/plan')
+def get_stored_plan(conversation_id: str,
+                    user_id: str = Depends(get_current_user_id)):
+    """Latest plan for this conversation, including ones the bridge generated."""
+    from app.services import strategic_plan
+    with get_connection() as conn:
+        if not conn.execute(
+            'SELECT 1 FROM conversations WHERE id=? AND user_id=?',
+            (conversation_id, user_id),
+        ).fetchone():
+            raise HTTPException(404, 'Conversation not found')
+        return {"plan": strategic_plan.load_plan(conn, user_id, conversation_id)}
+
+
 @router.get('/progress/{request_id}')
 def get_reply_progress(conversation_id: str, request_id: UUID,
                        user_id: str = Depends(get_current_user_id)):

@@ -317,6 +317,31 @@ STRATEGIC_REPLY_SCRIPT = r'''
     strategicReplyStatus.textContent = 'Prepared the existing Message composer only. Add message remains a separate explicit action; nothing has been saved or sent.';
   }
 
+  async function loadStoredPlan() {
+    if (!selectedConversationId || !currentAccessToken) {
+      renderStrategicPlan(null);
+      return;
+    }
+    const conversation = selectedConversationId;
+    let data = null;
+    try {
+      data = await api(`/api/v1/conversations/${encodeURIComponent(conversation)}/strategic-reply/plan`);
+    } catch (error) {
+      return;
+    }
+    if (conversation !== selectedConversationId) return;
+    const plan = data && data.plan;
+    if (!plan) {
+      renderStrategicPlan(null);
+      strategicReplyPlan.textContent = '还没有判断。点「Generate reply draft」，或让通道插件自动回一条后，这里会显示最近一次判断。';
+      return;
+    }
+    renderStrategicPlan({plan});
+    if (plan.created_at) {
+      strategicReplyPlan.appendChild(strategicReplyPlanRow(`生成于：${chinaTimeText(plan.created_at)}（可能是自动回复时生成的）`));
+    }
+  }
+
   const baseResetWorkspaceForStrategicReply = resetWorkspace;
   resetWorkspace = function(message = 'Login to load persons.') {
     baseResetWorkspaceForStrategicReply(message);
@@ -347,6 +372,7 @@ STRATEGIC_REPLY_SCRIPT = r'''
         ? 'Conversation changed. Generate explicitly when you want to call the analysis pipeline.'
         : 'Select a conversation first.'
     );
+    loadStoredPlan().catch(() => {});
   });
 
   byId('person-select').addEventListener('change', () => {

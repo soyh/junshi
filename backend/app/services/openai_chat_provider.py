@@ -747,3 +747,11 @@ class OpenAICompatibleProvider(OpenAIChatProvider):
 
     def _supports_json_schema(self) -> bool:
         return self._strict_json_schema
+
+    def _analysis_request_options(self) -> dict[str, Any]:
+        # Qwen 3.x thinks by default; on a custom endpoint that costs 40-60s per
+        # call. The structured prompts already spell out the reasoning format.
+        model = self.model.strip().lower()
+        if model.startswith(("qwen3.7", "qwen3.8", "qwen3-")):
+            return {"enable_thinking": False}
+        return {}

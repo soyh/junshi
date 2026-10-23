@@ -135,3 +135,55 @@ def test_analysis_strategic_reply_route_translates_llm_failure(monkeypatch):
 
     assert response.status_code == 502
     assert response.json()["detail"] == "LLM analysis failed"
+
+
+def test_plan_route_returns_the_latest_stored_plan(monkeypatch):
+    import json
+    import sqlite3
+    from contextlib import contextmanager
+
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.executescript(
+        """
+        CREATE TABLE conversations (id TEXT PRIMARY KEY, user_id TEXT NOT NULL);
+        CREATE TABLE strategic_reply_plans (
+            conversation_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            target_message_id TEXT,
+            payload TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO conversations (id, user_id) VALUES (?, ?)",
+        ("conversation-1", "00000000-0000-0000-0000-000000000001"),
+    )
+    conn.execute(
+        "INSERT INTO strategic_reply_plans"
+        " (conversation_id, user_id, target_message_id, payload)"
+        " VALUES (?, ?, ?, ?)",
+        (
+            "conversation-1",
+            "00000000-0000-0000-0000-000000000001",
+            "message-1",
+            json.dumps({"read": "她在接话", "signal": "green"}, ensure_ascii=False),
+        ),
+    )
+    conn.commit()
+
+    @contextmanager
+    def fake_connection():
+        yield conn
+
+    monkeypatch.setattr(analysis_strategic_reply, "get_connection", fake_connection)
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/conversations/conversation-1/strategic-reply/plan")
+        missing = client.get("/api/v1/conversations/conversation-9/strategic-reply/plan")
+
+    assert response.status_code == 200
+    assert response.json()["plan"]["read"] == "她在接话"
+    assert response.json()["plan"]["target_message_id"] == "message-1"
+    assert missing.status_code == 404

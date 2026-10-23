@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 cd "C:/Users/12274/Documents/deepseek-harness/default-workspace/junshi-repo"
-TOKEN=$(cat /tmp/tok.txt)
+TOKEN=$(cat /c/Users/12274/AppData/Local/Temp/tok251.txt)
 URL="https://uploads.github.com/repos/soyh/junshi/releases/421870235/assets?name=JunshiPC-251-Windows-x64.zip"
 for attempt in 1 2 3 4 5 6; do
   echo "attempt $attempt"
