@@ -317,6 +317,12 @@ STRATEGIC_REPLY_SCRIPT = r'''
     strategicReplyStatus.textContent = 'Prepared the existing Message composer only. Add message remains a separate explicit action; nothing has been saved or sent.';
   }
 
+  const baseResetWorkspaceForStrategicReply = resetWorkspace;
+  resetWorkspace = function(message = 'Login to load persons.') {
+    baseResetWorkspaceForStrategicReply(message);
+    resetStrategicReply();
+  };
+
   async function loadStoredPlan() {
     if (!selectedConversationId || !currentAccessToken) {
       renderStrategicPlan(null);
@@ -341,12 +347,6 @@ STRATEGIC_REPLY_SCRIPT = r'''
       strategicReplyPlan.appendChild(strategicReplyPlanRow(`生成于：${chinaTimeText(plan.created_at)}（可能是自动回复时生成的）`));
     }
   }
-
-  const baseResetWorkspaceForStrategicReply = resetWorkspace;
-  resetWorkspace = function(message = 'Login to load persons.') {
-    baseResetWorkspaceForStrategicReply(message);
-    resetStrategicReply();
-  };
 
   bind('load-strategic-reply', async () => {
     try { await loadStrategicReply(); }
@@ -378,4 +378,11 @@ STRATEGIC_REPLY_SCRIPT = r'''
   byId('person-select').addEventListener('change', () => {
     resetStrategicReply();
   });
+
+  // The bridge plans while this page is open; refresh so its plan shows up too.
+  setInterval(() => {
+    if (!selectedConversationId || !currentAccessToken) return;
+    if (document.visibilityState !== 'visible') return;
+    loadStoredPlan().catch(() => {});
+  }, 30000);
 '''

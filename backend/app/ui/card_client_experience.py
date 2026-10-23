@@ -830,6 +830,10 @@ CARD_CLIENT_EXPERIENCE_SCRIPT = r'''
     if (replyCard) {
       const replyHost = clientEl('div');
       replyHost.id = 'client-reply-host';
+      // The planner card belongs next to the draft: users look for the answer in
+      // 「军师结果」, not in the legacy form at the bottom of the page.
+      const planCard = byId('strategic-plan-heading')?.closest('.workspace-card');
+      if (planCard) replyHost.appendChild(planCard);
       replyHost.appendChild(replyCard);
       resultsGrid.appendChild(replyHost);
     }
