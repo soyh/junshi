@@ -75,6 +75,30 @@ CARD_NAVIGATION_STYLE = r'''
   #client-back-people:focus-visible,#client-footer button:focus-visible,.client-card-front:focus-visible{outline:3px solid #4cbac4;outline-offset:4px}
   @media(max-width:600px){body[data-client-view]{padding:14px 12px 0!important}#client-auth-screen{margin:5vh auto;padding:22px}body[data-client-view="people"] .client-topbar{padding-top:20px}body[data-client-view="people"] #client-person-stage{margin-top:0}body[data-client-view="people"] #client-person-deck{padding:22px 18px 30px;gap:16px}body[data-client-view="people"] .client-person-card{flex-basis:78vw;min-height:330px}#client-footer{margin-top:20px}#client-workbar h2{font-size:18px}}
   @media(prefers-reduced-motion:reduce){.client-person-card,.client-card-inner{transition:none!important;animation:none!important}}
+  /* One screen per task: conversation and results share a row and scroll inside. */
+  @media(min-width:1180px){
+    body[data-client-view="person"] #client-experience-shell{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);grid-template-areas:"top top" "person person" "conv results";gap:16px 20px;align-items:start}
+    #client-topbar{grid-area:top}#client-person-stage{grid-area:person;margin-top:0}
+    #client-conversation-stage{grid-area:conv;min-width:0}
+    #client-results-stage{grid-area:results;min-width:0}
+    body[data-client-view="person"] #client-conversation-host,
+    body[data-client-view="person"] #client-results-grid{max-height:calc(100vh - 330px);overflow:auto;padding-right:4px;scrollbar-gutter:stable}
+    body[data-client-view="person"] #client-person-deck{padding:14px 16px 18px}
+    body[data-client-view="person"] .client-stage-header{margin-bottom:8px}
+    body[data-client-view="person"] .client-stage-header p{max-width:60ch}
+  }
+  /* Person profile + relationship live in a dialog, never as a page section. */
+  #client-person-editor{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.46);backdrop-filter:blur(3px)}
+  #client-person-editor[hidden]{display:none!important}
+  .client-person-editor-card{width:min(920px,94vw);max-height:min(88vh,880px);display:flex;flex-direction:column;background:#fff;border-radius:22px;border:1px solid rgba(78,105,150,.18);box-shadow:0 32px 90px rgba(15,23,42,.34);overflow:hidden}
+  .client-person-editor-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 20px;border-bottom:1px solid rgba(78,105,150,.14);background:#f6faff}
+  .client-person-editor-head h2{margin:0;font-size:1.02rem;color:#17233b}
+  .client-person-editor-head p{margin:2px 0 0;font-size:.78rem;color:#526279}
+  .client-person-editor-close{border:1px solid rgba(78,105,150,.24);background:#fff;color:#33415c;border-radius:10px;padding:7px 13px;font:inherit;font-size:.82rem;cursor:pointer}
+  .client-person-editor-close:hover{background:#eef4fb}
+  .client-person-editor-body{padding:16px 20px 22px;overflow:auto;display:grid;gap:12px}
+  .client-person-editor-body .client-card-back{position:static!important;transform:none!important;width:auto!important;height:auto!important;border:0!important;box-shadow:none!important;background:transparent!important;padding:0!important;overflow:visible!important;cursor:default!important;pointer-events:auto!important}
+  .client-person-editor-body .client-card-back .client-card-message{display:none}
 '''
 
 CARD_NAVIGATION_SCRIPT = r'''
@@ -191,10 +215,55 @@ CARD_NAVIGATION_SCRIPT = r'''
     }catch(_){if(epoch===navEpoch)navStatus.textContent='人物暂时无法打开，请重试。';}
     finally{card.classList.remove('is-entering');if(epoch===navEpoch)navEntering=false;}
   },true);
-  navBack.addEventListener('click',()=>{navEpoch++;navEntering=false;navShow('people',true);navDeck.querySelector('.is-selected .client-card-front')?.focus({preventScroll:true});});
+  let navEditor=null;
+  function navBuildEditor(){
+    if(navEditor)return navEditor;
+    const overlay=document.createElement('div');overlay.id='client-person-editor';overlay.hidden=true;
+    const card=clientEl('div','client-person-editor-card');
+    const head=clientEl('div','client-person-editor-head');
+    const titles=clientEl('div');
+    titles.append(
+      clientEl('h2','','人物资料与关系'),
+      clientEl('p','','改的是这位人物的资料和你们的关系；保存后网页、PC、手机看到的是同一份。'),
+    );
+    const close=clientEl('button','client-person-editor-close','关闭');close.type='button';
+    head.append(titles,close);
+    const body=clientEl('div','client-person-editor-body');
+    card.append(head,body);overlay.append(card);
+    overlay.addEventListener('click',event=>{if(event.target===overlay)navClosePersonEditor();});
+    close.addEventListener('click',()=>navClosePersonEditor());
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!overlay.hidden)navClosePersonEditor();});
+    document.body.append(overlay);
+    navEditor={overlay,body,face:null};
+    return navEditor;
+  }
+  async function navOpenPersonEditor(){
+    if(!currentAccessToken){navStatus.textContent='请先登录。';return;}
+    if(!selectedPersonId){navStatus.textContent='请先选择人物。';return;}
+    const card=Array.from(navDeck.children).find(c=>c.dataset.personId===selectedPersonId);
+    if(!card){navStatus.textContent='人物卡尚未加载，请稍后再试。';return;}
+    const editor=navBuildEditor();
+    await clientPopulatePersonBack(card,selectedPersonId);
+    const back=card.querySelector('.client-card-back');
+    if(!back){navStatus.textContent='人物资料暂时无法读取，请重试。';return;}
+    editor.body.replaceChildren(back);
+    editor.face={card,back};
+    editor.overlay.hidden=false;
+    document.body.dataset.profileEdit='true';
+    editor.body.scrollTop=0;
+  }
+  function navClosePersonEditor(){
+    if(!navEditor||navEditor.overlay.hidden)return;
+    const state=navEditor.face;
+    if(state&&state.back&&state.card){
+      const inner=state.card.querySelector('.client-card-inner');
+      if(inner)inner.appendChild(state.back);
+    }
+    navEditor.face=null;navEditor.overlay.hidden=true;document.body.dataset.profileEdit='false';
+  }
+  navBack.addEventListener('click',()=>{navEpoch++;navEntering=false;navClosePersonEditor();navShow('people',true);navDeck.querySelector('.is-selected .client-card-front')?.focus({preventScroll:true});});
   navEdit.addEventListener('click',async()=>{
-    const show=document.body.dataset.profileEdit!=='true';document.body.dataset.profileEdit=String(show);
-    if(show){const card=Array.from(navDeck.children).find(c=>c.dataset.personId===selectedPersonId);if(card)await clientPopulatePersonBack(card,selectedPersonId);}
+    await navOpenPersonEditor();
   });
   navPrev.addEventListener('click',()=>navDeck.scrollBy({left:-280,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'}));
   navNext.addEventListener('click',()=>navDeck.scrollBy({left:280,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'}));

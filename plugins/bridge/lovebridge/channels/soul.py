@@ -68,7 +68,7 @@ class SoulChannel:
         self._watch: asyncio.Task | None = None
         self._lock = asyncio.Lock()
         self._last: dict[str, tuple[str, str]] = {}
-        self._counts: dict[str, int] = {}
+        self._seen: dict[str, None] = {}
         self._warned_login = False
         self._logged = write_line
 
@@ -385,31 +385,54 @@ class SoulChannel:
                 self._emit_new(name, messages)
 
     def _emit_new(self, name: str, messages: list[dict]) -> None:
-        previous = self._counts.get(name)
-        if previous is not None and len(messages) >= previous:
-            fresh = messages[previous:]
-        else:
-            fresh = []
-            for message in reversed(messages):
-                if message["self"]:
-                    break
-                fresh.insert(0, message)
-            fresh = fresh[-5:]
+        """Emit only the trailing burst of inbound bubbles, each with a stable id.
 
-        self._counts[name] = len(messages)
-        for message in fresh:
-            if message["self"]:
+        The old id included the current minute, so reopening the same chat (the
+        preview changes as soon as we reply) re-emitted her last message under a
+        fresh id and the bridge answered twice. Ids are now derived from the
+        bubble itself plus its occurrence ordinal, so re-reading is a no-op.
+        """
+        start = len(messages)
+        for index in range(len(messages) - 1, -1, -1):
+            if messages[index].get("self"):
+                break
+            start = index
+        fresh = list(range(start, len(messages)))[-5:]
+        if not fresh:
+            return
+
+        ordinals: dict[tuple, int] = {}
+        keys: list[tuple] = []
+        for message in messages:
+            signature = (
+                1 if message.get("self") else 0,
+                (message.get("text") or "").strip(),
+                (message.get("time") or "").strip(),
+            )
+            ordinals[signature] = ordinals.get(signature, 0) + 1
+            keys.append(signature + (ordinals[signature],))
+
+        for index in fresh:
+            message = messages[index]
+            if message.get("self"):
                 continue
             text = (message.get("text") or "").strip() or media_text(message)
             if not text:
                 continue
-            digest = hashlib.md5(f"{name}|{text}|{int(time.time() // 60)}".encode()).hexdigest()[:12]
+            raw = f"{name}|" + "|".join(str(part) for part in keys[index])
+            message_id = f"soul-{hashlib.md5(raw.encode()).hexdigest()[:12]}"
+            if message_id in self._seen:
+                continue
+            self._seen[message_id] = None
+            if len(self._seen) > 2_000:
+                for stale in list(self._seen)[:1_000]:
+                    self._seen.pop(stale, None)
             media_url = (message.get("image_url") or "").strip()
             event = InboundEvent(
                 contact_id=f"soul:{name}",
                 contact_name=name,
                 text=text,
-                message_id=f"soul-{digest}",
+                message_id=message_id,
                 is_group=False,
                 timestamp=time.time(),
                 raw={"media_url": media_url} if media_url else {},

@@ -544,9 +544,30 @@ class Orchestrator:
             return TurnResult(contact_id, conversation_id, len(events), reply=reply, reason="dry run")
 
         await self._human_delay()
-        await self.channel.send(contact_id, reply, is_group=bool(events[0].is_group))
-        await self.app.add_message(conversation_id, "user", reply)
-        count = self.state.bump(self._today(), contact_id)
+        if not self.state.claim_reply(contact_id, reply):
+            self._log(
+                f"[bridge] duplicate reply suppressed contact={contact_id}: {reply[:40]!r}"
+            )
+            return TurnResult(
+                contact_id, conversation_id, len(events), reply=reply,
+                reason="duplicate suppressed",
+            )
+        try:
+            await self.channel.send(contact_id, reply, is_group=bool(events[0].is_group))
+        except Exception:
+            self.state.release_reply(contact_id, reply)
+            raise
+        try:
+            await self.app.add_message(conversation_id, "user", reply)
+        except Exception as exc:
+            # The sentence is already on the platform; failing to record it must
+            # not mark the turn as failed or the retry would send it again.
+            self._log(f"[bridge] reply delivered but not recorded: {exc!r}")
+        try:
+            count = self.state.bump(self._today(), contact_id)
+        except Exception as exc:
+            count = 0
+            self._log(f"[bridge] daily counter update failed: {exc!r}")
 
         self._log(f"[bridge] replied to {contact_id} ({count} today): {reply[:60]!r}")
         return TurnResult(contact_id, conversation_id, len(events), reply=reply, sent=True)

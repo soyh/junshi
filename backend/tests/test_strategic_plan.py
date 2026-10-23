@@ -538,3 +538,79 @@ def test_a_new_message_invalidates_the_stored_plan():
     assert reused is False
     assert fresh_plan.read == "她又追问了一句"
     assert payload["read"] == "她又追问了一句"
+
+
+def _memory_conn() -> sqlite3.Connection:
+    conn = _conn()
+    conn.executescript(
+        """
+        CREATE TABLE person_memories (
+            person_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            summary_json TEXT,
+            coverage_json TEXT,
+            updated_at TEXT,
+            PRIMARY KEY (person_id, user_id)
+        );
+        """
+    )
+    return conn
+
+
+def test_long_term_archive_reaches_the_planner_within_a_budget():
+    conn = _memory_conn()
+    conn.execute(
+        "INSERT INTO person_memories VALUES (?,?,?,?,?)",
+        (
+            "p1",
+            "u1",
+            json.dumps(
+                {
+                    "facts": ["在杭州做设计", "养了一只叫豆豆的猫"],
+                    "preferences": ["不喜欢被追问年龄"],
+                    "unknowns": ["真名"],
+                },
+                ensure_ascii=False,
+            ),
+            "{}",
+            "2026-10-24T00:00:00+00:00",
+        ),
+    )
+
+    memory = strategic_plan.load_memory(conn, "u1", "p1")
+
+    texts = [row["text"] for row in memory["entries"]]
+    assert "在杭州做设计" in texts
+    assert "不喜欢被追问年龄" in texts
+    assert memory["updated_at"] == "2026-10-24T00:00:00+00:00"
+
+
+def test_long_term_archive_is_trimmed_to_the_character_budget():
+    conn = _memory_conn()
+    long_text = "很长的条目" * 200
+    conn.execute(
+        "INSERT INTO person_memories VALUES (?,?,?,?,?)",
+        ("p1", "u1", json.dumps({"facts": [long_text]}, ensure_ascii=False), "{}", "now"),
+    )
+
+    assert strategic_plan.load_memory(conn, "u1", "p1", limit_chars=50) == {}
+    assert strategic_plan.load_memory(conn, "u1", "p1", limit_chars=5_000)["entries"]
+
+
+def test_missing_archive_does_not_break_the_planner():
+    conn = _memory_conn()
+    assert strategic_plan.load_memory(conn, "u1", "p1") == {}
+    assert strategic_plan.load_memory(conn, "u1", "") == {}
+
+
+def test_planner_context_carries_the_archive():
+    conn = _memory_conn()
+    conn.execute(
+        "INSERT INTO person_memories VALUES (?,?,?,?,?)",
+        ("p1", "u1", json.dumps({"facts": ["喜欢爬山"]}, ensure_ascii=False), "{}", "now"),
+    )
+
+    context = strategic_plan.build_context(conn, "u1", "c1")
+
+    assert context["long_term_memory"]["entries"][0]["text"] == "喜欢爬山"
+    assert "喜欢爬山" in strategic_plan.context_for_prompt(context)

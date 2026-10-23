@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 SCHEMA = """
@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS outbox (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS outbox_due ON outbox (state, next_at);
+CREATE TABLE IF NOT EXISTS sent_replies (
+    contact_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    sent_at TEXT NOT NULL,
+    PRIMARY KEY (contact_id, content)
+);
 """
 
 
@@ -110,6 +116,52 @@ class StateStore:
             self._conn.commit()
 
     # -- dedup ------------------------------------------------------------
+    def claim_reply(self, contact_id: str, content: str, window: int = 600) -> bool:
+        """True only if this exact reply was not already sent recently.
+
+        Two turns can be triggered for the same moment (a re-read of the chat,
+        a retry after a slow bookkeeping call). Answering twice with the same
+        sentence is the worst failure users notice, so the last line per contact
+        is remembered and a repeat inside `window` seconds is dropped.
+        """
+        text = (content or "").strip()
+        if not text:
+            return False
+        now = datetime.now()
+        cutoff = (now - timedelta(seconds=window)).isoformat(timespec="seconds")
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT sent_at FROM sent_replies WHERE contact_id = ? AND content = ?",
+                (contact_id, text),
+            ).fetchone()
+            if row is not None and str(row["sent_at"]) >= cutoff:
+                return False
+            self._conn.execute(
+                """
+                INSERT INTO sent_replies (contact_id, content, sent_at) VALUES (?, ?, ?)
+                ON CONFLICT(contact_id, content) DO UPDATE SET sent_at = excluded.sent_at
+                """,
+                (contact_id, text, now.isoformat(timespec="seconds")),
+            )
+            self._conn.execute(
+                "DELETE FROM sent_replies WHERE sent_at < ?",
+                ((now - timedelta(days=2)).isoformat(timespec="seconds"),),
+            )
+            self._conn.commit()
+        return True
+
+    def release_reply(self, contact_id: str, content: str) -> None:
+        """Forget a claim whose send failed, so the retry is allowed to deliver."""
+        text = (content or "").strip()
+        if not text:
+            return
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM sent_replies WHERE contact_id = ? AND content = ?",
+                (contact_id, text),
+            )
+            self._conn.commit()
+
     def first_seen(self, message_id: str, contact_id: str) -> bool:
         """Record the id; return True only the first time it is seen."""
         now = datetime.now().isoformat(timespec="seconds")

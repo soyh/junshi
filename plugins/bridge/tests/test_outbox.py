@@ -266,3 +266,58 @@ def test_drain_skips_rows_that_were_already_answered(tmp_path):
 
     assert asyncio.run(orchestrator.drain_outbox()) == 0
     assert channel.sent == []
+
+
+def test_the_same_reply_is_never_sent_twice_to_one_contact(tmp_path):
+    """Two turns for one moment (a re-read of the chat) must not answer twice."""
+    app = _App(["行，那我今晚就去审判一下", "行，那我今晚就去审判一下"])
+    channel = _Channel()
+    orchestrator, state, logs = _build(tmp_path, app, channel)
+
+    _run(orchestrator, _event("m1"))
+    _run(orchestrator, _event("m2"))
+
+    assert channel.sent == ["行，那我今晚就去审判一下"]
+    assert any("duplicate" in line for line in logs)
+
+
+def test_a_failed_send_releases_the_claim_so_the_retry_still_delivers(tmp_path):
+    """Claiming happens before sending; a failure must hand the slot back."""
+    app = _App(["好", "好"])
+    channel = _Channel()
+    orchestrator, state, _logs = _build(tmp_path, app, channel)
+    calls = {"n": 0}
+
+    async def flaky(contact_id, text, is_group=False):  # noqa: ANN001
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("editor lost focus")
+        channel.sent.append(text)
+
+    channel.send = flaky  # type: ignore[method-assign]
+
+    _run(orchestrator, _event("m1"))
+    assert channel.sent == []
+    assert state.outbox_pending(CONTACT)
+
+    row = state.outbox_pending(CONTACT)[0]
+    state.outbox_finish([int(row["id"])], "queued", row["reason"], None)
+    asyncio.run(orchestrator.drain_outbox())
+
+    assert channel.sent == ["好"]
+
+
+def test_recording_failure_after_delivery_does_not_trigger_a_resend(tmp_path):
+    app = _App(["嗯嗯"])
+    channel = _Channel()
+    orchestrator, state, _logs = _build(tmp_path, app, channel)
+
+    async def broken(*args, **kwargs):  # noqa: ANN002
+        raise RuntimeError("HTTP 500 while recording")
+
+    app.add_message = broken  # type: ignore[method-assign]
+
+    _run(orchestrator, _event("m1"))
+
+    assert channel.sent == ["嗯嗯"]
+    assert state.outbox_pending(CONTACT) == []

@@ -16,6 +16,55 @@ from app.services.llm import LLMAnalysisError
 TRANSCRIPT_LIMIT = 30
 REFERENCE_BUDGET = 12_000
 REFERENCE_PER_DOC = 6_000
+MEMORY_BUDGET = 2_000
+
+
+def load_memory(
+    conn: sqlite3.Connection,
+    user_id: str,
+    person_id: str,
+    *,
+    limit_chars: int = MEMORY_BUDGET,
+) -> dict[str, Any]:
+    """Long-term profile entries for this person, trimmed to a small budget.
+
+    The archive is what the app already learns from every conversation; without
+    it the planner re-reads only the last 30 lines and loses every established
+    fact (her job, city, what she dislikes).
+    """
+    if not person_id:
+        return {}
+    try:
+        row = conn.execute(
+            "SELECT summary_json, updated_at FROM person_memories "
+            "WHERE person_id = ? AND user_id = ?",
+            (person_id, user_id),
+        ).fetchone()
+    except sqlite3.OperationalError:  # minimal schemas in tests / fresh installs
+        return {}
+    if row is None:
+        return {}
+    try:
+        summary = json.loads(row["summary_json"] or "{}")
+    except (TypeError, ValueError):
+        return {}
+    from app.services.compact_profile import entries as profile_entries
+
+    lines: list[dict[str, str]] = []
+    used = 0
+    for entry in profile_entries(summary):
+        if not entry.get("active", True):
+            continue
+        text = str(entry.get("text") or "").strip()
+        if not text:
+            continue
+        if used + len(text) > limit_chars:
+            break
+        lines.append({"kind": str(entry.get("kind") or ""), "text": text})
+        used += len(text)
+    if not lines:
+        return {}
+    return {"entries": lines, "updated_at": row["updated_at"]}
 
 
 def _clip(text: str, limit: int) -> str:
@@ -137,6 +186,7 @@ def build_context(
 
     transcript = load_transcript(conn, user_id, conversation_id)
     references, skipped = load_references(conn, user_id, conversation_id)
+    memory = load_memory(conn, user_id, str(person["id"]) if person else "")
     target = next((item for item in reversed(transcript) if item["who"] == "她"), None)
     return {
         "user_id": user_id,
@@ -153,6 +203,7 @@ def build_context(
         },
         "transcript": transcript,
         "reply_target_message": target,
+        "long_term_memory": memory,
         "references": references,
         "references_skipped": skipped,
         "self_profile": {k: v for k, v in (self_profile or {}).items() if str(v).strip()},

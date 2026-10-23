@@ -1,6 +1,8 @@
+import json
 import logging
+import sqlite3
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel
 from uuid import UUID
 
@@ -23,6 +25,52 @@ router = APIRouter(
 
 service = AnalysisStrategicReplyService()
 provider_config_service = LLMProviderConfigService()
+
+# The long-term archive is refreshed in the background once this many new
+# messages have piled up since the last pass; below it, replies just reuse what
+# is already known and nothing extra is spent per message.
+MEMORY_BATCH_TRIGGER = 6
+
+
+def _memory_needs_refresh(
+    conn, user_id: str, conversation_id: str
+) -> tuple[str, bool]:
+    row = conn.execute(
+        "SELECT person_id FROM conversations WHERE id = ? AND user_id = ?",
+        (conversation_id, user_id),
+    ).fetchone()
+    if row is None:
+        return "", False
+    person_id = str(row["person_id"])
+    total = conn.execute(
+        "SELECT COUNT(*) FROM messages m JOIN conversations c ON c.id = m.conversation_id "
+        "WHERE c.person_id = ? AND m.user_id = ?",
+        (person_id, user_id),
+    ).fetchone()[0]
+    memory = conn.execute(
+        "SELECT coverage_json FROM person_memories WHERE person_id = ? AND user_id = ?",
+        (person_id, user_id),
+    ).fetchone()
+    covered = 0
+    if memory is not None:
+        try:
+            covered = len(json.loads(memory["coverage_json"] or "{}"))
+        except (TypeError, ValueError):
+            covered = 0
+    return person_id, (total - covered) >= MEMORY_BATCH_TRIGGER
+
+
+def _schedule_memory_refresh(background, conn, user_id: str, conversation_id: str) -> None:
+    """Fold new messages into the long-term archive without delaying the reply."""
+    try:
+        person_id, behind = _memory_needs_refresh(conn, user_id, conversation_id)
+    except sqlite3.OperationalError:
+        return
+    if not behind or not person_id:
+        return
+    from app.services.person_memory import background_refresh
+
+    background.add_task(background_refresh, user_id, person_id)
 
 
 def _build_provider(conn, user_id: str):
@@ -86,10 +134,11 @@ def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
 )
 def get_analysis_strategic_reply_context(
     conversation_id: str,
+    background: BackgroundTasks,
     request_id: UUID | None = None,
     user_id: str = Depends(get_current_user_id),
 ):
-    return _reply_context(conversation_id, request_id, "", {}, user_id, None)
+    return _reply_context(conversation_id, request_id, "", {}, user_id, None, background)
 
 
 @router.post(
@@ -99,6 +148,7 @@ def get_analysis_strategic_reply_context(
 )
 def post_analysis_strategic_reply_context(
     conversation_id: str,
+    background: BackgroundTasks,
     body: ChannelRulesBody | None = None,
     request_id: UUID | None = None,
     user_id: str = Depends(get_current_user_id),
@@ -111,6 +161,7 @@ def post_analysis_strategic_reply_context(
         (body.self_profile if body else {}),
         user_id,
         (body.option if body else None),
+        background,
     )
 
 
@@ -121,6 +172,7 @@ def _reply_context(
     self_profile: dict[str, str],
     user_id: str,
     option: dict | None = None,
+    background: BackgroundTasks | None = None,
 ):
     from app.services.reply_progress import publish
     progress = (lambda stage, attempt=0: publish(user_id,conversation_id,str(request_id),stage,attempt)) if request_id else None
@@ -142,6 +194,8 @@ def _reply_context(
             )
             if progress: progress('complete')
             completed = True
+            if background is not None:
+                _schedule_memory_refresh(background, conn, user_id, conversation_id)
             return result
     except ValueError as exc:
         raise HTTPException(

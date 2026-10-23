@@ -5,6 +5,7 @@ import sys
 from ctypes import wintypes
 import tkinter as tk
 from tkinter import ttk, messagebox
+from tkinter import font as tkfont
 from urllib.parse import urlsplit
 
 PROVIDERS = ('qwen', 'deepseek', 'kimi', 'openai', 'gemini', 'openai_compatible')
@@ -13,6 +14,26 @@ PLATFORMS = {'微信':'wechat','抖音':'douyin','探探':'tantan','陌陌':'mom
 
 SECTION_OPEN = '\u25be'   # ▾
 SECTION_CLOSED = '\u25b8'  # ▸
+
+
+def apply_theme(window):
+    """One visual baseline for every dialog: font, row height and control padding."""
+    try:
+        families = set(tkfont.families(window))
+        family = next((name for name in ('Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI')
+                       if name in families), None)
+        for name in ('TkDefaultFont', 'TkTextFont', 'TkMenuFont', 'TkHeadingFont'):
+            font = tkfont.nametofont(name)
+            if family:
+                font.configure(family=family)
+            font.configure(size=10)
+        style = ttk.Style(window)
+        style.configure('TButton', padding=(10, 4))
+        style.configure('TCheckbutton', padding=(2, 3))
+        style.configure('Treeview', rowheight=24)
+        style.configure('TNotebook.Tab', padding=(12, 6))
+    except tk.TclError:  # a headless test run has no display to theme
+        return None
 
 
 class Section:
@@ -116,6 +137,7 @@ class Dialog:
     def __init__(self, app, title):
         self.app, self.client = app, app.client
         self.window = tk.Toplevel(app.root)
+        apply_theme(self.window)
         self.window.title(title); self.window.transient(app.root)
         self.window.minsize(520, 260)
         self.window.grab_set()

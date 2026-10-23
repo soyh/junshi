@@ -259,7 +259,7 @@ class OpenAIChatProvider(LLMProvider):
             "你会收到完整对话（最近若干条）、对方信息、关系阶段与目标、本人资料、写作风格统计，"
             "以及用户上传的参考资料全文（type=skill 是方法论，type=document 是背景）。\n"
             "规则：\n"
-            "1. read / signal / stage 只能依据对话与已提供的客观信息，不许编造对方主页、照片、经历；"
+            "1. read / signal / stage 只能依据对话、长期档案（long_term_memory）与已提供的客观信息，不许编造对方主页、照片、经历；"
             "没有的信息就当作未知。\n"
             "2. 先判断这段对话的温度：green=有来有回愿意聊，yellow=敷衍/降温/疲劳，red=冲突/被拒绝/越界。\n"
             "3. options 给 2-4 个真正不同的战术，按推荐顺序排列；第一个要是你现在最该做的。"
@@ -276,6 +276,8 @@ class OpenAIChatProvider(LLMProvider):
             "不得声称「没有对话记录」「缺少上下文」——哪怕只有一两条也要给出判断。"
             "只有 transcript 完全为空时才说明没有记录。\n"
             "9. options 最多给 3 条，避免凑数；每条 why 控制在两句话内。\n"
+            "10. 长期档案（long_term_memory）是之前聊天里已确认的事实与界线，可以直接作为判断依据，source 写「长期档案」；"
+            "与本次对话冲突时以本次对话为准，不要拿档案里过时的信息当现在的事实。\\n"
             "只输出 JSON，不要解释、不要 markdown。"
         )
 
