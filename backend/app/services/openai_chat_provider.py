@@ -185,8 +185,35 @@ class OpenAIChatProvider(LLMProvider):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+
+        def fit_planner_payload() -> None:
+            # Local fitting: the generic budget helper reduces "messages"/"references",
+            # which the planner context does not use, so it would give up instead of
+            # shrinking the transcript. Drop older exchanges first, then shorten lines.
+            limit = get_settings().llm_input_budget_tokens
+            payload["max_tokens"] = get_settings().llm_output_max_tokens
+            for _ in range(80):
+                payload["messages"][-1]["content"] = context_for_prompt(context)
+                size = len(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+                if size <= limit:
+                    return
+                transcript = context.get("transcript") or []
+                if len(transcript) > 6:
+                    context["transcript"] = transcript[4:]
+                    continue
+                trim = max(120, (context.get("_planner_trim") or 1200) // 2)
+                if trim == context.get("_planner_trim"):
+                    raise LLMRequestError("local_budget")
+                context["_planner_trim"] = trim
+                context["transcript"] = [
+                    {**item, "content": (item.get("content") or "")[:trim]}
+                    for item in transcript
+                ]
+            raise LLMRequestError("local_budget")
+
         try:
-            response = self._post_bounded(payload, headers, context, lambda value: system)
+            fit_planner_payload()
+            response = self._post_structured(payload, headers)
             response.raise_for_status()
             body = response.json()
             content = body["choices"][0]["message"]["content"]
