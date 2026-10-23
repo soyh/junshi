@@ -46,9 +46,11 @@ class UserProfileService:
             "SELECT * FROM user_profiles WHERE user_id = ?", (user_id,)
         ).fetchone()
         if row is None:
-            return UserProfileResponse()
+            # No row yet still means "planner on": it is the recommended default.
+            return UserProfileResponse(strategic_plan_enabled=True)
         data = {field: str(row[field] or "") for field in FIELDS}
         data["auto_send_authorized"] = bool(row["auto_send_authorized"])
+        data["strategic_plan_enabled"] = bool(row["strategic_plan_enabled"])
         return UserProfileResponse(**data, updated_at=str(row["updated_at"] or ""))
 
     def save(
@@ -58,6 +60,15 @@ class UserProfileService:
         # Trim what the user typed; email clients and phone keyboards love stray spaces.
         values = {field: value.strip() for field, value in values.items()}
         authorized = int(bool(payload.auto_send_authorized))
+        if payload.strategic_plan_enabled is None:
+            # Keep whatever the account already chose (the PC form omits it).
+            current = conn.execute(
+                "SELECT strategic_plan_enabled FROM user_profiles WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+            plan_enabled = int(current["strategic_plan_enabled"]) if current else 1
+        else:
+            plan_enabled = int(bool(payload.strategic_plan_enabled))
         existing = conn.execute(
             "SELECT 1 FROM user_profiles WHERE user_id = ?", (user_id,)
         ).fetchone()
@@ -66,15 +77,18 @@ class UserProfileService:
             conn.execute(
                 f"UPDATE user_profiles SET {assignments},"
                 " auto_send_authorized = ?,"
+                " strategic_plan_enabled = ?,"
                 " updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
-                [*(values[field] for field in FIELDS), authorized, user_id],
+                [*(values[field] for field in FIELDS), authorized, plan_enabled, user_id],
             )
         else:
-            columns = ", ".join(("user_id", *FIELDS, "auto_send_authorized"))
-            marks = ", ".join("?" for _ in range(len(FIELDS) + 2))
+            columns = ", ".join(
+                ("user_id", *FIELDS, "auto_send_authorized", "strategic_plan_enabled")
+            )
+            marks = ", ".join("?" for _ in range(len(FIELDS) + 3))
             conn.execute(
                 f"INSERT INTO user_profiles ({columns}) VALUES ({marks})",
-                [user_id, *(values[field] for field in FIELDS), authorized],
+                [user_id, *(values[field] for field in FIELDS), authorized, plan_enabled],
             )
         conn.commit()
         return self.get(conn, user_id)

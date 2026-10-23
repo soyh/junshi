@@ -17,6 +17,12 @@ STRATEGIC_REPLY_HTML = r'''
         <p class="note">仅在你已经通过外部聊天工具实际发送后使用。此按钮只把当前编辑文本填入现有 Message 表单，不会保存 Message 或发送任何内容；请核对实际发送文本与 Sent at，再单独点击 Add message。</p>
       </section>
 
+      <section class="workspace-card" aria-labelledby="strategic-plan-heading">
+        <h2 id="strategic-plan-heading">军师判断</h2>
+        <p class="note">先判断局势再措辞。资料全文在这一步被读到；如果它判断这一轮不该发，就不会生成回复。</p>
+        <div id="strategic-reply-plan" class="status">还没有判断。点「Generate reply draft」生成一次。</div>
+      </section>
+
       <section class="workspace-card" aria-labelledby="strategic-reply-context-heading">
         <h2 id="strategic-reply-context-heading">Why this reply</h2>
         <div id="strategic-reply-context" class="status">No strategic reply context loaded.</div>
@@ -36,6 +42,7 @@ STRATEGIC_REPLY_SCRIPT = r'''
   const strategicReplyRecommendations = byId('strategic-reply-recommendations');
   const strategicReplyConstraints = byId('strategic-reply-constraints');
   const strategicReplyLearning = byId('strategic-reply-learning');
+  const strategicReplyPlan = byId('strategic-reply-plan');
   let generatedStrategicReplyDraft = '';
   let strategicReplyRevision = 0;
   let strategicReplyInFlight = null;
@@ -53,6 +60,86 @@ STRATEGIC_REPLY_SCRIPT = r'''
     strategicReplyConstraints.textContent = 'No reply constraints loaded.';
     strategicReplyLearning.replaceChildren();
     strategicReplyLearning.textContent = 'No learning strategy loaded.';
+    strategicReplyPlan.replaceChildren();
+    strategicReplyPlan.textContent = '还没有判断。点「Generate reply draft」生成一次。';
+  }
+
+  const PLAN_SIGNALS = {green:'可以聊', yellow:'在降温', red:'该收手'};
+  function strategicReplyPlanRow(text, className) {
+    const row = document.createElement('div');
+    row.className = className || 'session-row';
+    row.textContent = text;
+    return row;
+  }
+
+  function renderStrategicPlan(data) {
+    strategicReplyPlan.replaceChildren();
+    const plan = data && data.plan;
+    if (!plan || typeof plan !== 'object') {
+      strategicReplyPlan.textContent = '这次没有判断（模型或资料不可用，已回退到原链路）。';
+      return;
+    }
+    strategicReplyPlan.appendChild(strategicReplyPlanRow(
+      `温度：${PLAN_SIGNALS[plan.signal] || plan.signal || '未知'}　阶段：${plan.stage || '未知'}`
+    ));
+    if (plan.read) strategicReplyPlan.appendChild(strategicReplyPlanRow(`她这条在说：${plan.read}`));
+    if (plan.goal_this_turn) strategicReplyPlan.appendChild(strategicReplyPlanRow(`这轮目标：${plan.goal_this_turn}`));
+    const options = Array.isArray(plan.options) ? plan.options : [];
+    options.forEach((option, index) => {
+      if (!option || typeof option !== 'object') return;
+      const card = document.createElement('div');
+      card.className = 'session-row';
+      const title = document.createElement('strong');
+      title.textContent = `${index + 1}. ${option.tactic || '战术'}`;
+      card.appendChild(title);
+      if (option.why) card.appendChild(strategicReplyPlanRow(`为什么：${option.why}`));
+      if (option.line) card.appendChild(strategicReplyPlanRow(`可以这么说：${option.line}`));
+      if (option.risk) card.appendChild(strategicReplyPlanRow(`风险：${option.risk}`));
+      if (option.source) card.appendChild(strategicReplyPlanRow(`依据：${option.source}`));
+      if (option.send === false) {
+        card.appendChild(strategicReplyPlanRow('这一条是「不发」：什么都不用发。'));
+      } else {
+        const use = document.createElement('button');
+        use.type = 'button';
+        use.className = 'requires-auth';
+        use.textContent = '用这条生成';
+        use.disabled = !currentAccessToken || !selectedConversationId;
+        use.addEventListener('click', () => {
+          generateStrategicReplyWithOption(option).catch((error) => {
+            if (!error?.superseded) strategicReplyStatus.textContent = error.message;
+          });
+        });
+        card.appendChild(use);
+      }
+      strategicReplyPlan.appendChild(card);
+    });
+    if (Array.isArray(plan.avoid) && plan.avoid.length) {
+      strategicReplyPlan.appendChild(strategicReplyPlanRow(`现在别做：${plan.avoid.join('、')}`));
+    }
+    const used = Array.isArray(plan.references_used) ? plan.references_used : [];
+    const skipped = Array.isArray(plan.references_skipped) ? plan.references_skipped : [];
+    strategicReplyPlan.appendChild(strategicReplyPlanRow(
+      used.length ? `本次用到的资料：${used.join('、')}${skipped.length ? `；还有 ${skipped.length} 篇没纳入` : ''}` : '本次未用到资料。'
+    ));
+  }
+
+  async function generateStrategicReplyWithOption(option) {
+    if (!selectedConversationId) throw new Error('Select a conversation first');
+    const conversation = selectedConversationId;
+    const revision = strategicReplyRevision;
+    const isCurrent = () => revision === strategicReplyRevision
+      && conversation === selectedConversationId;
+    strategicReplyStatus.textContent = `按「${option.tactic || '这个战术'}」重新生成回复…`;
+    const data = await api(
+      `/api/v1/conversations/${encodeURIComponent(conversation)}/strategic-reply/context`,
+      {method: 'POST', body: JSON.stringify({option})},
+    );
+    if (!isCurrent()) throw Object.assign(new Error('消息或会话已变化，已忽略过期回复。'), {superseded: true});
+    if (!data || typeof data.draft !== 'string' || !data.draft.trim()) {
+      throw new Error('这条战术没有生成可用回复，换一条试试。');
+    }
+    renderStrategicReply(data);
+    strategicReplyStatus.textContent = '已按你选的战术重新生成。核对后再复制，不会自动发送。';
   }
 
   function appendStrategicReplyObject(container, value, emptyMessage) {
@@ -76,6 +163,7 @@ STRATEGIC_REPLY_SCRIPT = r'''
   function renderStrategicReply(data) {
     generatedStrategicReplyDraft = data && data.draft ? String(data.draft) : '';
     strategicReplyDraft.value = generatedStrategicReplyDraft;
+    renderStrategicPlan(data);
 
     strategicReplyContext.replaceChildren();
     const analysis = data && data.structured_analysis ? data.structured_analysis : {};
@@ -183,7 +271,13 @@ STRATEGIC_REPLY_SCRIPT = r'''
     }
     if (!isCurrent()) throw stale();
     if (!data || typeof data.draft !== 'string' || !data.draft.replace(/[\s\u200b-\u200f\ufeff]/g, '')) {
-      throw new Error('模型未返回有效回复草稿，请重新生成。');
+      const heldPlan = data && data.plan;
+      if (!(heldPlan && heldPlan.send_allowed === false)) {
+        throw new Error('模型未返回有效回复草稿，请重新生成。');
+      }
+      renderStrategicReply(data);
+      strategicReplyStatus.textContent = `军师判断这一轮先不发：${heldPlan.read || ''}。可以在「军师判断」里选一条战术再生成。`;
+      return;
     }
     renderStrategicReply(data);
     const timings=data?.reply_inputs?.timings;

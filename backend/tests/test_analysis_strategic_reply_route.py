@@ -12,7 +12,7 @@ class FakeService:
         self.calls = []
 
     def build_context(self, conn, user_id, conversation_id, *, provider=None,
-                      channel_rules="", self_profile=None):
+                      channel_rules="", self_profile=None, option=None):
         self.calls.append((conn, user_id, conversation_id, provider, channel_rules,
                            self_profile))
         if self.error is not None:

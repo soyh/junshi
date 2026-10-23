@@ -507,6 +507,23 @@ class Orchestrator:
             conversation_id,
             self.config.bot.rules,
         )
+        plan = (context or {}).get("plan") if isinstance(context, dict) else None
+        if isinstance(plan, dict) and plan.get("send_allowed") is False:
+            # The planner read the situation and decided this turn should not be
+            # answered (conflict, cooling off, she asked for space). Holding is a
+            # decision, not a failure: nothing is queued for retry.
+            tactics = "、".join(
+                str(item.get("tactic") or "")
+                for item in (plan.get("options") or [])[:3]
+                if isinstance(item, dict) and item.get("tactic")
+            )
+            self._log(
+                f"[bridge] hold {contact_id}: {str(plan.get('read') or '')[:60]!r}"
+                + (f" tactics={tactics}" if tactics else "")
+            )
+            return TurnResult(
+                contact_id, conversation_id, len(events), reason="plan: hold"
+            )
         reply = (context or {}).get("draft")
         reply = reply.strip() if isinstance(reply, str) else ""
 

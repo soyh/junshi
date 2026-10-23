@@ -113,6 +113,8 @@ MY_PROFILE_HTML = r'''
       <div id="my-profile-auto-send">
         <label class="my-profile-check" for="mp-auto-send"><input id="mp-auto-send" type="checkbox"> 我授权电脑客户端自动代发</label>
         <p class="my-profile-hint">勾选后，服务端把「必须由本人发送」这条约束降级为提示：通道插件生成的回复可以直接发出，统计里记为已授权。不勾选时保持原样。</p>
+        <label class="my-profile-check" for="mp-strategic-plan"><input id="mp-strategic-plan" type="checkbox"> 先做「军师判断」再写回复（推荐）</label>
+        <p class="my-profile-hint">开启后先生成判断卡片（局势、阶段、2–4 条战术，可含「这轮先不发」），再按选中的战术写一条消息；参考资料全文在这一步读到。关掉则回到原来的一次生成。</p>
       </div>
     </div>
     <footer>
@@ -144,6 +146,7 @@ MY_PROFILE_SCRIPT = r'''
       reply_rules: byId('mp-rules'),
     };
     const autoSend = byId('mp-auto-send');
+    const strategicPlan = byId('mp-strategic-plan');
     const templateSelect = byId('mp-template');
     const templateNote = byId('my-profile-template-note');
     let templateCache = null;
@@ -173,6 +176,7 @@ MY_PROFILE_SCRIPT = r'''
           node.value = (data && data[key]) || '';
         });
         if (autoSend) { autoSend.checked = !!(data && data.auto_send_authorized); }
+        if (strategicPlan) { strategicPlan.checked = !(data && data.strategic_plan_enabled === false); }
         profileSetStatus(data && data.updated_at ? `上次保存：${data.updated_at}` : '还没有填写过。');
         await loadTemplates();
       } catch (error) {
@@ -186,6 +190,7 @@ MY_PROFILE_SCRIPT = r'''
       const payload = {};
       Object.entries(profileFields).forEach(([key, node]) => { payload[key] = node.value; });
       payload.auto_send_authorized = !!(autoSend && autoSend.checked);
+      payload.strategic_plan_enabled = !!(strategicPlan && strategicPlan.checked);
       profileSetStatus('正在保存…');
       try {
         const data = await api('/api/v1/settings/profile', {

@@ -34,6 +34,7 @@ def _conn():
             about TEXT NOT NULL DEFAULT '',
             reply_rules TEXT NOT NULL DEFAULT '',
             auto_send_authorized INTEGER NOT NULL DEFAULT 0,
+            strategic_plan_enabled INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
@@ -268,3 +269,20 @@ def test_profile_route_round_trips_the_auto_send_flag():
     assert saved.status_code == 200
     assert saved.json()["auto_send_authorized"] is True
     assert reread.json()["auto_send_authorized"] is True
+
+
+def test_planner_flag_defaults_on_and_a_pc_save_keeps_the_web_choice():
+    service = UserProfileService()
+    conn = _conn()
+
+    assert service.get(conn, "u1").strategic_plan_enabled is True
+
+    service.save(conn, "u1", UserProfilePayload(strategic_plan_enabled=False))
+    assert service.get(conn, "u1").strategic_plan_enabled is False
+
+    # The PC client saves the profile without this field; it must not re-enable
+    # a choice the user made on the web.
+    service.save(conn, "u1", UserProfilePayload(nickname="阿军"))
+    profile = service.get(conn, "u1")
+    assert profile.strategic_plan_enabled is False
+    assert profile.nickname == "阿军"

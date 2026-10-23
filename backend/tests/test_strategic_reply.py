@@ -41,6 +41,7 @@ def test_strategic_reply_context_locks_response_shape_and_constraints(client):
         "reply_constraints",
         "draft",
         "learning_strategy",
+        "plan",
     }
     assert body["person"]["id"] == person["id"]
     assert body["relationship"]["id"] == relationship["id"]

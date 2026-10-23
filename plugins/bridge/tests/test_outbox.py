@@ -20,9 +20,10 @@ CONTACT = "xhs:小柯"
 
 
 class _App:
-    def __init__(self, drafts, error: Exception | None = None) -> None:
+    def __init__(self, drafts, error: Exception | None = None, plan=None) -> None:
         self.drafts = list(drafts)
         self.error = error
+        self.plan = plan
         self.context_calls = 0
         self.messages = []
 
@@ -50,7 +51,7 @@ class _App:
         if self.error is not None:
             raise self.error
         draft = self.drafts.pop(0) if self.drafts else ""
-        return {"draft": draft}
+        return {"draft": draft, "plan": self.plan}
 
     async def heartbeat(self, *args, **kwargs):  # noqa: ANN002
         return None
@@ -153,6 +154,40 @@ def test_unsendable_draft_is_skipped_with_a_visible_reason(tmp_path):
     assert channel.sent == []
     assert any("skip" in line and "empty draft" in line for line in logs)
     assert "empty draft" in state.last_failure()
+
+
+def test_plan_hold_skips_the_message_without_queueing_a_retry(tmp_path):
+    app = _App(
+        ["这条不该发出去"],
+        plan={
+            "send_allowed": False,
+            "read": "她连发三条只回一个字，再追更糟",
+            "options": [{"tactic": "先停", "send": False}],
+        },
+    )
+    channel = _Channel()
+    orchestrator, state, logs = _build(tmp_path, app, channel)
+
+    _run(orchestrator, _event())
+
+    counts = state.outbox_counts()
+    assert channel.sent == []
+    assert counts["skipped"] == 1 and counts["queued"] == 0
+    assert any("hold" in line and "先停" in line for line in logs)
+    assert "plan: hold" in state.last_failure()
+
+
+def test_sendable_plan_still_sends_the_draft(tmp_path):
+    app = _App(
+        ["在，刚忙完"],
+        plan={"send_allowed": True, "read": "正常", "options": [{"tactic": "顺着聊"}]},
+    )
+    channel = _Channel()
+    orchestrator, _state, _logs = _build(tmp_path, app, channel)
+
+    _run(orchestrator, _event())
+
+    assert channel.sent == ["在，刚忙完"]
 
 
 def test_failure_is_reported_in_status_after_max_attempts(tmp_path):

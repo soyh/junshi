@@ -12,6 +12,7 @@ from app.services.strategic_reply_learning_strategy_bridge import (
     StrategicReplyLearningStrategyBridgeService,
 )
 from app.services.strategic_reply_llm import StrategicReplyLLMService
+from app.services import strategic_plan as plan_service
 
 #: Facts the operator registered about themselves; they are authoritative for
 #: first-person claims (age, city, job…) and must never be invented otherwise.
@@ -52,6 +53,19 @@ def _auto_send_authorized(conn: sqlite3.Connection, user_id: str) -> bool:
 def _auto_send_boundary(authorized: bool) -> dict[str, bool]:
     """The send boundary: hard rule by default, a note once the user opted in."""
     return {"must_not_auto_send": not authorized, "auto_send_authorized": bool(authorized)}
+
+
+def _strategic_plan_enabled(conn: sqlite3.Connection, user_id: str) -> bool:
+    """True when the account wants the planner stage in front of the draft.
+
+    A stub connection (tests) or a database without the column keeps the classic
+    single-stage chain, so callers never pay for a planner they cannot store.
+    """
+    stored = _stored_profile(conn, user_id)
+    if stored is None:
+        return False
+    value = getattr(stored, "strategic_plan_enabled", True)
+    return True if value is None else bool(value)
 
 
 def _resolve_rules(conn: sqlite3.Connection, user_id: str, override: str) -> str:
@@ -289,10 +303,12 @@ class AnalysisStrategicReplyService:
         progress=None,
         channel_rules: str = "",
         self_profile: dict[str, str] | None = None,
+        option: dict | None = None,
     ) -> dict:
         started = perf_counter()
         timings = {"analysis_seconds": 0.0, "draft_seconds": 0.0,
-                   "analysis_attempts": 0, "draft_attempts": 0}
+                   "analysis_attempts": 0, "draft_attempts": 0,
+                   "plan_seconds": 0.0}
         analysis_context = self.analysis_llm_service.analysis_service.get_context(
             conn, user_id, conversation_id
         )
@@ -300,6 +316,44 @@ class AnalysisStrategicReplyService:
         conversation_focus = self._build_conversation_focus(analysis_context)
         llm_analysis_context = dict(analysis_context)
         llm_analysis_context["conversation_focus"] = conversation_focus
+
+        auto_send = _auto_send_authorized(conn, user_id)
+        chosen_tactic = dict(option) if isinstance(option, dict) and option else None
+        plan_payload_value = None
+        plan_context = None
+        if chosen_tactic is None and _strategic_plan_enabled(conn, user_id):
+            # The planner runs first: it reads the references in full and decides
+            # whether this turn should be sent at all. A failure here falls back to
+            # the classic chain instead of blocking the user.
+            plan_started = perf_counter()
+            try:
+                plan_context = plan_service.build_context(
+                    conn, user_id, conversation_id,
+                    channel_rules=_resolve_rules(conn, user_id, channel_rules),
+                    self_profile=_resolve_profile(conn, user_id, self_profile),
+                    self_style=build_self_style(analysis_context.get("messages")),
+                )
+                plan = plan_service.generate(plan_context, provider=provider)
+                if plan is not None:
+                    sendable = plan.sendable()
+                    plan_payload_value = plan_service.plan_payload(
+                        plan,
+                        used=[item["name"] for item in plan_context.get("references") or []],
+                        skipped=plan_context.get("references_skipped") or [],
+                    )
+                    if sendable:
+                        chosen_tactic = sendable[0].model_dump(mode="json")
+                    else:
+                        timings["plan_seconds"] = perf_counter() - plan_started
+                        return self._hold_result(
+                            analysis_context, plan_context, plan_payload_value,
+                            auto_send, conversation_id, conversation_focus,
+                            timings, started,
+                        )
+            except LLMAnalysisError:
+                plan_payload_value = None
+                chosen_tactic = None
+            timings["plan_seconds"] = perf_counter() - plan_started
 
         for attempt in range(self.MAX_CORRECTIONS + 1):
             if progress: progress('analysis', attempt + 1)
@@ -335,8 +389,8 @@ class AnalysisStrategicReplyService:
             conversation_focus,
         )
 
-        auto_send = _auto_send_authorized(conn, user_id)
         generation_context = {
+            "chosen_tactic": chosen_tactic,
             "person_memory": analysis_context.get("person_memory"),
             "current_state": recommendation_context.get("current_state", {}),
             "evidence": evidence,
@@ -414,6 +468,50 @@ class AnalysisStrategicReplyService:
             "latest_human_message": conversation_focus.get("latest_human_message"),
             "reply_target_message": conversation_focus.get("reply_target_message"),
         }
+        result["plan"] = plan_payload_value
         timings["total_seconds"] = perf_counter() - started
         result["reply_inputs"]["timings"] = timings
         return result
+
+    def _hold_result(
+        self,
+        analysis_context: dict,
+        plan_context: dict,
+        plan_payload_value: dict,
+        auto_send: bool,
+        conversation_id: str,
+        conversation_focus: dict,
+        timings: dict,
+        started: float,
+    ) -> dict:
+        """A plan that says "do not send" needs no analysis or draft call.
+
+        Returning early keeps the expensive chain off, and the empty draft is the
+        signal the bridge uses to hold instead of sending.
+        """
+        timings["total_seconds"] = perf_counter() - started
+        return {
+            "person": analysis_context.get("person") or {},
+            "relationship": (plan_context or {}).get("relationship") or {},
+            "current_state": {
+                "stage": plan_payload_value.get("stage"),
+                "goal": plan_payload_value.get("goal_this_turn"),
+                "signal": plan_payload_value.get("signal"),
+            },
+            "evidence": [],
+            "facts": [],
+            "inferences": [],
+            "unknowns": [],
+            "recommendations": [],
+            "reply_constraints": _auto_send_boundary(auto_send),
+            "draft": None,
+            "learning_strategy": {"candidates": []},
+            "plan": plan_payload_value,
+            "reply_inputs": {
+                "conversation_id": conversation_id,
+                "latest_human_message": conversation_focus.get("latest_human_message"),
+                "reply_target_message": conversation_focus.get("reply_target_message"),
+                "timings": timings,
+            },
+        }
+

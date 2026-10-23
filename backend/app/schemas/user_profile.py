@@ -24,6 +24,10 @@ class UserProfilePayload(BaseModel):
     reply_rules: str = Field(default="", max_length=1500)
     # Explicit opt-in for the desktop bridge sending drafts unchanged.
     auto_send_authorized: bool = False
+    # The planner stage ("marshal") that reads the situation before wording.
+    # None means "leave the stored setting alone": the PC client saves the
+    # profile without this field and must not flip a choice made on the web.
+    strategic_plan_enabled: bool | None = None
 
 
 class UserProfileResponse(UserProfilePayload):

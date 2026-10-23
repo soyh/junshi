@@ -14,7 +14,7 @@ class FakeStrategicReplyService:
         self.calls = []
 
     def build_context(self, conn, user_id, conversation_id, *, provider=None,
-                      channel_rules="", self_profile=None, progress=None):
+                      channel_rules="", self_profile=None, progress=None, option=None):
         self.calls.append((user_id, conversation_id, provider))
         return self.result
 
@@ -149,7 +149,12 @@ def test_strategic_reply_workspace_preserves_auth_and_safe_dom_boundary(client):
 def test_strategic_reply_fragment_has_no_server_side_write_or_send(client):
     html = client.get("/app").text
     script = _strategic_reply_fragment(html)
-    assert "method: 'POST'" not in script
+    # Picking a tactic in the plan card re-generates the draft; it persists
+    # nothing. Every other write verb stays forbidden below.
+    regenerating = script.replace(
+        "method: 'POST', body: JSON.stringify({option})", ""
+    )
+    assert "method: 'POST'" not in regenerating
     assert "method: 'PATCH'" not in script
     assert "method: 'DELETE'" not in script
     assert "/messages" not in script

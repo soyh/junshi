@@ -34,6 +34,9 @@ def _build_provider(conn, user_id: str):
 class ChannelRulesBody(BaseModel):
     rules: str = ""
     self_profile: dict[str, str] = {}
+    # An option the user picked from the plan card; skips the planner call and
+    # drafts that tactic instead of the recommended one.
+    option: dict | None = None
 
 
 def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
@@ -86,7 +89,7 @@ def get_analysis_strategic_reply_context(
     request_id: UUID | None = None,
     user_id: str = Depends(get_current_user_id),
 ):
-    return _reply_context(conversation_id, request_id, "", {}, user_id)
+    return _reply_context(conversation_id, request_id, "", {}, user_id, None)
 
 
 @router.post(
@@ -107,6 +110,7 @@ def post_analysis_strategic_reply_context(
         (body.rules if body else ""),
         (body.self_profile if body else {}),
         user_id,
+        (body.option if body else None),
     )
 
 
@@ -116,6 +120,7 @@ def _reply_context(
     channel_rules: str,
     self_profile: dict[str, str],
     user_id: str,
+    option: dict | None = None,
 ):
     from app.services.reply_progress import publish
     progress = (lambda stage, attempt=0: publish(user_id,conversation_id,str(request_id),stage,attempt)) if request_id else None
@@ -132,6 +137,7 @@ def _reply_context(
                 provider=_build_provider(conn, user_id),
                 channel_rules=channel_rules,
                 self_profile=self_profile,
+                option=option,
                 **kwargs,
             )
             if progress: progress('complete')

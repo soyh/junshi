@@ -185,7 +185,13 @@ def test_action_plan_fragment_stops_before_decision_and_execution(client):
     script_end = html.index("  clearSession();\n})();")
     script = html[script_start:script_end]
 
-    assert "method: 'POST'" not in script
+    # The strategic-reply fragment also lives in this tail: choosing a plan
+    # option re-generates a draft and writes nothing, so that one call is
+    # exempt; all other write verbs and write paths remain forbidden.
+    regenerating = script.replace(
+        "method: 'POST', body: JSON.stringify({option})", ""
+    )
+    assert "method: 'POST'" not in regenerating
     assert "method: 'PATCH'" not in script
     assert "method: 'DELETE'" not in script
     assert "/decisions" not in script

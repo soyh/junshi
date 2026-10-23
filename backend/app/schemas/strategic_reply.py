@@ -15,3 +15,6 @@ class StrategicReplyContextResponse(BaseModel):
     reply_constraints: dict[str, Any]
     draft: str | None
     learning_strategy: dict[str, Any]
+    # The planner's read of the situation and its ranked tactics (None on the
+    # classic chain, or when the planner could not be reached).
+    plan: dict[str, Any] | None = None
