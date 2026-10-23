@@ -293,6 +293,20 @@ class AnalysisStrategicReplyService:
             and item.get("source_id") in wanted_ids
         ]
 
+    def _analysis_for_attempt(
+        self, attempt: int, plan_analysis, llm_analysis_context: dict, provider,
+    ):
+        """The plan already read the conversation; reuse it instead of paying twice.
+
+        A validation miss on the fast path retries with the model, so a weak plan
+        can never degrade the draft below the classic chain.
+        """
+        if attempt == 0 and plan_analysis is not None:
+            return plan_analysis
+        return self.analysis_llm_service.analyze_context(
+            llm_analysis_context, provider=provider,
+        )
+
     def build_context(
         self,
         conn: sqlite3.Connection,
@@ -321,6 +335,7 @@ class AnalysisStrategicReplyService:
         chosen_tactic = dict(option) if isinstance(option, dict) and option else None
         plan_payload_value = None
         plan_context = None
+        plan_analysis = None
         if chosen_tactic is None and _strategic_plan_enabled(conn, user_id):
             # The planner runs first: it reads the references in full and decides
             # whether this turn should be sent at all. A failure here falls back to
@@ -343,6 +358,14 @@ class AnalysisStrategicReplyService:
                     )
                     if sendable:
                         chosen_tactic = sendable[0].model_dump(mode="json")
+                        targets = conversation_focus.get("required_evidence_source_ids") or []
+                        try:
+                            plan_analysis = plan_service.structured_analysis_from_plan(
+                                plan,
+                                reply_target_id=targets[0] if targets else None,
+                            )
+                        except Exception:  # noqa: BLE001 - the plan stays usable without it
+                            plan_analysis = None
                     else:
                         timings["plan_seconds"] = perf_counter() - plan_started
                         return self._hold_result(
@@ -359,8 +382,8 @@ class AnalysisStrategicReplyService:
             if progress: progress('analysis', attempt + 1)
             phase_started = perf_counter()
             timings["analysis_attempts"] += 1
-            structured_analysis = self.analysis_llm_service.analyze_context(
-                llm_analysis_context, provider=provider,
+            structured_analysis = self._analysis_for_attempt(
+                attempt, plan_analysis, llm_analysis_context, provider,
             )
             recommendation_context = self.analysis_recommendation_service.build_context(
                 conn, user_id, conversation_id, provider=provider,
@@ -506,6 +529,19 @@ class AnalysisStrategicReplyService:
             "reply_constraints": _auto_send_boundary(auto_send),
             "draft": None,
             "learning_strategy": {"candidates": []},
+            "structured_analysis": {
+                "summary": str(plan_payload_value.get("read") or "本轮判断为不发消息"),
+                "observed_facts": [],
+                "inferences": [],
+                "unknowns": [],
+                "hypotheses": [],
+                "emotional_signals": [],
+                "relationship_signals": [],
+                "risk_signals": [],
+                "intent_signals": [],
+                "evidence_links": [],
+                "analysis_constraints": ["plan_hold"],
+            },
             "plan": plan_payload_value,
             "reply_inputs": {
                 "conversation_id": conversation_id,

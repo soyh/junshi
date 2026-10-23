@@ -221,6 +221,53 @@ def plan_payload(
     }
 
 
+def structured_analysis_from_plan(plan, *, reply_target_id=None):
+    """Derive the analysis stage's input from the plan so the draft needs no second read.
+
+    The plan already contains the reading, the tactics and the risks; re-asking the
+    analysis model the same question only adds latency. Anything the plan cannot
+    support (observed facts, unknowns) stays empty rather than being invented.
+    """
+    from app.schemas.structured_analysis import StructuredAnalysis, StructuredAnalysisItem
+
+    target = reply_target_id if isinstance(reply_target_id, str) else None
+    hypotheses: list[StructuredAnalysisItem] = []
+    for option in plan.options:
+        ids = list(option.evidence_source_ids)
+        if not ids and target:
+            ids = [target]
+        hypotheses.append(
+            StructuredAnalysisItem(
+                content=f"{option.tactic}：{option.why}",
+                confidence=plan.confidence,
+                evidence_source_ids=ids,
+                action="send" if option.send else "hold",
+            )
+        )
+    inferences: list[StructuredAnalysisItem] = []
+    if plan.read:
+        inferences.append(
+            StructuredAnalysisItem(
+                content=plan.read,
+                confidence=plan.confidence,
+                evidence_source_ids=[target] if target else [],
+            )
+        )
+    return StructuredAnalysis(
+        summary=plan.read or f"{plan.stage}：{plan.goal_this_turn}".strip("："),
+        observed_facts=[],
+        inferences=inferences,
+        unknowns=[],
+        hypotheses=hypotheses,
+        emotional_signals=[StructuredAnalysisItem(content=f"signal={plan.signal}")],
+        relationship_signals=[],
+        risk_signals=[StructuredAnalysisItem(content=text) for text in plan.avoid],
+        intent_signals=[],
+        evidence_links=[],
+        analysis_constraints=["plan_derived"],
+    )
+
+
 def context_for_prompt(context: dict[str, Any]) -> str:
     """Serialise the planner input. References go last so they stay readable."""
     payload = {

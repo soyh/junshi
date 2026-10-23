@@ -91,7 +91,7 @@ def main():
     assert completed.returncode == 0 and json.loads(report.read_text())['frozen'], 'Packaged smoke test failed'
     assert not list(app.rglob('*.sqlite3')) and not list(app.rglob('.env'))
     assert (app/'JunshiBridge'/'JunshiBridge.exe').is_file(), 'Bundled bridge executable missing'
-    archive=Path(shutil.make_archive(str(output/'JunshiPC-250-Windows-x64'), 'zip', app.parent, app.name))
+    archive=Path(shutil.make_archive(str(output/'JunshiPC-251-Windows-x64'), 'zip', app.parent, app.name))
     digest=hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix('.zip.sha256').write_text(digest+'  '+archive.name+'\n',encoding='ascii')
     (output/'build-result.json').write_text(json.dumps({'exe':str(app/'JunshiPC.exe'),'zip':str(archive),'sha256':digest,'smoke':'PASS'},indent=2),encoding='utf-8')

@@ -403,3 +403,70 @@ def test_option_skips_the_planner_call(monkeypatch):
             option={"tactic": "顺着聊", "why": "w", "line": "在", "send": True},
         )
     assert called["plan"] == 0
+
+
+def test_structured_analysis_from_plan_reuses_the_tactics_without_inventing_facts():
+    plan = StrategicPlan.model_validate(
+        {
+            "read": "她只回了两个字，热度在降",
+            "signal": "yellow",
+            "options": [
+                {
+                    "tactic": "降压收线",
+                    "why": "再追会更冷",
+                    "line": "行，那你先忙",
+                    "send": True,
+                    "evidence_source_ids": [],
+                },
+                {"tactic": "先停", "why": "等她主动", "line": "", "send": False},
+            ],
+            "avoid": ["连发三条"],
+            "confidence": 0.6,
+        }
+    )
+
+    analysis = strategic_plan.structured_analysis_from_plan(plan, reply_target_id="m9")
+
+    assert analysis.summary == "她只回了两个字，热度在降"
+    assert [item.action for item in analysis.hypotheses] == ["send", "hold"]
+    assert analysis.hypotheses[0].evidence_source_ids == ["m9"]
+    assert analysis.observed_facts == []
+    assert analysis.analysis_constraints == ["plan_derived"]
+    assert [item.content for item in analysis.risk_signals] == ["连发三条"]
+
+
+def test_plan_replaces_the_second_analysis_read_on_the_first_attempt():
+    service = AnalysisStrategicReplyService(analysis_llm_service=_AnalysisLLM)
+    plan = StrategicPlan.model_validate(
+        {"read": "可以接住", "options": [{"tactic": "顺着聊", "why": "她主动", "line": "在呢"}]}
+    )
+    analysis = strategic_plan.structured_analysis_from_plan(plan, reply_target_id="m1")
+
+    first = service._analysis_for_attempt(0, analysis, {"messages": []}, provider=None)
+
+    assert first is analysis
+    # Attempt 1 must still be able to ask the model when the fast path was rejected.
+    with pytest.raises(AssertionError):
+        service._analysis_for_attempt(1, analysis, {"messages": []}, provider=None)
+
+
+def test_hold_payload_survives_response_model_validation():
+    from app.schemas.analysis_strategic_reply import (
+        AnalysisStrategicReplyContextResponse,
+    )
+
+    conn = _conn()
+    service = AnalysisStrategicReplyService(analysis_llm_service=_AnalysisLLM)
+    provider = _Provider(
+        {
+            "read": "她说别再发了",
+            "signal": "red",
+            "options": [{"tactic": "收线", "why": "边界已明确", "line": "", "send": False}],
+        }
+    )
+
+    result = service.build_context(conn, "u1", "c1", provider=provider)
+
+    validated = AnalysisStrategicReplyContextResponse.model_validate(result)
+    assert validated.draft is None
+    assert validated.structured_analysis.summary == "她说别再发了"
