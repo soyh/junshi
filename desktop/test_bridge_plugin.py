@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -531,6 +532,30 @@ def test_clear_outbox_forgets_failures_or_one_contact(plugin_home):
     _write_outbox(profile_id, [("m4", "soul:b", "松影", "早", "queued", 0, None, "2026-10-22T09:03:00")])
     assert bp.clear_outbox(profile_id, only_failed=True) == 1
     assert [row["contact_id"] for row in bp.pending_contacts(profile_id)] == ["soul:b"]
+
+
+def test_takeover_targets_list_only_contacts_with_a_conversation(plugin_home):
+    profile_id = bp.create_profile(
+        name="Soul 小号", server="https://example.com", username="u",
+        password="password-123456", channel="soul",
+    )
+    path = bp.profile_dir(profile_id) / "state.sqlite3"
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "CREATE TABLE contacts (contact_id TEXT PRIMARY KEY, conversation_id TEXT,"
+            " label TEXT, updated_at TEXT)"
+        )
+        connection.executemany(
+            "INSERT INTO contacts VALUES (?, ?, ?, ?)",
+            [
+                ("soul:a", "c-1", "桃雾漫", "2026-10-24T18:50:00"),
+                ("soul:b", "", "没会话", "2026-10-24T18:51:00"),
+            ],
+        )
+        connection.commit()
+    rows = bp.takeover_targets(profile_id)
+    assert [row["label"] for row in rows] == ["桃雾漫"]
+    assert rows[0]["conversation_id"] == "c-1"
 
 
 def test_place_fields_survive_the_account_round_trip():

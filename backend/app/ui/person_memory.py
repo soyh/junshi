@@ -41,10 +41,49 @@ PERSON_MEMORY_SCRIPT = r'''
       if(!profileLoaded){profileBody.replaceChildren();memoryLine(profileBody,'所有人物采用相同规则；回复时仅选取预算内的相关条目，不发送完整档案。');}
       if(data.stale)memoryLine(profileBody,'原聊天已修改，以下旧条目暂不用于回复，等待重建。');
       const labels={facts:'事实',preferences:'偏好',events:'重要事件',constraints:'约定与边界',unknowns:'待确认',inferences:'推断'};
+      async function profileReload(){
+        profileOffset=0;profileLoaded=false;profileBody.replaceChildren();
+        await profileLoad();
+      }
+      async function profileCorrect(body,host){
+        const person=selectedPersonId,epoch=personMemoryEpoch;
+        try{
+          await api(`/api/v1/persons/${encodeURIComponent(person)}/memory/corrections`,{method:'POST',body:JSON.stringify(body)});
+          if(person!==selectedPersonId || epoch!==personMemoryEpoch)return;
+          await profileReload();
+        }catch(error){
+          memoryLine(host,'改正失败：'+(error && error.message ? error.message : error));
+        }
+      }
       for(const item of data.items || []){
         const row=document.createElement('details'),title=document.createElement('summary');
         title.textContent=`${labels[item.kind] || item.kind} · ${item.active?'有效':'已被修订'}：${item.text}`;
         row.append(title);
+        const tools=document.createElement('div');tools.className='memory-actions';
+        const editor=document.createElement('div');editor.className='memory-actions';editor.hidden=true;
+        if(item.source==='user')memoryLine(tools,'这条是你写的，优先于 AI 推断。');
+        const fix=document.createElement('button');fix.type='button';fix.textContent='改正';
+        const del=document.createElement('button');del.type='button';del.textContent='删除';
+        const field=document.createElement('textarea');field.rows=2;field.value=item.text;
+        const save=document.createElement('button');save.type='button';save.textContent='保存改正';
+        const cancel=document.createElement('button');cancel.type='button';cancel.textContent='取消';
+        editor.append(field,save,cancel);
+        if(item.active)tools.append(fix,del);
+        row.append(tools,editor);
+        fix.addEventListener('click',event=>{event.preventDefault();editor.hidden=false;field.focus();});
+        cancel.addEventListener('click',()=>{editor.hidden=true;});
+        save.addEventListener('click',async()=>{
+          const text=field.value.trim();
+          if(!text){memoryLine(editor,'请填写正确的内容。');return;}
+          save.disabled=true;
+          await profileCorrect({action:'edit',entry_id:item.id,kind:item.kind,text},editor);
+          save.disabled=false;
+        });
+        del.addEventListener('click',async()=>{
+          del.disabled=true;
+          await profileCorrect({action:'delete',entry_id:item.id,kind:item.kind,text:''},tools);
+          del.disabled=false;
+        });
         if(item.legacy)memoryLine(row,'来自升级前的摘要；原始更新记录仍可查询，未补造逐条依据。');
         if(item.revision_reason)memoryLine(row,`修订原因：${item.revision_reason}`);
         let read=false;
@@ -62,7 +101,33 @@ PERSON_MEMORY_SCRIPT = r'''
     }catch(_){if(person===selectedPersonId)memoryLine(profileBody,'档案条目读取失败，请重试。');}
     finally{profileBusy=false;profileMore.disabled=false;}
   }
-  profileDetails.append(profileTitle,profileBody,profileMore);
+  const profileAddHost=document.createElement('div');profileAddHost.className='memory-actions';
+  const profileAdd=document.createElement('button');profileAdd.type='button';profileAdd.textContent='补充一条事实';
+  const addField=document.createElement('textarea');addField.rows=2;
+  addField.placeholder='比如：见面地点是破店烧烤，不是喜茶。';
+  const addSave=document.createElement('button');addSave.type='button';addSave.textContent='保存';
+  const addCancel=document.createElement('button');addCancel.type='button';addCancel.textContent='取消';
+  profileAddHost.append(addField,addSave,addCancel);profileAddHost.hidden=true;
+  profileAdd.addEventListener('click',()=>{profileAddHost.hidden=false;addField.focus();});
+  addCancel.addEventListener('click',()=>{profileAddHost.hidden=true;});
+  addSave.addEventListener('click',async()=>{
+    const text=addField.value.trim();
+    if(!text){memoryLine(profileAddHost,'请填写内容。');return;}
+    if(!selectedPersonId)return;
+    const person=selectedPersonId,epoch=personMemoryEpoch;
+    addSave.disabled=true;
+    try{
+      await api(`/api/v1/persons/${encodeURIComponent(person)}/memory/corrections`,
+        {method:'POST',body:JSON.stringify({action:'add',kind:'facts',text})});
+      if(person!==selectedPersonId || epoch!==personMemoryEpoch)return;
+      addField.value='';profileAddHost.hidden=true;
+      profileOffset=0;profileLoaded=false;profileBody.replaceChildren();
+      if(profileDetails.open)profileLoad();
+    }catch(error){
+      memoryLine(profileAddHost,'保存失败：'+(error && error.message ? error.message : error));
+    }finally{addSave.disabled=false;}
+  });
+  profileDetails.append(profileTitle,profileBody,profileAdd,profileAddHost,profileMore);
   profileDetails.addEventListener('toggle',()=>{if(profileDetails.open && !profileLoaded)profileLoad();});
   profileMore.addEventListener('click',profileLoad);
   memoryDrawer.append(memoryDrawerTitle,memorySummary,profileDetails,memoryEvents,memoryPages);

@@ -35,7 +35,13 @@ def test_compact_surface_quick_new_conversation_is_explicit(client):
     compact_start = html.index('function clientConversationChipLabel')
     compact_end = html.index("const messagesStatus = byId('messages-status')")
     compact = html[compact_start:compact_end]
-    assert "method: 'POST'" not in compact
+    # The only write the compact surface owns is the manual-takeover toggle,
+    # which flips one boolean on the conversation already selected. Everything
+    # else (create, send, imports) must keep going through its verified path.
+    start = compact.index("byId('client-conversation-takeover')?.addEventListener")
+    end = compact.index("\n  });", start) + len("\n  });")
+    remainder = compact[:start] + compact[end:]
+    assert "method: 'POST'" not in remainder
     assert "api('/api/v1/conversations'" not in compact
 
 

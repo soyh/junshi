@@ -218,6 +218,15 @@ class AppClient:
             },
         )
 
+    async def set_takeover(self, conversation_id: str, paused: bool) -> bool:
+        """Stop or resume automatic replies for one conversation."""
+        result = await self._request(
+            "POST",
+            f"/api/v1/conversations/{conversation_id}/takeover",
+            json={"enabled": bool(paused)},
+        )
+        return bool((result or {}).get("auto_reply_paused"))
+
     async def capture_wechat(self, person_id: str, text: str) -> str:
         """Let the server spot a WeChat id the counterpart typed in chat."""
         try:

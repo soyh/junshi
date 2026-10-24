@@ -13,10 +13,17 @@ def size(value):
 
 def entries(summary):
     if '_profile' in summary:
-        return deepcopy(summary['_profile'])
-    return [{'id':hashlib.sha256((kind+'\0'+text).encode()).hexdigest()[:24],
-             'kind':kind,'text':text,'evidence':[],'active':True,'legacy':True}
-            for kind in KINDS for text in summary.get(kind,[])]
+        base = deepcopy(summary['_profile'])
+    else:
+        base = [{'id':hashlib.sha256((kind+'\0'+text).encode()).hexdigest()[:24],
+                 'kind':kind,'text':text,'evidence':[],'active':True,'legacy':True}
+                for kind in KINDS for text in summary.get(kind,[])]
+    # A person's own correction outranks anything the model derived, so it is
+    # listed first and never folded away by a later summarisation pass.
+    fixed = [{'id':row['id'],'kind':row['kind'],'text':row['text'],'evidence':[],
+              'active':True,'source':'user','legacy':False}
+             for row in summary.get('_corrections',[]) if str(row.get('text','')).strip()]
+    return fixed + base
 
 
 def merge(previous,proposal,evidence,complete):
@@ -36,6 +43,9 @@ def merge(previous,proposal,evidence,complete):
         if key not in index or key not in {row['id'] for row in entries(previous)}:
             raise ValueError('unknown profile revision target')
         row=index[key]
+        if row.get('source')=='user':
+            # The person wrote this; a model revision cannot overwrite it.
+            continue
         if not any(c['after']['kind']==row['kind'] for c in changes if c['before'] is None):
             raise ValueError('profile revision requires an explicit replacement')
         if row['active']:
@@ -68,7 +78,7 @@ def project(summary,messages,budget,*,updated_at=None,covered_count=0,original_m
     # Consolidation is lossless exact deduplication, never semantic guessing.
     all_items=list({(r['kind'],r['text']):r for r in entries(summary) if r['active']}.values())
     query=terms(' '.join(m.get('content','') for m in messages[-8:]))
-    ranked=sorted(enumerate(all_items),key=lambda p:(p[1]['kind']=='constraints',len(terms(p[1]['text']) & query),p[0]),reverse=True)
+    ranked=sorted(enumerate(all_items),key=lambda p:(p[1].get('source')=='user',p[1]['kind']=='constraints',len(terms(p[1]['text']) & query),p[0]),reverse=True)
     result['omitted_count']=len(all_items)
     if size(result)>limit:
         return None

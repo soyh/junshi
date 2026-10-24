@@ -401,6 +401,33 @@ def pending_contacts(profile_id: str) -> list[dict]:
     return rows
 
 
+def takeover_targets(profile_id: str) -> list[dict]:
+    """Contacts this channel has talked to, with the conversation they map to.
+
+    人工接管 works per conversation, so the dialog needs the server-side id.
+    """
+    path = profile_dir(profile_id) / "state.sqlite3"
+    if not path.is_file():
+        return []
+    rows: list[dict] = []
+    try:
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
+            connection.row_factory = sqlite3.Row
+            try:
+                cursor = connection.execute(
+                    "SELECT contact_id, conversation_id, COALESCE(label, '') AS label"
+                    " FROM contacts WHERE COALESCE(conversation_id, '') != ''"
+                    " ORDER BY updated_at DESC LIMIT 60"
+                )
+            except sqlite3.Error:
+                return []
+            for row in cursor:
+                rows.append(dict(row))
+    except sqlite3.Error:
+        return []
+    return rows
+
+
 def clear_outbox(profile_id: str, contact_id: str | None = None,
                  only_failed: bool = True) -> int:
     """Forget owed replies — the user answered that person by hand."""

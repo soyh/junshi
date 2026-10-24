@@ -44,3 +44,14 @@ class PersonMemoryProposal(BaseModel):
         if len(json.dumps(summary,ensure_ascii=False).encode('utf-8')) > 8192:
             raise ValueError('memory summary exceeds compact input budget')
         return self
+
+class PersonMemoryCorrection(BaseModel):
+    """One correction the person makes to their own archive."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: str = Field(default="add", pattern="^(add|edit|delete)$")
+    entry_id: str = Field(default="", max_length=64)
+    kind: str = Field(default="facts", max_length=20)
+    text: str = Field(default="", max_length=400)
+

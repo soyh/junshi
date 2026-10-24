@@ -225,6 +225,75 @@ def refresh_memory(user_id, person_id, provider, *, max_batches=4):
             _running.discard(key)
 
 
+def _entry_key(kind, text):
+    return 'user-' + hashlib.sha256((kind + '\0' + text).encode()).hexdigest()[:20]
+
+
+def apply_correction(conn, user_id, person_id, *, action='add', entry_id='', kind='facts', text=''):
+    """Record what the person says is true, and let it outrank the model.
+
+    A correction is stored next to the derived profile rather than rewritten into
+    it: the next summarisation pass keeps it unchanged, and the planner reads it
+    first. Deleting only deactivates the entry so the model cannot invent the
+    same sentence again from the same evidence.
+    """
+    s = snapshot(conn, user_id, person_id)
+    summary = s['summary'] or {}
+    if '_profile' in summary:
+        base = [dict(row) for row in summary['_profile']]
+    else:
+        from app.services.compact_profile import entries as profile_entries
+        base = [dict(row) for row in profile_entries(summary)]
+    corrections = [dict(row) for row in summary.get('_corrections', [])]
+
+    def deactivate(target, reason):
+        for row in base:
+            if row['id'] == target:
+                row['active'] = False
+                row['revision_reason'] = reason
+        corrections[:] = [row for row in corrections if row['id'] != target]
+
+    action = (action or 'add').strip().lower()
+    entry_id = (entry_id or '').strip()
+    text = (text or '').strip()
+    if action == 'delete':
+        if not entry_id:
+            raise ValueError('entry_id is required')
+        deactivate(entry_id, '你删除了这条')
+        reason = '你删除了档案里的一条记录。'
+    elif action in {'add', 'edit'}:
+        if not text:
+            raise ValueError('text is required')
+        if kind not in ('constraints', 'facts', 'preferences', 'events', 'unknowns', 'inferences'):
+            kind = 'facts'
+        if len(text) > 400:
+            text = text[:400]
+        if entry_id:
+            deactivate(entry_id, '你改正了这条')
+        corrections[:] = [row for row in corrections if row['id'] != _entry_key(kind, text)]
+        corrections.insert(0, {'id': _entry_key(kind, text), 'kind': kind, 'text': text,
+                               'created_at': now(), 'target': entry_id})
+        reason = '你改正/补充了档案条目。' if entry_id else '你补充了一条档案事实。'
+    else:
+        raise ValueError('unknown action')
+
+    summary['_profile'] = base
+    summary['_corrections'] = corrections
+    summary['_profile_version'] = int(summary.get('_profile_version') or 1)
+    before = {'summary': summary.get('_profile') and [row for row in base]}
+    conn.execute('BEGIN IMMEDIATE')
+    updated = conn.execute(
+        'UPDATE person_memories SET summary_json=?,revision=revision+1,updated_at=? WHERE person_id=? AND user_id=?',
+        (dump(summary), now(), person_id, user_id)).rowcount
+    if not updated:
+        conn.execute('INSERT INTO person_memories VALUES (?,?,?,?,?,?)',
+                     (person_id, user_id, s['revision'] + 1, dump(summary), dump(s['coverage']), now()))
+    record_event(conn, user_id, person_id, 'user', 'updated', reason, before,
+                 {'summary': {k: v for k, v in summary.items() if not k.startswith('_')},
+                  'corrections': corrections})
+    return {'corrections': corrections, 'revision': s['revision'] + 1}
+
+
 def background_refresh(user_id, person_id):
     from app.api.routes.analysis_strategic_reply import _build_provider
     try:

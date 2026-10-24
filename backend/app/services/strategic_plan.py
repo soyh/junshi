@@ -60,11 +60,18 @@ def load_memory(
             continue
         if used + len(text) > limit_chars:
             break
-        lines.append({"kind": str(entry.get("kind") or ""), "text": text})
+        line = {"kind": str(entry.get("kind") or ""), "text": text}
+        if entry.get("source") == "user":
+            line["source"] = "user"
+        lines.append(line)
         used += len(text)
     if not lines:
         return {}
-    return {"entries": lines, "updated_at": row["updated_at"]}
+    return {
+        "entries": lines,
+        "updated_at": row["updated_at"],
+        "rule": "标记为「你写的」的条目是本人亲自改正的事实，优先级高于推断；与推断冲突时以它为准。",
+    }
 
 
 def _clip(text: str, limit: int) -> str:

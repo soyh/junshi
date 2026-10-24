@@ -1,7 +1,8 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
-from app.services.person_memory import read_memory, background_refresh
+from app.schemas.person_memory import PersonMemoryCorrection
+from app.services.person_memory import read_memory, background_refresh, apply_correction
 
 router = APIRouter(prefix='/persons/{person_id}/memory', tags=['person-memory'])
 
@@ -40,3 +41,17 @@ def get_profile(person_id: str, offset: int = Query(0,ge=0), limit: int = Query(
         rows=entries(s['summary'])
         return {'items':rows[offset:offset+limit],'total':len(rows),'stale':s['stale'],
                 'has_more':offset+limit<len(rows)}
+
+
+@router.post('/corrections')
+def correct(person_id: str, body: PersonMemoryCorrection,
+            user_id: str = Depends(get_current_user_id)):
+    """Let the person fix a wrong archive entry; it outranks model inference."""
+    with get_connection() as conn:
+        try:
+            return apply_correction(conn, user_id, person_id, action=body.action,
+                                    entry_id=body.entry_id, kind=body.kind, text=body.text)
+        except ValueError as error:
+            if 'Person not found' in str(error):
+                raise HTTPException(404, 'Person not found') from None
+            raise HTTPException(422, str(error)) from None

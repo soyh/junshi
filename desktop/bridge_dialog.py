@@ -297,11 +297,25 @@ class BridgeDialog(Dialog):
                 row=0, column=index, sticky="ew", padx=(0, 6), pady=2
             )
         ttk.Label(queue_buttons, text="已手动回复：").grid(row=1, column=0, sticky="w", pady=(4, 0))
+        self.takeover_status = tk.StringVar(value="")
         self.queue_contact = tk.StringVar()
         self.queue_picker = ttk.Combobox(
             queue_buttons, textvariable=self.queue_contact, state="readonly", width=18
         )
         self.queue_picker.grid(row=1, column=1, columnspan=3, sticky="ew", pady=(4, 0))
+
+        ttk.Label(queue_buttons, text="人工接管：").grid(row=2, column=0, sticky="w", pady=(4, 0))
+        self.takeover_contact = tk.StringVar()
+        self.takeover_picker = ttk.Combobox(
+            queue_buttons, textvariable=self.takeover_contact, state="readonly", width=18
+        )
+        self.takeover_picker.grid(row=2, column=1, sticky="ew", pady=(4, 0))
+        ttk.Button(queue_buttons, text="切换接管", command=self.toggle_takeover).grid(
+            row=2, column=2, sticky="ew", padx=(6, 6), pady=(4, 0)
+        )
+        ttk.Label(queue_buttons, textvariable=self.takeover_status, wraplength=780).grid(
+            row=3, column=0, columnspan=4, sticky="w", pady=(3, 0)
+        )
         for column in range(4):
             queue_buttons.grid_columnconfigure(column, weight=1)
 
@@ -680,14 +694,56 @@ class BridgeDialog(Dialog):
             return
         self.perform(
             lambda: (bp.outbox_lines([current], empty=f"{current['name']}：当前没有待发或失败的消息。"),
-                     bp.pending_contacts(self.current)),
+                     bp.pending_contacts(self.current),
+                     bp.takeover_targets(self.current)),
             self._queue_loaded,
         )
 
     def _queue_loaded(self, payload):
-        lines, contacts = payload
+        lines, contacts, targets = payload
         self.render_queue(lines)
         self._set_contacts(contacts)
+        self._set_takeover(targets)
+
+    def _set_takeover(self, targets):
+        labels = [f"{row.get('label') or row['contact_id']}" for row in targets]
+        self.takeover_picker.configure(values=labels)
+        if self.takeover_contact.get() not in labels:
+            self.takeover_contact.set(labels[0] if labels else "")
+        self._takeover_rows = {
+            f"{row.get('label') or row['contact_id']}": row for row in targets
+        }
+        if not labels:
+            self.takeover_status.set("这个通道还没有聊过的人。")
+
+    def toggle_takeover(self):
+        row = getattr(self, "_takeover_rows", {}).get(self.takeover_contact.get())
+        if not row:
+            self.message.set("先在「人工接管」里选一个人（这个通道聊过的人才会列出）。")
+            return
+        conversation_id = row["conversation_id"]
+        who = row.get("label") or row["contact_id"]
+
+        def work():
+            detail = self.server.request("GET", f"/conversations/{conversation_id}")
+            paused = bool((detail or {}).get("auto_reply_paused"))
+            fresh = self.server.request(
+                "POST",
+                f"/conversations/{conversation_id}/takeover",
+                {"enabled": not paused},
+            )
+            return bool((fresh or {}).get("auto_reply_paused")), who
+
+        self.perform(work, self._takeover_done)
+
+    def _takeover_done(self, result):
+        paused, who = result
+        if paused:
+            self.takeover_status.set(f"{who}：人工接管中，自动回复已停。")
+            self.message.set(f"已接管 {who}：这个人的消息只提醒，不再自动回。")
+        else:
+            self.takeover_status.set(f"{who}：自动回复已恢复。")
+            self.message.set(f"已交还 {who}：恢复自动回复。")
 
     def _set_contacts(self, contacts):
         labels = [f"{row.get('contact_name') or row['contact_id']}" for row in contacts]
