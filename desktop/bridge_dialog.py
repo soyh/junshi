@@ -24,46 +24,64 @@ class BridgeDialog(Dialog):
         super().__init__(app, "自动回复通道插件（多开）")
         self.profiles = {}
         self.current = None
-        self.window.minsize(900, 560)
-        self.fit(1080, 700)
+        self.window.minsize(880, 520)
+        self.fit(1120, 720)
+        # 768 高的笔记本屏幕上 720 的窗口会贴着任务栏，直接最大化更稳。
+        if self.window.winfo_screenheight() <= 800:
+            try:
+                self.window.state("zoomed")
+            except tk.TclError:
+                pass
 
         ttk.Label(
             self.frame,
             text="每个通道独立账号、独立浏览器登录态与独立进程，可同时运行；微信一个 Windows 会话只能登一个号。",
             wraplength=900,
-        ).pack(anchor="w")
+        ).grid(row=0, column=0, sticky="w")
 
+        # The action bar is a fixed grid row: the scrollable body may shrink on
+        # small screens, the buttons never get clipped.
         bar = ttk.Frame(self.frame)
-        bar.pack(side="bottom", fill="x", pady=(8, 0))
+        bar.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        self.frame.grid_rowconfigure(1, weight=1)
+        self.frame.grid_columnconfigure(0, weight=1)
 
         body = ttk.Frame(self.frame)
-        body.pack(fill="both", expand=True, pady=(6, 0))
+        body.grid(row=1, column=0, sticky="nsew", pady=(6, 0))
         left = ttk.Frame(body)
         left.pack(side="left", fill="y")
         right_wrap = ttk.Frame(body)
         right_wrap.pack(side="left", fill="both", expand=True, padx=(12, 0))
 
         self._build_left(left)
+        queue_host = ttk.Frame(right_wrap)
+        queue_host.pack(side="bottom", fill="x", pady=(6, 0))
         self._build_right(scrollable(right_wrap))
+        self._build_queue(queue_host)
 
         actions = ttk.Frame(bar)
         actions.pack(fill="x")
-        self.button(actions, "保存配置", self.save)
-        self.button(actions, "启动", self.start_profile)
-        self.button(actions, "停止", self.stop_profile)
-        self.button(actions, "启动全部", self.start_all)
-        self.button(actions, "显示浏览器", self.show_browser)
-        self.button(actions, "隐藏浏览器", self.hide_browser)
-        self.button(actions, "刷新状态", self.refresh)
-        self.button(actions, "关闭", self.close)
-        ttk.Label(bar, textvariable=self.message, wraplength=1000).pack(fill="x", pady=(4, 0))
+        for index, (text, command) in enumerate(
+            (
+                ("保存配置", self.save),
+                ("启动", self.start_profile),
+                ("停止", self.stop_profile),
+                ("启动全部", self.start_all),
+                ("显示浏览器", self.show_browser),
+                ("隐藏浏览器", self.hide_browser),
+                ("刷新状态", self.refresh),
+                ("关闭", self.close),
+            )
+        ):
+            button = ttk.Button(actions, text=text, command=command)
+            button.grid(row=index // 4, column=index % 4, sticky="ew", padx=(0, 6), pady=2)
+        for column in range(4):
+            actions.grid_columnconfigure(column, weight=1)
+        ttk.Label(bar, textvariable=self.message, wraplength=980).pack(fill="x", pady=(4, 0))
         ttk.Label(
             bar,
-            text=(
-                "首次启动或登录态过期会自动弹出可见浏览器窗口供扫码；登录成功后按“隐藏方式”处理。"
-                "状态以本机当前为准（每 15 秒刷新）。"
-            ),
-            wraplength=1000,
+            text="首次启动或登录态过期会弹出浏览器扫码；状态每 15 秒刷新。",
+            wraplength=980,
         ).pack(anchor="w")
         self.load_shared(announce=True)
         self.reload()
@@ -218,7 +236,7 @@ class BridgeDialog(Dialog):
         self.template.bind("<<ComboboxSelected>>", lambda _event: self.fill_template(insert_only=False))
         text_row = ttk.Frame(rules.body)
         text_row.pack(fill="both", expand=True, pady=(2, 0))
-        self.rules = tk.Text(text_row, height=7, wrap="word", spacing1=2, spacing3=2)
+        self.rules = tk.Text(text_row, height=5, wrap="word", spacing1=2, spacing3=2)
         self.rules.pack(side="left", fill="both", expand=True)
         bar = ttk.Scrollbar(text_row, command=self.rules.yview)
         bar.pack(side="left", fill="y")
@@ -231,26 +249,37 @@ class BridgeDialog(Dialog):
 
         self._build_shared(parent)
 
+    def _build_queue(self, parent):
+        """Pinned below the scroll area: the queue is why the dialog is open."""
         queue = Section(parent, "待发 / 失败（仅当前通道）", open=True)
         queue_row = ttk.Frame(queue.body)
         queue_row.pack(fill="both", expand=True)
-        self.queue_text = tk.Text(queue_row, height=10, wrap="char", state="disabled")
+        self.queue_text = tk.Text(queue_row, height=5, wrap="char", state="disabled")
         self.queue_text.pack(side="left", fill="both", expand=True)
         queue_bar = ttk.Scrollbar(queue_row, command=self.queue_text.yview)
         queue_bar.pack(side="left", fill="y")
         self.queue_text.configure(yscrollcommand=queue_bar.set)
         queue_buttons = ttk.Frame(queue.body)
         queue_buttons.pack(fill="x", pady=(3, 0))
-        self.button(queue_buttons, "立即重试", self.retry_outbox)
-        self.button(queue_buttons, "刷新队列", self.refresh_queue)
-        ttk.Label(queue_buttons, text="已手动回复：").pack(side="left", padx=(10, 2))
+        for index, (text, command) in enumerate(
+            (
+                ("立即重试", self.retry_outbox),
+                ("刷新队列", self.refresh_queue),
+                ("计入已回", self.resolve_contact),
+                ("清除失败记录", self.clear_failed),
+            )
+        ):
+            ttk.Button(queue_buttons, text=text, command=command).grid(
+                row=0, column=index, sticky="ew", padx=(0, 6), pady=2
+            )
+        ttk.Label(queue_buttons, text="已手动回复：").grid(row=1, column=0, sticky="w", pady=(4, 0))
         self.queue_contact = tk.StringVar()
         self.queue_picker = ttk.Combobox(
             queue_buttons, textvariable=self.queue_contact, state="readonly", width=18
         )
-        self.queue_picker.pack(side="left")
-        self.button(queue_buttons, "计入已回", self.resolve_contact)
-        self.button(queue_buttons, "清除失败记录", self.clear_failed)
+        self.queue_picker.grid(row=1, column=1, columnspan=3, sticky="ew", pady=(4, 0))
+        for column in range(4):
+            queue_buttons.grid_columnconfigure(column, weight=1)
 
 
     def _cell(self, grid, row, column, key, label, value="", choices=None, secret=False,
