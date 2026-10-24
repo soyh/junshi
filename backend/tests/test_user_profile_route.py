@@ -34,6 +34,8 @@ def _conn():
             about TEXT NOT NULL DEFAULT '',
             reply_rules TEXT NOT NULL DEFAULT '',
             auto_send_authorized INTEGER NOT NULL DEFAULT 0,
+            wechat_id TEXT NOT NULL DEFAULT '',
+            contact_handoff_enabled INTEGER NOT NULL DEFAULT 0,
             strategic_plan_enabled INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -286,3 +288,46 @@ def test_planner_flag_defaults_on_and_a_pc_save_keeps_the_web_choice():
     profile = service.get(conn, "u1")
     assert profile.strategic_plan_enabled is False
     assert profile.nickname == "阿军"
+
+
+def test_profile_stores_the_wechat_id_and_the_handoff_switch():
+    conn = _conn()
+    service = UserProfileService()
+
+    saved = service.save(
+        conn,
+        "u1",
+        UserProfilePayload(wechat_id=" lin_xiao96 ", contact_handoff_enabled=True),
+    )
+    assert saved.wechat_id == "lin_xiao96"
+    assert saved.contact_handoff_enabled is True
+
+    # The PC form omits the switch: saving the profile must not turn it off.
+    again = service.save(conn, "u1", UserProfilePayload(wechat_id="lin_xiao96"))
+    assert again.contact_handoff_enabled is True
+
+
+def test_handoff_reply_is_blocked_until_the_user_authorises_it():
+    from app.services.analysis_strategic_reply import _contact_handoff
+
+    conn = _conn()
+    conn.execute(
+        "CREATE TABLE persons (id TEXT PRIMARY KEY, user_id TEXT, wechat_id TEXT NOT NULL DEFAULT '')"
+    )
+    conn.execute("INSERT INTO persons (id, user_id, wechat_id) VALUES ('p1', 'u1', 'her_wx_88')")
+    service = UserProfileService()
+    profile = service.save(
+        conn, "u1", UserProfilePayload(wechat_id="lin_xiao96", contact_handoff_enabled=False)
+    )
+
+    blocked = _contact_handoff(conn, "u1", "p1", profile)
+    assert blocked["enabled"] is False
+    assert blocked["my_wechat"] == ""
+    assert blocked["their_wechat"] == "her_wx_88"
+
+    profile = service.save(
+        conn, "u1", UserProfilePayload(wechat_id="lin_xiao96", contact_handoff_enabled=True)
+    )
+    allowed = _contact_handoff(conn, "u1", "p1", profile)
+    assert allowed["enabled"] is True
+    assert allowed["my_wechat"] == "lin_xiao96"

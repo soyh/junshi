@@ -15,6 +15,7 @@ FIELDS = (
     "relationship_status",
     "about",
     "reply_rules",
+    "wechat_id",
 )
 
 #: Names the draft prompt understands; `relationship_status` is stored as
@@ -50,6 +51,7 @@ class UserProfileService:
             return UserProfileResponse(strategic_plan_enabled=True)
         data = {field: str(row[field] or "") for field in FIELDS}
         data["auto_send_authorized"] = bool(row["auto_send_authorized"])
+        data["contact_handoff_enabled"] = bool(row["contact_handoff_enabled"])
         data["strategic_plan_enabled"] = bool(row["strategic_plan_enabled"])
         return UserProfileResponse(**data, updated_at=str(row["updated_at"] or ""))
 
@@ -60,15 +62,20 @@ class UserProfileService:
         # Trim what the user typed; email clients and phone keyboards love stray spaces.
         values = {field: value.strip() for field, value in values.items()}
         authorized = int(bool(payload.auto_send_authorized))
-        if payload.strategic_plan_enabled is None:
-            # Keep whatever the account already chose (the PC form omits it).
-            current = conn.execute(
-                "SELECT strategic_plan_enabled FROM user_profiles WHERE user_id = ?",
-                (user_id,),
-            ).fetchone()
-            plan_enabled = int(current["strategic_plan_enabled"]) if current else 1
-        else:
-            plan_enabled = int(bool(payload.strategic_plan_enabled))
+        current = conn.execute(
+            "SELECT strategic_plan_enabled, contact_handoff_enabled"
+            " FROM user_profiles WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+
+        def carried(flag, stored_column, default):
+            """None means the caller did not touch the switch (the PC form)."""
+            if flag is None:
+                return int(current[stored_column]) if current else default
+            return int(bool(flag))
+
+        plan_enabled = carried(payload.strategic_plan_enabled, "strategic_plan_enabled", 1)
+        handoff = carried(payload.contact_handoff_enabled, "contact_handoff_enabled", 0)
         existing = conn.execute(
             "SELECT 1 FROM user_profiles WHERE user_id = ?", (user_id,)
         ).fetchone()
@@ -78,17 +85,36 @@ class UserProfileService:
                 f"UPDATE user_profiles SET {assignments},"
                 " auto_send_authorized = ?,"
                 " strategic_plan_enabled = ?,"
+                " contact_handoff_enabled = ?,"
                 " updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
-                [*(values[field] for field in FIELDS), authorized, plan_enabled, user_id],
+                [
+                    *(values[field] for field in FIELDS),
+                    authorized,
+                    plan_enabled,
+                    handoff,
+                    user_id,
+                ],
             )
         else:
             columns = ", ".join(
-                ("user_id", *FIELDS, "auto_send_authorized", "strategic_plan_enabled")
+                (
+                    "user_id",
+                    *FIELDS,
+                    "auto_send_authorized",
+                    "strategic_plan_enabled",
+                    "contact_handoff_enabled",
+                )
             )
-            marks = ", ".join("?" for _ in range(len(FIELDS) + 3))
+            marks = ", ".join("?" for _ in range(len(FIELDS) + 4))
             conn.execute(
                 f"INSERT INTO user_profiles ({columns}) VALUES ({marks})",
-                [user_id, *(values[field] for field in FIELDS), authorized, plan_enabled],
+                [
+                    user_id,
+                    *(values[field] for field in FIELDS),
+                    authorized,
+                    plan_enabled,
+                    handoff,
+                ],
             )
         conn.commit()
         return self.get(conn, user_id)

@@ -151,6 +151,32 @@ def load_transcript(
     return out
 
 
+def load_contact(conn: sqlite3.Connection, user_id: str, person_id: str) -> dict[str, Any]:
+    """WeChat exchange permission for this pair (see analysis_strategic_reply)."""
+    mine = ""
+    enabled = False
+    try:
+        row = conn.execute(
+            "SELECT wechat_id, contact_handoff_enabled FROM user_profiles WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if row is not None:
+            mine = str(row["wechat_id"] or "").strip()
+            enabled = bool(row["contact_handoff_enabled"])
+    except sqlite3.OperationalError:
+        pass
+    theirs = ""
+    try:
+        row = conn.execute(
+            "SELECT wechat_id FROM persons WHERE id = ? AND user_id = ?",
+            (person_id, user_id),
+        ).fetchone()
+        theirs = str(row["wechat_id"] or "").strip() if row is not None else ""
+    except sqlite3.OperationalError:
+        theirs = ""
+    return {"enabled": bool(enabled and mine), "my_wechat": mine, "their_wechat": theirs}
+
+
 def build_context(
     conn: sqlite3.Connection,
     user_id: str,
@@ -209,6 +235,9 @@ def build_context(
         "self_profile": {k: v for k, v in (self_profile or {}).items() if str(v).strip()},
         "self_style": self_style or {},
         "channel_rules": (channel_rules or "").strip(),
+        "contact_handoff": load_contact(
+            conn, user_id, str(person["id"]) if person else ""
+        ),
     }
 
 

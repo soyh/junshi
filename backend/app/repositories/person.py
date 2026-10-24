@@ -89,6 +89,7 @@ class PersonRepository:
         name=UNSET,
         nickname=UNSET,
         notes=UNSET,
+        wechat_id=UNSET,
     ) -> sqlite3.Row | None:
         existing = self.get(conn, user_id, person_id)
 
@@ -98,6 +99,7 @@ class PersonRepository:
         new_name = existing["name"] if name is UNSET or name is None else name
         new_nickname = existing["nickname"] if nickname is UNSET else nickname
         new_notes = existing["notes"] if notes is UNSET else notes
+        new_wechat = existing["wechat_id"] if wechat_id is UNSET else wechat_id
 
         conn.execute(
             """
@@ -105,6 +107,7 @@ class PersonRepository:
             SET name = ?,
                 nickname = ?,
                 notes = ?,
+                wechat_id = ?,
                 updated_at = ?
             WHERE id = ?
               AND user_id = ?
@@ -113,6 +116,7 @@ class PersonRepository:
                 new_name,
                 new_nickname,
                 new_notes,
+                new_wechat,
                 utc_now(),
                 person_id,
                 user_id,

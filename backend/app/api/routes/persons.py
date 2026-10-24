@@ -87,6 +87,9 @@ def update_person(
             payload.notes
             if "notes" in payload.model_fields_set
             else UNSET,
+            payload.wechat_id
+            if "wechat_id" in payload.model_fields_set
+            else UNSET,
         )
 
     if person is None:

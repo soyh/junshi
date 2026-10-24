@@ -81,6 +81,8 @@ from app.api.routes.person_merge import router as person_merge_router
 api_router.include_router(person_merge_router)
 from app.api.routes.person_conversation import router as person_conversation_router
 api_router.include_router(person_conversation_router)
+from app.api.routes.person_channels import router as person_channels_router
+api_router.include_router(person_channels_router)
 api_router.include_router(account_identity_router)
 api_router.include_router(account_admin_router)
 from app.api.routes.person_memory import router as person_memory_router

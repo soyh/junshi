@@ -985,7 +985,8 @@ CARD_CLIENT_EXPERIENCE_SCRIPT = r'''
       const name = clientInput('姓名 / 标识', person.name || '');
       const nickname = clientInput('昵称', person.nickname || '');
       const personNotes = clientTextarea('人物备注', person.notes || '');
-      personGrid.append(name.wrap, nickname.wrap, personNotes.wrap);
+      const personWechat = clientInput('她的微信号', person.wechat_id || '');
+      personGrid.append(name.wrap, nickname.wrap, personWechat.wrap, personNotes.wrap);
 
       const relationTitle = clientEl('div', 'client-card-section-title', '人物关系');
       const relationGrid = clientEl('div', 'client-card-grid');
@@ -1052,6 +1053,7 @@ CARD_CLIENT_EXPERIENCE_SCRIPT = r'''
               name: nextName,
               nickname: nickname.input.value.trim() || null,
               notes: personNotes.textarea.value.trim() || null,
+              wechat_id: personWechat.input.value.trim(),
             }),
           });
           await loadPersons();

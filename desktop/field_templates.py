@@ -15,6 +15,7 @@ PERSON_SAMPLES = {
     "job": "产品经理",
     "hobbies": "爬山、看展、撸猫",
     "relationship": "单身",
+    "wechat_id": "lin_xiao96",
     "notes": "话不多，喜欢先听；不太用书面语，偶尔发语音。",
 }
 

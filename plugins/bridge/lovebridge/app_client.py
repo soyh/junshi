@@ -191,6 +191,45 @@ class AppClient:
             "POST", f"/api/v1/persons/{person_id}/consolidate", json={}
         )
 
+    async def resolve_channel(self, platform: str, handle: str) -> dict | None:
+        """Which person/ conversation owns this channel handle? None when new."""
+        try:
+            return await self._request(
+                "POST",
+                "/api/v1/persons/resolve-channel",
+                json={"platform": platform, "account_handle": handle},
+            )
+        except AppError as exc:
+            if exc.status == 404:
+                return None
+            raise
+
+    async def link_channel(
+        self, person_id: str, platform: str, handle: str, display_name: str = ""
+    ) -> dict:
+        """Bind this handle to the person so other channels land on the same one."""
+        return await self._request(
+            "POST",
+            f"/api/v1/persons/{person_id}/channels",
+            json={
+                "platform": platform,
+                "account_handle": handle,
+                "display_name": display_name or handle,
+            },
+        )
+
+    async def capture_wechat(self, person_id: str, text: str) -> str:
+        """Let the server spot a WeChat id the counterpart typed in chat."""
+        try:
+            result = await self._request(
+                "POST",
+                f"/api/v1/persons/{person_id}/wechat/capture",
+                json={"text": text[:4000]},
+            )
+        except AppError:
+            return ""
+        return str((result or {}).get("wechat_id") or "")
+
     async def ensure_platform_source(
         self,
         person_id: str,

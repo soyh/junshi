@@ -31,7 +31,7 @@ DEFAULT_QUIET = ("03:00", "05:30")
 #: 「本人信息」登记项 —— 让自动回复用真实身份说话，不瞎编年龄/职业。
 PERSON_FIELDS = ("nickname", "gender", "birth_year", "city", "hometown",
                  "current_location", "work_address", "job", "hobbies",
-                 "relationship", "about")
+                 "relationship", "about", "wechat_id")
 PERSON_LABELS = {
     "nickname": "我的称呼",
     "gender": "性别",
@@ -44,6 +44,7 @@ PERSON_LABELS = {
     "hobbies": "兴趣",
     "relationship": "感情状态",
     "about": "其他设定",
+    "wechat_id": "我的微信号",
 }
 
 # The account API calls it relationship_status; the local file keeps "relationship".
@@ -59,12 +60,19 @@ def person_from_api(data: dict) -> dict[str, str]:
     return person
 
 
-def api_payload(person: dict[str, str], rules: str, auto_send: bool = False) -> dict:
+def api_payload(
+    person: dict[str, str],
+    rules: str,
+    auto_send: bool = False,
+    handoff: bool | None = None,
+) -> dict:
     """Build the account profile body from local person fields and rules."""
     payload = {API_FIELDS.get(key, key): str(person.get(key, "") or "").strip()
                for key in PERSON_FIELDS}
     payload["reply_rules"] = str(rules or "")
     payload["auto_send_authorized"] = bool(auto_send)
+    if handoff is not None:
+        payload["contact_handoff_enabled"] = bool(handoff)
     return payload
 
 
@@ -123,6 +131,7 @@ def load_global() -> dict:
         "person": {key: str(person.get(key, "")) for key in PERSON_FIELDS if str(person.get(key, "")).strip()},
         "rules": str(data.get("rules", "") or ""),
         "auto_send": bool(data.get("auto_send", False)),
+        "handoff": bool(data.get("handoff", False)),
     }
 
 
@@ -130,6 +139,7 @@ def save_global(
     person: dict[str, str] | None = None,
     rules: str | None = None,
     auto_send: bool | None = None,
+    handoff: bool | None = None,
 ) -> Path:
     """Persist the shared settings; omitted arguments keep their stored value."""
     current = load_global()
@@ -142,6 +152,8 @@ def save_global(
         current["rules"] = rules
     if auto_send is not None:
         current["auto_send"] = bool(auto_send)
+    if handoff is not None:
+        current["handoff"] = bool(handoff)
     path = global_path()
     path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
     return path

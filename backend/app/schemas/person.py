@@ -13,6 +13,9 @@ class PersonUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     nickname: str | None = Field(default=None, max_length=200)
     notes: str | None = None
+    # The counterpart's WeChat id, either typed by the user or captured when she
+    # sends it in chat. One per person, so a contact hand-off never duplicates.
+    wechat_id: str | None = Field(default=None, max_length=60)
 
 
 class PersonResponse(BaseModel):
@@ -21,5 +24,6 @@ class PersonResponse(BaseModel):
     name: str
     nickname: str | None
     notes: str | None
+    wechat_id: str | None = None
     created_at: datetime
     updated_at: datetime

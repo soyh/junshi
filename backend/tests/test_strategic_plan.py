@@ -35,6 +35,8 @@ def _conn() -> sqlite3.Connection:
             about TEXT NOT NULL DEFAULT '',
             reply_rules TEXT NOT NULL DEFAULT '',
             auto_send_authorized INTEGER NOT NULL DEFAULT 0,
+            wechat_id TEXT NOT NULL DEFAULT '',
+            contact_handoff_enabled INTEGER NOT NULL DEFAULT 0,
             strategic_plan_enabled INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -44,7 +46,8 @@ def _conn() -> sqlite3.Connection:
             user_id TEXT NOT NULL,
             name TEXT,
             notes TEXT,
-            tags TEXT
+            tags TEXT,
+            wechat_id TEXT
         );
         CREATE TABLE conversations (
             id TEXT PRIMARY KEY,
@@ -614,3 +617,26 @@ def test_planner_context_carries_the_archive():
 
     assert context["long_term_memory"]["entries"][0]["text"] == "喜欢爬山"
     assert "喜欢爬山" in strategic_plan.context_for_prompt(context)
+
+
+def test_planner_context_carries_the_handoff_only_after_opt_in():
+    conn = _conn()
+    conn.execute("UPDATE persons SET wechat_id = 'her_wx_88' WHERE id = 'p1'")
+
+    off = strategic_plan.build_context(conn, "u1", "c1")
+    assert off["contact_handoff"] == {
+        "enabled": False,
+        "my_wechat": "",
+        "their_wechat": "her_wx_88",
+    }
+
+    conn.execute(
+        "UPDATE user_profiles SET wechat_id = 'lin_xiao96', contact_handoff_enabled = 1"
+        " WHERE user_id = 'u1'"
+    )
+    on = strategic_plan.build_context(conn, "u1", "c1")
+    assert on["contact_handoff"] == {
+        "enabled": True,
+        "my_wechat": "lin_xiao96",
+        "their_wechat": "her_wx_88",
+    }

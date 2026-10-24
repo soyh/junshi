@@ -98,6 +98,7 @@ MY_PROFILE_HTML = r'''
         <div><label for="mp-job">职业</label><input id="mp-job" maxlength="40" placeholder="比如：产品经理"></div>
         <div><label for="mp-hobbies">兴趣爱好</label><input id="mp-hobbies" maxlength="120" placeholder="比如：跑步、看展"></div>
         <div><label for="mp-relationship">感情状态</label><input id="mp-relationship" maxlength="40" placeholder="比如：单身"></div>
+        <div><label for="mp-wechat-id">我的微信号</label><input id="mp-wechat-id" maxlength="60" placeholder="比如：lin_xiao96"></div>
         <div id="my-profile-about"><label for="mp-about">其他想让它知道的</label><input id="mp-about" maxlength="400" placeholder="比如：不太爱打电话，晚上回消息慢"></div>
       </div>
       <div>
@@ -115,6 +116,8 @@ MY_PROFILE_HTML = r'''
         <p class="my-profile-hint">勾选后，服务端把「必须由本人发送」这条约束降级为提示：通道插件生成的回复可以直接发出，统计里记为已授权。不勾选时保持原样。</p>
         <label class="my-profile-check" for="mp-strategic-plan"><input id="mp-strategic-plan" type="checkbox"> 先做「军师判断」再写回复（推荐）</label>
         <p class="my-profile-hint">开启后先生成判断卡片（局势、阶段、2–4 条战术，可含「这轮先不发」），再按选中的战术写一条消息；参考资料全文在这一步读到。关掉则回到原来的一次生成。</p>
+        <label class="my-profile-check" for="mp-handoff"><input id="mp-handoff" type="checkbox"> 对方主动要联系方式时，可以把我的微信号发给他</label>
+        <p class="my-profile-hint">只在对方明确开口、且聊得顺的时候给，不会主动塞；不勾选则一律不发号、也不问对方要号。对方给你的微信号会被记到人物资料里。</p>
       </div>
     </div>
     <footer>
@@ -143,10 +146,12 @@ MY_PROFILE_SCRIPT = r'''
       hobbies: byId('mp-hobbies'),
       relationship_status: byId('mp-relationship'),
       about: byId('mp-about'),
+      wechat_id: byId('mp-wechat-id'),
       reply_rules: byId('mp-rules'),
     };
     const autoSend = byId('mp-auto-send');
     const strategicPlan = byId('mp-strategic-plan');
+    const handoff = byId('mp-handoff');
     const templateSelect = byId('mp-template');
     const templateNote = byId('my-profile-template-note');
     let templateCache = null;
@@ -177,6 +182,7 @@ MY_PROFILE_SCRIPT = r'''
         });
         if (autoSend) { autoSend.checked = !!(data && data.auto_send_authorized); }
         if (strategicPlan) { strategicPlan.checked = !(data && data.strategic_plan_enabled === false); }
+        if (handoff) { handoff.checked = !!(data && data.contact_handoff_enabled); }
         profileSetStatus(data && data.updated_at ? `上次保存：${data.updated_at}` : '还没有填写过。');
         await loadTemplates();
       } catch (error) {
@@ -191,6 +197,7 @@ MY_PROFILE_SCRIPT = r'''
       Object.entries(profileFields).forEach(([key, node]) => { payload[key] = node.value; });
       payload.auto_send_authorized = !!(autoSend && autoSend.checked);
       payload.strategic_plan_enabled = !!(strategicPlan && strategicPlan.checked);
+      payload.contact_handoff_enabled = !!(handoff && handoff.checked);
       profileSetStatus('正在保存…');
       try {
         const data = await api('/api/v1/settings/profile', {

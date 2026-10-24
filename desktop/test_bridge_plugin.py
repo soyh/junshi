@@ -409,7 +409,7 @@ def test_retry_outbox_reports_daemon_answer(plugin_home, monkeypatch):
 
 
 def test_global_settings_are_shared_and_survive_profile_creation(plugin_home):
-    assert bp.load_global() == {"person": {}, "rules": "", "auto_send": False}
+    assert bp.load_global() == {"person": {}, "rules": "", "auto_send": False, "handoff": False}
     bp.save_global(person={"nickname": "小满", "city": "杭州", "unused": "x"}, rules="短句、口语")
     shared = bp.load_global()
     assert shared["person"] == {"nickname": "小满", "city": "杭州"}
@@ -568,3 +568,18 @@ def test_auto_send_authorisation_round_trips_through_the_local_cache(plugin_home
 
     person = bp.person_from_api({"nickname": "小满", "auto_send_authorized": True})
     assert bp.api_payload(person, "", True)["auto_send_authorized"] is True
+
+
+def test_handoff_switch_and_wechat_id_round_trip():
+    bp.save_global(person={"wechat_id": " lin_xiao96 "}, rules="", auto_send=False, handoff=True)
+
+    shared = bp.load_global()
+    assert shared["person"]["wechat_id"] == "lin_xiao96"
+    assert shared["handoff"] is True
+
+    payload = bp.api_payload(shared["person"], "", False, True)
+    assert payload["wechat_id"] == "lin_xiao96"
+    assert payload["contact_handoff_enabled"] is True
+
+    # Saving from a form that does not know the switch keeps the stored choice.
+    assert "contact_handoff_enabled" not in bp.api_payload(shared["person"], "", False)

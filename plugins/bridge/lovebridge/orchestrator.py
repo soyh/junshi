@@ -445,17 +445,46 @@ class Orchestrator:
         if contact is None:
             if not bot.auto_create_person:
                 return TurnResult(contact_id, "", 0, reason="unmapped contact")
-            person = await self.app.find_or_create_person(
-                events[0].contact_name, contact_id, bot.auto_merge_same_name
-            )
-            primary = await self.app.ensure_primary_conversation(person["id"])
-            self.state.save_contact(
-                contact_id, person["id"], primary["id"], events[0].contact_name
-            )
-            contact = self.state.get_contact(contact_id)
-            self._log(
-                f"[bridge] mapped {contact_id} -> person={person['id']} conversation={primary['id']}"
-            )
+            handle = contact_id.split(":", 1)[-1]
+            platform = platform_of(contact_id)
+            # A human can write from several apps. Ask the server first: if this
+            # handle is already on someone's record, reuse that person instead of
+            # creating a second person (and a second conversation) for them.
+            known = None
+            try:
+                known = await self.app.resolve_channel(platform, handle)
+            except Exception as exc:
+                self._log(f"[bridge] channel resolve failed: {exc!r}")
+            if known:
+                self.state.save_contact(
+                    contact_id,
+                    known["person_id"],
+                    known["conversation_id"],
+                    events[0].contact_name,
+                )
+                contact = self.state.get_contact(contact_id)
+                self._log(
+                    f"[bridge] recognised {contact_id} as person={known['person_id']}"
+                    f"（{known.get('person_name') or ''}），复用同一会话"
+                )
+            else:
+                person = await self.app.find_or_create_person(
+                    events[0].contact_name, contact_id, bot.auto_merge_same_name
+                )
+                primary = await self.app.ensure_primary_conversation(person["id"])
+                self.state.save_contact(
+                    contact_id, person["id"], primary["id"], events[0].contact_name
+                )
+                contact = self.state.get_contact(contact_id)
+                self._log(
+                    f"[bridge] mapped {contact_id} -> person={person['id']} conversation={primary['id']}"
+                )
+                try:
+                    await self.app.link_channel(
+                        person["id"], platform, handle, events[0].contact_name
+                    )
+                except Exception as exc:
+                    self._log(f"[bridge] channel link failed: {exc!r}")
 
         if contact is None or not contact["enabled"]:
             return TurnResult(contact_id, "", 0, reason="contact disabled")
@@ -494,6 +523,17 @@ class Orchestrator:
                 platform=platform,
                 platform_account_id=account_id,
             )
+
+        # She may have typed a WeChat id in this burst; the server keeps it on the
+        # person record (never overwriting an id the user entered by hand).
+        try:
+            captured = await self.app.capture_wechat(
+                person_id, "\n".join(event.text for event in events)
+            )
+            if captured:
+                self._log(f"[bridge] 记录到对方微信号 {captured}（person={person_id}）")
+        except Exception as exc:
+            self._log(f"[bridge] wechat capture failed: {exc!r}")
 
         if self._in_quiet_hours():
             return TurnResult(contact_id, conversation_id, len(events), reason="quiet hours")

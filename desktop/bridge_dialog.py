@@ -180,6 +180,18 @@ class BridgeDialog(Dialog):
             foreground="#666",
             wraplength=660,
         ).pack(anchor="w")
+        self.handoff = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            consent,
+            text="对方主动要联系方式时，可以把「我的微信号」直接发给他（写进账号，三端同步）",
+            variable=self.handoff,
+        ).pack(anchor="w", pady=(6, 0))
+        ttk.Label(
+            consent,
+            text="不勾选就不发号、也不问对方要号；勾选后只在对方明确开口时给，且不会主动塞过去。",
+            foreground="#666",
+            wraplength=660,
+        ).pack(anchor="w")
         bar_row = ttk.Frame(shared.body)
         bar_row.pack(fill="x", pady=(4, 0))
         self.button(bar_row, "保存全局设置", self.save_shared)
@@ -360,13 +372,16 @@ class BridgeDialog(Dialog):
         person = shared["person"]
         rules = shared["rules"]
         auto_send = bool(shared.get("auto_send"))
+        handoff = bool(shared.get("handoff"))
         remote, error = self._fetch_shared()
         if remote is not None:
             person = bp.person_from_api(remote)
             rules = str(remote.get("reply_rules") or "")
             auto_send = bool(remote.get("auto_send_authorized"))
+            handoff = bool(remote.get("contact_handoff_enabled"))
             try:
-                bp.save_global(person=person, rules=rules, auto_send=auto_send)
+                bp.save_global(person=person, rules=rules, auto_send=auto_send,
+                               handoff=handoff)
             except OSError:
                 pass
             if announce:
@@ -380,6 +395,7 @@ class BridgeDialog(Dialog):
         if rules:
             self.global_rules.insert("1.0", rules)
         self.auto_send.set(auto_send)
+        self.handoff.set(handoff)
 
     def _fetch_shared(self):
         """Return (profile, error). The client already prefixes /api/v1."""
@@ -395,8 +411,9 @@ class BridgeDialog(Dialog):
         person = self._person_values()
         rules = self.global_rules.get("1.0", "end").strip()
         auto_send = bool(self.auto_send.get())
+        handoff = bool(self.handoff.get())
         try:
-            bp.save_global(person=person, rules=rules, auto_send=auto_send)
+            bp.save_global(person=person, rules=rules, auto_send=auto_send, handoff=handoff)
         except OSError as exc:
             self.message.set(f"全局设置保存失败：{exc}")
             return
@@ -406,7 +423,8 @@ class BridgeDialog(Dialog):
             return
         def work():
             return self.client.request(
-                "PUT", "/settings/profile", bp.api_payload(person, rules, auto_send), timeout=20
+                "PUT", "/settings/profile", bp.api_payload(person, rules, auto_send, handoff),
+                timeout=20
             )
 
         def done(result, error):

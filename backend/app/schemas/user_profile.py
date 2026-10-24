@@ -22,8 +22,14 @@ class UserProfilePayload(BaseModel):
     )
     about: str = Field(default="", max_length=400)
     reply_rules: str = Field(default="", max_length=1500)
+    # The user's own WeChat id, so the assistant can hand it over when the
+    # counterpart asks for a contact (only once the user opts in below).
+    wechat_id: str = Field(default="", max_length=60)
     # Explicit opt-in for the desktop bridge sending drafts unchanged.
     auto_send_authorized: bool = False
+    # Opt-in for handing out `wechat_id` inside a reply. None keeps the stored
+    # choice (the PC form omits it), same rule as strategic_plan_enabled.
+    contact_handoff_enabled: bool | None = None
     # The planner stage ("marshal") that reads the situation before wording.
     # None means "leave the stored setting alone": the PC client saves the
     # profile without this field and must not flip a choice made on the web.

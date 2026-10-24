@@ -56,6 +56,43 @@ def _auto_send_boundary(authorized: bool) -> dict[str, bool]:
     return {"must_not_auto_send": not authorized, "auto_send_authorized": bool(authorized)}
 
 
+def _contact_handoff(
+    conn: sqlite3.Connection,
+    user_id: str,
+    person_id: str,
+    profile=None,
+) -> dict[str, object]:
+    """What the draft may say about contacting each other.
+
+    Off unless the account opted in AND filled in a WeChat id. The counterpart's
+    id (when known) is shared so the model never asks for something it has.
+    """
+    stored = profile if profile is not None else _stored_profile(conn, user_id)
+    mine = str(getattr(stored, "wechat_id", "") or "").strip() if stored else ""
+    enabled = bool(getattr(stored, "contact_handoff_enabled", False)) if stored else False
+    theirs = ""
+    try:
+        row = conn.execute(
+            "SELECT wechat_id FROM persons WHERE id = ? AND user_id = ?",
+            (person_id, user_id),
+        ).fetchone()
+        theirs = str(row["wechat_id"] or "").strip() if row is not None else ""
+    except sqlite3.OperationalError:
+        theirs = ""
+    allowed = bool(enabled and mine)
+    return {
+        "enabled": allowed,
+        "my_wechat": mine if allowed else "",
+        "their_wechat": theirs,
+        "rule": (
+            "只在对方明确要联系方式、且对话已经聊得比较顺时给出 my_wechat，原文照抄，不要改字符；"
+            "对方没问就不要主动提。their_wechat 已知时，不要再问她的号，也不要说「加你了」。"
+            if allowed
+            else "未授权交换联系方式：不要给出任何微信号，也不要索要对方的号；对方问起就用轻松的话带过。"
+        ),
+    }
+
+
 def _strategic_plan_enabled(conn: sqlite3.Connection, user_id: str) -> bool:
     """True when the account wants the planner stage in front of the draft.
 
@@ -430,6 +467,7 @@ class AnalysisStrategicReplyService:
             "channel_rules": _resolve_rules(conn, user_id, channel_rules),
             "self_profile": _resolve_profile(conn, user_id, self_profile),
             "self_style": build_self_style(analysis_context.get("messages")),
+            "contact_handoff": _contact_handoff(conn, user_id, person_id),
             "constraints": {
                 "must_be_evidence_backed": True,
                 "must_prioritize_current_conversation": True,

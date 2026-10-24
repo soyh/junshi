@@ -51,6 +51,7 @@ class PersonService:
         name=UNSET,
         nickname=UNSET,
         notes=UNSET,
+        wechat_id=UNSET,
     ) -> sqlite3.Row | None:
         return self.repository.update(
             conn,
@@ -59,6 +60,7 @@ class PersonService:
             name,
             nickname,
             notes,
+            wechat_id,
         )
 
     def delete(
