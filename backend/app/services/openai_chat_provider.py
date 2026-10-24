@@ -288,6 +288,10 @@ class OpenAIChatProvider(LLMProvider):
             "14. 按 relationship.intent 定调子与尺度：long_term（长期恋爱）放慢节奏、不急着亲密升级、不画大饼；"
             "casual（轻松约会）可以撩、往见面推进但留退路；one_night（一夜情）可以直接但不承诺关系、明确同意与安全、被拒绝就停；"
             "friendship（先做朋友）不施压、不暧昧绑架；unsure 按对话实际温度走。\n"
+            "15. photos 是本人照片库（id 与 caption 说明这张拍的是什么）。只有对方明确要照片"
+            "（要照片 / 看看你 / 发张自拍之类）且 photos 非空时，才给一条 send=true 的战术，"
+            "photo_id 填其中一张的 id，line 写一句配文或留空；caption 与对方要求明显不符就换一张，"
+            "宁可不发也不要发错场景。对方没要照片时不要提照片，也不要声称自己发过图。\n"
             "只输出 JSON，不要解释、不要 markdown。"
         )
 

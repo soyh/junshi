@@ -17,8 +17,10 @@ class PlanOption(BaseModel):
     source: str = Field(default="", max_length=200)
     risk: str = Field(default="", max_length=120)
     evidence_source_ids: list[str] = Field(default_factory=list)
+    #: 本人照片库里的一张；对方要照片时，这条战术直接发图而不是说话。
+    photo_id: str = Field(default="", max_length=40)
 
-    @field_validator("tactic", "why", "source", "risk", "line")
+    @field_validator("tactic", "why", "source", "risk", "line", "photo_id")
     @classmethod
     def strip_text(cls, value: str) -> str:
         return value.strip()

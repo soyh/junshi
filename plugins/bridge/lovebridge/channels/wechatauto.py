@@ -152,12 +152,12 @@ class WechatautoChannel:
             return
         if self._is_system_account(username):
             return
-        # Our own outgoing messages must never come back as inbound.
+        # Our own bubbles are not inbound traffic, but a message the user typed
+        # by hand still matters: it cancels a queued reply and feeds the style
+        # profile. Marked instead of dropped; the orchestrator decides.
         sender_username = str(msg.get("sender_username") or "")
-        if self._self_wxid and sender_username == self._self_wxid:
-            return
-        if msg.get("sender_id") == 2:  # legacy sentinel
-            return
+        mine = bool(self._self_wxid and sender_username == self._self_wxid)
+        mine = mine or msg.get("sender_id") == 2
 
         content = msg.get("content")
         if isinstance(content, str):
@@ -166,7 +166,7 @@ class WechatautoChannel:
             content = media_text(msg)
         if not content:
             return
-        if self._is_echo(username, content):
+        if mine and self._is_echo(username, content):
             return
 
         try:
@@ -191,8 +191,9 @@ class WechatautoChannel:
             contact_id=username,
             contact_name=name,
             text=content,
-            message_id=message_id,
+            message_id=f"{'self-' if mine else ''}{message_id}",
             is_group=False,
+            is_self=mine,
             timestamp=float(created) if created else time.time(),
         )
         if self._handler:

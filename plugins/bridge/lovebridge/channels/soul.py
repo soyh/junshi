@@ -392,12 +392,9 @@ class SoulChannel:
         fresh id and the bridge answered twice. Ids are now derived from the
         bubble itself plus its occurrence ordinal, so re-reading is a no-op.
         """
-        start = len(messages)
-        for index in range(len(messages) - 1, -1, -1):
-            if messages[index].get("self"):
-                break
-            start = index
-        fresh = list(range(start, len(messages)))[-5:]
+        # The tail may interleave her bubbles and ours (a reply typed by hand).
+        # Both matter: hers starts a turn, ours cancels a queued one.
+        fresh = list(range(max(0, len(messages) - 6), len(messages)))
         if not fresh:
             return
 
@@ -414,13 +411,12 @@ class SoulChannel:
 
         for index in fresh:
             message = messages[index]
-            if message.get("self"):
-                continue
+            mine = bool(message.get("self"))
             text = (message.get("text") or "").strip() or media_text(message)
             if not text:
                 continue
             raw = f"{name}|" + "|".join(str(part) for part in keys[index])
-            message_id = f"soul-{hashlib.md5(raw.encode()).hexdigest()[:12]}"
+            message_id = f"soul-{'self-' if mine else ''}{hashlib.md5(raw.encode()).hexdigest()[:12]}"
             if message_id in self._seen:
                 continue
             self._seen[message_id] = None
@@ -434,6 +430,7 @@ class SoulChannel:
                 text=text,
                 message_id=message_id,
                 is_group=False,
+                is_self=mine,
                 timestamp=time.time(),
                 raw={"media_url": media_url} if media_url else {},
             )
@@ -452,6 +449,20 @@ class SoulChannel:
             return await response.body()
         except Exception:
             return b""
+
+    async def send_image(self, contact_id: str, path: str, caption: str = "") -> None:
+        """Send one local photo into the open conversation."""
+        from .base import attach_file
+
+        name = contact_id.split(":", 1)[1] if ":" in contact_id else contact_id
+        async with self._lock:
+            await self._ensure_chat()
+            await self._open(name)
+            if not await attach_file(self._page, path):
+                raise RuntimeError("soul: no file hook on this page")
+            await asyncio.sleep(2.0)
+            if caption.strip():
+                await self.send(contact_id, caption, is_group=is_group)
 
     async def send(self, contact_id: str, text: str, is_group: bool = False) -> None:
         name = contact_id.split(":", 1)[1] if ":" in contact_id else contact_id

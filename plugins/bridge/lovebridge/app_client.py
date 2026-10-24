@@ -117,6 +117,27 @@ class AppClient:
             raise AppError(response.status_code, _detail(response), path)
         return response.json()
 
+    async def fetch_photo(self, photo_id: str) -> tuple[bytes, str]:
+        """One of the user's own photos, as bytes, to hand to the channel."""
+        if self._token is None:
+            await self.login()
+        response = await self._client.get(
+            f"/api/v1/settings/photos/{photo_id}/image",
+            headers={"Authorization": f"Bearer {self._token}"},
+            timeout=max(self._timeout, 60.0),
+        )
+        if response.status_code == 401:
+            await self.login()
+            response = await self._client.get(
+                f"/api/v1/settings/photos/{photo_id}/image",
+                headers={"Authorization": f"Bearer {self._token}"},
+                timeout=max(self._timeout, 60.0),
+            )
+        if response.status_code >= 400:
+            raise AppError(response.status_code, _detail(response), "/settings/photos")
+        mime = response.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+        return response.content, mime
+
     # -- canonical resources ---------------------------------------------
     async def list_persons(self) -> list[dict]:
         return await self._request("GET", "/api/v1/persons")

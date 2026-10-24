@@ -56,6 +56,7 @@ from app.api.routes.strategy_decision_synthesis import router as strategy_decisi
 from app.api.routes.text_imports import router as text_imports_router
 from app.api.routes.timeline import router as timeline_router
 from app.api.routes.user_profile import router as user_profile_router
+from app.api.routes.user_photos import router as user_photos_router
 
 
 api_router = APIRouter(
@@ -126,6 +127,7 @@ api_router.include_router(reference_context_router)
 api_router.include_router(conversations_router)
 api_router.include_router(timeline_router)
 api_router.include_router(user_profile_router)
+api_router.include_router(user_photos_router)
 api_router.include_router(text_imports_router)
 api_router.include_router(evidence_router)
 from app.api.routes.platform_accounts import router as platform_accounts_router

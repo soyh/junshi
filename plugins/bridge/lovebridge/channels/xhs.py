@@ -404,8 +404,7 @@ class XhsChannel:
         self._last_index[conv["id"]] = fresh[-1]["id"]
 
         for message in fresh:
-            if message.get("me"):
-                continue
+            mine = bool(message.get("me"))
             text = (message.get("text") or "").strip() or media_text(message)
             if not text:
                 continue
@@ -414,8 +413,9 @@ class XhsChannel:
                 contact_id=f"xhs:{conv['id']}",
                 contact_name=conv["name"] or conv["id"],
                 text=text,
-                message_id=f"xhs-{conv['id']}-{message['id']}",
+                message_id=f"xhs-{'self' if mine else 'peer'}-{conv['id']}-{message['id']}",
                 is_group=False,
+                is_self=mine,
                 timestamp=time.time(),
                 raw={"media_url": media_url} if media_url else {},
             )
@@ -434,6 +434,20 @@ class XhsChannel:
             return await response.body()
         except Exception:
             return b""
+
+    async def send_image(self, contact_id: str, path: str, caption: str = "") -> None:
+        """Send one local photo into the open conversation."""
+        from .base import attach_file
+
+        name = contact_id.split(":", 1)[1] if ":" in contact_id else contact_id
+        async with self._lock:
+            await self._ensure_chat()
+            await self._open(name)
+            if not await attach_file(self._page, path):
+                raise RuntimeError("soul: no file hook on this page")
+            await asyncio.sleep(2.0)
+            if caption.strip():
+                await self.send(contact_id, caption, is_group=is_group)
 
     async def send(self, contact_id: str, text: str, is_group: bool = False) -> None:
         conv_id = contact_id.split(":", 1)[1] if ":" in contact_id else contact_id

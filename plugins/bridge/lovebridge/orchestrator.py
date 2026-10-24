@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import random
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -379,6 +380,80 @@ class Orchestrator:
             except Exception as exc:  # the loop must outlive any one failure
                 self._log(f"[bridge] outbox pass failed: {exc!r}")
 
+    async def _send_photo(
+        self,
+        contact_id: str,
+        conversation_id: str,
+        person_id: str,
+        photo_id: str,
+        caption: str,
+        events: list[InboundEvent],
+    ) -> TurnResult:
+        """Deliver one of the user's own photos, with an optional line of text."""
+        sender = getattr(self.channel, "send_image", None)
+        if sender is None:
+            self._log(
+                f"[bridge] 这个通道还不能发图（{type(self.channel).__name__}），改为只发文字"
+            )
+            if not caption.strip():
+                return TurnResult(
+                    contact_id, conversation_id, len(events), reason="photo unsupported"
+                )
+            await self._human_delay()
+            if not self.state.claim_reply(contact_id, caption):
+                return TurnResult(
+                    contact_id, conversation_id, len(events), reason="duplicate suppressed"
+                )
+            await self.channel.send(contact_id, caption, is_group=bool(events[0].is_group))
+            try:
+                await self.app.add_message(conversation_id, "user", caption)
+            except Exception as exc:
+                self._log(f"[bridge] caption delivered but not recorded: {exc!r}")
+            return TurnResult(
+                contact_id, conversation_id, len(events), reply=caption,
+                reason="photo unsupported, text only",
+            )
+        marker = f"photo:{photo_id}"
+        if not self.state.claim_reply(contact_id, marker):
+            return TurnResult(
+                contact_id, conversation_id, len(events), reason="duplicate suppressed"
+            )
+        path = ""
+        try:
+            content, mime = await self.app.fetch_photo(photo_id)
+            suffix = {"image/png": ".png", "image/webp": ".webp"}.get(mime, ".jpg")
+            handle = tempfile.NamedTemporaryFile(
+                delete=False, suffix=suffix, prefix="junshi-photo-"
+            )
+            handle.write(content)
+            handle.close()
+            path = handle.name
+            await sender(contact_id, path, caption or "")
+        except Exception as exc:
+            self.state.release_reply(contact_id, marker)
+            self._log(f"[bridge] 发图失败 contact={contact_id}: {exc!r}")
+            raise
+        finally:
+            if path:
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+        if caption.strip():
+            try:
+                await self.app.add_message(conversation_id, "user", caption)
+            except Exception as exc:
+                self._log(f"[bridge] caption delivered but not recorded: {exc!r}")
+        try:
+            self.state.bump(self._today(), contact_id)
+        except Exception:
+            pass
+        self._log(f"[bridge] 发出照片 contact={contact_id} photo={photo_id}")
+        return TurnResult(
+            contact_id, conversation_id, len(events), reply=caption or "[照片]",
+            reason="photo sent",
+        )
+
     async def drain_outbox(self) -> int:
         """Retry every owed reply that is due. Returns how many were handled."""
         if await self._channel_status() not in ("online",):
@@ -505,6 +580,33 @@ class Orchestrator:
         )
         await self.app.ensure_scoped(conversation_id, person_id)
 
+        mine = [event for event in events if event.is_self]
+        if mine:
+            # A reply the user typed in the app itself: keep it (it teaches the
+            # style profile and keeps the archive honest) and cancel anything
+            # queued for this person — otherwise we answer on top of them.
+            for event in mine:
+                try:
+                    await self.app.add_message_once(
+                        conversation_id,
+                        "user",
+                        event.text,
+                        operation_id=str(uuid.uuid5(uuid.NAMESPACE_URL, event.message_id)),
+                        sent_at=datetime.fromtimestamp(event.timestamp or time.time())
+                        .astimezone()
+                        .isoformat(timespec="seconds"),
+                    )
+                except Exception as exc:
+                    self._log(f"[bridge] manual reply not recorded: {exc!r}")
+            dropped = self.state.clear_pending(contact_id, reason="你手动回了这条")
+            self._log(
+                f"[bridge] 检测到你手动回复 contact={contact_id}: {mine[-1].text[:40]!r}"
+                + (f"，已取消 {dropped} 条排队回复" if dropped else "")
+            )
+            events = [event for event in events if not event.is_self]
+            if not events:
+                return TurnResult(contact_id, conversation_id, len(mine), reason="manual reply")
+
         for event in events:
             text = event.text
             media_url = (event.raw or {}).get("media_url")
@@ -573,7 +675,13 @@ class Orchestrator:
                 f"{str(plan.get('tactic') or (plan.get('options') or [{}])[0].get('tactic') or '')[:40]}"
             )
 
-        if not reply:
+        photo_id = ""
+        if isinstance(plan, dict):
+            for item in plan.get("options") or []:
+                if isinstance(item, dict) and item.get("send") and item.get("photo_id"):
+                    photo_id = str(item.get("photo_id"))
+                    break
+        if not reply and not photo_id:
             return TurnResult(contact_id, conversation_id, len(events), reason="empty draft")
         if len(reply) > bot.max_reply_chars:
             return TurnResult(
@@ -585,6 +693,10 @@ class Orchestrator:
             return TurnResult(contact_id, conversation_id, len(events), reply=reply, reason="dry run")
 
         await self._human_delay()
+        if photo_id:
+            return await self._send_photo(
+                contact_id, conversation_id, person_id, photo_id, reply, events
+            )
         if not self.state.claim_reply(contact_id, reply):
             self._log(
                 f"[bridge] duplicate reply suppressed contact={contact_id}: {reply[:40]!r}"

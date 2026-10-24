@@ -13,6 +13,8 @@ class InboundEvent:
     text: str
     message_id: str
     is_group: bool = False
+    #: True when the bubble is *ours* — a reply the user typed by hand.
+    is_self: bool = False
     timestamp: float | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -57,3 +59,36 @@ class Channel(Protocol):
     async def stop(self) -> None: ...
 
     async def send(self, contact_id: str, text: str, is_group: bool = False) -> None: ...
+
+
+async def attach_file(page, path: str) -> bool:
+    """Hand a local file to a chat composer, whatever hook the page offers.
+
+    Most web chats keep a hidden ``input[type=file]``; some only open the picker
+    from a toolbar button. Both are tried, and a False return means the channel
+    cannot send files here (the caller then falls back to words).
+    """
+    inputs = page.locator("input[type=file]")
+    if await inputs.count():
+        try:
+            await inputs.first.set_input_files(path)
+            return True
+        except Exception:
+            pass
+    selectors = (
+        "[aria-label*='图片']", "[title*='图片']", "[aria-label*='相册']",
+        "button[class*='image']", "[class*='image-btn']", "[class*='upload']",
+        "input[accept*='image']",
+    )
+    for selector in selectors:
+        locator = page.locator(selector).first
+        if not await locator.count():
+            continue
+        try:
+            async with page.expect_file_chooser(timeout=4000) as chooser:
+                await locator.click(timeout=4000)
+            await (await chooser.value).set_files(path)
+            return True
+        except Exception:
+            continue
+    return False

@@ -30,13 +30,19 @@ def test_rereading_the_same_chat_does_not_emit_her_message_twice():
     assert [event.text for event in channel.events] == ["在吗"]
 
     # Our reply lands, the preview changes, the poll re-reads the same chat.
+    # Her bubble must not repeat; our own bubble comes through as a self event
+    # (the orchestrator uses it to cancel queued replies).
     second = first + [_bubble("在的", self_=True, time_="10:01")]
     channel._emit_new("小柯", second)
-    assert [event.text for event in channel.events] == ["在吗"]
+    assert [(event.text, event.is_self) for event in channel.events] == [
+        ("在吗", False), ("在的", True),
+    ]
 
     third = second + [_bubble("问你个事", time_="10:02")]
     channel._emit_new("小柯", third)
-    assert [event.text for event in channel.events] == ["在吗", "问你个事"]
+    assert [(event.text, event.is_self) for event in channel.events] == [
+        ("在吗", False), ("在的", True), ("问你个事", False),
+    ]
 
 
 def test_one_minute_later_the_same_bubble_keeps_its_id():

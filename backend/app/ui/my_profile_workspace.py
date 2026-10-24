@@ -67,6 +67,14 @@ MY_PROFILE_STYLE = r'''
   #my-profile-location-row > span { display: flex; gap: 6px; align-items: stretch; }
   #my-profile-location-row > span input { flex: 1 1 auto; min-width: 0; }
   #my-profile-location-row > span button { flex: 0 0 auto; padding: 8px 10px; white-space: nowrap; }
+  #my-profile-photos { border-top: 1px dashed #d6e2ec; padding-top: 10px; display: grid; gap: 8px; }
+  .my-photo-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .my-photo-form input[type=text], .my-photo-form input:not([type]) { flex: 1 1 220px; padding: 7px 9px; border: 1px solid #cddbe7; border-radius: 9px; font: inherit; }
+  .my-photo-list { display: flex; flex-wrap: wrap; gap: 10px; }
+  .my-photo { width: 128px; display: grid; gap: 4px; }
+  .my-photo img { width: 128px; height: 128px; object-fit: cover; border-radius: 10px; border: 1px solid #d6e2ec; background: #f4f8fb; }
+  .my-photo span { font-size: .76rem; color: #5a7288; line-height: 1.35; word-break: break-word; }
+  .my-photo button { padding: 4px 8px; font-size: .76rem; }
   #mp-location-note { display: block; font-style: normal; }
 
   @media (max-width: 620px) {
@@ -120,6 +128,16 @@ MY_PROFILE_HTML = r'''
         <p class="my-profile-hint">开启后先生成判断卡片（局势、阶段、2–4 条战术，可含「这轮先不发」），再按选中的战术写一条消息；参考资料全文在这一步读到。关掉则回到原来的一次生成。</p>
         <label class="my-profile-check" for="mp-handoff"><input id="mp-handoff" type="checkbox"> 对方主动要联系方式时，可以把我的微信号发给他</label>
         <p class="my-profile-hint">只在对方明确开口、且聊得顺的时候给，不会主动塞；不勾选则一律不发号、也不问对方要号。对方给你的微信号会被记到人物资料里。对方用上面这些别称（V、绿泡泡…）开口也算数。</p>
+      </div>
+      <div id="my-profile-photos">
+        <strong>我的照片</strong>
+        <p class="my-profile-hint">对方明确要照片时，会从这几张里挑一张直接发出去；「这张拍的是什么」要写清楚场景（比如：健身房、公司楼下、周末爬山），判断层才不会发错。</p>
+        <div class="my-photo-form">
+          <input id="mp-photo-file" type="file" accept="image/jpeg,image/png,image/webp">
+          <input id="mp-photo-caption" maxlength="120" placeholder="这张拍的是什么">
+          <button id="mp-photo-upload" type="button">上传</button>
+        </div>
+        <div id="my-photo-list" class="my-photo-list"></div>
       </div>
     </div>
     <footer>
@@ -189,6 +207,7 @@ MY_PROFILE_SCRIPT = r'''
         if (handoff) { handoff.checked = !!(data && data.contact_handoff_enabled); }
         profileSetStatus(data && data.updated_at ? `上次保存：${data.updated_at}` : '还没有填写过。');
         await loadTemplates();
+        await loadPhotos();
       } catch (error) {
         profileSetStatus(`读取失败：${error instanceof Error ? error.message : String(error)}`);
       }
@@ -245,6 +264,90 @@ MY_PROFILE_SCRIPT = r'''
         note.textContent = `${reasons[error.code] || '定位失败'}，手动填写也可以。`;
       }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
     }
+
+    const photoFile = byId('mp-photo-file');
+    const photoCaption = byId('mp-photo-caption');
+    const photoList = byId('my-photo-list');
+    const photoUrls = new Map();
+
+    async function photoBlobUrl(id) {
+      if (photoUrls.has(id)) return photoUrls.get(id);
+      const response = await fetch(`/api/v1/settings/photos/${id}/image`, {
+        headers: { Authorization: `Bearer ${requireToken()}` },
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const url = URL.createObjectURL(await response.blob());
+      photoUrls.set(id, url);
+      return url;
+    }
+
+    function dropPhotoUrls() {
+      photoUrls.forEach((url) => URL.revokeObjectURL(url));
+      photoUrls.clear();
+    }
+
+    async function loadPhotos() {
+      try {
+        const data = await api('/api/v1/settings/photos');
+        const photos = (data && data.photos) || [];
+        photoList.replaceChildren();
+        if (!photos.length) {
+          photoList.appendChild(clientEl('span', 'my-profile-hint', '还没有上传照片。对方要照片时就不会发图。'));
+          return;
+        }
+        for (const photo of photos) {
+          const card = clientEl('div', 'my-photo');
+          const img = clientEl('img', '');
+          img.alt = photo.caption || '我的照片';
+          try { img.src = await photoBlobUrl(photo.id); } catch (_) { img.alt = '读图失败'; }
+          const caption = clientEl('span', '', photo.caption || '（没写说明）');
+          const remove = clientEl('button', '', '删除');
+          remove.type = 'button';
+          remove.addEventListener('click', async () => {
+            if (!window.confirm('删除这张照片？')) return;
+            try {
+              await api(`/api/v1/settings/photos/${photo.id}`, { method: 'DELETE' });
+              dropPhotoUrls();
+              await loadPhotos();
+              profileSetStatus('已删除一张照片。');
+            } catch (error) {
+              profileSetStatus(`删除失败：${error instanceof Error ? error.message : String(error)}`);
+            }
+          });
+          card.append(img, caption, remove);
+          photoList.appendChild(card);
+        }
+      } catch (error) {
+        photoList.replaceChildren();
+        photoList.appendChild(clientEl('span', 'my-profile-hint', '照片列表读取失败。'));
+      }
+    }
+
+    async function uploadPhoto() {
+      const file = photoFile && photoFile.files && photoFile.files[0];
+      if (!file) { profileSetStatus('先选一张照片。'); return; }
+      const body = new FormData();
+      body.append('file', file);
+      body.append('caption', (photoCaption && photoCaption.value) || '');
+      profileSetStatus('正在上传…');
+      try {
+        const response = await fetch('/api/v1/settings/photos', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${requireToken()}` },
+          body,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (photoFile) photoFile.value = '';
+        if (photoCaption) photoCaption.value = '';
+        dropPhotoUrls();
+        await loadPhotos();
+        profileSetStatus('照片已加入，对方要照片时就能发这张。');
+      } catch (error) {
+        profileSetStatus(`上传失败：${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    if (byId('mp-photo-upload')) byId('mp-photo-upload').addEventListener('click', uploadPhoto);
 
     byId('my-profile-close').addEventListener('click', closeProfile);
     byId('mp-detect-location').addEventListener('click', detectLocation);

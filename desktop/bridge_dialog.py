@@ -192,6 +192,12 @@ class BridgeDialog(Dialog):
             foreground="#666",
             wraplength=660,
         ).pack(anchor="w")
+        ttk.Label(
+            consent,
+            text="照片：在网页「我的资料 → 我的照片」上传并写清场景；对方明确要照片时会从那几张里挑一张发。",
+            foreground="#666",
+            wraplength=660,
+        ).pack(anchor="w")
         bar_row = ttk.Frame(shared.body)
         bar_row.pack(fill="x", pady=(4, 0))
         self.button(bar_row, "保存全局设置", self.save_shared)

@@ -162,6 +162,18 @@ class StateStore:
             )
             self._conn.commit()
 
+    def clear_pending(self, contact_id: str, reason: str = "answered by hand") -> int:
+        """Drop owed replies for one contact — the user just replied in person."""
+        now = datetime.now().isoformat(timespec="seconds")
+        with self._lock:
+            changed = self._conn.execute(
+                "UPDATE outbox SET state = 'skipped', reason = ?, next_at = NULL, updated_at = ?"
+                " WHERE contact_id = ? AND state IN ('queued', 'failed')",
+                (reason, now, contact_id),
+            ).rowcount
+            self._conn.commit()
+        return int(changed or 0)
+
     def first_seen(self, message_id: str, contact_id: str) -> bool:
         """Record the id; return True only the first time it is seen."""
         now = datetime.now().isoformat(timespec="seconds")

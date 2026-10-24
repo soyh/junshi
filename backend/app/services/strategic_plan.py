@@ -272,6 +272,12 @@ def build_context(
     transcript = load_transcript(conn, user_id, conversation_id)
     references, skipped = load_references(conn, user_id, conversation_id)
     memory = load_memory(conn, user_id, str(person["id"]) if person else "")
+    try:
+        from app.services import user_photos
+
+        photos = user_photos.pick_for_prompt(conn, user_id)
+    except (sqlite3.Error, ImportError):
+        photos = []
     target = next((item for item in reversed(transcript) if item["who"] == "她"), None)
     return {
         "user_id": user_id,
@@ -290,6 +296,7 @@ def build_context(
         "transcript": transcript,
         "reply_target_message": target,
         "long_term_memory": memory,
+        "photos": photos,
         "references": references,
         "references_skipped": skipped,
         "self_profile": {k: v for k, v in (self_profile or {}).items() if str(v).strip()},
@@ -304,15 +311,17 @@ def build_context(
 def _normalise(plan: StrategicPlan, context: dict[str, Any]) -> StrategicPlan:
     """Keep the plan honest: real message ids only, no empty sendable lines."""
     canonical = {item["id"] for item in context.get("transcript") or []}
+    allowed_photos = {str(item.get("id") or "") for item in context.get("photos") or []}
     target = (context.get("reply_target_message") or {}).get("id")
     options: list[PlanOption] = []
     for option in plan.options:
         ids = [source for source in option.evidence_source_ids if source in canonical]
         if option.send and target and target not in ids:
             ids.append(target)
-        if option.send and not option.line.strip():
+        photo_id = option.photo_id if option.photo_id in allowed_photos else ""
+        if option.send and not option.line.strip() and not photo_id:
             option = option.model_copy(update={"send": False})
-        options.append(option.model_copy(update={"evidence_source_ids": ids}))
+        options.append(option.model_copy(update={"evidence_source_ids": ids, "photo_id": photo_id}))
     return plan.model_copy(update={"options": options})
 
 
