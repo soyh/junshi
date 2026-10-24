@@ -76,6 +76,33 @@ class Section:
         return widget
 
 
+_SCROLL_TARGETS: dict = {}
+_WHEEL_BOUND: set = set()
+
+
+def _on_wheel(event):
+    """Scroll the panel under the pointer.
+
+    Bound to the window instead of the canvas: a canvas-wide ``bind_all`` kept
+    firing after its dialog was destroyed (two-finger scrolling then raised
+    "bad window path name" and the client showed 界面操作未完成).
+    """
+    widget = event.widget
+    if str(widget.winfo_class()) in {'Text', 'Listbox'}:
+        return None  # nested editors scroll themselves
+    node = widget
+    while node is not None:
+        canvas = _SCROLL_TARGETS.get(str(node))
+        if canvas is not None:
+            if canvas.winfo_exists():
+                delta = int(getattr(event, 'delta', 0) or 0)
+                if delta:
+                    canvas.yview_scroll(-1 if delta > 0 else 1, 'units')
+            return 'break'
+        node = getattr(node, 'master', None)
+    return None
+
+
 def scrollable(parent):
     """Wrap a frame in a vertical scroll area and return the inner frame."""
     canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
@@ -88,14 +115,12 @@ def scrollable(parent):
     canvas.pack(side='left', fill='both', expand=True)
     bar.pack(side='right', fill='y')
 
-    def wheel(event):
-        # Leave nested editors (rules text, logs) to their own scrolling.
-        if str(event.widget.winfo_class()) in {'Text', 'Listbox'}:
-            return None
-        canvas.yview_scroll(-1 * (event.delta // 120), 'units')
-        return 'break'
-
-    canvas.bind_all('<MouseWheel>', wheel)
+    _SCROLL_TARGETS[str(inner)] = canvas
+    canvas.bind('<Destroy>', lambda _event, key=str(inner): _SCROLL_TARGETS.pop(key, None))
+    top = canvas.winfo_toplevel()
+    if str(top) not in _WHEEL_BOUND:
+        _WHEEL_BOUND.add(str(top))
+        top.bind('<MouseWheel>', _on_wheel, add='+')
     return inner
 
 

@@ -36,6 +36,8 @@ def _conn() -> sqlite3.Connection:
             reply_rules TEXT NOT NULL DEFAULT '',
             auto_send_authorized INTEGER NOT NULL DEFAULT 0,
             wechat_id TEXT NOT NULL DEFAULT '',
+            wechat_aliases TEXT NOT NULL DEFAULT '',
+            wechat_display_alias TEXT NOT NULL DEFAULT '微信',
             contact_handoff_enabled INTEGER NOT NULL DEFAULT 0,
             strategic_plan_enabled INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -59,6 +61,7 @@ def _conn() -> sqlite3.Connection:
             user_id TEXT NOT NULL,
             person_id TEXT NOT NULL,
             stage TEXT,
+            intent TEXT NOT NULL DEFAULT 'unsure',
             current_goal TEXT,
             long_term_goal TEXT,
             status TEXT
@@ -623,20 +626,59 @@ def test_planner_context_carries_the_handoff_only_after_opt_in():
     conn = _conn()
     conn.execute("UPDATE persons SET wechat_id = 'her_wx_88' WHERE id = 'p1'")
 
-    off = strategic_plan.build_context(conn, "u1", "c1")
-    assert off["contact_handoff"] == {
-        "enabled": False,
-        "my_wechat": "",
-        "their_wechat": "her_wx_88",
-    }
+    off = strategic_plan.build_context(conn, "u1", "c1")["contact_handoff"]
+    assert off["enabled"] is False
+    assert off["my_wechat"] == ""
+    assert off["their_wechat"] == "her_wx_88"
+    assert off["wechat_word"] == "微信"
 
     conn.execute(
         "UPDATE user_profiles SET wechat_id = 'lin_xiao96', contact_handoff_enabled = 1"
         " WHERE user_id = 'u1'"
     )
-    on = strategic_plan.build_context(conn, "u1", "c1")
-    assert on["contact_handoff"] == {
-        "enabled": True,
-        "my_wechat": "lin_xiao96",
-        "their_wechat": "her_wx_88",
-    }
+    on = strategic_plan.build_context(conn, "u1", "c1")["contact_handoff"]
+    assert on["enabled"] is True
+    assert on["my_wechat"] == "lin_xiao96"
+    assert on["their_wechat"] == "her_wx_88"
+
+
+def test_the_channel_alias_wins_over_the_account_word():
+    """A platform that censors 微信 gets its own word without a second setting."""
+    conn = _conn()
+    conn.execute(
+        "UPDATE user_profiles SET wechat_id = 'lin_xiao96', contact_handoff_enabled = 1,"
+        " wechat_display_alias = 'wx' WHERE user_id = 'u1'"
+    )
+
+    default = strategic_plan.build_context(conn, "u1", "c1")["contact_handoff"]
+    assert default["wechat_word"] == "wx"
+
+    channel = strategic_plan.build_context(
+        conn, "u1", "c1", wechat_alias="V"
+    )["contact_handoff"]
+    assert channel["wechat_word"] == "V"
+    assert "V" in channel["banned_word_rule"]
+
+
+def test_user_aliases_reach_the_planner_vocabulary():
+    conn = _conn()
+    conn.execute(
+        "UPDATE user_profiles SET wechat_aliases = '绿恐龙、地球号' WHERE user_id = 'u1'"
+    )
+
+    handoff = strategic_plan.build_context(conn, "u1", "c1")["contact_handoff"]
+
+    assert "绿恐龙" in handoff["aliases"]
+    assert "地球号" in handoff["aliases"]
+    assert "微信" in handoff["aliases"]
+
+
+def test_chat_intent_reaches_the_planner():
+    conn = _conn()
+    conn.execute("UPDATE relationships SET intent = 'long_term' WHERE person_id = 'p1'")
+
+    context = strategic_plan.build_context(conn, "u1", "c1")
+
+    assert context["relationship"]["intent"] == "long_term"
+    assert "long_term" in strategic_plan.context_for_prompt(context)
+

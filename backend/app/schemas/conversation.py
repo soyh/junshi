@@ -50,5 +50,7 @@ class ConversationResponse(BaseModel):
     title: str | None
     status: str
     is_primary: int = 0
+    auto_reply_paused: int = 0
+    takeover_at: str | None = None
     created_at: str
     updated_at: str

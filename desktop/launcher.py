@@ -2,12 +2,16 @@
 import argparse
 import ctypes
 import json
+import os
 import sys
+import tempfile
+import time
+import traceback
+import tkinter as tk
 from pathlib import Path
 
 
 def main():
-    import tkinter as tk
     from tkinter import messagebox
     from PIL import Image, ImageTk
     from assistant import Assistant
@@ -33,7 +37,25 @@ def main():
     root.title('AI 恋爱军师 · PC 客户端')
     app = Assistant(root, hotkey=not bool(args.self_test))
     root.title('AI 恋爱军师 · PC 客户端 221.1')
-    root.report_callback_exception = lambda *_: messagebox.showerror('操作未完成', '界面操作未完成，请重试。已提交的服务器记录不会删除。', parent=root)
+    def report_ui_error(exc_type, exc, traceback):
+        text = str(exc)
+        # Window teardown races (a callback firing after its dialog closed) are
+        # noise: scrolling used to hit this and pop a scary dialog.
+        if issubclass(exc_type, tk.TclError) and (
+            'bad window' in text or 'destroyed' in text or 'has been deleted' in text
+        ):
+            return
+        try:
+            log = Path(os.environ.get('LOCALAPPDATA') or tempfile.gettempdir()) / 'JunshiPC' / 'ui-errors.log'
+            log.parent.mkdir(parents=True, exist_ok=True)
+            with log.open('a', encoding='utf-8') as handle:
+                handle.write(time.strftime('%Y-%m-%d %H:%M:%S ') + repr(exc) + chr(10))
+                traceback.print_exception(exc_type, exc, traceback, file=handle)
+        except Exception:
+            pass
+        messagebox.showerror('操作未完成', '界面操作未完成，请重试。已提交的服务器记录不会删除。', parent=root)
+
+    root.report_callback_exception = report_ui_error
     if args.self_test:
         root.update()
         preview = ImageTk.PhotoImage(Image.new('RGB', (4, 4), 'white'), master=root)

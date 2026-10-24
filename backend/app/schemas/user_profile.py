@@ -25,6 +25,11 @@ class UserProfilePayload(BaseModel):
     # The user's own WeChat id, so the assistant can hand it over when the
     # counterpart asks for a contact (only once the user opts in below).
     wechat_id: str = Field(default="", max_length=60)
+    # Words that mean "WeChat" on censoring platforms ("V", "绿泡泡", ...).
+    # Recognition only; comma separated so one text box serves every client.
+    wechat_aliases: str = Field(default="", max_length=200)
+    # The word a reply may use instead of 微信 when it hands the id over.
+    wechat_display_alias: str = Field(default="微信", max_length=20)
     # Explicit opt-in for the desktop bridge sending drafts unchanged.
     auto_send_authorized: bool = False
     # Opt-in for handing out `wechat_id` inside a reply. None keeps the stored

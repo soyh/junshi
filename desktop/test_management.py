@@ -3,7 +3,7 @@ import tkinter as tk
 import unittest
 from unittest.mock import Mock
 from assistant import Assistant
-from management import PersonDialog, AccountDialog, ModelDialog, create_person_with_conversation, model_payload
+from management import PersonDialog, AccountDialog, ModelDialog, create_person_with_conversation, model_payload, scrollable
 
 
 class WorkflowTests(unittest.TestCase):
@@ -148,3 +148,27 @@ class EventPumpTests(unittest.TestCase):
         finally:
             app.closed = True
             root.destroy()
+
+
+class ScrollTests(unittest.TestCase):
+    def test_wheel_scrolls_the_panel_and_teardown_is_quiet(self):
+        from tkinter import ttk
+        root = tk.Tk(); root.withdraw()
+        holder = ttk.Frame(root); holder.pack(fill='both', expand=True)
+        inner = scrollable(holder)
+        for _ in range(40):
+            ttk.Label(inner, text='一行内容').pack()
+        root.update()
+        inner.event_generate('<MouseWheel>', delta=-120)
+        root.update()
+        root.destroy()
+
+    def test_wheel_after_teardown_does_not_raise(self):
+        import management
+        from tkinter import ttk
+        root = tk.Tk(); root.withdraw()
+        holder = ttk.Frame(root); holder.pack()
+        inner = scrollable(holder)
+        key = str(inner)
+        root.destroy()
+        self.assertNotIn(key, management._SCROLL_TARGETS)

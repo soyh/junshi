@@ -336,6 +336,7 @@ class AppClient:
         conversation_id: str,
         rules: str = "",
         self_profile: dict[str, str] | None = None,
+        wechat_alias: str = "",
     ) -> dict:
         """Calls the LLM chain; may take tens of seconds.
 
@@ -346,11 +347,15 @@ class AppClient:
         path = f"/api/v1/conversations/{conversation_id}/strategic-reply/context"
         timeout = max(self._timeout, 180.0)
         profile = {k: v for k, v in (self_profile or {}).items() if str(v).strip()}
-        if rules.strip() or profile:
+        alias = (wechat_alias or "").strip()
+        if rules.strip() or profile or alias:
+            body = {"rules": rules, "self_profile": profile}
+            if alias:
+                body["wechat_alias"] = alias
             return await self._request(
                 "POST",
                 path,
-                json={"rules": rules, "self_profile": profile},
+                json=body,
                 timeout=timeout,
             )
         return await self._request("GET", path, timeout=timeout)

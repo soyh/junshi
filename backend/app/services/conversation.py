@@ -149,6 +149,30 @@ class ConversationService:
 
         return conversation
 
+    def set_takeover(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        conversation_id: str,
+        enabled: bool,
+    ) -> sqlite3.Row:
+        """Turn the "I answer this one myself" switch on or off."""
+        existing = self.get(conn, user_id, conversation_id)
+        if existing is None:
+            raise ConversationNotFoundError("Conversation not found")
+        conn.execute(
+            """
+            UPDATE conversations
+            SET auto_reply_paused = ?,
+                takeover_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ?
+            """,
+            (int(bool(enabled)), int(bool(enabled)), conversation_id, user_id),
+        )
+        conn.commit()
+        return self.get(conn, user_id, conversation_id)
+
     def update(
         self,
         conn: sqlite3.Connection,

@@ -45,6 +45,20 @@ def _resolve_profile(conn: sqlite3.Connection, user_id: str, override) -> dict[s
     return _clean_profile(UserProfileService().prompt_facts(stored))
 
 
+def _taken_over(conn: sqlite3.Connection, user_id: str, conversation_id: str) -> bool:
+    """True while the user asked to answer this conversation personally."""
+    try:
+        row = conn.execute(
+            "SELECT auto_reply_paused FROM conversations WHERE id = ? AND user_id = ?",
+            (conversation_id, user_id),
+        ).fetchone()
+    except (sqlite3.OperationalError, AttributeError):
+        return False
+    if row is None or "auto_reply_paused" not in row.keys():
+        return False
+    return bool(row["auto_reply_paused"])
+
+
 def _auto_send_authorized(conn: sqlite3.Connection, user_id: str) -> bool:
     """True when the account opted into the bridge sending drafts itself."""
     stored = _stored_profile(conn, user_id)
@@ -61,15 +75,20 @@ def _contact_handoff(
     user_id: str,
     person_id: str,
     profile=None,
+    wechat_alias: str = "",
 ) -> dict[str, object]:
     """What the draft may say about contacting each other.
 
-    Off unless the account opted in AND filled in a WeChat id. The counterpart's
-    id (when known) is shared so the model never asks for something it has.
+    Off unless the account opted in AND filled in a WeChat id. Ships the word the
+    current channel may use for WeChat (some platforms censor 微信/VX) and the
+    counterpart's id (when known) so the model never asks for something it has.
     """
     stored = profile if profile is not None else _stored_profile(conn, user_id)
     mine = str(getattr(stored, "wechat_id", "") or "").strip() if stored else ""
     enabled = bool(getattr(stored, "contact_handoff_enabled", False)) if stored else False
+    word = (wechat_alias or "").strip()
+    if not word:
+        word = str(getattr(stored, "wechat_display_alias", "") or "").strip() or "微信"
     theirs = ""
     try:
         row = conn.execute(
@@ -77,19 +96,31 @@ def _contact_handoff(
             (person_id, user_id),
         ).fetchone()
         theirs = str(row["wechat_id"] or "").strip() if row is not None else ""
-    except sqlite3.OperationalError:
+    except (sqlite3.OperationalError, AttributeError):
+        # Stub connections in tests and pre-migration databases have no column.
         theirs = ""
     allowed = bool(enabled and mine)
+    masked = word.lower() not in {"微信", "wechat", "weixin"}
+    if allowed:
+        rule = (
+            f"只在对方明确要联系方式、且对话已经聊得比较顺时给出 my_wechat，号码原样照抄，不要改字符；"
+            f"提到微信时一律写「{word}」，不要写微信/VX/WeChat 这类字样；"
+            "对方没问就不要主动提。their_wechat 已知时，不要再问她的号，"
+            "也不要声称「加你了」「我加你了」。"
+        )
+        if not masked:
+            rule = rule.replace("提到微信时一律写「微信」，不要写微信/VX/WeChat 这类字样；", "")
+    else:
+        rule = (
+            "未授权交换联系方式：不要给出任何微信号，也不要索要对方的号；"
+            "对方问起就用轻松的话带过，不要写微信/VX/WeChat 这类字样。"
+        )
     return {
         "enabled": allowed,
         "my_wechat": mine if allowed else "",
         "their_wechat": theirs,
-        "rule": (
-            "只在对方明确要联系方式、且对话已经聊得比较顺时给出 my_wechat，原文照抄，不要改字符；"
-            "对方没问就不要主动提。their_wechat 已知时，不要再问她的号，也不要说「加你了」。"
-            if allowed
-            else "未授权交换联系方式：不要给出任何微信号，也不要索要对方的号；对方问起就用轻松的话带过。"
-        ),
+        "wechat_word": word,
+        "rule": rule,
     }
 
 
@@ -356,6 +387,7 @@ class AnalysisStrategicReplyService:
         channel_rules: str = "",
         self_profile: dict[str, str] | None = None,
         option: dict | None = None,
+        wechat_alias: str = "",
     ) -> dict:
         started = perf_counter()
         timings = {"analysis_seconds": 0.0, "draft_seconds": 0.0,
@@ -370,6 +402,27 @@ class AnalysisStrategicReplyService:
         llm_analysis_context["conversation_focus"] = conversation_focus
 
         auto_send = _auto_send_authorized(conn, user_id)
+        if _taken_over(conn, user_id, conversation_id):
+            # The user is handling this one by hand: answer immediately, without
+            # spending an analysis or a draft call, and tell the bridge to hold.
+            timings["total_seconds"] = perf_counter() - started
+            return self._hold_result(
+                analysis_context,
+                {},
+                {
+                    "read": "已开启人工接管：这条会话由你手动回复，这段时间不会自动代发。",
+                    "signal": "yellow",
+                    "stage": "",
+                    "goal_this_turn": "由你手动回复",
+                    "options": [],
+                    "avoid": [],
+                    "confidence": 1.0,
+                    "send_allowed": False,
+                    "references_used": [],
+                    "references_skipped": [],
+                },
+                auto_send, conversation_id, conversation_focus, timings, started,
+            )
         chosen_tactic = dict(option) if isinstance(option, dict) and option else None
         plan_payload_value = None
         plan_context = None
@@ -467,7 +520,9 @@ class AnalysisStrategicReplyService:
             "channel_rules": _resolve_rules(conn, user_id, channel_rules),
             "self_profile": _resolve_profile(conn, user_id, self_profile),
             "self_style": build_self_style(analysis_context.get("messages")),
-            "contact_handoff": _contact_handoff(conn, user_id, person_id),
+            "contact_handoff": _contact_handoff(
+                conn, user_id, person_id, _stored_profile(conn, user_id), wechat_alias
+            ),
             "constraints": {
                 "must_be_evidence_backed": True,
                 "must_prioritize_current_conversation": True,

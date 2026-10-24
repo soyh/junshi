@@ -20,6 +20,7 @@ class RelationshipRepository:
         long_term_goal: str | None,
         current_goal: str | None,
         notes: str | None,
+        intent: str = "unsure",
     ) -> sqlite3.Row:
         relationship_id = str(uuid.uuid4())
         now = utc_now()
@@ -32,13 +33,14 @@ class RelationshipRepository:
                 person_id,
                 status,
                 stage,
+                intent,
                 long_term_goal,
                 current_goal,
                 notes,
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 relationship_id,
@@ -46,6 +48,7 @@ class RelationshipRepository:
                 person_id,
                 status,
                 stage,
+                intent,
                 long_term_goal,
                 current_goal,
                 notes,
@@ -105,6 +108,7 @@ class RelationshipRepository:
         long_term_goal=UNSET,
         current_goal=UNSET,
         notes=UNSET,
+        intent=UNSET,
     ) -> sqlite3.Row | None:
         existing = self.get(conn, user_id, relationship_id)
 
@@ -124,12 +128,14 @@ class RelationshipRepository:
             else current_goal
         )
         new_notes = existing["notes"] if notes is UNSET else notes
+        new_intent = existing["intent"] if intent is UNSET or not intent else intent
 
         conn.execute(
             """
             UPDATE relationships
             SET status = ?,
                 stage = ?,
+                intent = ?,
                 long_term_goal = ?,
                 current_goal = ?,
                 notes = ?,
@@ -140,6 +146,7 @@ class RelationshipRepository:
             (
                 new_status,
                 new_stage,
+                new_intent,
                 new_long_term_goal,
                 new_current_goal,
                 new_notes,
@@ -150,7 +157,7 @@ class RelationshipRepository:
         )
 
         updated = self.get(conn, user_id, relationship_id)
-        fields = ('status','stage','long_term_goal','current_goal','notes')
+        fields = ('status','stage','intent','long_term_goal','current_goal','notes')
         before = {key: existing[key] for key in fields}
         after = {key: updated[key] for key in fields}
         if before != after:

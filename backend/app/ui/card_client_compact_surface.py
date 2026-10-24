@@ -239,11 +239,19 @@ CARD_CLIENT_COMPACT_SURFACE_SCRIPT = r'''
     tabs.setAttribute('role', 'tablist');
     tabs.setAttribute('aria-label', '当前人物的会话');
 
+    const takeover = document.createElement('button');
+    takeover.id = 'client-conversation-takeover';
+    takeover.type = 'button';
+    takeover.className = 'requires-auth';
+    takeover.disabled = true;
+    takeover.textContent = '人工接管';
+    takeover.title = '打开后这条对话不再自动回复，你自己回；其它对话照常。';
+
     const status = document.createElement('div');
     status.id = 'client-conversation-compact-status';
     status.textContent = '选择人物后显示会话。';
 
-    bar.append(head, tabs, status);
+    bar.append(head, tabs, takeover, status);
     host.insertBefore(bar, content);
 
     create.addEventListener('click', async () => {
@@ -330,13 +338,59 @@ CARD_CLIENT_COMPACT_SURFACE_SCRIPT = r'''
     status.textContent = `共 ${options.length} 个会话；当前会话中的新增内容会自动进入分析链。`;
   }
 
+  let clientTakeoverPaused = false;
+  async function clientRefreshTakeover() {
+    const button = byId('client-conversation-takeover');
+    if (!button) return;
+    if (!selectedConversationId || !currentAccessToken) {
+      button.disabled = true;
+      button.textContent = '人工接管';
+      button.classList.remove('is-active');
+      clientTakeoverPaused = false;
+      return;
+    }
+    try {
+      const data = await api('/api/v1/conversations/' + encodeURIComponent(selectedConversationId));
+      clientTakeoverPaused = !!(data && data.auto_reply_paused);
+    } catch (_) {
+      clientTakeoverPaused = false;
+    }
+    button.disabled = false;
+    button.classList.toggle('is-active', clientTakeoverPaused);
+    button.textContent = clientTakeoverPaused ? '人工接管中 · 点此恢复自动' : '人工接管';
+  }
+
+  byId('client-conversation-takeover')?.addEventListener('click', async () => {
+    const button = byId('client-conversation-takeover');
+    if (!selectedConversationId || !button) return;
+    button.disabled = true;
+    try {
+      const data = await api('/api/v1/conversations/' + encodeURIComponent(selectedConversationId) + '/takeover', {
+        method: 'POST',
+        body: JSON.stringify({enabled: !clientTakeoverPaused}),
+      });
+      clientTakeoverPaused = !!(data && data.auto_reply_paused);
+      button.classList.toggle('is-active', clientTakeoverPaused);
+      button.textContent = clientTakeoverPaused ? '人工接管中 · 点此恢复自动' : '人工接管';
+    } catch (error) {
+      const status = byId('client-conversation-compact-status');
+      if (status) status.textContent = '切换失败：' + (error && error.message ? error.message : error);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   const clientCompactBaseLoadConversations = loadConversations;
   loadConversations = async function() {
     await clientCompactBaseLoadConversations();
     clientRenderConversationBar();
+    clientRefreshTakeover();
   };
 
-  byId('conversation-select')?.addEventListener('change', clientRenderConversationBar);
+  byId('conversation-select')?.addEventListener('change', () => {
+    clientRenderConversationBar();
+    clientRefreshTakeover();
+  });
   byId('person-select')?.addEventListener('change', () => {
     queueMicrotask(clientRenderConversationBar);
   });

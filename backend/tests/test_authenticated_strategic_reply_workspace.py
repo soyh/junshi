@@ -14,7 +14,8 @@ class FakeStrategicReplyService:
         self.calls = []
 
     def build_context(self, conn, user_id, conversation_id, *, provider=None,
-                      channel_rules="", self_profile=None, progress=None, option=None):
+                      channel_rules="", self_profile=None, progress=None, option=None,
+                      wechat_alias=""):
         self.calls.append((user_id, conversation_id, provider))
         return self.result
 

@@ -178,6 +178,7 @@ def build_config(
     browser_window: str = "hide",
     rules: str | None = None,
     person: dict[str, str] | None = None,
+    wechat_alias: str | None = None,
 ) -> str:
     if channel not in set(CHANNELS) | {"mock"}:
         raise ValueError("不支持的平台通道")
@@ -224,6 +225,7 @@ quiet_hours = [{_toml(quiet[0])}, {_toml(quiet[1])}]
 max_reply_chars = 500
 reply_to_groups = false
 rules = {_toml(str(effective_rules or "").strip())}
+wechat_alias = {_toml((wechat_alias or "").strip()[:20])}
 max_concurrency = 2
 browser_window = {_toml(browser_window)}
 state_path = "state.sqlite3"
@@ -280,6 +282,7 @@ def summary(profile_id: str) -> dict:
         "quiet": (str(quiet[0]), str(quiet[1])),
         "verify_tls": bool(app.get("verify_tls", True)),
         "rules": str(bot.get("rules", "")) or load_global()["rules"],
+        "wechat_alias": str(bot.get("wechat_alias", "")),
         "person": load_global()["person"],
         "running": is_running(profile_id),
         "status": local_status(profile_id)["status"],

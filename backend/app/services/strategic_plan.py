@@ -151,20 +151,43 @@ def load_transcript(
     return out
 
 
-def load_contact(conn: sqlite3.Connection, user_id: str, person_id: str) -> dict[str, Any]:
-    """WeChat exchange permission for this pair (see analysis_strategic_reply)."""
+def load_contact(
+    conn: sqlite3.Connection,
+    user_id: str,
+    person_id: str,
+    alias_override: str = "",
+) -> dict[str, Any]:
+    """WeChat exchange permission for this pair (see analysis_strategic_reply).
+
+    `alias_override` is the current channel's word for WeChat ("V" on a platform
+    that bans 微信); it wins over the account-wide value so one reply never uses
+    a word the platform censors.
+    """
+    from app.services.person_channel import parse_aliases
+
     mine = ""
     enabled = False
-    try:
-        row = conn.execute(
-            "SELECT wechat_id, contact_handoff_enabled FROM user_profiles WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
+    aliases_text = ""
+    display = "微信"
+    for sql in (
+        "SELECT wechat_id, contact_handoff_enabled, wechat_aliases, wechat_display_alias"
+        " FROM user_profiles WHERE user_id = ?",
+        # Databases created before build 258 simply have no alias columns.
+        "SELECT wechat_id, contact_handoff_enabled FROM user_profiles WHERE user_id = ?",
+    ):
+        try:
+            row = conn.execute(sql, (user_id,)).fetchone()
+        except sqlite3.OperationalError:
+            continue
         if row is not None:
             mine = str(row["wechat_id"] or "").strip()
             enabled = bool(row["contact_handoff_enabled"])
-    except sqlite3.OperationalError:
-        pass
+            keys = row.keys()
+            if "wechat_aliases" in keys:
+                aliases_text = str(row["wechat_aliases"] or "")
+            if "wechat_display_alias" in keys:
+                display = str(row["wechat_display_alias"] or "").strip() or "微信"
+        break
     theirs = ""
     try:
         row = conn.execute(
@@ -174,7 +197,19 @@ def load_contact(conn: sqlite3.Connection, user_id: str, person_id: str) -> dict
         theirs = str(row["wechat_id"] or "").strip() if row is not None else ""
     except sqlite3.OperationalError:
         theirs = ""
-    return {"enabled": bool(enabled and mine), "my_wechat": mine, "their_wechat": theirs}
+    alias = (alias_override or "").strip() or display
+    return {
+        "enabled": bool(enabled and mine),
+        "my_wechat": mine,
+        "their_wechat": theirs,
+        "wechat_word": alias,
+        "aliases": parse_aliases(aliases_text)[:12],
+        "banned_word_rule": (
+            f"写「{alias}」，不要写出微信/VX/WeChat 这类会被平台屏蔽的字样"
+            if alias.lower() not in {"微信", "wechat", "weixin"}
+            else "正常写「微信」即可"
+        ),
+    }
 
 
 def build_context(
@@ -185,6 +220,7 @@ def build_context(
     channel_rules: str = "",
     self_profile: dict[str, str] | None = None,
     self_style: dict[str, Any] | None = None,
+    wechat_alias: str = "",
 ) -> dict[str, Any]:
     conversation = conn.execute(
         "SELECT id, title FROM conversations WHERE id = ? AND user_id = ?",
@@ -200,15 +236,31 @@ def build_context(
         """,
         (conversation_id, user_id),
     ).fetchone()
-    relationship = conn.execute(
+    relationship = None
+    for sql in (
+        """
+        SELECT r.stage, r.intent, r.current_goal, r.long_term_goal, r.status
+        FROM conversations c
+        JOIN relationships r ON r.person_id = c.person_id AND r.user_id = c.user_id
+        WHERE c.id = ? AND r.user_id = ?
+        """,
         """
         SELECT r.stage, r.current_goal, r.long_term_goal, r.status
         FROM conversations c
         JOIN relationships r ON r.person_id = c.person_id AND r.user_id = c.user_id
         WHERE c.id = ? AND r.user_id = ?
         """,
-        (conversation_id, user_id),
-    ).fetchone()
+    ):
+        try:
+            relationship = conn.execute(sql, (conversation_id, user_id)).fetchone()
+            break
+        except sqlite3.OperationalError:
+            continue
+
+    def relationship_field(name: str, default: str = "") -> str:
+        if relationship is None or name not in relationship.keys():
+            return default
+        return str(relationship[name] or default)
 
     transcript = load_transcript(conn, user_id, conversation_id)
     references, skipped = load_references(conn, user_id, conversation_id)
@@ -222,10 +274,11 @@ def build_context(
             "notes": (person["notes"] or "") if person else "",
         },
         "relationship": {
-            "stage": (relationship["stage"] if relationship else "") or "",
-            "status": (relationship["status"] if relationship else "") or "",
-            "current_goal": (relationship["current_goal"] if relationship else "") or "",
-            "long_term_goal": (relationship["long_term_goal"] if relationship else "") or "",
+            "stage": relationship_field("stage"),
+            "intent": relationship_field("intent", "unsure") or "unsure",
+            "status": relationship_field("status"),
+            "current_goal": relationship_field("current_goal"),
+            "long_term_goal": relationship_field("long_term_goal"),
         },
         "transcript": transcript,
         "reply_target_message": target,
@@ -236,7 +289,7 @@ def build_context(
         "self_style": self_style or {},
         "channel_rules": (channel_rules or "").strip(),
         "contact_handoff": load_contact(
-            conn, user_id, str(person["id"]) if person else ""
+            conn, user_id, str(person["id"]) if person else "", wechat_alias
         ),
     }
 

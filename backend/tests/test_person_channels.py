@@ -119,3 +119,20 @@ def test_hand_typed_wechat_id_wins_over_capture():
 
     assert service.capture_wechat_id(conn, "u1", "p1", "加我 lin_xiao96") == ""
     assert conn.execute("SELECT wechat_id FROM persons WHERE id = 'p1'").fetchone()[0] == "typed_id_1"
+
+
+def test_custom_alias_is_recognised_next_to_the_id():
+    """A platform that censors 微信 makes people write "绿恐龙 xxxx"."""
+    tokens = extract_wechat_id("绿恐龙 lin_xiao96", ["绿恐龙"])
+
+    assert tokens == "lin_xiao96"
+
+
+def test_alias_glued_to_the_id_still_yields_the_id():
+    tokens = extract_wechat_id("V abc12345", ["V"])
+
+    assert tokens == "abc12345"
+
+
+def test_default_words_are_not_mistaken_for_ids():
+    assert extract_wechat_id("微信 wechat VX") == ""

@@ -546,6 +546,7 @@ class Orchestrator:
         context = await self.app.get_reply_context(
             conversation_id,
             self.config.bot.rules,
+            wechat_alias=self.config.bot.wechat_alias,
         )
         plan = (context or {}).get("plan") if isinstance(context, dict) else None
         if isinstance(plan, dict) and plan.get("send_allowed") is False:

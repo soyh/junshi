@@ -99,6 +99,13 @@ CARD_NAVIGATION_STYLE = r'''
   .client-person-editor-body{padding:16px 20px 22px;overflow:auto;display:grid;gap:12px}
   .client-person-editor-body .client-card-back{position:static!important;transform:none!important;width:auto!important;height:auto!important;border:0!important;box-shadow:none!important;background:transparent!important;padding:0!important;overflow:visible!important;cursor:default!important;pointer-events:auto!important}
   .client-person-editor-body .client-card-back .client-card-message{display:none}
+  .client-batch-people{display:grid;gap:6px;max-height:44vh;overflow:auto;border:1px solid rgba(78,105,150,.14);border-radius:14px;padding:10px}
+  .client-batch-person{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:10px;cursor:pointer;font-size:.88rem;color:#22314a}
+  .client-batch-person:hover{background:#eef4fb}
+  .client-batch-person input{width:16px;height:16px;accent-color:#2f6fd0}
+  .client-batch-intent-select{display:grid;gap:5px;margin-top:4px}
+  .client-batch-intent-select label{font-size:.8rem;color:#526279}
+  .client-batch-intent-select select{padding:8px 10px;border-radius:10px;border:1px solid rgba(78,105,150,.24);background:#fff;font:inherit}
 '''
 
 CARD_NAVIGATION_SCRIPT = r'''
@@ -134,7 +141,8 @@ CARD_NAVIGATION_SCRIPT = r'''
   const navBack=clientEl('button','','← 返回人物卡组');navBack.id='client-back-people';navBack.type='button';
   const navName=clientEl('h2');navName.tabIndex=-1;
   const navEdit=clientEl('button','','人物资料与关系');navEdit.type='button';
-  navWorkbar.append(navBack,navName,navEdit);navShell.prepend(navWorkbar);
+  const navBatch=clientEl('button','','批量设聊天目的');navBatch.id='client-batch-intent-open';navBatch.type='button';
+  navWorkbar.append(navBack,navName,navEdit,navBatch);navShell.prepend(navWorkbar);
   document.querySelector('.client-brand p').textContent='选择一位人物，继续你们的故事。';
   let navEpoch=0,navEntering=false,navWorkspaceAnimation=null,navMorph=null;
   function navCancelMorph(){
@@ -247,6 +255,18 @@ CARD_NAVIGATION_SCRIPT = r'''
     const back=card.querySelector('.client-card-back');
     if(!back){navStatus.textContent='人物资料暂时无法读取，请重试。';return;}
     editor.body.replaceChildren(back);
+    // Inside the modal the card cannot "flip": the old 翻回卡面 button used to
+    // remove a class on a card that is not on screen, so it did nothing.
+    back.querySelectorAll('.client-card-actions button').forEach(button=>{
+      if(button.classList.contains('client-primary-button'))return;
+      if(!button.textContent.includes('翻回卡面'))return;
+      // Clone so the card-flip listener does not survive: inside the modal the
+      // card is not on screen, so flipping it did nothing visible.
+      const close=button.cloneNode(true);
+      close.textContent='关闭';
+      button.replaceWith(close);
+      close.addEventListener('click',()=>navClosePersonEditor());
+    });
     editor.face={card,back};
     editor.overlay.hidden=false;
     document.body.dataset.profileEdit='true';
@@ -261,6 +281,75 @@ CARD_NAVIGATION_SCRIPT = r'''
     }
     navEditor.face=null;navEditor.overlay.hidden=true;document.body.dataset.profileEdit='false';
   }
+
+  let navBatchEditor=null;
+  const NAV_INTENTS=[['long_term','长期恋爱'],['casual','轻松约会'],['one_night','一夜情'],['friendship','先做朋友'],['unsure','还没想好']];
+  function navBuildBatchEditor(){
+    if(navBatchEditor)return navBatchEditor;
+    const overlay=document.createElement('div');overlay.id='client-batch-intent';overlay.hidden=true;
+    const card=clientEl('div','client-person-editor-card');
+    const head=clientEl('div','client-person-editor-head');
+    const titles=clientEl('div');
+    titles.append(
+      clientEl('h2','','批量设置聊天目的'),
+      clientEl('p','','勾选要改的人，选一个目的，一次改完；没建过关系的人会自动补一条。'),
+    );
+    const close=clientEl('button','client-person-editor-close','关闭');close.type='button';
+    head.append(titles,close);
+    const body=clientEl('div','client-person-editor-body');
+    const people=clientEl('div','client-batch-people');people.id='client-batch-people';
+    const picker=document.createElement('select');picker.id='client-batch-intent-value';
+    NAV_INTENTS.forEach(([key,text])=>picker.appendChild(new Option(text,key)));
+    const pickerWrap=clientEl('div','client-batch-intent-select');
+    pickerWrap.append(clientEl('label','','聊天目的'),picker);
+    const actions=clientEl('div','client-card-actions');
+    const save=clientEl('button','client-primary-button','保存到选中的人');save.type='button';
+    const all=clientEl('button','','全选');all.type='button';
+    const none=clientEl('button','','清空');none.type='button';
+    const message=clientEl('div','client-card-message');message.id='client-batch-intent-status';
+    actions.append(save,all,none);
+    body.append(people,pickerWrap,actions,message);
+    card.append(head,body);overlay.append(card);
+    overlay.addEventListener('click',event=>{if(event.target===overlay)overlay.hidden=true;});
+    close.addEventListener('click',()=>{overlay.hidden=true;});
+    all.addEventListener('click',()=>people.querySelectorAll('input[type=checkbox]').forEach(box=>{box.checked=true;}));
+    none.addEventListener('click',()=>people.querySelectorAll('input[type=checkbox]').forEach(box=>{box.checked=false;}));
+    save.addEventListener('click',async()=>{
+      const ids=Array.from(people.querySelectorAll('input[type=checkbox]:checked')).map(box=>box.value);
+      if(ids.length===0){message.textContent='先勾选至少一个人。';return;}
+      save.disabled=true;message.textContent='正在保存…';
+      try{
+        await api('/api/v1/relationships/batch-intent',{method:'POST',body:JSON.stringify({person_ids:ids,intent:picker.value})});
+        message.textContent=`已把 ${ids.length} 个人的聊天目的改成「${picker.options[picker.selectedIndex].text}」。`;
+      }catch(error){message.textContent='保存失败：'+(error&&error.message?error.message:error);}
+      finally{save.disabled=false;}
+    });
+    document.body.append(overlay);
+    navBatchEditor={overlay,people,picker,message};
+    return navBatchEditor;
+  }
+  async function navOpenBatchEditor(){
+    if(!currentAccessToken){navStatus.textContent='请先登录。';return;}
+    const editor=navBuildBatchEditor();
+    editor.people.replaceChildren(clientEl('div','client-card-message','正在读取人物…'));
+    editor.overlay.hidden=false;
+    try{
+      const rows=await api('/api/v1/persons');
+      const list=Array.isArray(rows)?rows:[];
+      editor.people.replaceChildren();
+      if(list.length===0){editor.people.append(clientEl('div','client-card-message','还没有人物。'));return;}
+      list.forEach(person=>{
+        const row=clientEl('label','client-batch-person');
+        const box=document.createElement('input');box.type='checkbox';box.value=person.id;
+        const text=document.createElement('span');text.textContent=person.nickname?`${person.name}（${person.nickname}）`:person.name;
+        row.append(box,text);
+        editor.people.append(row);
+      });
+    }catch(error){
+      editor.people.replaceChildren(clientEl('div','client-card-message','人物读取失败：'+(error&&error.message?error.message:error)));
+    }
+  }
+  navBatch.addEventListener('click',()=>{navOpenBatchEditor();});
   navBack.addEventListener('click',()=>{navEpoch++;navEntering=false;navClosePersonEditor();navShow('people',true);navDeck.querySelector('.is-selected .client-card-front')?.focus({preventScroll:true});});
   navEdit.addEventListener('click',async()=>{
     await navOpenPersonEditor();

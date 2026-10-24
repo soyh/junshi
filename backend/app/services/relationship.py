@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sqlite3
 
 from app.core.sentinels import UNSET
@@ -25,6 +27,7 @@ class RelationshipService:
         long_term_goal: str | None,
         current_goal: str | None,
         notes: str | None,
+        intent: str = "unsure",
     ) -> sqlite3.Row:
         person = conn.execute(
             """
@@ -49,6 +52,7 @@ class RelationshipService:
                 long_term_goal,
                 current_goal,
                 notes,
+                intent,
             )
         except sqlite3.IntegrityError as exc:
             error_message = str(exc)
@@ -83,6 +87,45 @@ class RelationshipService:
             relationship_id,
         )
 
+    def set_intent_many(
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_ids: list[str],
+        intent: str,
+    ) -> list[sqlite3.Row]:
+        """Set the same chat intent on several people in one go.
+
+        Missing relationship rows are created rather than skipped, so "select
+        eight people, set 长期恋爱" also works for brand-new contacts.
+        """
+        rows: list[sqlite3.Row] = []
+        for person_id in person_ids:
+            person = conn.execute(
+                "SELECT id FROM persons WHERE id = ? AND user_id = ?",
+                (person_id, user_id),
+            ).fetchone()
+            if person is None:
+                continue
+            existing = conn.execute(
+                "SELECT id FROM relationships WHERE user_id = ? AND person_id = ?",
+                (user_id, person_id),
+            ).fetchone()
+            if existing is None:
+                row = self.create(
+                    conn, user_id, person_id, "unknown", "unknown",
+                    None, None, None, intent,
+                )
+            else:
+                row = self.update(
+                    conn, user_id, existing["id"],
+                    UNSET, UNSET, UNSET, UNSET, UNSET, intent,
+                )
+            if row is not None:
+                rows.append(row)
+        conn.commit()
+        return rows
+
     def update(
         self,
         conn: sqlite3.Connection,
@@ -93,6 +136,7 @@ class RelationshipService:
         long_term_goal=UNSET,
         current_goal=UNSET,
         notes=UNSET,
+        intent=UNSET,
     ) -> sqlite3.Row | None:
         return self.repository.update(
             conn,
@@ -103,6 +147,7 @@ class RelationshipService:
             long_term_goal,
             current_goal,
             notes,
+            intent,
         )
 
     def delete(

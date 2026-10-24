@@ -236,6 +236,18 @@ class BridgeDialog(Dialog):
         rules = Section(parent, "本通道回复规则（留空则用全局默认）", open=False)
         self.rules_section = rules
         ttk.Label(rules.body, text=RULES_HINT, foreground="#555").pack(anchor="w")
+        alias_row = ttk.Frame(rules.body)
+        alias_row.pack(fill="x", pady=(4, 2))
+        ttk.Label(alias_row, text="提到微信时写：").pack(side="left")
+        self.wechat_alias = tk.StringVar()
+        entry = ttk.Entry(alias_row, textvariable=self.wechat_alias, width=16)
+        entry.pack(side="left")
+        self.button(alias_row, "示例", self.fill_alias)
+        ttk.Label(
+            alias_row,
+            text="有些平台屏蔽「微信/VX」，这里填你要用的说法（如 V、绿泡泡）；留空用账号里的设置。",
+            foreground="#666",
+        ).pack(side="left", padx=(8, 0))
         picker = ttk.Frame(rules.body)
         picker.pack(fill="x", pady=(3, 2))
         ttk.Label(picker, text="模板：").pack(side="left")
@@ -356,6 +368,7 @@ class BridgeDialog(Dialog):
         self.rules.delete("1.0", "end")
         if item.get("rules"):
             self.rules.insert("1.0", item["rules"])
+        self.wechat_alias.set(str(item.get("wechat_alias") or ""))
         state = item.get("status") or ("运行中" if item["running"] else "未运行")
         self.message.set(f"{item['name']}：{state}")
         self.refresh_queue()
@@ -471,6 +484,7 @@ class BridgeDialog(Dialog):
             "headless": self.headless.get() == "是",
             "browser_window": WINDOW_LABELS.get(self.window_mode.get(), "hide"),
             "rules": self.rules.get("1.0", "end").strip(),
+            "wechat_alias": self.wechat_alias.get().strip(),
             "person": self._person_values(),
         }
 
@@ -602,6 +616,22 @@ class BridgeDialog(Dialog):
                 "没找到窗口",
                 "这个通道没有可见的浏览器窗口（可能已经在后台，或还没登录）。",
             )
+
+    def fill_alias(self):
+        """Offer the words people actually use when a platform bans 微信."""
+        picker = tk.Toplevel(self.window)
+        picker.title("微信的别称示例")
+        picker.transient(self.window)
+        frame = ttk.Frame(picker, padding=12)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="点一个填进「提到微信时写」：").pack(anchor="w")
+        for sample in ("V", "vx", "绿泡泡", "地球号", "加个地球", "小绿"):
+            ttk.Button(
+                frame,
+                text=sample,
+                command=lambda value=sample: (self.wechat_alias.set(value), picker.destroy()),
+            ).pack(fill="x", pady=2)
+        ttk.Button(frame, text="关闭", command=picker.destroy).pack(anchor="e", pady=(8, 0))
 
     def fill_template(self, insert_only=True, target=None):
         picker = self.global_template if target is not None else self.template

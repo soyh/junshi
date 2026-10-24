@@ -29,6 +29,37 @@ PRODUCT_SHELL_HTML = r'''<!doctype html>
     .session-row:last-child { border-bottom: 0; }
     .wide { grid-column: 1 / -1; }
     code { overflow-wrap: anywhere; }
+
+    /* One look for every control: same height, radius, colour and focus ring.
+       Buttons used to differ page by page depending on which module won the
+       cascade, which is why some of them looked disabled or unclickable. */
+    :root { --ui-accent: #2f6fd0; --ui-line: rgba(78,105,150,.22); --ui-radius: 10px; }
+    button, .client-primary-button, input[type="submit"], input[type="button"] {
+      min-height: 34px; border-radius: var(--ui-radius); border: 1px solid var(--ui-line);
+      background: #fff; color: #22314a; padding: 7px 14px; margin: 0; cursor: pointer;
+      transition: background .15s ease, border-color .15s ease, transform .1s ease;
+    }
+    button:hover:not(:disabled) { background: #eef4fb; border-color: rgba(47,111,208,.45); }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 2px solid rgba(47,111,208,.45); outline-offset: 1px;
+    }
+    .client-primary-button { background: var(--ui-accent); border-color: var(--ui-accent); color: #fff; }
+    .client-primary-button:hover:not(:disabled) { background: #255cb0; }
+    select, input[type="text"], input[type="password"], input[type="datetime-local"], input[type="number"], textarea {
+      min-height: 34px; border-radius: var(--ui-radius); border: 1px solid var(--ui-line); background: #fff; padding: 7px 10px;
+    }
+    input[type="range"] { accent-color: var(--ui-accent); height: 22px; }
+    input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-accent); }
+    details { border: 1px solid var(--ui-line); border-radius: var(--ui-radius); padding: 8px 12px; background: rgba(255,255,255,.6); }
+    details + details { margin-top: 8px; }
+    details > summary { cursor: pointer; font-weight: 600; color: #22314a; list-style: none; display: flex; align-items: center; gap: 6px; }
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary::before { content: '▸'; color: #6b7f9b; transition: transform .15s ease; }
+    details[open] > summary::before { content: '▾'; }
+    ::-webkit-scrollbar { width: 9px; height: 9px; }
+    ::-webkit-scrollbar-thumb { background: rgba(78,105,150,.30); border-radius: 9px; }
+    ::-webkit-scrollbar-track { background: transparent; }
   </style>
 </head>
 <body>

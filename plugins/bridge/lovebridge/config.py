@@ -38,6 +38,9 @@ class BotConfig:
     max_reply_chars: int = 500
     reply_to_groups: bool = False
     rules: str = ""
+    #: Which word this channel may use for WeChat ("V", "绿泡泡"). Empty means
+    #: "use whatever the account set"; the server still refuses banned wording.
+    wechat_alias: str = ""
     person: dict[str, str] = field(default_factory=dict)
     max_concurrency: int = 3
     browser_window: str = "hide"
@@ -127,6 +130,7 @@ def load_config(path: str | Path) -> Config:
         quiet_hours=quiet,
         max_reply_chars=int(bot_raw.get("max_reply_chars", 500)),
         rules=str(bot_raw.get("rules", "") or ""),
+        wechat_alias=str(bot_raw.get("wechat_alias", "") or "").strip()[:20],
         person=_person(raw.get("person", {})),
         reply_to_groups=bool(bot_raw.get("reply_to_groups", False)),
         max_concurrency=max(1, int(bot_raw.get("max_concurrency", 3))),

@@ -99,6 +99,8 @@ MY_PROFILE_HTML = r'''
         <div><label for="mp-hobbies">兴趣爱好</label><input id="mp-hobbies" maxlength="120" placeholder="比如：跑步、看展"></div>
         <div><label for="mp-relationship">感情状态</label><input id="mp-relationship" maxlength="40" placeholder="比如：单身"></div>
         <div><label for="mp-wechat-id">我的微信号</label><input id="mp-wechat-id" maxlength="60" placeholder="比如：lin_xiao96"></div>
+        <div><label for="mp-wechat-aliases">微信的别称</label><input id="mp-wechat-aliases" maxlength="200" placeholder="比如：V、绿泡泡、地球号（逗号分隔）"></div>
+        <div><label for="mp-wechat-word">提到微信时写</label><input id="mp-wechat-word" maxlength="20" placeholder="比如：V"><em class="my-profile-hint">有些平台屏蔽「微信/VX」，这里填你要用的说法；留空写「微信」。</em></div>
         <div id="my-profile-about"><label for="mp-about">其他想让它知道的</label><input id="mp-about" maxlength="400" placeholder="比如：不太爱打电话，晚上回消息慢"></div>
       </div>
       <div>
@@ -117,7 +119,7 @@ MY_PROFILE_HTML = r'''
         <label class="my-profile-check" for="mp-strategic-plan"><input id="mp-strategic-plan" type="checkbox"> 先做「军师判断」再写回复（推荐）</label>
         <p class="my-profile-hint">开启后先生成判断卡片（局势、阶段、2–4 条战术，可含「这轮先不发」），再按选中的战术写一条消息；参考资料全文在这一步读到。关掉则回到原来的一次生成。</p>
         <label class="my-profile-check" for="mp-handoff"><input id="mp-handoff" type="checkbox"> 对方主动要联系方式时，可以把我的微信号发给他</label>
-        <p class="my-profile-hint">只在对方明确开口、且聊得顺的时候给，不会主动塞；不勾选则一律不发号、也不问对方要号。对方给你的微信号会被记到人物资料里。</p>
+        <p class="my-profile-hint">只在对方明确开口、且聊得顺的时候给，不会主动塞；不勾选则一律不发号、也不问对方要号。对方给你的微信号会被记到人物资料里。对方用上面这些别称（V、绿泡泡…）开口也算数。</p>
       </div>
     </div>
     <footer>
@@ -147,6 +149,8 @@ MY_PROFILE_SCRIPT = r'''
       relationship_status: byId('mp-relationship'),
       about: byId('mp-about'),
       wechat_id: byId('mp-wechat-id'),
+      wechat_aliases: byId('mp-wechat-aliases'),
+      wechat_display_alias: byId('mp-wechat-word'),
       reply_rules: byId('mp-rules'),
     };
     const autoSend = byId('mp-auto-send');

@@ -85,6 +85,9 @@ class ChannelRulesBody(BaseModel):
     # An option the user picked from the plan card; skips the planner call and
     # drafts that tactic instead of the recommended one.
     option: dict | None = None
+    # The current channel's word for WeChat ("V", "绿泡泡"): platforms censor the
+    # obvious spelling, so the bridge tells us which one is safe here.
+    wechat_alias: str = ""
 
 
 def _safe_llm_failure_detail(exc: LLMAnalysisError) -> str:
@@ -138,7 +141,9 @@ def get_analysis_strategic_reply_context(
     request_id: UUID | None = None,
     user_id: str = Depends(get_current_user_id),
 ):
-    return _reply_context(conversation_id, request_id, "", {}, user_id, None, background)
+    return _reply_context(
+        conversation_id, request_id, "", {}, user_id, None, background, ""
+    )
 
 
 @router.post(
@@ -162,6 +167,7 @@ def post_analysis_strategic_reply_context(
         user_id,
         (body.option if body else None),
         background,
+        (body.wechat_alias if body else ""),
     )
 
 
@@ -173,6 +179,7 @@ def _reply_context(
     user_id: str,
     option: dict | None = None,
     background: BackgroundTasks | None = None,
+    wechat_alias: str = "",
 ):
     from app.services.reply_progress import publish
     progress = (lambda stage, attempt=0: publish(user_id,conversation_id,str(request_id),stage,attempt)) if request_id else None
@@ -190,6 +197,7 @@ def _reply_context(
                 channel_rules=channel_rules,
                 self_profile=self_profile,
                 option=option,
+                wechat_alias=wechat_alias,
                 **kwargs,
             )
             if progress: progress('complete')

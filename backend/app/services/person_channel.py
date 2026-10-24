@@ -25,6 +25,60 @@ WECHAT_ID = re.compile(r"[A-Za-z][A-Za-z0-9_-]{5,19}")
 
 _SPLIT = re.compile(r"[\s，,。.、:：;；!！?？()（）\[\]【】\"'“”‘’~～]+")
 
+#: Words that mean "WeChat" even when a platform censors the obvious ones.
+#: The user can add their own in Settings; these are the defaults we ship.
+DEFAULT_WECHAT_ALIASES = (
+    "微信",
+    "威信",
+    "徽信",
+    "薇信",
+    "vx",
+    "wx",
+    "wechat",
+    "weixin",
+    "v信",
+    "v",
+    "绿泡泡",
+    "绿恐龙",
+    "地球号",
+    "小绿",
+)
+
+#: Delimiters the settings box accepts: "V,绿泡泡" / "V、绿泡泡" / "V 绿泡泡".
+_ALIAS_SPLIT = re.compile(r"[,，、;；/|\s]+")
+
+
+def parse_aliases(text: str | None) -> list[str]:
+    """User aliases first (they know their platform), then the shipped defaults."""
+    seen: list[str] = []
+    for raw in _ALIAS_SPLIT.split(str(text or "")):
+        item = raw.strip()
+        if item and item.lower() not in {value.lower() for value in seen}:
+            seen.append(item)
+    for item in DEFAULT_WECHAT_ALIASES:
+        if item.lower() not in {value.lower() for value in seen}:
+            seen.append(item)
+    return seen
+
+
+def mentions_wechat(text: str, aliases: list[str] | None = None) -> bool:
+    """True when the message uses any alias that stands for WeChat.
+
+    One- and two-letter aliases ("V", "VX") only count as standalone tokens, so
+    an English word containing a "v" never looks like a contact request.
+    """
+    blob = text or ""
+    for alias in aliases or list(DEFAULT_WECHAT_ALIASES):
+        alias = alias.strip()
+        if not alias:
+            continue
+        if len(alias) <= 2 and alias.isascii():
+            if re.search(rf"(?<![A-Za-z0-9]){re.escape(alias)}(?![A-Za-z0-9])", blob, re.I):
+                return True
+        elif alias.lower() in blob.lower():
+            return True
+    return False
+
 
 class PersonChannelError(Exception):
     pass
@@ -34,19 +88,39 @@ class PersonChannelConflict(PersonChannelError):
     """The handle is already bound to a different person."""
 
 
+_NOT_AN_ID = {'wechat', 'weixin', 'wxid', 'contact', 'number', 'wechatid', 'vx', 'v'}
+_TRIM = " " + chr(9) + chr(10) + ":,." + chr(12290) + chr(12289)
+
+
 def looks_like_wechat_id(text: str) -> bool:
     return bool(WECHAT_ID.fullmatch(text.strip()))
 
 
-def extract_wechat_id(text: str) -> str:
-    """Pull a WeChat id out of what the counterpart wrote, or ''."""
-    for token in _SPLIT.split(text or ""):
-        token = token.strip()
-        if not looks_like_wechat_id(token):
+def extract_wechat_id(text: str, aliases: list[str] | None = None) -> str:
+    """Pull a WeChat id out of what the counterpart wrote, or ''.
+
+    `aliases` are the account's own words for WeChat (a platform may censor the
+    word itself). They matter because people then write the alias right before
+    the id, with no separator the splitter would catch.
+    """
+    blob = text or ""
+    for token in _SPLIT.split(blob):
+        token = token.strip(_TRIM)
+        if token.lower() in _NOT_AN_ID:
             continue
-        if token.lower() in {"wechat", "weixin", "wxid", "contact", "number", "wechatid"}:
+        if looks_like_wechat_id(token):
+            return token
+    for alias in [*(aliases or []), *DEFAULT_WECHAT_ALIASES]:
+        alias = (alias or "").strip()
+        if not alias:
             continue
-        return token
+        stripped = re.sub(re.escape(alias), " ", blob, flags=re.I)
+        if stripped == blob:
+            continue
+        for token in _SPLIT.split(stripped):
+            token = token.strip(_TRIM)
+            if looks_like_wechat_id(token) and token.lower() not in _NOT_AN_ID:
+                return token
     return ""
 
 
@@ -193,11 +267,28 @@ class PersonChannelService:
         )
         return {"person_id": person_id, "wechat_id": value}
 
+    def account_aliases(self, conn: sqlite3.Connection, user_id: str) -> list[str]:
+        """The user's own words for WeChat; empty when they kept the default."""
+        try:
+            row = conn.execute(
+                "SELECT wechat_aliases FROM user_profiles WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        except sqlite3.OperationalError:
+            return []
+        if row is None or "wechat_aliases" not in row.keys():
+            return []
+        return parse_aliases(str(row["wechat_aliases"] or ""))
+
     def capture_wechat_id(
-        self, conn: sqlite3.Connection, user_id: str, person_id: str, text: str
+        self,
+        conn: sqlite3.Connection,
+        user_id: str,
+        person_id: str,
+        text: str,
+        aliases: list[str] | None = None,
     ) -> str:
         """Store a WeChat id the counterpart typed; never overwrite an existing one."""
-        candidate = extract_wechat_id(text)
+        candidate = extract_wechat_id(text, aliases)
         if not candidate:
             return ""
         try:

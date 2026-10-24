@@ -128,12 +128,15 @@ def capture_wechat(
     try:
         with get_connection() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            stored = service.capture_wechat_id(conn, user_id, person_id, payload.text)
+            aliases = service.account_aliases(conn, user_id)
+            stored = service.capture_wechat_id(
+                conn, user_id, person_id, payload.text, aliases
+            )
             conn.commit()
             return {
                 "person_id": person_id,
                 "wechat_id": stored,
-                "detected": extract_wechat_id(payload.text),
+                "detected": extract_wechat_id(payload.text, aliases),
             }
     except PersonNotFoundForConversation as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from None

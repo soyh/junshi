@@ -937,11 +937,31 @@ CARD_CLIENT_EXPERIENCE_SCRIPT = r'''
     clientMarkSelectedCard();
   }
 
+  //: 目的会改变判断层的节奏与尺度，所以是固定选项而不是自由文本。
+  const CLIENT_INTENTS = [
+    ['long_term', '长期恋爱'],
+    ['casual', '轻松约会'],
+    ['one_night', '一夜情'],
+    ['friendship', '先做朋友'],
+    ['unsure', '还没想好'],
+  ];
+
+  function clientIntentSelect(labelText, value) {
+    const wrap = clientEl('div');
+    const label = clientEl('label', '', labelText);
+    const select = document.createElement('select');
+    CLIENT_INTENTS.forEach(([key, text]) => select.appendChild(new Option(text, key)));
+    select.value = CLIENT_INTENTS.some(([key]) => key === value) ? value : 'unsure';
+    wrap.append(label, select);
+    return {wrap, select};
+  }
+
   function clientRelationshipPayload(personId, fields) {
     return {
       person_id: personId,
       status: fields.status.input.value.trim() || 'unknown',
       stage: fields.stage.input.value.trim() || 'unknown',
+      intent: fields.intent.select.value || 'unsure',
       long_term_goal: fields.longTerm.textarea.value.trim() || null,
       current_goal: fields.current.textarea.value.trim() || null,
       notes: fields.notes.textarea.value.trim() || null,
@@ -951,16 +971,18 @@ CARD_CLIENT_EXPERIENCE_SCRIPT = r'''
   function clientMakeRelationshipFields(initial = {}) {
     const status = clientInput('关系状态', initial.status || '');
     const stage = clientInput('关系阶段', initial.stage || '');
+    const intent = clientIntentSelect('聊天目的', initial.intent || 'unsure');
     const longTerm = clientTextarea('长期目标', initial.long_term_goal || '');
     const current = clientTextarea('当前目标', initial.current_goal || '');
     const notes = clientTextarea('关系备注', initial.notes || '');
-    return {status, stage, longTerm, current, notes};
+    return {status, stage, intent, longTerm, current, notes};
   }
 
   function clientAppendRelationshipFields(grid, fields) {
     grid.append(
       fields.status.wrap,
       fields.stage.wrap,
+      fields.intent.wrap,
       fields.longTerm.wrap,
       fields.current.wrap,
       fields.notes.wrap,

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 
 from app.core.context import get_current_user_id
 from app.core.database import get_connection
@@ -182,3 +183,26 @@ def delete_conversation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found",
         ) from exc
+class TakeoverBody(BaseModel):
+    enabled: bool = True
+
+
+@router.post("/{conversation_id}/takeover", response_model=ConversationResponse)
+def set_conversation_takeover(
+    conversation_id: str,
+    payload: TakeoverBody,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Pause or resume automatic replies for this one conversation."""
+    try:
+        with get_connection() as conn:
+            conversation = service.set_takeover(
+                conn, user_id, conversation_id, payload.enabled
+            )
+    except ConversationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found",
+        ) from exc
+
+    return row_to_dict(conversation)
