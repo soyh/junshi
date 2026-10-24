@@ -39,7 +39,10 @@ MSG_JS = """() => Array.from(document.querySelectorAll('.bubble-row')).map(el =>
   time: (el.querySelector('.bubble-time, time') || {}).textContent || '',
   sticker: !!el.querySelector('[class*=emoji], [class*=sticker], .bubble-img--emoji'),
   image: !!el.querySelector('.bubble-img, img[class*=bubble], [class*=bubble-image]'),
-  image_url: ((el.querySelector('.bubble-img img, img[class*=bubble], .bubble-img') || {}).src) || ''
+  image_url: ((el.querySelector('.bubble-img img, img[class*=bubble], .bubble-img') || {}).src) || '',
+  url: ((el.querySelector('a[href]') || {}).href) || '',
+  title: ((el.querySelector('a[href]') || {}).textContent) || '',
+  place: ((el.querySelector('[class*=location], [class*=poi], [class*=map], [class*=address]') || {}).textContent) || ''
 }))"""
 
 PAGE_TEXT_JS = "() => document.body ? document.body.innerText : ''"

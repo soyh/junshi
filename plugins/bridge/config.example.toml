@@ -2,7 +2,7 @@
 # Nothing here writes to WeChat unless dry_run = false.
 
 [app]
-base_url = "https://101.34.253.116"   # your deployed instance
+base_url = "https://your-instance.example.com"   # 由安装包内置；本地调试才需要改
 username = "your_username"           # ASCII 3-64 位；别把真实密码写进这个文件
 password = "your_password"
 verify_tls = false                    # the instance uses a self-signed cert on a bare IP

@@ -45,7 +45,10 @@ MSG_JS = """() => Array.from(document.querySelectorAll('.xhs-im-msg-list .chat-i
     text: (el.querySelector('.xhs-im-bubble__text') || {}).textContent || '',
     sticker: !!el.querySelector('.xhs-im-bubble__emoji, .emoji, [class*=sticker], [class*=emoji]'),
     image: !!el.querySelector('.xhs-im-bubble img, .xhs-im-bubble__image, [class*=image]'),
-    image_url: ((el.querySelector('.xhs-im-bubble img, .xhs-im-bubble__image img, [class*=image] img') || {}).src) || ''
+    image_url: ((el.querySelector('.xhs-im-bubble img, .xhs-im-bubble__image img, [class*=image] img') || {}).src) || '',
+    url: ((el.querySelector('a[href]') || {}).href) || '',
+    title: ((el.querySelector('a[href]') || {}).textContent) || '',
+    place: ((el.querySelector('[class*=location], [class*=poi], [class*=map], [class*=address]') || {}).textContent) || ''
   }))"""
 
 STATE_JS = """() => {

@@ -27,27 +27,73 @@ MEDIA_STICKER = "[对方发了一个表情]"
 MEDIA_IMAGE = "[对方发了一张图片]"
 MEDIA_VOICE = "[对方发了一条语音]"
 MEDIA_VIDEO = "[对方发了一段视频]"
+MEDIA_LINK = "[对方发来一个链接]"
+MEDIA_LOCATION = "[对方分享了一个位置]"
+MEDIA_CARD = "[对方分享了一张卡片]"
 
 _STICKER_HINTS = ("sticker", "emoji", "emoticon")
 _IMAGE_HINTS = ("image", "img", "picture", "photo")
 _VOICE_HINTS = ("voice", "audio")
 _VIDEO_HINTS = ("video", "movie")
+_LINK_HINTS = ("link", "url", "share", "article", "note", "webpage")
+_LOCATION_HINTS = ("location", "position", "map", "geo", "poi")
+_CARD_HINTS = ("card", "product", "goods", "item")
+
+# Shared chats hide links behind cards, so a bubble with no text is still a
+# message worth answering. Describe it instead of dropping the turn.
+_DETAIL_LIMIT = 60
+
+
+def _short(value: object) -> str:
+    text = " ".join(str(value or "").split())
+    return text if len(text) <= _DETAIL_LIMIT else text[:_DETAIL_LIMIT] + "…"
+
+
+def _domain(url: str) -> str:
+    rest = url.split("://", 1)[-1]
+    return rest.split("/", 1)[0][:40]
+
+
+def link_text(item: dict[str, Any]) -> str:
+    """Describe a link / location / card bubble, or '' when it is none of them."""
+    url = str(item.get("url") or item.get("link") or item.get("href") or "").strip()
+    title = _short(item.get("title") or item.get("name"))
+    place = _short(item.get("location") or item.get("address") or item.get("poi"))
+    if place:
+        return f"[对方分享了一个位置：{place}]"
+    if url:
+        suffix = f"（{title}）" if title else ""
+        return f"[对方发来一个链接：{_domain(url)}{suffix}]"
+    if title and str(item.get("type") or "").lower() in _CARD_HINTS:
+        return f"[对方分享了一张卡片：{title}]"
+    return ""
 
 
 def media_text(item: dict[str, Any]) -> str:
     """Return a Chinese description for a non-text bubble, else ''."""
     kind = str(item.get("type") or item.get("content_type") or "").lower()
+
     def hit(flag: str, hints: tuple[str, ...]) -> bool:
         return bool(item.get(flag)) or any(hint in kind for hint in hints)
 
     if hit("sticker", _STICKER_HINTS):
         return MEDIA_STICKER
+    # A place card can also carry a picture, so read the card before the image.
+    place = _short(item.get("place") or item.get("location") or item.get("address") or item.get("poi"))
+    if place:
+        return f"[对方分享了一个位置：{place}]"
+    if hit("location", _LOCATION_HINTS):
+        return MEDIA_LOCATION
+    if hit("link", _LINK_HINTS) or hit("card", _CARD_HINTS):
+        return link_text(item) or (MEDIA_LINK if hit("link", _LINK_HINTS) else MEDIA_CARD)
     if hit("image", _IMAGE_HINTS):
         return MEDIA_IMAGE
     if hit("voice", _VOICE_HINTS):
         return MEDIA_VOICE
     if hit("video", _VIDEO_HINTS):
         return MEDIA_VIDEO
+    if str(item.get("url") or "").strip():
+        return link_text(item)
     return ""
 
 

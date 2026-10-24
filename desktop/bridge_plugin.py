@@ -159,6 +159,9 @@ def save_global(
     return path
 
 
+DEFAULT_SERVER = "https://101.34.253.116"
+
+
 def _toml(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -183,7 +186,7 @@ def build_config(
     if channel not in set(CHANNELS) | {"mock"}:
         raise ValueError("不支持的平台通道")
     if not server.strip():
-        raise ValueError("请填写服务器地址")
+        server = DEFAULT_SERVER
     if not username.strip() or not password:
         raise ValueError("请填写军师账号与密码")
     verify = "true" if verify_tls and not server.startswith("http://") else "false"

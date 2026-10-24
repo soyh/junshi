@@ -97,7 +97,11 @@ class Assistant:
         top = ttk.Frame(frame, style='Page.TFrame'); top.grid(row=1, column=0, sticky='ew')
         top.columnconfigure(0, weight=1, uniform='top'); top.columnconfigure(1, weight=1, uniform='top')
         login = raised_card(top, '  连接与账号  ', row=0, column=0)
-        self.server = self.entry(login, '服务器', load_server(), label_width=8)
+        # The sold client ships with one fixed server; never show or ask for it.
+        self.server = tk.StringVar(value=load_server())
+        fixed = ttk.Frame(login); fixed.pack(fill='x')
+        ttk.Label(fixed, text='服务', width=8, anchor='w').pack(side='left')
+        ttk.Label(fixed, text='已连接官方服务器', foreground='#666').pack(side='left')
         self.username = self.entry(login, '用户名', label_width=8)
         self.password = self.entry(login, '密码', secret=True, label_width=8)
         ttk.Label(login, text=ACCOUNT_HINT, wraplength=420).pack(anchor='w')

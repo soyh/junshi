@@ -6,7 +6,7 @@ from assistant import Assistant
 from email_account import EmailAccountDialog
 
 root=tk.Tk();app=Assistant(root,hotkey=False);root.update()
-app.server.delete(0,'end');app.server.insert(0,'https://example.com')
+app.server.set('https://example.com')
 app.username.insert(0,'email_user')
 client=Mock(base='https://example.com',token=None)
 client.request.side_effect=[{'challenge_id':'a'*36,'message':'已发送测试验证码'},{'access_token':'test-token'},[]]

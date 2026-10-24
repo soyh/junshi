@@ -214,7 +214,12 @@ class BridgeDialog(Dialog):
             bp.CHANNEL_LABELS.get(self.channel.get(), "wechat")
         ))
         self.channel = self._cell(grid, 0, 1, "channel", "平台通道", "微信", choices=list(bp.CHANNELS.values()))
-        self.server = self._cell(grid, 1, 0, "server", "服务器", self.app.server.get())
+        # Shipping client: the server is compiled in, never shown or edited.
+        self.server = tk.StringVar(value=self.app.server.get() or bp.DEFAULT_SERVER)
+        fixed = ttk.Frame(grid)
+        fixed.grid(row=1, column=0, sticky="ew", padx=4, pady=1)
+        ttk.Label(fixed, text="服务器").pack(anchor="w")
+        ttk.Label(fixed, text="已内置（无需填写）", foreground="#666").pack(anchor="w")
         self.username = self._cell(grid, 1, 1, "username", "军师账号", self.app.username.get())
         self.password = self._cell(grid, 2, 0, "password", "军师密码", "", secret=True)
 
@@ -375,7 +380,7 @@ class BridgeDialog(Dialog):
         item = self.profiles[profile_id]
         self.current = profile_id
         self._fill(self.name, item["name"])
-        self._fill(self.server, item["server"])
+        self.server.set(item["server"] or bp.DEFAULT_SERVER)
         self._fill(self.username, item["username"])
         self._fill(self.password, item["password"])
         self.channel.set(bp.CHANNELS.get(item["channel"], "微信"))
